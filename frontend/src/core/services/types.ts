@@ -22,6 +22,12 @@ import type {
   Recording,
   Report,
   ConsentLog,
+  Assessment,
+  CreateAssessmentDTO,
+  MissionBank,
+  CreateMissionBankDTO,
+  LoginDTO,
+  LoginResponse,
 } from '../types'
 
 // Programs
@@ -130,4 +136,31 @@ export interface LiveSessionEvent {
 
 export interface LiveSessionService {
   connect(sessionId: string): EventSource
+}
+
+// Assessments
+export interface AssessmentService {
+  upsert(data: CreateAssessmentDTO): Promise<Assessment>
+  bulkUpsert(data: CreateAssessmentDTO[]): Promise<Assessment[]>
+  getByParticipant(participantId: string): Promise<Assessment[]>
+  getBySession(sessionId: string): Promise<Assessment[]>
+}
+
+// Auth
+export interface AuthService {
+  login(data: LoginDTO): Promise<LoginResponse>
+  refresh(refreshToken: string): Promise<LoginResponse>
+  logout(): Promise<void>
+  getMe(): Promise<User>
+  generateKioskToken(sessionId: string): Promise<{ access_token: string }>
+  generateParentToken(reportId: string): Promise<{ access_token: string }>
+}
+
+// Mission Bank
+export interface MissionBankService {
+  getAll(params?: ListParams): Promise<PaginatedResponse<MissionBank>>
+  create(data: CreateMissionBankDTO): Promise<MissionBank>
+  update(id: string, data: Partial<CreateMissionBankDTO>): Promise<MissionBank>
+  delete(id: string): Promise<void>
+  toggleActive(id: string): Promise<MissionBank>
 }

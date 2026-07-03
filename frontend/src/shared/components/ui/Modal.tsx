@@ -42,11 +42,13 @@ export function Modal({ open, onClose, title, size = 'md', children, footer, clo
         className={cn('relative w-full mx-4 bg-white rounded-xl shadow-lg', sizes[size])}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="modal-title"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <h3 id="modal-title" className="text-lg font-semibold text-gray-900">{title}</h3>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <X className="w-5 h-5" />

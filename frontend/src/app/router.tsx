@@ -14,7 +14,6 @@ const SuspenseWrapper = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<Loading />}>{children}</Suspense>
 )
 
-const LandingPage = lazy(() => import('../pages/LandingPage'))
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'))
 const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage'))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
@@ -36,17 +35,7 @@ const ParentStoriesPage = lazy(() => import('../features/parent/pages/StoriesPag
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <MainLayout />,
-    children: [
-      {
-        index: true,
-        element: (
-          <SuspenseWrapper>
-            <LandingPage />
-          </SuspenseWrapper>
-        ),
-      },
-    ],
+    element: <Navigate to="/auth/login" replace />,
   },
   {
     path: '/auth',

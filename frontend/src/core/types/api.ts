@@ -86,3 +86,30 @@ export interface CreateUserDTO {
 export interface UpdateUserDTO extends Partial<CreateUserDTO> {
   is_active?: boolean
 }
+
+export interface CreateAssessmentDTO {
+  participant_id: string
+  session_stage_id: string
+  star_rating: number
+  comment?: string
+}
+
+export interface LoginDTO {
+  email: string
+  password: string
+}
+
+export interface LoginResponse {
+  access_token: string
+  refresh_token: string
+  user: import('./entities').User
+}
+
+export interface CreateMissionBankDTO {
+  program_id: string
+  category: import('./enums').MissionCategory
+  title_child: string
+  title_parent: string
+  description_parent?: string
+  related_stage_ids?: string[]
+}

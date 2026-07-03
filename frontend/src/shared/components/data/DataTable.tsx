@@ -26,6 +26,7 @@ interface DataTableProps<T> {
   getRowId: (item: T) => string
   emptyState?: React.ReactNode
   actions?: React.ReactNode
+  ariaLabel?: string
 }
 
 export function DataTable<T>({
@@ -43,6 +44,7 @@ export function DataTable<T>({
   getRowId,
   emptyState,
   actions,
+  ariaLabel,
 }: DataTableProps<T>) {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortKey, setSortKey] = useState<string | null>(null)
@@ -103,7 +105,7 @@ export function DataTable<T>({
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" aria-label={ariaLabel}>
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 {selectable && (
@@ -115,6 +117,7 @@ export function DataTable<T>({
                         if (el) el.indeterminate = someSelected
                       }}
                       onChange={toggleSelectAll}
+                      aria-label="Select all rows"
                       className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                   </th>
@@ -189,6 +192,7 @@ export function DataTable<T>({
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelectRow(rowId)}
+                            aria-label={`Select row ${rowId}`}
                             className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
                           />
                         </td>

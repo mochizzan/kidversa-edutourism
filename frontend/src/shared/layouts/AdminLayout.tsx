@@ -44,7 +44,7 @@ const menuSections = [
 ]
 
 const AdminLayout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
 
   if (location.pathname === '/admin') {
@@ -53,10 +53,33 @@ const AdminLayout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Mobile header bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center gap-4 px-4 h-14 bg-primary text-white shadow-md">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-1 rounded-lg hover:bg-primary-light transition-colors"
+          aria-label="Open sidebar"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+        <Link to={ROUTES.HOME} className="flex items-center gap-3">
+          <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
+          <span className="text-xl font-bold">Kidversa</span>
+        </Link>
+      </div>
+
+      {/* Mobile backdrop overlay */}
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-40 bg-black/50"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <div className="flex">
         <aside
           className={cn(
-            'fixed left-0 top-0 z-40 h-screen bg-primary text-white transition-all duration-300',
+            'fixed left-0 top-0 z-50 h-screen bg-primary text-white transition-all duration-300',
             sidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'
           )}
         >
@@ -83,6 +106,7 @@ const AdminLayout = () => {
                         <Link
                           key={item.path}
                           to={item.path}
+                          onClick={() => setSidebarOpen(false)}
                           className={cn(
                             'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
                             isActive ? 'bg-accent text-primary-dark font-medium' : 'hover:bg-primary-light text-white/90',
@@ -119,6 +143,7 @@ const AdminLayout = () => {
         <div
           className={cn(
             'flex-1 min-h-screen transition-all duration-300',
+            'pt-14 lg:pt-0',
             sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'
           )}
         >
