@@ -3,6 +3,7 @@ export enum UserRole {
   ADMIN_WISATA = 'ADMIN_WISATA',
   KOORDINATOR = 'KOORDINATOR',
   FASILITATOR = 'FASILITATOR',
+  PARENT = 'PARENT',
 }
 
 export enum ContentType {

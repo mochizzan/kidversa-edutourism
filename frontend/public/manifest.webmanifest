@@ -1,0 +1,26 @@
+{
+  "name": "Kidversa - Edutourism",
+  "short_name": "Kidversa - Edutourism",
+  "description": "Platform Edutourism Interaktif untuk Anak",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#5B2C8D",
+  "theme_color": "#5B2C8D",
+  "orientation": "any",
+  "lang": "id",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "kids", "travel"]
+}

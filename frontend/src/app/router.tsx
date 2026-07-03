@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import AdminLayout from '../shared/layouts/AdminLayout'
 import MainLayout from '../shared/layouts/MainLayout'
 import AuthLayout from '../shared/layouts/AuthLayout'
+import ProtectedRoute from '../shared/components/auth/ProtectedRoute'
 import { lazy, Suspense } from 'react'
 
 const Loading = () => (
@@ -64,128 +65,133 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: '/admin',
-    element: <AdminLayout />,
+    element: <ProtectedRoute />,
     children: [
       {
-        index: true,
-        element: <Navigate to="/admin/dashboard" replace />,
+        path: '/admin',
+        element: <AdminLayout />,
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/admin/dashboard" replace />,
+          },
+          {
+            path: 'dashboard',
+            element: (
+              <SuspenseWrapper>
+                <AdminDashboardPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'programs',
+            element: (
+              <SuspenseWrapper>
+                <ProgramsPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'programs/:programId',
+            element: (
+              <SuspenseWrapper>
+                <ProgramDetailPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'sessions',
+            element: (
+              <SuspenseWrapper>
+                <SessionsPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'sessions/:sessionId',
+            element: (
+              <SuspenseWrapper>
+                <SessionDetailPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'content',
+            element: (
+              <SuspenseWrapper>
+                <ContentPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'frames',
+            element: (
+              <SuspenseWrapper>
+                <FramesPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'users',
+            element: (
+              <SuspenseWrapper>
+                <UsersPage />
+              </SuspenseWrapper>
+            ),
+          },
+        ],
       },
       {
-        path: 'dashboard',
-        element: (
-          <SuspenseWrapper>
-            <AdminDashboardPage />
-          </SuspenseWrapper>
-        ),
+        path: '/fasilitator',
+        element: <AdminLayout />,
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/fasilitator/dashboard" replace />,
+          },
+          {
+            path: 'dashboard',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorDashboardPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'activities',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorActivitiesPage />
+              </SuspenseWrapper>
+            ),
+          },
+        ],
       },
       {
-        path: 'programs',
-        element: (
-          <SuspenseWrapper>
-            <ProgramsPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'programs/:programId',
-        element: (
-          <SuspenseWrapper>
-            <ProgramDetailPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'sessions',
-        element: (
-          <SuspenseWrapper>
-            <SessionsPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'sessions/:sessionId',
-        element: (
-          <SuspenseWrapper>
-            <SessionDetailPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'content',
-        element: (
-          <SuspenseWrapper>
-            <ContentPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'frames',
-        element: (
-          <SuspenseWrapper>
-            <FramesPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'users',
-        element: (
-          <SuspenseWrapper>
-            <UsersPage />
-          </SuspenseWrapper>
-        ),
-      },
-    ],
-  },
-  {
-    path: '/fasilitator',
-    element: <AdminLayout />,
-    children: [
-      {
-        index: true,
-        element: <Navigate to="/fasilitator/dashboard" replace />,
-      },
-      {
-        path: 'dashboard',
-        element: (
-          <SuspenseWrapper>
-            <FasilitatorDashboardPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'activities',
-        element: (
-          <SuspenseWrapper>
-            <FasilitatorActivitiesPage />
-          </SuspenseWrapper>
-        ),
-      },
-    ],
-  },
-  {
-    path: '/parent',
-    element: <MainLayout />,
-    children: [
-      {
-        index: true,
-        element: <Navigate to="/parent/dashboard" replace />,
-      },
-      {
-        path: 'dashboard',
-        element: (
-          <SuspenseWrapper>
-            <ParentDashboardPage />
-          </SuspenseWrapper>
-        ),
-      },
-      {
-        path: 'stories',
-        element: (
-          <SuspenseWrapper>
-            <ParentStoriesPage />
-          </SuspenseWrapper>
-        ),
+        path: '/parent',
+        element: <MainLayout />,
+        children: [
+          {
+            index: true,
+            element: <Navigate to="/parent/dashboard" replace />,
+          },
+          {
+            path: 'dashboard',
+            element: (
+              <SuspenseWrapper>
+                <ParentDashboardPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'stories',
+            element: (
+              <SuspenseWrapper>
+                <ParentStoriesPage />
+              </SuspenseWrapper>
+            ),
+          },
+        ],
       },
     ],
   },

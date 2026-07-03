@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation, Navigate } from 'react-router-dom'
+import { Outlet, Link, useLocation, Navigate, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   FolderOpen,
@@ -13,6 +13,8 @@ import {
 import { useState } from 'react'
 import { ROUTES } from '../../core/constants/app'
 import { cn } from '../../core/utils'
+import { useAuth } from '../../core/hooks/useAuth'
+import { UserRole } from '../../core/types'
 
 const menuSections = [
   {
@@ -43,12 +45,28 @@ const menuSections = [
   },
 ]
 
+// Role display labels
+const ROLE_LABELS: Record<string, string> = {
+  [UserRole.SUPER_ADMIN]: 'Super Admin',
+  [UserRole.ADMIN_WISATA]: 'Admin Wisata',
+  [UserRole.KOORDINATOR]: 'Koordinator',
+  [UserRole.FASILITATOR]: 'Fasilitator',
+  [UserRole.PARENT]: 'Orang Tua',
+}
+
 const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
 
   if (location.pathname === '/admin') {
     return <Navigate to="/admin/dashboard" replace />
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/auth/login', { replace: true })
   }
 
   return (
@@ -84,6 +102,7 @@ const AdminLayout = () => {
           )}
         >
           <div className="flex flex-col h-full">
+            {/* Logo */}
             <div className="p-6 border-b border-primary-light">
               <Link to={ROUTES.HOME} className="flex items-center gap-3">
                 <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
@@ -91,6 +110,26 @@ const AdminLayout = () => {
               </Link>
             </div>
 
+            {/* User Info (when sidebar expanded) */}
+            {sidebarOpen && user && (
+              <div className="px-4 py-4 border-b border-primary-light">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center shrink-0">
+                    <span className="text-primary-dark font-bold text-lg">
+                      {user.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-white truncate">{user.name}</p>
+                    <p className="text-xs text-white/60 truncate">
+                      {ROLE_LABELS[user.role] || user.role}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation */}
             <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
               {menuSections.map((section) => (
                 <div key={section.section}>
@@ -124,6 +163,7 @@ const AdminLayout = () => {
               ))}
             </nav>
 
+            {/* Footer */}
             <div className="p-4 border-t border-primary-light space-y-2">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -132,7 +172,10 @@ const AdminLayout = () => {
                 {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                 {sidebarOpen && <span>Collapse</span>}
               </button>
-              <button className="flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-primary-light rounded-lg transition-colors text-sm text-white/80">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-red-500/20 rounded-lg transition-colors text-sm text-white/80 hover:text-red-300"
+              >
                 <LogOut className="w-5 h-5" />
                 {sidebarOpen && <span>Keluar</span>}
               </button>
