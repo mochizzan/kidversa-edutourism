@@ -6,6 +6,7 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
 import { Select } from '../../../shared/components/ui/Select'
 import { DataTable } from '../../../shared/components/data/DataTable'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { userService } from '../../../core/services/users'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { User } from '../../../core/types'
@@ -110,13 +111,13 @@ const UsersPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola pengguna sistem.</p>
-        </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={() => { setEditingUser(null); setOpen(true) }}>Tambah User</Button>
-      </div>
+      <PageHeader
+        title="Users"
+        subtitle="Kelola pengguna sistem."
+        actions={
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => { setEditingUser(null); setOpen(true) }}>Tambah User</Button>
+        }
+      />
 
       <DataTable
         data={users}

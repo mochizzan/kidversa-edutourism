@@ -6,6 +6,7 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
 import { Select } from '../../../shared/components/ui/Select'
 import { Card } from '../../../shared/components/ui/Card'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { frameService } from '../../../core/services/frames'
 
 const FramesPage = () => {
@@ -33,13 +34,13 @@ const FramesPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Frame Manager</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola frame PNG untuk Smart Photo.</p>
-        </div>
-        <Button icon={<Upload className="w-4 h-4" />} onClick={() => setOpen(true)}>Upload Frame</Button>
-      </div>
+      <PageHeader
+        title="Frame Manager"
+        subtitle="Kelola frame PNG untuk Smart Photo."
+        actions={
+          <Button icon={<Upload className="w-4 h-4" />} onClick={() => setOpen(true)}>Upload Frame</Button>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {frames.map((frame) => (

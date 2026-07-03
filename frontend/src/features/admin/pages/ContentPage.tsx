@@ -6,6 +6,7 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
 import { Select } from '../../../shared/components/ui/Select'
 import { Card } from '../../../shared/components/ui/Card'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
 
 const ContentPage = () => {
   const [contents] = useState([
@@ -16,13 +17,13 @@ const ContentPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Content Manager</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola konten stage: video, gambar, audio, game.</p>
-        </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={() => setOpen(true)}>Tambah Konten</Button>
-      </div>
+      <PageHeader
+        title="Content Manager"
+        subtitle="Kelola konten stage: video, gambar, audio, game."
+        actions={
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setOpen(true)}>Tambah Konten</Button>
+        }
+      />
 
       <div className="space-y-4">
         {contents.map((item) => (

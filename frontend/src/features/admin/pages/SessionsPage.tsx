@@ -6,6 +6,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { sessionService } from '../../../core/services/sessions'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Session } from '../../../core/types'
@@ -97,15 +98,15 @@ const SessionsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sessions</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola sesi edutourism.</p>
-        </div>
-        <Link to="/admin/sessions/new">
-          <Button icon={<Plus className="w-4 h-4" />}>Buat Sesi</Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Sessions"
+        subtitle="Kelola sesi edutourism."
+        actions={
+          <Link to="/admin/sessions/new">
+            <Button icon={<Plus className="w-4 h-4" />}>Buat Sesi</Button>
+          </Link>
+        }
+      />
 
       <DataTable
         data={sessions}

@@ -1,5 +1,6 @@
 import { Plus, Search, Edit, Trash2, Eye } from 'lucide-react'
 import { useState } from 'react'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
 
 const StoriesPage = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -38,14 +39,16 @@ const StoriesPage = () => {
   )
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Stories</h1>
-        <button className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors">
-          <Plus className="w-5 h-5" />
-          Tambah Story
-        </button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Stories"
+        actions={
+          <button className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors">
+            <Plus className="w-5 h-5" />
+            Tambah Story
+          </button>
+        }
+      />
 
       {/* Search */}
       <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 mb-6">

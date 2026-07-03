@@ -6,6 +6,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { programService } from '../../../core/services/programs'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Program } from '../../../core/types'
@@ -100,15 +101,15 @@ const ProgramsPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Programs</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola program edutourism dan stage-nya.</p>
-        </div>
-        <Link to="/admin/programs/new">
-          <Button icon={<Plus className="w-4 h-4" />}>Buat Program</Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Programs"
+        subtitle="Kelola program edutourism dan stage-nya."
+        actions={
+          <Link to="/admin/programs/new">
+            <Button icon={<Plus className="w-4 h-4" />}>Buat Program</Button>
+          </Link>
+        }
+      />
 
       <DataTable
         data={programs}

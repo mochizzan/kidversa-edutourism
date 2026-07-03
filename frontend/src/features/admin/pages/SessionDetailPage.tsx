@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
-import { Button } from '../../../shared/components/ui/Button'
+import { useParams } from 'react-router-dom'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Tabs } from '../../../shared/components/ui/Tabs'
 import { Card } from '../../../shared/components/ui/Card'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { sessionService } from '../../../core/services/sessions'
 import { userService } from '../../../core/services/users'
 import type { Session, SessionStage, SessionGroup, Participant, User } from '../../../core/types'
@@ -34,16 +33,17 @@ const SessionDetailPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link to="/admin/sessions">
-          <Button variant="ghost" icon={<ArrowLeft className="w-4 h-4" />} />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">{session.name}</h1>
-          <p className="text-sm text-gray-500 mt-1">{session.location} · {formatDate(session.session_date)}</p>
-        </div>
-        <Badge variant={session.status === 'ACTIVE' ? 'success' : session.status === 'COMPLETED' ? 'primary' : 'neutral'}>{session.status}</Badge>
-      </div>
+      <PageHeader
+        title={session.name}
+        subtitle={`${session.location} · ${formatDate(session.session_date)}`}
+        breadcrumbs={[
+          { label: 'Sessions', href: '/admin/sessions' },
+          { label: session.name },
+        ]}
+        actions={
+          <Badge variant={session.status === 'ACTIVE' ? 'success' : session.status === 'COMPLETED' ? 'primary' : 'neutral'}>{session.status}</Badge>
+        }
+      />
 
       <Tabs
         tabs={[

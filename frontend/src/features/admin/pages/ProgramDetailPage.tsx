@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -8,6 +8,7 @@ import { Tabs } from '../../../shared/components/ui/Tabs'
 import { Input } from '../../../shared/components/ui/Input'
 import { Select } from '../../../shared/components/ui/Select'
 import { Card } from '../../../shared/components/ui/Card'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { programService } from '../../../core/services/programs'
 import type { Program, ProgramStage, ContentType } from '../../../core/types'
 import { ContentType as ContentTypeEnum } from '../../../core/types'
@@ -74,16 +75,17 @@ const ProgramDetailPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link to="/admin/programs">
-          <Button variant="ghost" icon={<ArrowLeft className="w-4 h-4" />} />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">{program.name}</h1>
-          <p className="text-sm text-gray-500 mt-1">Dibuat {formatDate(program.created_at)}</p>
-        </div>
-        <Badge variant={program.is_active ? 'success' : 'neutral'}>{program.is_active ? 'Aktif' : 'Nonaktif'}</Badge>
-      </div>
+      <PageHeader
+        title={program.name}
+        subtitle={`Dibuat ${formatDate(program.created_at)}`}
+        breadcrumbs={[
+          { label: 'Programs', href: '/admin/programs' },
+          { label: program.name },
+        ]}
+        actions={
+          <Badge variant={program.is_active ? 'success' : 'neutral'}>{program.is_active ? 'Aktif' : 'Nonaktif'}</Badge>
+        }
+      />
 
       <Tabs
         tabs={[
