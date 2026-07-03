@@ -1,7 +1,6 @@
 import { Users, BookOpen, MapPin, TrendingUp } from 'lucide-react'
 
 const DashboardPage = () => {
-  // Mock stats
   const stats = [
     { label: 'Total Users', value: '1,234', icon: <Users className="w-6 h-6" />, change: '+12%' },
     { label: 'Total Stories', value: '56', icon: <BookOpen className="w-6 h-6" />, change: '+8%' },
@@ -25,7 +24,7 @@ const DashboardPage = () => {
                 <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
                 <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
               </div>
-              <div className="p-3 bg-purple-100 text-purple-600 rounded-lg">
+              <div className="p-3 bg-primary-100 text-primary rounded-lg">
                 {stat.icon}
               </div>
             </div>
@@ -42,7 +41,7 @@ const DashboardPage = () => {
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Aktivitas Terbaru</h2>
         <div className="space-y-4">
           <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-            <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-primary-100 text-primary rounded-full flex items-center justify-center">
               <Users className="w-5 h-5" />
             </div>
             <div className="flex-1">
@@ -51,7 +50,7 @@ const DashboardPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-            <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-accent-100 text-accent rounded-full flex items-center justify-center">
               <BookOpen className="w-5 h-5" />
             </div>
             <div className="flex-1">

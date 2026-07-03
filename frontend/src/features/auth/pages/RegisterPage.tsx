@@ -21,7 +21,6 @@ const RegisterPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement register logic
     console.log('Register:', formData)
   }
 
@@ -44,7 +43,7 @@ const RegisterPage = () => {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="John Doe"
               required
             />
@@ -63,7 +62,7 @@ const RegisterPage = () => {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="email@example.com"
               required
             />
@@ -82,7 +81,7 @@ const RegisterPage = () => {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="••••••••"
               required
             />
@@ -108,7 +107,7 @@ const RegisterPage = () => {
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="••••••••"
               required
             />
@@ -126,16 +125,16 @@ const RegisterPage = () => {
         <div className="flex items-start">
           <input
             type="checkbox"
-            className="w-4 h-4 mt-1 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+            className="w-4 h-4 mt-1 text-primary border-gray-300 rounded focus:ring-primary"
             required
           />
           <span className="ml-2 text-sm text-gray-600">
             Saya setuju dengan{' '}
-            <Link to="/terms" className="text-purple-600 hover:text-purple-800">
+            <Link to="/terms" className="text-primary hover:text-primary-dark">
               Syarat & Ketentuan
             </Link>{' '}
             dan{' '}
-            <Link to="/privacy" className="text-purple-600 hover:text-purple-800">
+            <Link to="/privacy" className="text-primary hover:text-primary-dark">
               Kebijakan Privasi
             </Link>
           </span>
@@ -144,7 +143,7 @@ const RegisterPage = () => {
         {/* Submit */}
         <button
           type="submit"
-          className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+          className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-dark transition-colors"
         >
           Daftar
         </button>
@@ -153,7 +152,7 @@ const RegisterPage = () => {
       {/* Login link */}
       <p className="mt-6 text-center text-sm text-gray-600">
         Sudah punya akun?{' '}
-        <Link to="/auth/login" className="text-purple-600 hover:text-purple-800 font-semibold">
+        <Link to="/auth/login" className="text-primary hover:text-primary-dark font-semibold">
           Masuk
         </Link>
       </p>

@@ -1,7 +1,6 @@
 import { BookOpen, Clock, Award, TrendingUp } from 'lucide-react'
 
 const DashboardPage = () => {
-  // Mock stats
   const stats = [
     { label: 'Cerita Dibaca', value: '12', icon: <BookOpen className="w-6 h-6" />, change: '+3' },
     { label: 'Waktu Belajar', value: '8.5 jam', icon: <Clock className="w-6 h-6" />, change: '+1.5 jam' },
@@ -40,14 +39,14 @@ const DashboardPage = () => {
       {/* Continue Reading */}
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Lanjutkan Membaca</h2>
-        <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-r from-primary to-primary-light rounded-xl p-6 text-white">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
               <BookOpen className="w-8 h-8" />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-lg">Petualangan di Candi Borobudur</h3>
-              <p className="text-purple-200 text-sm mt-1">Bab 3: Misteri Stupа</p>
+              <p className="text-primary-200 text-sm mt-1">Bab 3: Misteri Stupa</p>
               <div className="mt-3">
                 <div className="flex items-center justify-between text-sm mb-1">
                   <span>Progress</span>
@@ -74,7 +73,7 @@ const DashboardPage = () => {
           ].map((achievement, index) => (
             <div
               key={index}
-              className="text-center p-4 bg-amber-50 rounded-xl border border-amber-100"
+              className="text-center p-4 bg-accent-50 rounded-xl border border-accent-100"
             >
               <div className="text-3xl mb-2">{achievement.icon}</div>
               <h3 className="font-medium text-gray-800 text-sm">{achievement.title}</h3>

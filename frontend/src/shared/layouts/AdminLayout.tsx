@@ -1,9 +1,8 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { 
-  Globe, 
-  LayoutDashboard, 
-  BookOpen, 
-  Activity, 
+import {
+  LayoutDashboard,
+  BookOpen,
+  Activity,
   Users,
   LogOut,
   Menu,
@@ -19,7 +18,6 @@ interface SidebarItem {
   icon: React.ReactNode
 }
 
-// Menu items based on role (determined by path)
 const getMenuItems = (pathname: string): SidebarItem[] => {
   if (pathname.startsWith('/admin')) {
     return [
@@ -51,10 +49,10 @@ const AdminLayout = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Mobile sidebar toggle */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-purple-900 text-white p-4">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-primary text-white p-4">
         <div className="flex items-center justify-between">
           <Link to={ROUTES.HOME} className="flex items-center gap-2">
-            <Globe className="w-6 h-6 text-amber-400" />
+            <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain" />
             <span className="text-xl font-bold">Kidversa</span>
           </Link>
           <button onClick={() => setSidebarOpen(!sidebarOpen)}>
@@ -66,14 +64,14 @@ const AdminLayout = () => {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 z-40 h-screen w-64 bg-purple-900 text-white transition-transform lg:translate-x-0',
+          'fixed left-0 top-0 z-40 h-screen w-64 bg-primary text-white transition-transform lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-purple-700">
+        <div className="p-6 border-b border-primary-light">
           <Link to={ROUTES.HOME} className="flex items-center gap-2">
-            <Globe className="w-8 h-8 text-amber-400" />
+            <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain" />
             <span className="text-2xl font-bold">Kidversa</span>
           </Link>
         </div>
@@ -87,8 +85,8 @@ const AdminLayout = () => {
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
                 location.pathname === item.path
-                  ? 'bg-amber-400 text-purple-900'
-                  : 'hover:bg-purple-800'
+                  ? 'bg-accent text-primary-dark'
+                  : 'hover:bg-primary-light'
               )}
             >
               {item.icon}
@@ -98,8 +96,8 @@ const AdminLayout = () => {
         </nav>
 
         {/* Logout */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-purple-700">
-          <button className="flex items-center gap-3 px-4 py-3 w-full text-left hover:bg-purple-800 rounded-lg transition-colors">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-primary-light">
+          <button className="flex items-center gap-3 px-4 py-3 w-full text-left hover:bg-primary-light rounded-lg transition-colors">
             <LogOut className="w-5 h-5" />
             <span>Keluar</span>
           </button>

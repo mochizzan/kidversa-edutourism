@@ -1,7 +1,6 @@
 import { Users, Activity, Calendar, TrendingUp } from 'lucide-react'
 
 const DashboardPage = () => {
-  // Mock stats
   const stats = [
     { label: 'Total Anak', value: '45', icon: <Users className="w-6 h-6" />, change: '+5' },
     { label: 'Aktivitas Hari Ini', value: '3', icon: <Activity className="w-6 h-6" />, change: '+1' },
@@ -25,7 +24,7 @@ const DashboardPage = () => {
                 <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
                 <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
               </div>
-              <div className="p-3 bg-amber-100 text-amber-600 rounded-lg">
+              <div className="p-3 bg-accent-100 text-accent rounded-lg">
                 {stat.icon}
               </div>
             </div>
@@ -41,8 +40,8 @@ const DashboardPage = () => {
       <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Aktivitas Hari Ini</h2>
         <div className="space-y-4">
-          <div className="flex items-center gap-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
-            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
+          <div className="flex items-center gap-4 p-4 bg-primary-50 rounded-lg border border-primary-100">
+            <div className="w-12 h-12 bg-primary-100 text-primary rounded-lg flex items-center justify-center">
               <Activity className="w-6 h-6" />
             </div>
             <div className="flex-1">
@@ -54,7 +53,7 @@ const DashboardPage = () => {
             </span>
           </div>
           <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-            <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-accent-100 text-accent rounded-lg flex items-center justify-center">
               <Activity className="w-6 h-6" />
             </div>
             <div className="flex-1">
@@ -78,7 +77,7 @@ const DashboardPage = () => {
             { name: 'Citra', progress: 90, stories: 15 },
           ].map((child, index) => (
             <div key={index} className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-semibold">
+              <div className="w-10 h-10 bg-primary-100 text-primary rounded-full flex items-center justify-center font-semibold">
                 {child.name.charAt(0)}
               </div>
               <div className="flex-1">
@@ -88,7 +87,7 @@ const DashboardPage = () => {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
-                    className="bg-purple-600 h-2 rounded-full"
+                    className="bg-primary h-2 rounded-full"
                     style={{ width: `${child.progress}%` }}
                   />
                 </div>

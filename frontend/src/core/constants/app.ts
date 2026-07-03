@@ -2,10 +2,15 @@
 export const APP_NAME = 'Kidversa'
 export const APP_DESCRIPTION = 'Platform Edutourism Interaktif untuk Anak - Belajar Sambil Berpetualang!'
 
-// Brand Colors
+// Brand Colors (matched to logo)
+// For dynamic JS usage. For Tailwind classes, use theme tokens: bg-primary, text-accent, etc.
 export const COLORS = {
-  primary: '#5E2E91', // Purple
-  accent: '#F9A01F',  // Orange
+  primary: '#5B2C8D',    // Deep Purple (logo background)
+  primaryLight: '#7B4DB5',
+  primaryDark: '#4A2370',
+  accent: '#F5A623',     // Orange/Amber (logo accent)
+  accentLight: '#FFC04D',
+  accentDark: '#D48B1C',
   white: '#FFFFFF',
   black: '#000000',
 } as const

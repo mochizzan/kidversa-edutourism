@@ -4,7 +4,6 @@ import { useState } from 'react'
 const ActivitiesPage = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
-  // Mock activities data
   const activities = [
     {
       id: '1',
@@ -40,7 +39,7 @@ const ActivitiesPage = () => {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Aktivitas</h1>
-        <button className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors">
+        <button className="flex items-center gap-2 bg-accent text-primary-dark px-4 py-2 rounded-lg hover:bg-accent-light transition-colors">
           <Plus className="w-5 h-5" />
           Tambah Aktivitas
         </button>
@@ -54,7 +53,7 @@ const ActivitiesPage = () => {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-accent focus:border-transparent"
           />
           <span className="text-sm text-gray-500">
             {filteredActivities.length} aktivitas ditemukan
@@ -99,7 +98,7 @@ const ActivitiesPage = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
+                <button className="p-2 text-gray-400 hover:text-accent hover:bg-accent-50 rounded-lg transition-colors">
                   <Edit className="w-5 h-5" />
                 </button>
                 <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">

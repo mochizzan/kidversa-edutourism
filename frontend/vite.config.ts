@@ -14,7 +14,7 @@ export default defineConfig({
         name: 'Kidversa - Edutourism Platform',
         short_name: 'Kidversa',
         description: 'Interactive digital storytelling-based learning platform for kids',
-        theme_color: '#5E2E91',
+        theme_color: '#5B2C8D',
         background_color: '#ffffff',
         display: 'standalone',
         scope: '/',

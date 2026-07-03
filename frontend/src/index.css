@@ -1,8 +1,49 @@
 @import "tailwindcss";
 
+/*
+ * Kidversa Theme - Tailwind CSS v4
+ *
+ * All brand colors are defined here as the single source of truth.
+ * Use Tailwind utility classes: bg-primary, text-accent, border-primary-light, etc.
+ *
+ * Available tokens:
+ *   primary / primary-light / primary-dark / primary-50..900
+ *   accent  / accent-light  / accent-dark  / accent-50..900
+ */
+
+@theme {
+  --color-primary: #5B2C8D;
+  --color-primary-light: #7B4DB5;
+  --color-primary-dark: #4A2370;
+  --color-primary-50: #F3EEFA;
+  --color-primary-100: #E1D4F2;
+  --color-primary-200: #C3A9E5;
+  --color-primary-300: #A57ED8;
+  --color-primary-400: #8B5CC8;
+  --color-primary-500: #7B4DB5;
+  --color-primary-600: #5B2C8D;
+  --color-primary-700: #4A2370;
+  --color-primary-800: #3A1B57;
+  --color-primary-900: #2A133E;
+
+  --color-accent: #F5A623;
+  --color-accent-light: #FFC04D;
+  --color-accent-dark: #D48B1C;
+  --color-accent-50: #FFF8EB;
+  --color-accent-100: #FFEDC7;
+  --color-accent-200: #FFDB8A;
+  --color-accent-300: #FFC94D;
+  --color-accent-400: #FFB726;
+  --color-accent-500: #F5A623;
+  --color-accent-600: #D48B1C;
+  --color-accent-700: #A66B15;
+  --color-accent-800: #7A4E10;
+  --color-accent-900: #4D310A;
+}
+
 :root {
-  --color-primary: #5E2E91;
-  --color-accent: #F9A01F;
+  --color-primary: #5B2C8D;
+  --color-accent: #F5A623;
   --color-primary-light: #7B4DB5;
   --color-primary-dark: #4A2370;
 }

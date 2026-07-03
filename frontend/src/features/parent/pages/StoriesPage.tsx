@@ -5,7 +5,6 @@ const StoriesPage = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
-  // Mock stories data
   const stories = [
     {
       id: '1',
@@ -70,7 +69,7 @@ const StoriesPage = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="Cari cerita..."
             />
           </div>
@@ -81,7 +80,7 @@ const StoriesPage = () => {
                 onClick={() => setSelectedCategory(category)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedCategory === category
-                    ? 'bg-purple-600 text-white'
+                    ? 'bg-primary text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -100,14 +99,14 @@ const StoriesPage = () => {
             className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
           >
             {/* Thumbnail */}
-            <div className="h-40 bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
+            <div className="h-40 bg-gradient-to-br from-primary to-primary-light flex items-center justify-center">
               <BookOpen className="w-12 h-12 text-white/80" />
             </div>
 
             {/* Content */}
             <div className="p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                <span className="px-2 py-1 text-xs font-medium bg-primary-100 text-primary rounded-full">
                   {story.category}
                 </span>
                 <span className="text-xs text-gray-500">{story.ageGroup}</span>
@@ -115,7 +114,7 @@ const StoriesPage = () => {
               <h3 className="font-semibold text-gray-800 mb-2">{story.title}</h3>
               <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
                 <div className="flex items-center gap-1">
-                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                  <Star className="w-4 h-4 text-accent fill-accent" />
                   <span>{story.rating}</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -134,7 +133,7 @@ const StoriesPage = () => {
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div
                       className={`h-1.5 rounded-full ${
-                        story.progress === 100 ? 'bg-green-500' : 'bg-purple-500'
+                        story.progress === 100 ? 'bg-green-500' : 'bg-primary'
                       }`}
                       style={{ width: `${story.progress}%` }}
                     />
@@ -148,7 +147,7 @@ const StoriesPage = () => {
                   story.progress === 100
                     ? 'bg-green-100 text-green-700 hover:bg-green-200'
                     : story.progress > 0
-                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                    ? 'bg-primary text-white hover:bg-primary-dark'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >

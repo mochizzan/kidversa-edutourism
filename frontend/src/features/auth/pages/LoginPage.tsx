@@ -9,7 +9,6 @@ const LoginPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement login logic
     console.log('Login:', { email, password })
   }
 
@@ -31,7 +30,7 @@ const LoginPage = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="email@example.com"
               required
             />
@@ -49,7 +48,7 @@ const LoginPage = () => {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="••••••••"
               required
             />
@@ -68,13 +67,13 @@ const LoginPage = () => {
           <label className="flex items-center">
             <input
               type="checkbox"
-              className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
             />
             <span className="ml-2 text-sm text-gray-600">Ingat saya</span>
           </label>
           <Link
             to="/auth/forgot-password"
-            className="text-sm text-purple-600 hover:text-purple-800"
+            className="text-sm text-primary hover:text-primary-dark"
           >
             Lupa password?
           </Link>
@@ -83,7 +82,7 @@ const LoginPage = () => {
         {/* Submit */}
         <button
           type="submit"
-          className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+          className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-dark transition-colors"
         >
           Masuk
         </button>
@@ -92,7 +91,7 @@ const LoginPage = () => {
       {/* Register link */}
       <p className="mt-6 text-center text-sm text-gray-600">
         Belum punya akun?{' '}
-        <Link to="/auth/register" className="text-purple-600 hover:text-purple-800 font-semibold">
+        <Link to="/auth/register" className="text-primary hover:text-primary-dark font-semibold">
           Daftar sekarang
         </Link>
       </p>
