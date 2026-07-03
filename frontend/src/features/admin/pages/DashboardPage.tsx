@@ -1,73 +1,77 @@
-import { Users, BookOpen, MapPin, TrendingUp } from 'lucide-react'
+import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import { FolderOpen, Calendar, Users, Plus } from 'lucide-react'
+import { Card } from '../../../shared/components/ui/Card'
+import { Button } from '../../../shared/components/ui/Button'
+
+type StatItem = {
+  label: string
+  value: number
+  icon: React.ReactNode
+  href: string
+  accent: string
+}
 
 const DashboardPage = () => {
-  const stats = [
-    { label: 'Total Users', value: '1,234', icon: <Users className="w-6 h-6" />, change: '+12%' },
-    { label: 'Total Stories', value: '56', icon: <BookOpen className="w-6 h-6" />, change: '+8%' },
-    { label: 'Total Destinations', value: '24', icon: <MapPin className="w-6 h-6" />, change: '+5%' },
-    { label: 'Active Users', value: '892', icon: <TrendingUp className="w-6 h-6" />, change: '+15%' },
-  ]
+  const stats = useMemo<StatItem[]>(() => [
+    {
+      label: 'Total Programs',
+      value: 3,
+      icon: <FolderOpen className="w-6 h-6" />,
+      href: '/admin/programs',
+      accent: 'bg-primary-100 text-primary',
+    },
+    {
+      label: 'Total Sessions',
+      value: 4,
+      icon: <Calendar className="w-6 h-6" />,
+      href: '/admin/sessions',
+      accent: 'bg-accent-100 text-accent-dark',
+    },
+    {
+      label: 'Total Participants',
+      value: 4,
+      icon: <Users className="w-6 h-6" />,
+      href: '/admin/sessions',
+      accent: 'bg-green-100 text-green-700',
+    },
+  ], [])
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Admin Dashboard</h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">Ringkasan program dan sesi edutourism Anda.</p>
+        </div>
+        <Link to="/admin/programs">
+          <Button icon={<Plus className="w-4 h-4" />}>Buat Program</Button>
+        </Link>
+      </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, index) => (
-          <div
-            key={index}
-            className="bg-white rounded-xl shadow-sm p-6 border border-gray-100"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
-                <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {stats.map((stat) => (
+          <Link key={stat.label} to={stat.href} className="block">
+            <Card className="hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
+                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                </div>
+                <div className={`p-3 rounded-lg ${stat.accent}`}>{stat.icon}</div>
               </div>
-              <div className="p-3 bg-primary-100 text-primary rounded-lg">
-                {stat.icon}
-              </div>
-            </div>
-            <div className="mt-4 flex items-center text-sm">
-              <span className="text-green-500 font-medium">{stat.change}</span>
-              <span className="text-gray-400 ml-2">dari bulan lalu</span>
-            </div>
-          </div>
+            </Card>
+          </Link>
         ))}
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Aktivitas Terbaru</h2>
-        <div className="space-y-4">
-          <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-            <div className="w-10 h-10 bg-primary-100 text-primary rounded-full flex items-center justify-center">
-              <Users className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">User baru terdaftar</p>
-              <p className="text-xs text-gray-500">2 menit yang lalu</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-            <div className="w-10 h-10 bg-accent-100 text-accent rounded-full flex items-center justify-center">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">Story baru ditambahkan</p>
-              <p className="text-xs text-gray-500">15 menit yang lalu</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-            <div className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
-              <MapPin className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">Destinasi baru ditambahkan</p>
-              <p className="text-xs text-gray-500">1 jam yang lalu</p>
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card title="Program Terbaru" subtitle="Program yang baru saja dibuat">
+          <p className="text-sm text-gray-500">Lihat daftar program untuk mengelola stage dan konten.</p>
+        </Card>
+        <Card title="Sesi Aktif" subtitle="Sesi yang sedang berlangsung">
+          <p className="text-sm text-gray-500">Pantau progress sesi dan kelola peserta.</p>
+        </Card>
       </div>
     </div>
   )

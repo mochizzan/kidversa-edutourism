@@ -1,38 +1,38 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
-
-// Layouts
-import MainLayout from '../shared/layouts/MainLayout'
 import AdminLayout from '../shared/layouts/AdminLayout'
+import MainLayout from '../shared/layouts/MainLayout'
 import AuthLayout from '../shared/layouts/AuthLayout'
-
-// Pages - Lazy loaded for better performance
 import { lazy, Suspense } from 'react'
 
-// Loading component
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
   </div>
 )
 
-// Lazy load pages
-const LandingPage = lazy(() => import('../pages/LandingPage'))
-const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'))
-const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage'))
-const AdminDashboardPage = lazy(() => import('../features/admin/pages/DashboardPage'))
-const AdminStoriesPage = lazy(() => import('../features/admin/pages/StoriesPage'))
-const FasilitatorDashboardPage = lazy(() => import('../features/fasilitator/pages/DashboardPage'))
-const FasilitatorActivitiesPage = lazy(() => import('../features/fasilitator/pages/ActivitiesPage'))
-const ParentDashboardPage = lazy(() => import('../features/parent/pages/DashboardPage'))
-const ParentStoriesPage = lazy(() => import('../features/parent/pages/StoriesPage'))
-const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
-
-// Suspense wrapper
 const SuspenseWrapper = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<Loading />}>{children}</Suspense>
 )
 
-// Router configuration
+const LandingPage = lazy(() => import('../pages/LandingPage'))
+const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'))
+const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage'))
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
+
+const AdminDashboardPage = lazy(() => import('../features/admin/pages/DashboardPage'))
+const ProgramsPage = lazy(() => import('../features/admin/pages/ProgramsPage'))
+const ProgramDetailPage = lazy(() => import('../features/admin/pages/ProgramDetailPage'))
+const SessionsPage = lazy(() => import('../features/admin/pages/SessionsPage'))
+const SessionDetailPage = lazy(() => import('../features/admin/pages/SessionDetailPage'))
+const ContentPage = lazy(() => import('../features/admin/pages/ContentPage'))
+const FramesPage = lazy(() => import('../features/admin/pages/FramesPage'))
+const UsersPage = lazy(() => import('../features/admin/pages/UsersPage'))
+
+const FasilitatorDashboardPage = lazy(() => import('../features/fasilitator/pages/DashboardPage'))
+const FasilitatorActivitiesPage = lazy(() => import('../features/fasilitator/pages/ActivitiesPage'))
+const ParentDashboardPage = lazy(() => import('../features/parent/pages/DashboardPage'))
+const ParentStoriesPage = lazy(() => import('../features/parent/pages/StoriesPage'))
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -45,84 +45,6 @@ export const router = createBrowserRouter([
             <LandingPage />
           </SuspenseWrapper>
         ),
-      },
-      {
-        path: 'admin',
-        element: <AdminLayout />,
-        children: [
-          {
-            index: true,
-            element: <Navigate to="/admin/dashboard" replace />,
-          },
-          {
-            path: 'dashboard',
-            element: (
-              <SuspenseWrapper>
-                <AdminDashboardPage />
-              </SuspenseWrapper>
-            ),
-          },
-          {
-            path: 'stories',
-            element: (
-              <SuspenseWrapper>
-                <AdminStoriesPage />
-              </SuspenseWrapper>
-            ),
-          },
-        ],
-      },
-      {
-        path: 'fasilitator',
-        element: <AdminLayout />,
-        children: [
-          {
-            index: true,
-            element: <Navigate to="/fasilitator/dashboard" replace />,
-          },
-          {
-            path: 'dashboard',
-            element: (
-              <SuspenseWrapper>
-                <FasilitatorDashboardPage />
-              </SuspenseWrapper>
-            ),
-          },
-          {
-            path: 'activities',
-            element: (
-              <SuspenseWrapper>
-                <FasilitatorActivitiesPage />
-              </SuspenseWrapper>
-            ),
-          },
-        ],
-      },
-      {
-        path: 'parent',
-        element: <AdminLayout />,
-        children: [
-          {
-            index: true,
-            element: <Navigate to="/parent/dashboard" replace />,
-          },
-          {
-            path: 'dashboard',
-            element: (
-              <SuspenseWrapper>
-                <ParentDashboardPage />
-              </SuspenseWrapper>
-            ),
-          },
-          {
-            path: 'stories',
-            element: (
-              <SuspenseWrapper>
-                <ParentStoriesPage />
-              </SuspenseWrapper>
-            ),
-          },
-        ],
       },
     ],
   },
@@ -147,6 +69,132 @@ export const router = createBrowserRouter([
         element: (
           <SuspenseWrapper>
             <RegisterPage />
+          </SuspenseWrapper>
+        ),
+      },
+    ],
+  },
+  {
+    path: '/admin',
+    element: <AdminLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/admin/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
+        element: (
+          <SuspenseWrapper>
+            <AdminDashboardPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'programs',
+        element: (
+          <SuspenseWrapper>
+            <ProgramsPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'programs/:programId',
+        element: (
+          <SuspenseWrapper>
+            <ProgramDetailPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'sessions',
+        element: (
+          <SuspenseWrapper>
+            <SessionsPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'sessions/:sessionId',
+        element: (
+          <SuspenseWrapper>
+            <SessionDetailPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'content',
+        element: (
+          <SuspenseWrapper>
+            <ContentPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'frames',
+        element: (
+          <SuspenseWrapper>
+            <FramesPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'users',
+        element: (
+          <SuspenseWrapper>
+            <UsersPage />
+          </SuspenseWrapper>
+        ),
+      },
+    ],
+  },
+  {
+    path: '/fasilitator',
+    element: <AdminLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/fasilitator/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
+        element: (
+          <SuspenseWrapper>
+            <FasilitatorDashboardPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'activities',
+        element: (
+          <SuspenseWrapper>
+            <FasilitatorActivitiesPage />
+          </SuspenseWrapper>
+        ),
+      },
+    ],
+  },
+  {
+    path: '/parent',
+    element: <MainLayout />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/parent/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
+        element: (
+          <SuspenseWrapper>
+            <ParentDashboardPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'stories',
+        element: (
+          <SuspenseWrapper>
+            <ParentStoriesPage />
           </SuspenseWrapper>
         ),
       },
