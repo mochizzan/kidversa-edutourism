@@ -36,19 +36,19 @@ export function useToast() {
 const toastConfig: Record<ToastType, { icon: typeof Info; className: string }> = {
   success: {
     icon: CheckCircle2,
-    className: 'text-green-600 bg-green-50 border-green-200',
+    className: 'text-green-700 bg-green-50 border-green-200',
   },
   error: {
     icon: XCircle,
-    className: 'text-red-600 bg-red-50 border-red-200',
+    className: 'text-on-error-container bg-error-container border-error-container',
   },
   warning: {
     icon: AlertCircle,
-    className: 'text-yellow-600 bg-yellow-50 border-yellow-200',
+    className: 'text-yellow-700 bg-yellow-50 border-yellow-200',
   },
   info: {
     icon: Info,
-    className: 'text-blue-600 bg-blue-50 border-blue-200',
+    className: 'text-blue-700 bg-blue-50 border-blue-200',
   },
 }
 
@@ -64,13 +64,13 @@ export function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove
           <div
             key={toast.id}
             className={cn(
-              'flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg min-w-[320px]',
+              'flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg min-w-[320px]',
               'animate-in slide-in-from-right',
               config.className
             )}
           >
             <Icon className="w-5 h-5 shrink-0" />
-            <p className="flex-1 text-sm font-medium text-gray-900">{toast.message}</p>
+            <p className="flex-1 text-sm font-medium text-on-surface">{toast.message}</p>
             <button
               onClick={() => onRemove(toast.id)}
               className="p-1 rounded hover:bg-black/5 transition-colors"

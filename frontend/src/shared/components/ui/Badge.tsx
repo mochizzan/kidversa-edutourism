@@ -10,12 +10,12 @@ interface BadgeProps {
 
 export function Badge({ variant = 'primary', size = 'sm', children, className }: BadgeProps) {
   const variants = {
-    primary: 'bg-primary-100 text-primary-dark',
-    accent: 'bg-accent-100 text-accent-dark',
+    primary: 'bg-primary-container text-on-primary-container',
+    accent: 'bg-tertiary-container text-on-tertiary-container',
     success: 'bg-green-100 text-green-700',
     warning: 'bg-yellow-100 text-yellow-700',
-    danger: 'bg-red-100 text-red-700',
-    neutral: 'bg-gray-100 text-gray-700',
+    danger: 'bg-error-container text-on-error-container',
+    neutral: 'bg-surface-variant text-on-surface-variant',
   }
 
   const sizes = {

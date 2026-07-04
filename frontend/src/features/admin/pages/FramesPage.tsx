@@ -45,15 +45,15 @@ const FramesPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {frames.map((frame) => (
           <Card key={frame.id} className="hover:shadow-md transition-shadow">
-            <div className="aspect-[4/3] bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-              <Image className="w-12 h-12 text-gray-300" />
+            <div className="aspect-[4/3] bg-surface-container-high rounded-2xl flex items-center justify-center mb-4">
+              <Image className="w-12 h-12 text-on-surface-variant/30" />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="font-medium text-gray-900">{frame.name}</p>
+                <p className="font-medium text-on-surface">{frame.name}</p>
                 <Badge variant={frame.is_active ? 'success' : 'neutral'}>{frame.is_active ? 'Aktif' : 'Nonaktif'}</Badge>
               </div>
-              <p className="text-sm text-gray-500">{frame.program_id ? `Program: ${frame.program_id}` : 'Semua Program'}</p>
+              <p className="text-sm text-on-surface-variant">{frame.program_id ? `Program: ${frame.program_id}` : 'Semua Program'}</p>
             </div>
           </Card>
         ))}
@@ -72,9 +72,9 @@ const FramesPage = () => {
             { value: 'p-1', label: 'Edukasi Peternakan Sapi' },
             { value: 'p-2', label: 'Edukasi Pertanian Sayur' },
           ]} />
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">Upload PNG frame (1280x960 min, max 2MB)</p>
+          <div className="border-2 border-dashed border-outline-variant rounded-2xl p-8 text-center">
+            <Upload className="w-8 h-8 text-on-surface-variant mx-auto mb-2" />
+            <p className="text-sm text-on-surface-variant">Upload PNG frame (1280x960 min, max 2MB)</p>
           </div>
         </form>
       </Modal>

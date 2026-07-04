@@ -30,12 +30,12 @@ const ContentPage = () => {
           <Card key={item.id} className="hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-900">{item.title}</p>
-                <p className="text-sm text-gray-500">Stage: {item.stage_id}</p>
+                <p className="font-medium text-on-surface">{item.title}</p>
+                <p className="text-sm text-on-surface-variant">Stage: {item.stage_id}</p>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="primary">{item.file_type}</Badge>
-                {item.duration_seconds > 0 && <span className="text-sm text-gray-500">{item.duration_seconds}s</span>}
+                {item.duration_seconds > 0 && <span className="text-sm text-on-surface-variant">{item.duration_seconds}s</span>}
               </div>
             </div>
           </Card>
@@ -56,9 +56,9 @@ const ContentPage = () => {
             { value: 'AUDIO', label: 'Audio' },
             { value: 'GAME_BUNDLE', label: 'Game Bundle' },
           ]} />
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">Klik atau seret file ke sini</p>
+          <div className="border-2 border-dashed border-outline-variant rounded-2xl p-8 text-center">
+            <Upload className="w-8 h-8 text-on-surface-variant mx-auto mb-2" />
+            <p className="text-sm text-on-surface-variant">Klik atau seret file ke sini</p>
           </div>
         </form>
       </Modal>

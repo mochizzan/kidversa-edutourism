@@ -25,7 +25,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className="w-full">
         {label && (
-          <label htmlFor={selectId} className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor={selectId} className="block text-sm font-medium text-on-surface mb-1">
             {label}
           </label>
         )}
@@ -35,10 +35,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           className={cn(
-            'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm',
-            'focus:border-primary focus:ring-2 focus:ring-primary-100 focus:outline-none',
-            'disabled:cursor-not-allowed disabled:bg-gray-50',
-            error && 'border-red-500 focus:border-red-500 focus:ring-red-100',
+            'w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm',
+            'focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none',
+            'disabled:cursor-not-allowed disabled:bg-surface-container-low',
+            error && 'border-error focus:border-error focus:ring-error-container',
             className
           )}
           {...props}
@@ -54,8 +54,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <p id={errorId} className="mt-1 text-sm text-red-500">{error}</p>}
-        {hint && !error && <p id={hintId} className="mt-1 text-sm text-gray-500">{hint}</p>}
+        {error && <p id={errorId} className="mt-1 text-sm text-error">{error}</p>}
+        {hint && !error && <p id={hintId} className="mt-1 text-sm text-on-surface-variant">{hint}</p>}
       </div>
     )
   }

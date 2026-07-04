@@ -61,8 +61,8 @@ const ProgramsPage = () => {
       sortable: true,
       render: (item: Program) => (
         <div>
-          <p className="font-medium text-gray-900">{item.name}</p>
-          <p className="text-sm text-gray-500">{item.description || '-'}</p>
+          <p className="font-medium text-on-surface">{item.name}</p>
+          <p className="text-sm text-on-surface-variant">{item.description || '-'}</p>
         </div>
       ),
     },
@@ -85,15 +85,16 @@ const ProgramsPage = () => {
       render: (item: Program) => (
         <div className="flex items-center justify-end gap-2">
           <Link to={`/admin/programs/${item.id}`}>
-            <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} />
+            <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" />
           </Link>
           <Button
             variant="ghost"
             size="sm"
             icon={item.is_active ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
+            tooltip="Ubah Status"
             onClick={() => handleToggle(item.id)}
           />
-          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-red-500" />} onClick={() => setDeleteId(item.id)} />
+          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Hapus" onClick={() => setDeleteId(item.id)} />
         </div>
       ),
     },
@@ -120,11 +121,6 @@ const ProgramsPage = () => {
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item: Program) => item.id}
-        actions={
-          <Button variant="primary" icon={<Plus className="w-4 h-4" />}>
-            Tambah Program
-          </Button>
-        }
         emptyState={
           <EmptyState
             icon={<FolderOpen className="w-12 h-12" />}
@@ -141,7 +137,7 @@ const ProgramsPage = () => {
           <Button variant="danger" onClick={handleDelete}>Hapus</Button>
         </div>
       }>
-        <p className="text-sm text-gray-600">Apakah Anda yakin ingin menghapus program ini?</p>
+        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menghapus program ini?</p>
       </Modal>
     </div>
   )

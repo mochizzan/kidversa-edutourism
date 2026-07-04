@@ -29,7 +29,7 @@ const SessionDetailPage = () => {
   }, [sessionId])
 
   if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>
-  if (!session) return <div className="text-center text-gray-500">Session not found</div>
+  if (!session) return <div className="text-center text-on-surface-variant">Session not found</div>
 
   return (
     <div className="space-y-6">
@@ -59,20 +59,20 @@ const SessionDetailPage = () => {
         <Card>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-gray-500">Program</p>
-              <p className="font-medium text-gray-900">{session.program_id}</p>
+              <p className="text-sm text-on-surface-variant">Program</p>
+              <p className="font-medium text-on-surface">{session.program_id}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Lokasi</p>
-              <p className="font-medium text-gray-900">{session.location}</p>
+              <p className="text-sm text-on-surface-variant">Lokasi</p>
+              <p className="font-medium text-on-surface">{session.location}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Tanggal</p>
-              <p className="font-medium text-gray-900">{formatDate(session.session_date)}</p>
+              <p className="text-sm text-on-surface-variant">Tanggal</p>
+              <p className="font-medium text-on-surface">{formatDate(session.session_date)}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-500">Catatan</p>
-              <p className="font-medium text-gray-900">{session.notes || '-'}</p>
+              <p className="text-sm text-on-surface-variant">Catatan</p>
+              <p className="font-medium text-on-surface">{session.notes || '-'}</p>
             </div>
           </div>
         </Card>
@@ -82,16 +82,16 @@ const SessionDetailPage = () => {
         <Card>
           <div className="space-y-3">
             {session.stages?.map((stage: SessionStage) => (
-              <div key={stage.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div key={stage.id} className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl">
                 <div>
-                  <p className="font-medium text-gray-900">{stage.program_stage_id}</p>
-                  <p className="text-sm text-gray-500">Status: {stage.status}</p>
+                  <p className="font-medium text-on-surface">{stage.program_stage_id}</p>
+                  <p className="text-sm text-on-surface-variant">Status: {stage.status}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <select
                     value={stage.fasilitator_id || ''}
                     onChange={(e) => sessionService.assignFacilitator(sessionId!, stage.id, e.target.value)}
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-primary focus:ring-2 focus:ring-primary-100 focus:outline-none"
+                    className="rounded-xl border border-outline-variant px-3 py-1.5 text-sm focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
                   >
                     <option value="">Pilih Fasilitator</option>
                     {facilitators.map((f) => (
@@ -111,10 +111,10 @@ const SessionDetailPage = () => {
             <Card key={group.id} title={group.name}>
               <div className="space-y-2">
                 {group.participants?.map((participant: Participant) => (
-                  <div key={participant.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={participant.id} className="flex items-center justify-between p-3 bg-surface-container-low rounded-xl">
                     <div>
-                      <p className="font-medium text-gray-900">{participant.child_name}</p>
-                      <p className="text-sm text-gray-500">Umur {participant.child_age} · {participant.parent_name}</p>
+                      <p className="font-medium text-on-surface">{participant.child_name}</p>
+                      <p className="text-sm text-on-surface-variant">Umur {participant.child_age} · {participant.parent_name}</p>
                     </div>
                     <div className="flex gap-2">
                       <Badge variant={participant.consent_recording ? 'success' : 'danger'}>Recording</Badge>

@@ -90,24 +90,24 @@ export function DataTable<T>({
       <div className="flex items-center justify-between gap-4">
         {onSearch && (
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Cari..."
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary-100 focus:outline-none"
+              className="w-full pl-9 pr-4 py-2 text-sm bg-surface-container-low rounded-2xl border-0 focus:ring-2 focus:ring-primary-container focus:outline-none"
             />
           </div>
         )}
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-surface rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full" aria-label={ariaLabel}>
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr className="bg-surface-container-low border-b border-outline-variant">
                 {selectable && (
                   <th className="w-12 px-4 py-3">
                     <input
@@ -118,7 +118,7 @@ export function DataTable<T>({
                       }}
                       onChange={toggleSelectAll}
                       aria-label="Select all rows"
-                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
                     />
                   </th>
                 )}
@@ -126,7 +126,7 @@ export function DataTable<T>({
                   <th
                     key={column.key}
                     className={cn(
-                      'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider',
+                      'px-4 py-3 text-left text-xs font-semibold text-on-surface-variant uppercase tracking-wider',
                       column.align === 'center' && 'text-center',
                       column.align === 'right' && 'text-right',
                       column.width && `w-[${column.width}]`
@@ -135,7 +135,7 @@ export function DataTable<T>({
                     {column.sortable ? (
                       <button
                         onClick={() => handleSort(column.key)}
-                        className="flex items-center gap-1 hover:text-gray-700 transition-colors"
+                        className="flex items-center gap-1 hover:text-on-surface transition-colors"
                       >
                         {column.header}
                         {sortKey === column.key ? (
@@ -155,13 +155,13 @@ export function DataTable<T>({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-outline-variant/50">
               {loading ? (
                 Array.from({ length: pageSize }).map((_, index) => (
                   <tr key={index}>
                     {columns.map((_, colIndex) => (
                       <td key={colIndex} className="px-4 py-3">
-                        <div className="h-4 bg-gray-100 rounded animate-pulse" />
+                        <div className="h-4 bg-surface-container-high rounded animate-pulse" />
                       </td>
                     ))}
                   </tr>
@@ -170,7 +170,7 @@ export function DataTable<T>({
                 <tr>
                   <td colSpan={columns.length + (selectable ? 1 : 0)}>
                     {emptyState || (
-                      <div className="py-12 text-center text-gray-500">Tidak ada data</div>
+                      <div className="py-12 text-center text-on-surface-variant">Tidak ada data</div>
                     )}
                   </td>
                 </tr>
@@ -182,8 +182,8 @@ export function DataTable<T>({
                     <tr
                       key={rowId}
                       className={cn(
-                        'hover:bg-gray-50 transition-colors',
-                        isSelected && 'bg-primary-50'
+                        'hover:bg-surface-container-low/50 transition-colors',
+                        isSelected && 'bg-primary-container/30'
                       )}
                     >
                       {selectable && (
@@ -193,7 +193,7 @@ export function DataTable<T>({
                             checked={isSelected}
                             onChange={() => toggleSelectRow(rowId)}
                             aria-label={`Select row ${rowId}`}
-                            className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
                           />
                         </td>
                       )}
@@ -201,7 +201,7 @@ export function DataTable<T>({
                         <td
                           key={column.key}
                           className={cn(
-                            'px-4 py-3 text-sm text-gray-900',
+                            'px-4 py-3 text-sm text-on-surface',
                             column.align === 'center' && 'text-center',
                             column.align === 'right' && 'text-right'
                           )}
@@ -218,25 +218,25 @@ export function DataTable<T>({
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-            <div className="text-sm text-gray-500">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-outline-variant">
+            <div className="text-sm text-on-surface-variant">
               Menampilkan {(page - 1) * pageSize + 1} sampai {Math.min(page * pageSize, total)} dari {total} data
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onPageChange?.(page - 1)}
                 disabled={page === 1}
-                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-xl border border-outline-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-on-surface-variant">
                 Halaman {page} dari {totalPages}
               </span>
               <button
                 onClick={() => onPageChange?.(page + 1)}
                 disabled={page === totalPages}
-                className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-xl border border-outline-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

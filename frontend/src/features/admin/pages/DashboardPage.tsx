@@ -1,153 +1,129 @@
-import { Link } from 'react-router-dom'
 import {
   FolderOpen,
   Calendar,
   Users,
-  FileText,
-  Plus,
 } from 'lucide-react'
-import { PageHeader } from '../../../shared/components/ui/PageHeader'
-import { StatCard } from '../../../shared/components/ui/StatCard'
-import { BarChartAverage } from '../../../shared/components/charts/BarChartAverage'
-import { PieChartDistribution } from '../../../shared/components/charts/PieChartDistribution'
-import { ActivityFeed } from '../../../shared/components/data/ActivityFeed'
-import { RecentSessions } from '../../../shared/components/data/RecentSessions'
-import { DashboardLayout } from '../../../shared/components/layout/DashboardLayout'
-import { Button } from '../../../shared/components/ui/Button'
+import { CategoryCard } from '../../../shared/components/ui/CategoryCard'
+import { SessionCarousel } from '../../../shared/components/data/SessionCarousel'
+import { DonutStat } from '../../../shared/components/charts/DonutStat'
+import { TeamList } from '../../../shared/components/data/TeamList'
 import {
   dashboardStats,
-  stageAverages,
-  ratingDistribution,
-  recentActivities,
   recentSessions,
+  teamMembers,
+  sessionCards,
 } from '../mock/dashboard'
 
 const DashboardPage = () => {
-  const reportPercentage = Math.round(
-    (dashboardStats.reportsSent / dashboardStats.reportsTotal) * 100
-  )
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        subtitle="Ringkasan program dan sesi edutourism Anda."
-        actions={
-          <Link to="/admin/programs">
-            <Button icon={<Plus className="w-4 h-4" />}>Buat Program</Button>
-          </Link>
-        }
-      />
+    <div className="grid grid-cols-12 gap-6">
+      {/* Left column */}
+      <div className="col-span-12 xl:col-span-9 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <CategoryCard
+            icon={FolderOpen}
+            title={`${dashboardStats.totalPrograms} Program`}
+            subtitle="Total program"
+            iconBg="bg-primary-container text-primary"
+          />
+          <CategoryCard
+            icon={Calendar}
+            title={`${dashboardStats.activeSessions} Sesi`}
+            subtitle="Sesi aktif"
+            iconBg="bg-secondary-container text-secondary"
+          />
+          <CategoryCard
+            icon={Users}
+            title={`${dashboardStats.totalParticipants} Peserta`}
+            subtitle="Total peserta"
+            iconBg="bg-tertiary-container text-tertiary"
+          />
+        </div>
 
-      <DashboardLayout
-        sidebar={
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Quick Stats</h3>
+        <SessionCarousel sessions={sessionCards} />
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Program Aktif</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {dashboardStats.totalPrograms}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Sesi Berlangsung</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {dashboardStats.activeSessions}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Total Peserta</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {dashboardStats.totalParticipants}
-                </span>
-              </div>
-              <div className="border-t border-gray-100 pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-500">Raport Terkirim</span>
-                  <span className="text-sm font-semibold text-gray-900">
-                    {dashboardStats.reportsSent}/{dashboardStats.reportsTotal}
+        <div className="bg-surface rounded-3xl p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-on-surface mb-4">Sesi Terbaru</h2>
+          {/* Mobile: card layout */}
+          <div className="md:hidden space-y-3">
+            {recentSessions.map((session) => (
+              <div key={session.id} className="bg-surface-container-low rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-on-surface">{session.name}</p>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    session.status === 'ACTIVE' ? 'bg-primary-container text-on-primary-container' :
+                    session.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                    'bg-surface-variant text-on-surface-variant'
+                  }`}>
+                    {session.status === 'ACTIVE' ? 'Aktif' : session.status === 'COMPLETED' ? 'Selesai' : 'Draf'}
                   </span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all"
-                    style={{ width: `${reportPercentage}%` }}
-                  />
+                <p className="text-sm text-on-surface-variant truncate">{session.programName}</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-surface-container-high rounded-full h-1.5">
+                    <div
+                      className="bg-primary h-1.5 rounded-full"
+                      style={{ width: `${session.completionRate}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-on-surface-variant whitespace-nowrap">{session.completionRate}%</span>
                 </div>
               </div>
-            </div>
-
-            <Link
-              to="/admin/sessions"
-              className="block w-full text-center px-4 py-2 bg-primary-50 text-primary rounded-lg hover:bg-primary-100 transition-colors text-sm font-medium"
-            >
-              Lihat Semua Sesi
-            </Link>
+            ))}
           </div>
-        }
-      >
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            label="Total Programs"
-            value={dashboardStats.totalPrograms}
-            icon={<FolderOpen className="w-6 h-6" />}
-            href="/admin/programs"
-            accent="bg-primary-100 text-primary"
-            change={{ value: '+1 bulan ini', type: 'increase' }}
-          />
-          <StatCard
-            label="Sesi Aktif"
-            value={dashboardStats.activeSessions}
-            icon={<Calendar className="w-6 h-6" />}
-            href="/admin/sessions"
-            accent="bg-accent-100 text-accent-dark"
-            change={{ value: '+2 minggu ini', type: 'increase' }}
-          />
-          <StatCard
-            label="Total Peserta"
-            value={dashboardStats.totalParticipants}
-            icon={<Users className="w-6 h-6" />}
-            href="/admin/sessions"
-            accent="bg-green-100 text-green-700"
-            change={{ value: '+15 bulan ini', type: 'increase' }}
-          />
-          <StatCard
-            label="Raport Terkirim"
-            value={`${dashboardStats.reportsSent}/${dashboardStats.reportsTotal}`}
-            icon={<FileText className="w-6 h-6" />}
-            accent="bg-blue-100 text-blue-700"
-            change={{ value: `${reportPercentage}% terkirim`, type: 'neutral' }}
-          />
+          {/* Desktop/tablet: table layout */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-outline-variant">
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Nama Sesi</th>
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Program</th>
+                  <th className="hidden lg:table-cell text-left py-3 px-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Tanggal</th>
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Status</th>
+                  <th className="hidden xl:table-cell text-left py-3 px-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider text-center">Peserta</th>
+                  <th className="text-left py-3 px-3 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSessions.map((session) => (
+                  <tr key={session.id} className="border-b border-outline-variant/50 hover:bg-surface-container-low/50 transition-colors">
+                    <td className="py-3 px-3 font-medium text-on-surface whitespace-nowrap">{session.name}</td>
+                    <td className="py-3 px-3 text-on-surface-variant truncate max-w-[140px]">{session.programName}</td>
+                    <td className="hidden lg:table-cell py-3 px-3 text-on-surface-variant whitespace-nowrap">{session.date}</td>
+                    <td className="py-3 px-3">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        session.status === 'ACTIVE' ? 'bg-primary-container text-on-primary-container' :
+                        session.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                        'bg-surface-variant text-on-surface-variant'
+                      }`}>
+                        {session.status === 'ACTIVE' ? 'Aktif' : session.status === 'COMPLETED' ? 'Selesai' : 'Draf'}
+                      </span>
+                    </td>
+                    <td className="hidden xl:table-cell py-3 px-3 text-on-surface-variant text-center">{session.participantCount}</td>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-14 bg-surface-container-high rounded-full h-1.5">
+                          <div
+                            className="bg-primary h-1.5 rounded-full"
+                            style={{ width: `${session.completionRate}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] text-on-surface-variant whitespace-nowrap">{session.completionRate}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+      </div>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <BarChartAverage
-            data={stageAverages}
-            title="Rata-rata Nilai per Stage"
-          />
-          <PieChartDistribution
-            data={ratingDistribution}
-            title="Distribusi Penilaian"
-          />
-        </div>
-
-        {/* Bottom Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ActivityFeed
-            activities={recentActivities}
-            title="Aktivitas Terbaru"
-            maxItems={5}
-          />
-          <RecentSessions
-            sessions={recentSessions}
-            title="Sesi Terbaru"
-          />
-        </div>
-      </DashboardLayout>
+      {/* Right sidebar */}
+      <div className="col-span-12 xl:col-span-3 space-y-6">
+        <DonutStat />
+        <TeamList members={teamMembers} />
+      </div>
     </div>
   )
 }

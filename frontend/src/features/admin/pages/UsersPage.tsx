@@ -80,7 +80,7 @@ const UsersPage = () => {
     {
       key: 'name',
       header: 'Nama',
-      render: (item: User) => <div><p className="font-medium text-gray-900">{item.name}</p><p className="text-sm text-gray-500">{item.email}</p></div>,
+      render: (item: User) => <div><p className="font-medium text-on-surface">{item.name}</p><p className="text-sm text-on-surface-variant">{item.email}</p></div>,
     },
     {
       key: 'role',
@@ -102,8 +102,8 @@ const UsersPage = () => {
       align: 'right',
       render: (item: User) => (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={() => { setEditingUser(item); setOpen(true) }} />
-          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-red-500" />} onClick={() => handleDeactivate(item.id)} />
+          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" onClick={() => { setEditingUser(item); setOpen(true) }} />
+          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Nonaktifkan" onClick={() => handleDeactivate(item.id)} />
         </div>
       ),
     },

@@ -7,14 +7,15 @@ import {
   Image,
   Users,
   LogOut,
-  Menu,
-  X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { useState } from 'react'
 import { ROUTES } from '../../core/constants/app'
 import { cn } from '../../core/utils'
 import { useAuth } from '../../core/hooks/useAuth'
-import { UserRole } from '../../core/types'
+import { AppHeader } from '../components/layout/AppHeader'
+import { Tooltip } from '../components/ui/Tooltip'
 
 const menuSections = [
   {
@@ -45,20 +46,11 @@ const menuSections = [
   },
 ]
 
-// Role display labels
-const ROLE_LABELS: Record<string, string> = {
-  [UserRole.SUPER_ADMIN]: 'Super Admin',
-  [UserRole.ADMIN_WISATA]: 'Admin Wisata',
-  [UserRole.KOORDINATOR]: 'Koordinator',
-  [UserRole.FASILITATOR]: 'Fasilitator',
-  [UserRole.PARENT]: 'Orang Tua',
-}
-
 const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { logout } = useAuth()
 
   if (location.pathname === '/admin') {
     return <Navigate to="/admin/dashboard" replace />
@@ -70,23 +62,8 @@ const AdminLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile header bar */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center gap-4 px-4 h-14 bg-primary text-white shadow-md">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="p-1 rounded-lg hover:bg-primary-light transition-colors"
-          aria-label="Open sidebar"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-        <Link to={ROUTES.HOME} className="flex items-center gap-3">
-          <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
-          <span className="text-xl font-bold">Kidversa</span>
-        </Link>
-      </div>
-
-      {/* Mobile backdrop overlay */}
+    <div className="flex h-screen bg-background">
+      {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
           className="lg:hidden fixed inset-0 z-40 bg-black/50"
@@ -94,106 +71,102 @@ const AdminLayout = () => {
         />
       )}
 
-      <div className="flex">
-        <aside
-          className={cn(
-            'fixed left-0 top-0 z-50 h-screen bg-primary text-white transition-all duration-300',
-            sidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'
-          )}
-        >
-          <div className="flex flex-col h-full">
-            {/* Logo */}
-            <div className="p-6 border-b border-primary-light">
-              <Link to={ROUTES.HOME} className="flex items-center gap-3">
-                <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
-                {sidebarOpen && <span className="text-xl font-bold">Kidversa</span>}
-              </Link>
-            </div>
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'z-50 h-screen bg-surface-container-low border-r border-outline-variant flex flex-col transition-all duration-300 shrink-0',
+          'fixed lg:relative',
+          sidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'
+        )}
+      >
+        {/* Logo */}
+        <div className="p-6 border-b border-outline-variant">
+          <Link to={ROUTES.HOME} className="flex items-center gap-3">
+            <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
+            {sidebarOpen && <span className="text-xl font-bold text-on-surface">Kidversa</span>}
+          </Link>
+        </div>
 
-            {/* User Info (when sidebar expanded) */}
-            {sidebarOpen && user && (
-              <div className="px-4 py-4 border-b border-primary-light">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center shrink-0">
-                    <span className="text-primary-dark font-bold text-lg">
-                      {user.name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-white truncate">{user.name}</p>
-                    <p className="text-xs text-white/60 truncate">
-                      {ROLE_LABELS[user.role] || user.role}
-                    </p>
-                  </div>
-                </div>
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+          {menuSections.map((section) => (
+            <div key={section.section}>
+              {sidebarOpen && (
+                <h3 className="px-4 mb-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
+                  {section.section}
+                </h3>
+              )}
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+                  const linkEl = (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setSidebarOpen(false)}
+                      className={cn(
+                        'flex items-center gap-3 px-4 py-3 rounded-xl transition-colors',
+                        isActive
+                          ? 'bg-primary-container text-on-primary-container font-medium'
+                          : 'text-on-surface-variant hover:bg-surface-container',
+                        !sidebarOpen && 'justify-center'
+                      )}
+                    >
+                      {item.icon}
+                      {sidebarOpen && <span className="text-sm">{item.label}</span>}
+                    </Link>
+                  )
+                  return !sidebarOpen ? (
+                    <Tooltip key={item.path} content={item.label}>
+                      {linkEl}
+                    </Tooltip>
+                  ) : linkEl
+                })}
               </div>
-            )}
+            </div>
+          ))}
+        </nav>
 
-            {/* Navigation */}
-            <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
-              {menuSections.map((section) => (
-                <div key={section.section}>
-                  {sidebarOpen && (
-                    <h3 className="px-4 mb-2 text-xs font-semibold text-white/50 uppercase tracking-wider">
-                      {section.section}
-                    </h3>
-                  )}
-                  <div className="space-y-1">
-                    {section.items.map((item) => {
-                      const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                      return (
-                        <Link
-                          key={item.path}
-                          to={item.path}
-                          onClick={() => setSidebarOpen(false)}
-                          className={cn(
-                            'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-                            isActive ? 'bg-accent text-primary-dark font-medium' : 'hover:bg-primary-light text-white/90',
-                            !sidebarOpen && 'justify-center'
-                          )}
-                          title={!sidebarOpen ? item.label : undefined}
-                        >
-                          {item.icon}
-                          {sidebarOpen && <span>{item.label}</span>}
-                        </Link>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </nav>
-
-            {/* Footer */}
-            <div className="p-4 border-t border-primary-light space-y-2">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-primary-light rounded-lg transition-colors text-sm text-white/80"
-              >
-                {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                {sidebarOpen && <span>Collapse</span>}
-              </button>
+        {/* Footer */}
+        <div className="p-4 border-t border-outline-variant space-y-2">
+          {/* Desktop toggle — lg+ only */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="hidden lg:flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-surface-container rounded-xl transition-colors text-on-surface-variant text-sm"
+          >
+            {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+            {sidebarOpen && <span>Tutup Sidebar</span>}
+          </button>
+          {/* Logout */}
+          {!sidebarOpen ? (
+            <Tooltip content="Keluar">
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-red-500/20 rounded-lg transition-colors text-sm text-white/80 hover:text-red-300"
+                className="flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-error-container rounded-xl transition-colors text-on-surface-variant hover:text-on-error-container justify-center"
               >
                 <LogOut className="w-5 h-5" />
-                {sidebarOpen && <span>Keluar</span>}
               </button>
-            </div>
-          </div>
-        </aside>
-
-        <div
-          className={cn(
-            'flex-1 min-h-screen transition-all duration-300',
-            'pt-14 lg:pt-0',
-            sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'
+            </Tooltip>
+          ) : (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-error-container rounded-xl transition-colors text-sm text-on-surface-variant hover:text-on-error-container"
+            >
+              <LogOut className="w-5 h-5" />
+              <span>Keluar</span>
+            </button>
           )}
-        >
-          <main className="p-6 lg:p-8">
-            <Outlet />
-          </main>
         </div>
+      </aside>
+
+      {/* Main Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="p-6 lg:p-8">
+            <Outlet />
+          </div>
+        </main>
       </div>
     </div>
   )

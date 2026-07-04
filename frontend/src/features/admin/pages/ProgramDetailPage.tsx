@@ -71,7 +71,7 @@ const ProgramDetailPage = () => {
   }
 
   if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>
-  if (!program) return <div className="text-center text-gray-500">Program not found</div>
+  if (!program) return <div className="text-center text-on-surface-variant">Program not found</div>
 
   return (
     <div className="space-y-6">
@@ -101,16 +101,16 @@ const ProgramDetailPage = () => {
           <form className="space-y-4 max-w-2xl" onSubmit={(e) => { e.preventDefault(); }}>
             <Input label="Nama Program" defaultValue={program.name} />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
+              <label className="block text-sm font-medium text-on-surface mb-1">Deskripsi</label>
               <textarea
                 defaultValue={program.description}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary-100 focus:outline-none"
+                className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
                 rows={4}
               />
             </div>
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="active" defaultChecked={program.is_active} className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary" />
-              <label htmlFor="active" className="text-sm text-gray-700">Program Aktif</label>
+              <input type="checkbox" id="active" defaultChecked={program.is_active} className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary" />
+              <label htmlFor="active" className="text-sm text-on-surface">Program Aktif</label>
             </div>
             <div className="flex justify-end">
               <Button type="submit">Simpan Perubahan</Button>
@@ -122,7 +122,7 @@ const ProgramDetailPage = () => {
       {activeTab === 'stages' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">Daftar Stage</h3>
+            <h3 className="text-lg font-semibold text-on-surface">Daftar Stage</h3>
             <Button icon={<Plus className="w-4 h-4" />} onClick={() => { setEditingStage(null); setShowStageForm(true) }}>Tambah Stage</Button>
           </div>
 
@@ -131,18 +131,18 @@ const ProgramDetailPage = () => {
               <Card key={stage.id} className="hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <GripVertical className="w-5 h-5 text-gray-300" />
+                    <GripVertical className="w-5 h-5 text-on-surface-variant/30" />
                     <div>
-                      <p className="font-medium text-gray-900">{stage.name}</p>
-                      <p className="text-sm text-gray-500">{stage.description} · {stage.duration_minutes} menit</p>
+                      <p className="font-medium text-on-surface">{stage.name}</p>
+                      <p className="text-sm text-on-surface-variant">{stage.description} · {stage.duration_minutes} menit</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="primary">{stage.content_type}</Badge>
                     {stage.is_recording_stage && <Badge variant="accent">Recording</Badge>}
                     {stage.is_photo_stage && <Badge variant="success">Photo</Badge>}
-                    <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} onClick={() => { setEditingStage(stage); setShowStageForm(true) }} />
-                    <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-red-500" />} onClick={() => handleDeleteStage(stage.id)} />
+                    <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit Stage" onClick={() => { setEditingStage(stage); setShowStageForm(true) }} />
+                    <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Hapus Stage" onClick={() => handleDeleteStage(stage.id)} />
                   </div>
                 </div>
               </Card>
@@ -170,12 +170,12 @@ const ProgramDetailPage = () => {
           <Select label="Tipe Konten" name="content_type" options={contentTypes} defaultValue={editingStage?.content_type || ContentTypeEnum.VIDEO} />
           <Input label="Durasi (menit)" name="duration_minutes" type="number" min={1} max={60} defaultValue={editingStage?.duration_minutes || 12} />
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" name="is_recording_stage" defaultChecked={editingStage?.is_recording_stage} className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary" />
+            <label className="flex items-center gap-2 text-sm text-on-surface">
+              <input type="checkbox" name="is_recording_stage" defaultChecked={editingStage?.is_recording_stage} className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary" />
               Recording Stage
             </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" name="is_photo_stage" defaultChecked={editingStage?.is_photo_stage ?? true} className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary" />
+            <label className="flex items-center gap-2 text-sm text-on-surface">
+              <input type="checkbox" name="is_photo_stage" defaultChecked={editingStage?.is_photo_stage ?? true} className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary" />
               Photo Stage
             </label>
           </div>

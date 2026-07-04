@@ -140,3 +140,51 @@ export const recentSessions: RecentSession[] = [
     completionRate: 0,
   },
 ]
+
+export const teamMembers = [
+  { id: '1', name: 'Padhang Sanio', role: 'Koordinator', avatar: '' },
+  { id: '2', name: 'Zain Horizontal', role: 'Fasilitator', avatar: '' },
+  { id: '3', name: 'Leonardo Samsel', role: 'Fasilitator', avatar: '' },
+]
+
+export const weeklyActivity = [
+  { week: '10-16 Jul', count: 15 },
+  { week: '17-20 Jul', count: 28 },
+  { week: '21-30 Jul', count: 42 },
+]
+
+export const sessionCards = [
+  {
+    id: 's-1',
+    name: 'Kunjungan SD Matahari',
+    programName: 'Belajar Bertani',
+    status: 'ACTIVE',
+    statusLabel: 'Aktif',
+    image: 'bg-gradient-to-br from-primary to-primary-light',
+    mentor: 'Padhang Sanio',
+    mentorAvatar: '',
+    isSaved: false,
+  },
+  {
+    id: 's-2',
+    name: 'Trip TK Ceria',
+    programName: 'Mengenal Laut',
+    status: 'COMPLETED',
+    statusLabel: 'Selesai',
+    image: 'bg-gradient-to-br from-secondary to-secondary-container',
+    mentor: 'Zain Horizontal',
+    mentorAvatar: '',
+    isSaved: true,
+  },
+  {
+    id: 's-3',
+    name: 'Kelas Inspirasi SDN 5',
+    programName: 'Petualangan Hutan',
+    status: 'DRAFT',
+    statusLabel: 'Draf',
+    image: 'bg-gradient-to-br from-tertiary to-tertiary-container',
+    mentor: 'Leonardo Samsel',
+    mentorAvatar: '',
+    isSaved: false,
+  },
+]

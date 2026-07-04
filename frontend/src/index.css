@@ -39,6 +39,47 @@
   --color-accent-700: #A66B15;
   --color-accent-800: #7A4E10;
   --color-accent-900: #4D310A;
+
+  /* M3 Color System */
+  --color-on-primary: #FFFFFF;
+  --color-primary-container: #F3EEFA;
+  --color-on-primary-container: #21005D;
+
+  --color-secondary: #625B71;
+  --color-on-secondary: #FFFFFF;
+  --color-secondary-container: #E8DEF8;
+  --color-on-secondary-container: #1D192B;
+
+  --color-tertiary: #7D5700;
+  --color-on-tertiary: #FFFFFF;
+  --color-tertiary-container: #FFDEA1;
+  --color-on-tertiary-container: #261900;
+
+  --color-background: #FFFBFE;
+  --color-on-background: #1C1B1F;
+  --color-surface: #FFFBFE;
+  --color-on-surface: #1C1B1F;
+  --color-surface-variant: #E7E0EC;
+  --color-on-surface-variant: #49454F;
+  --color-inverse-surface: #313033;
+  --color-inverse-on-surface: #F4EFF4;
+  --color-inverse-primary: #D0BCFF;
+
+  --color-outline: #79747E;
+  --color-outline-variant: #CAC4D0;
+
+  --color-error: #B3261E;
+  --color-on-error: #FFFFFF;
+  --color-error-container: #F9DEDC;
+  --color-on-error-container: #410E0B;
+
+  --color-surface-dim: #DED8E1;
+  --color-surface-bright: #FFFBFE;
+  --color-surface-container-lowest: #FFFFFF;
+  --color-surface-container-low: #F7F2FA;
+  --color-surface-container: #F3EDF7;
+  --color-surface-container-high: #ECE6F0;
+  --color-surface-container-highest: #E6E0E9;
 }
 
 :root {
@@ -46,6 +87,22 @@
   --color-accent: #F5A623;
   --color-primary-light: #7B4DB5;
   --color-primary-dark: #4A2370;
+  --color-primary-container: #F3EEFA;
+  --color-on-primary-container: #21005D;
+  --color-secondary: #625B71;
+  --color-secondary-container: #E8DEF8;
+  --color-tertiary: #7D5700;
+  --color-tertiary-container: #FFDEA1;
+  --color-surface: #FFFBFE;
+  --color-on-surface: #1C1B1F;
+  --color-outline: #79747E;
+  --color-outline-variant: #CAC4D0;
+  --color-error: #B3261E;
+  --color-on-error: #FFFFFF;
+  --color-surface-container-low: #F7F2FA;
+  --color-surface-container: #F3EDF7;
+  --color-surface-container-high: #ECE6F0;
+  --color-surface-container-highest: #E6E0E9;
 }
 
 body {

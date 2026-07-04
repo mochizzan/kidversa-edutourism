@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { cn } from '../../../core/utils'
+import { Tooltip } from './Tooltip'
 
 interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -9,6 +10,7 @@ interface ButtonProps {
   icon?: ReactNode
   iconPosition?: 'left' | 'right'
   children?: ReactNode
+  tooltip?: string
   onClick?: (e?: React.MouseEvent<HTMLButtonElement>) => void
   type?: 'button' | 'submit'
   className?: string
@@ -23,18 +25,19 @@ export function Button({
   icon,
   iconPosition = 'left',
   children,
+  tooltip,
   onClick,
   type = 'button',
   className,
   form,
 }: ButtonProps) {
-  const base = 'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
+  const base = 'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
 
   const variants = {
     primary: 'bg-primary text-white hover:bg-primary-dark focus:ring-primary',
-    secondary: 'bg-white text-primary border border-primary hover:bg-primary-50 focus:ring-primary',
-    ghost: 'text-primary hover:bg-primary-100 focus:ring-primary',
-    danger: 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500',
+    secondary: 'bg-surface text-primary border border-primary hover:bg-primary-50 focus:ring-primary',
+    ghost: 'text-primary hover:bg-primary-container/50 focus:ring-primary',
+    danger: 'bg-error text-white hover:bg-error/90 focus:ring-error',
   }
 
   const sizes = {
@@ -43,7 +46,8 @@ export function Button({
     lg: 'px-6 py-3 text-lg',
   }
 
-  return (
+  const isIconOnly = tooltip && !children
+  const buttonEl = (
     <button
       type={type}
       onClick={onClick}
@@ -52,11 +56,17 @@ export function Button({
       className={cn(base, variants[variant], sizes[size], className)}
     >
       {loading && (
-        <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+        <span className="animate-spin rounded-full h-4 w-4 border-2 border-on-primary border-t-transparent" />
       )}
       {!loading && iconPosition === 'left' && icon}
       {children}
       {!loading && iconPosition === 'right' && icon}
     </button>
   )
+
+  if (isIconOnly) {
+    return <Tooltip content={tooltip}>{buttonEl}</Tooltip>
+  }
+
+  return buttonEl
 }

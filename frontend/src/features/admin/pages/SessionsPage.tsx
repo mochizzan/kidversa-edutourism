@@ -55,8 +55,8 @@ const SessionsPage = () => {
       sortable: true,
       render: (item: Session) => (
         <div>
-          <p className="font-medium text-gray-900">{item.name}</p>
-          <p className="text-sm text-gray-500">{item.location}</p>
+          <p className="font-medium text-on-surface">{item.name}</p>
+          <p className="text-sm text-on-surface-variant">{item.location}</p>
         </div>
       ),
     },
@@ -85,12 +85,12 @@ const SessionsPage = () => {
       render: (item: Session) => (
         <div className="flex items-center justify-end gap-2">
           <Link to={`/admin/sessions/${item.id}`}>
-            <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} />
+            <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip="Lihat Detail" />
           </Link>
           {item.status === 'DRAFT' && (
-            <Button variant="ghost" size="sm" icon={<Play className="w-4 h-4 text-green-600" />} onClick={() => sessionService.start(item.id).then(load)} />
+            <Button variant="ghost" size="sm" icon={<Play className="w-4 h-4 text-green-600" />} tooltip="Mulai Sesi" onClick={() => sessionService.start(item.id).then(load)} />
           )}
-          <Button variant="ghost" size="sm" icon={<X className="w-4 h-4 text-red-500" />} onClick={() => setDeleteId(item.id)} />
+          <Button variant="ghost" size="sm" icon={<X className="w-4 h-4 text-error" />} tooltip="Batalkan" onClick={() => setDeleteId(item.id)} />
         </div>
       ),
     },
@@ -133,7 +133,7 @@ const SessionsPage = () => {
           <Button variant="danger" onClick={handleDelete}>Batalkan</Button>
         </div>
       }>
-        <p className="text-sm text-gray-600">Apakah Anda yakin ingin membatalkan sesi ini?</p>
+        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin membatalkan sesi ini?</p>
       </Modal>
     </div>
   )
