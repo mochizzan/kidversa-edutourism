@@ -11,6 +11,9 @@ build/
 *.so
 *.dylib
 
+# TypeScript build info
+*.tsbuildinfo
+
 # Database
 *.db
 *.sqlite
@@ -36,8 +39,11 @@ Thumbs.db
 *.log
 logs/
 
-# Vite
+# Vite / build cache
 .vite/
+
+# Internal docs (not for version control)
+docs/internal/
 
 # Go
 kidversa-server

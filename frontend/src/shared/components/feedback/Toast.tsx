@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { CheckCircle2, XCircle, AlertCircle, Info, X } from 'lucide-react'
 import { cn } from '../../../core/utils'
 
@@ -9,6 +9,19 @@ interface Toast {
   type: ToastType
   message: string
   duration?: number
+}
+
+interface ToastContextValue {
+  addToast: (toast: Omit<Toast, 'id'>) => string
+  removeToast: (id: string) => void
+}
+
+const ToastContext = createContext<ToastContextValue | null>(null)
+
+export function useGlobalToast() {
+  const ctx = useContext(ToastContext)
+  if (!ctx) throw new Error('useGlobalToast must be used within a ToastProvider')
+  return ctx
 }
 
 export function useToast() {
@@ -33,50 +46,35 @@ export function useToast() {
   return { toasts, addToast, removeToast }
 }
 
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const { toasts, addToast, removeToast } = useToast()
+  return (
+    <ToastContext.Provider value={{ addToast, removeToast }}>
+      {children}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+    </ToastContext.Provider>
+  )
+}
+
 const toastConfig: Record<ToastType, { icon: typeof Info; className: string }> = {
-  success: {
-    icon: CheckCircle2,
-    className: 'text-green-700 bg-green-50 border-green-200',
-  },
-  error: {
-    icon: XCircle,
-    className: 'text-on-error-container bg-error-container border-error-container',
-  },
-  warning: {
-    icon: AlertCircle,
-    className: 'text-yellow-700 bg-yellow-50 border-yellow-200',
-  },
-  info: {
-    icon: Info,
-    className: 'text-blue-700 bg-blue-50 border-blue-200',
-  },
+  success: { icon: CheckCircle2, className: 'text-green-700 bg-green-50 border-green-200' },
+  error: { icon: XCircle, className: 'text-on-error-container bg-error-container border-error-container' },
+  warning: { icon: AlertCircle, className: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
+  info: { icon: Info, className: 'text-blue-700 bg-blue-50 border-blue-200' },
 }
 
 export function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: string) => void }) {
   if (!toasts.length) return null
-
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
       {toasts.map((toast) => {
         const config = toastConfig[toast.type]
         const Icon = config.icon
         return (
-          <div
-            key={toast.id}
-            className={cn(
-              'flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg min-w-[320px]',
-              'animate-in slide-in-from-right',
-              config.className
-            )}
-          >
+          <div key={toast.id} className={cn('flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg min-w-[320px]', 'animate-in slide-in-from-right', config.className)}>
             <Icon className="w-5 h-5 shrink-0" />
             <p className="flex-1 text-sm font-medium text-on-surface">{toast.message}</p>
-            <button
-              onClick={() => onRemove(toast.id)}
-              className="p-1 rounded hover:bg-black/5 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <button onClick={() => onRemove(toast.id)} className="p-1 rounded hover:bg-black/5 transition-colors"><X className="w-4 h-4" /></button>
           </div>
         )
       })}

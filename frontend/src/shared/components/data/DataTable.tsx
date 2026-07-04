@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '../../../core/utils'
 
@@ -24,6 +24,7 @@ interface DataTableProps<T> {
   selectedRows?: string[]
   onSelectionChange?: (ids: string[]) => void
   getRowId: (item: T) => string
+  rowClassName?: (item: T) => string
   emptyState?: React.ReactNode
   actions?: React.ReactNode
   ariaLabel?: string
@@ -42,6 +43,7 @@ export function DataTable<T>({
   selectedRows = [],
   onSelectionChange,
   getRowId,
+  rowClassName,
   emptyState,
   actions,
   ariaLabel,
@@ -49,6 +51,19 @@ export function DataTable<T>({
   const [searchQuery, setSearchQuery] = useState('')
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  const sortedData = useMemo(() => {
+    if (!sortKey) return data
+    return [...data].sort((a, b) => {
+      const aVal = (a as Record<string, unknown>)[sortKey]
+      const bVal = (b as Record<string, unknown>)[sortKey]
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+      const cmp = String(aVal).localeCompare(String(bVal), 'id-ID')
+      return sortOrder === 'asc' ? cmp : -cmp
+    })
+  }, [data, sortKey, sortOrder])
 
   const totalPages = Math.ceil(total / pageSize) || 1
 
@@ -66,14 +81,14 @@ export function DataTable<T>({
     }
   }
 
-  const allSelected = data.length > 0 && selectedRows.length === data.length
+  const allSelected = sortedData.length > 0 && selectedRows.length === sortedData.length
   const someSelected = selectedRows.length > 0 && !allSelected
 
   const toggleSelectAll = () => {
     if (allSelected) {
       onSelectionChange?.([])
     } else {
-      onSelectionChange?.(data.map(getRowId))
+      onSelectionChange?.(sortedData.map(getRowId))
     }
   }
 
@@ -159,6 +174,11 @@ export function DataTable<T>({
               {loading ? (
                 Array.from({ length: pageSize }).map((_, index) => (
                   <tr key={index}>
+                    {selectable && (
+                      <td className="px-4 py-3">
+                        <div className="h-4 w-4 bg-surface-container-high rounded" />
+                      </td>
+                    )}
                     {columns.map((_, colIndex) => (
                       <td key={colIndex} className="px-4 py-3">
                         <div className="h-4 bg-surface-container-high rounded" />
@@ -166,7 +186,7 @@ export function DataTable<T>({
                     ))}
                   </tr>
                 ))
-              ) : data.length === 0 ? (
+              ) : sortedData.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length + (selectable ? 1 : 0)}>
                     {emptyState || (
@@ -175,7 +195,7 @@ export function DataTable<T>({
                   </td>
                 </tr>
               ) : (
-                data.map((item) => {
+                sortedData.map((item) => {
                   const rowId = getRowId(item)
                   const isSelected = selectedRows.includes(rowId)
                   return (
@@ -183,7 +203,8 @@ export function DataTable<T>({
                       key={rowId}
                       className={cn(
                         'hover:bg-surface-container-low/50 transition-colors',
-                        isSelected && 'bg-primary-container/30'
+                        isSelected && 'bg-primary-container/30',
+                        rowClassName?.(item)
                       )}
                     >
                       {selectable && (

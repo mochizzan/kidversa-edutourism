@@ -1,5 +1,7 @@
 node_modules
 dist
+build
 *.local
 .vite
+*.tsbuildinfo
 build-errors.txt

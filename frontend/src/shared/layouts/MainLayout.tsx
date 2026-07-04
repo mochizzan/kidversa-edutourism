@@ -1,5 +1,6 @@
 import { Outlet, Link } from 'react-router-dom'
 import { ROUTES } from '../../core/constants/app'
+import { ErrorBoundary } from '../components/feedback/ErrorBoundary'
 
 const MainLayout = () => {
   return (
@@ -30,7 +31,9 @@ const MainLayout = () => {
 
       {/* Main Content */}
       <main>
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       {/* Footer */}

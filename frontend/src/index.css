@@ -17,6 +17,7 @@
   --animate-splash-slide: splashSlideUp 0.6s ease-out forwards;
   --animate-float: float 8s ease-in-out infinite;
   --animate-float-slow: floatSlow 12s ease-in-out infinite;
+  --animate-highlight-once: highlightBlink 1.5s ease-out;
 }
 
 /* ── Brand Colors ── */
@@ -175,4 +176,13 @@ body {
   25% { transform: translateY(-12px) translateX(6px) scale(1.02); }
   50% { transform: translateY(4px) translateX(-4px) scale(0.98); }
   75% { transform: translateY(-8px) translateX(4px) scale(1.01); }
+}
+
+/* Highlight blink for search result navigation */
+@keyframes highlightBlink {
+  0%   { background-color: transparent; }
+  20%  { background-color: rgba(91, 44, 141, 0.12); }
+  40%  { background-color: transparent; }
+  60%  { background-color: rgba(91, 44, 141, 0.08); }
+  100% { background-color: transparent; }
 }

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { router } from './app/router'
 import { useAuthStore } from './core/stores/authStore'
+import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
+import { ToastProvider } from './shared/components/feedback/Toast'
 
 /* ── Splash Screen ── */
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -98,7 +100,7 @@ function App() {
     )
   }
 
-  return <RouterProvider router={router} />
+  return <ErrorBoundary><ToastProvider><RouterProvider router={router} /></ToastProvider></ErrorBoundary>
 }
 
 export default App

@@ -8,21 +8,21 @@ import { Input } from '../../../shared/components/ui/Input'
 import { Select } from '../../../shared/components/ui/Select'
 import { Card } from '../../../shared/components/ui/Card'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
+import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { frameService } from '../../../core/services/frames'
 import { programService } from '../../../core/services/programs'
 import { formatDate } from '../../../shared/utils'
 import type { PhotoFrame, Program } from '../../../core/types'
 
 // Module-level cache: persists across re-mounts so back-navigation is instant
-let _frameCache: PhotoFrame[] = []
-
 const FramesPage = () => {
-  const [frames, setFrames] = useState<PhotoFrame[]>(_frameCache)
+  const [frames, setFrames] = useState<PhotoFrame[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editingFrame, setEditingFrame] = useState<PhotoFrame | null>(null)
   const [editName, setEditName] = useState('')
   const [editProgramId, setEditProgramId] = useState('')
+  const { getHighlightClass } = useHighlight()
 
   const programMap = useMemo(
     () => new Map(programs.map((p) => [p.id, p.name])),
@@ -32,7 +32,6 @@ const FramesPage = () => {
   const load = async () => {
     const res = await frameService.getAll({ page: 1, limit: 100 })
     setFrames(res.data)
-    _frameCache = res.data
   }
 
   useEffect(() => { load() }, [])
@@ -69,7 +68,7 @@ const FramesPage = () => {
 
       <div className="space-y-3">
         {frames.map((frame) => (
-          <Card key={frame.id} padding="sm" className="hover:shadow-md transition-shadow">
+          <Card key={frame.id} padding="sm" className={`hover:shadow-md transition-shadow ${getHighlightClass(frame.id)}`}>
             <div className="flex items-start gap-4">
               {/* Thumbnail */}
               <div className="relative w-20 h-16 shrink-0 rounded-xl bg-surface-container-high overflow-hidden flex items-center justify-center">

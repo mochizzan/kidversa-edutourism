@@ -17,17 +17,6 @@ export interface ListParams {
   filters?: Record<string, string | boolean | undefined>
 }
 
-export interface ApiResponse<T = unknown> {
-  success: boolean
-  data?: T
-  message?: string
-  error?: {
-    code: string
-    message: string
-    field?: string
-  }
-}
-
 export interface CreateProgramDTO {
   name: string
   description?: string

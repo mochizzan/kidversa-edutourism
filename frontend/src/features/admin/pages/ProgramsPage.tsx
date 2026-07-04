@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, FolderOpen } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -7,60 +7,30 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
+import { useHighlight } from '../../../shared/hooks/useHighlight'
+import { useCrudList } from '../../../shared/hooks/useCrudList'
 import { programService } from '../../../core/services/programs'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Program } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 
-// Module-level cache: persists across re-mounts so back-navigation is instant
-let _programCache: Program[] = []
-let _totalCache = 0
-
 const ProgramsPage = () => {
-  const [programs, setPrograms] = useState<Program[]>(_programCache)
-  const [loading, setLoading] = useState(_programCache.length === 0)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(_totalCache)
-  const [search, setSearch] = useState('')
+  const { data: programs, loading, page, total, setPage, setSearch, refresh } = useCrudList<Program>({
+    fetchFn: (params) => programService.getAll({ ...params, limit: 10 }),
+  })
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const isSearchMounted = useRef(false)
-
-  const load = async () => {
-    try {
-      const res = await programService.getAll({ page, limit: 10, search })
-      setPrograms(res.data)
-      setTotal(res.total)
-      // Update module cache for next mount
-      _programCache = res.data
-      _totalCache = res.total
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-  }, [page])
-
-  useEffect(() => {
-    if (!isSearchMounted.current) {
-      isSearchMounted.current = true
-      return
-    }
-    const timeout = setTimeout(() => load(), 300)
-    return () => clearTimeout(timeout)
-  }, [search])
+  const { getHighlightClass } = useHighlight()
 
   const handleToggle = async (id: string) => {
     await programService.toggleActive(id)
-    load()
+    refresh()
   }
 
   const handleDelete = async () => {
     if (!deleteId) return
     await programService.delete(deleteId)
     setDeleteId(null)
-    load()
+    refresh()
   }
 
   const columns: Column<Program>[] = [
@@ -130,6 +100,7 @@ const ProgramsPage = () => {
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item: Program) => item.id}
+        rowClassName={(item: Program) => getHighlightClass(item.id)}
         emptyState={
           <EmptyState
             icon={<FolderOpen className="w-12 h-12" />}

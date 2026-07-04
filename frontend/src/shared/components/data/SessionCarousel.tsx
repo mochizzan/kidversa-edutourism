@@ -50,7 +50,9 @@ function SessionCard({ session }: { session: SessionCardData }) {
 
 export function SessionCarousel({ sessions }: SessionCarouselProps) {
   const [page, setPage] = useState(0)
-  const totalPages = Math.ceil(sessions.length / 3)
+  const PAGE_SIZE = 3
+  const totalPages = Math.ceil(sessions.length / PAGE_SIZE)
+  const visibleSessions = sessions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
     <div className="overflow-hidden">
@@ -75,7 +77,7 @@ export function SessionCarousel({ sessions }: SessionCarouselProps) {
         </div>
       </div>
       <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2">
-        {sessions.map((session) => (
+        {visibleSessions.map((session) => (
           <SessionCard key={session.id} session={session} />
         ))}
       </div>

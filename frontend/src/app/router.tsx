@@ -3,6 +3,7 @@ import AdminLayout from '../shared/layouts/AdminLayout'
 import MainLayout from '../shared/layouts/MainLayout'
 import AuthLayout from '../shared/layouts/AuthLayout'
 import ProtectedRoute from '../shared/components/auth/ProtectedRoute'
+import { UserRole } from '../core/types/enums'
 import { lazy, Suspense } from 'react'
 
 const Loading = () => (
@@ -57,8 +58,9 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  // ── Admin routes (SUPER_ADMIN, ADMIN_WISATA, KOORDINATOR) ──
   {
-    element: <ProtectedRoute />,
+    element: <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA, UserRole.KOORDINATOR]} />,
     children: [
       {
         path: '/admin',
@@ -138,6 +140,12 @@ export const router = createBrowserRouter([
           },
         ],
       },
+    ],
+  },
+  // ── Fasilitator routes ──
+  {
+    element: <ProtectedRoute allowedRoles={[UserRole.FASILITATOR]} />,
+    children: [
       {
         path: '/fasilitator',
         element: <AdminLayout />,
@@ -164,6 +172,12 @@ export const router = createBrowserRouter([
           },
         ],
       },
+    ],
+  },
+  // ── Parent routes ──
+  {
+    element: <ProtectedRoute allowedRoles={[UserRole.PARENT]} />,
+    children: [
       {
         path: '/parent',
         element: <MainLayout />,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Eye, Play, X, Calendar } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -7,55 +7,25 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
+import { useHighlight } from '../../../shared/hooks/useHighlight'
+import { useCrudList } from '../../../shared/hooks/useCrudList'
 import { sessionService } from '../../../core/services/sessions'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Session } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 
-// Module-level cache: persists across re-mounts so back-navigation is instant
-let _sessionCache: Session[] = []
-let _totalCache = 0
-
 const SessionsPage = () => {
-  const [sessions, setSessions] = useState<Session[]>(_sessionCache)
-  const [loading, setLoading] = useState(_sessionCache.length === 0)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(_totalCache)
-  const [search, setSearch] = useState('')
-  const [statusFilter] = useState<string>('')
+  const { data: sessions, loading, page, total, setPage, setSearch, refresh } = useCrudList<Session>({
+    fetchFn: (params) => sessionService.getAll({ ...params, limit: 10 }),
+  })
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const isSearchMounted = useRef(false)
-
-  const load = async () => {
-    try {
-      const res = await sessionService.getAll({ page, limit: 10, search, status: statusFilter || undefined })
-      setSessions(res.data)
-      setTotal(res.total)
-      _sessionCache = res.data
-      _totalCache = res.total
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-  }, [page])
-
-  useEffect(() => {
-    if (!isSearchMounted.current) {
-      isSearchMounted.current = true
-      return
-    }
-    const timeout = setTimeout(load, 300)
-    return () => clearTimeout(timeout)
-  }, [search, statusFilter])
+  const { getHighlightClass } = useHighlight()
 
   const handleDelete = async () => {
     if (!deleteId) return
     await sessionService.cancel(deleteId)
     setDeleteId(null)
-    load()
+    refresh()
   }
 
   const columns: Column<Session>[] = [
@@ -98,7 +68,7 @@ const SessionsPage = () => {
             <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip="Lihat Detail" />
           </Link>
           {item.status === 'DRAFT' && (
-            <Button variant="ghost" size="sm" icon={<Play className="w-4 h-4 text-green-600" />} tooltip="Mulai Sesi" onClick={() => sessionService.start(item.id).then(load)} />
+            <Button variant="ghost" size="sm" icon={<Play className="w-4 h-4 text-green-600" />} tooltip="Mulai Sesi" onClick={() => sessionService.start(item.id).then(() => refresh())} />
           )}
           <Button variant="ghost" size="sm" icon={<X className="w-4 h-4 text-error" />} tooltip="Batalkan" onClick={() => setDeleteId(item.id)} />
         </div>
@@ -127,6 +97,7 @@ const SessionsPage = () => {
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item: Session) => item.id}
+        rowClassName={(item: Session) => getHighlightClass(item.id)}
         emptyState={
           <EmptyState
             icon={<Calendar className="w-12 h-12" />}

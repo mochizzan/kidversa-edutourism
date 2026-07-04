@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -7,6 +7,8 @@ import { Input } from '../../../shared/components/ui/Input'
 import { Select } from '../../../shared/components/ui/Select'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
+import { useHighlight } from '../../../shared/hooks/useHighlight'
+import { useCrudList } from '../../../shared/hooks/useCrudList'
 import { userService } from '../../../core/services/users'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { User } from '../../../core/types'
@@ -18,37 +20,12 @@ const roleOptions = [
 ]
 
 const UsersPage = () => {
-  const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [search, setSearch] = useState('')
+  const { data: users, loading, page, total, setPage, setSearch, refresh } = useCrudList<User>({
+    fetchFn: (params) => userService.getAll({ ...params, limit: 10 }),
+  })
   const [open, setOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const isSearchMounted = useRef(false)
-
-  const load = async () => {
-    try {
-      const res = await userService.getAll({ page, limit: 10, search })
-      setUsers(res.data)
-      setTotal(res.total)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load()
-  }, [page])
-
-  useEffect(() => {
-    if (!isSearchMounted.current) {
-      isSearchMounted.current = true
-      return
-    }
-    const timeout = setTimeout(load, 300)
-    return () => clearTimeout(timeout)
-  }, [search])
+  const { getHighlightClass } = useHighlight()
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -72,12 +49,12 @@ const UsersPage = () => {
     }
     setOpen(false)
     setEditingUser(null)
-    load()
+    refresh()
   }
 
   const handleDeactivate = async (id: string) => {
     await userService.deactivate(id)
-    load()
+    refresh()
   }
 
   const columns: Column<User>[] = [
@@ -132,6 +109,7 @@ const UsersPage = () => {
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item: User) => item.id}
+        rowClassName={(item: User) => getHighlightClass(item.id)}
       />
 
       <Modal open={open} onClose={() => { setOpen(false); setEditingUser(null) }} title={editingUser ? 'Edit User' : 'Tambah User'} footer={

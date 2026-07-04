@@ -1,4 +1,5 @@
 import { Outlet, Link, useLocation, Navigate, useNavigate } from 'react-router-dom'
+import { ErrorBoundary } from '../components/feedback/ErrorBoundary'
 import {
   LayoutDashboard,
   FolderOpen,
@@ -17,8 +18,9 @@ import { cn } from '../../core/utils'
 import { useAuth } from '../../core/hooks/useAuth'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Tooltip } from '../components/ui/Tooltip'
+import { UserRole } from '../../core/types/enums'
 
-const menuSections = [
+const adminMenuSections = [
   {
     section: 'OVERVIEW',
     items: [
@@ -52,7 +54,7 @@ const AdminLayout = () => {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
 
   if (location.pathname === '/admin') {
     return <Navigate to="/admin/dashboard" replace />
@@ -65,6 +67,28 @@ const AdminLayout = () => {
 
   const closeDrawer = useCallback(() => setMobileDrawerOpen(false), [])
   const isCollapsed = sidebarCollapsed
+
+  // Role-based menu sections
+  const menuSections = user?.role === UserRole.FASILITATOR
+    ? [{
+        section: 'OVERVIEW',
+        items: [
+          { label: 'Dashboard', path: '/fasilitator/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+        ],
+      }, {
+        section: 'AKTIVITAS',
+        items: [
+          { label: 'Activities', path: '/fasilitator/activities', icon: <Calendar className="w-5 h-5" /> },
+        ],
+      }]
+    : adminMenuSections.map(section => ({
+        ...section,
+        items: section.items.map(item => ({
+          ...item,
+          path: user?.role === UserRole.KOORDINATOR || user?.role === UserRole.ADMIN_WISATA || user?.role === UserRole.SUPER_ADMIN
+            ? item.path : item.path,
+        })),
+      }))
 
   return (
     <div className="flex h-screen bg-background">
@@ -209,7 +233,9 @@ const AdminLayout = () => {
         <AppHeader onMenuToggle={() => setMobileDrawerOpen((prev) => !prev)} />
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="p-6 lg:p-8">
-            <Outlet />
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>
