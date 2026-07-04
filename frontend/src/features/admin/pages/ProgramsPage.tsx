@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, FolderOpen } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -12,20 +12,27 @@ import type { Column } from '../../../shared/components/data/DataTable'
 import type { Program } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 
+// Module-level cache: persists across re-mounts so back-navigation is instant
+let _programCache: Program[] = []
+let _totalCache = 0
+
 const ProgramsPage = () => {
-  const [programs, setPrograms] = useState<Program[]>([])
-  const [loading, setLoading] = useState(true)
+  const [programs, setPrograms] = useState<Program[]>(_programCache)
+  const [loading, setLoading] = useState(_programCache.length === 0)
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [total, setTotal] = useState(_totalCache)
   const [search, setSearch] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const isSearchMounted = useRef(false)
 
   const load = async () => {
-    setLoading(true)
     try {
       const res = await programService.getAll({ page, limit: 10, search })
       setPrograms(res.data)
       setTotal(res.total)
+      // Update module cache for next mount
+      _programCache = res.data
+      _totalCache = res.total
     } finally {
       setLoading(false)
     }
@@ -36,9 +43,11 @@ const ProgramsPage = () => {
   }, [page])
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      load()
-    }, 300)
+    if (!isSearchMounted.current) {
+      isSearchMounted.current = true
+      return
+    }
+    const timeout = setTimeout(() => load(), 300)
     return () => clearTimeout(timeout)
   }, [search])
 

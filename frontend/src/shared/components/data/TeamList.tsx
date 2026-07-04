@@ -1,7 +1,3 @@
-import { useState } from 'react'
-import { UserPlus, Check } from 'lucide-react'
-import { cn } from '../../../core/utils'
-
 interface TeamMember {
   id: string
   name: string
@@ -14,29 +10,16 @@ interface TeamListProps {
 }
 
 function TeamMemberItem({ member }: { member: TeamMember }) {
-  const [following, setFollowing] = useState(false)
-
   return (
-    <li className="flex items-center gap-3">
-      <div className="w-11 h-11 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-sm shrink-0">
+    <li className="flex items-center gap-3 px-3 -mx-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-surface-container-low hover:shadow-sm cursor-default group">
+      <div className="w-11 h-11 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-sm shrink-0 transition-all duration-200 group-hover:scale-110 group-hover:shadow-md">
         {member.name.charAt(0).toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-on-surface truncate">{member.name}</p>
+        <p className="text-sm font-bold text-on-surface truncate group-hover:text-primary transition-colors duration-200">{member.name}</p>
         <p className="text-xs text-on-surface-variant">{member.role}</p>
       </div>
-      <button
-        onClick={() => setFollowing(!following)}
-        className={cn(
-          'flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors',
-          following
-            ? 'border-primary bg-primary-container text-on-primary-container'
-            : 'border-outline text-on-surface-variant hover:border-primary hover:text-primary'
-        )}
-      >
-        {following ? <Check className="w-3 h-3" /> : <UserPlus className="w-3 h-3" />}
-        {following ? 'Following' : 'Follow'}
-      </button>
+      <div className="w-2 h-2 rounded-full bg-primary/20 group-hover:bg-primary transition-colors duration-200" />
     </li>
   )
 }
@@ -50,7 +33,7 @@ export function TeamList({ members }: TeamListProps) {
           <TeamMemberItem key={member.id} member={member} />
         ))}
       </ul>
-      <button className="w-full mt-5 py-3 rounded-xl bg-surface-container-low text-primary text-sm font-bold hover:bg-surface-container transition-colors">
+      <button className="w-full mt-5 py-3 rounded-xl bg-surface-container-low text-primary text-sm font-bold transition-all duration-200 hover:bg-primary hover:text-on-primary hover:shadow-md active:scale-[0.98]">
         Lihat Semua
       </button>
     </div>

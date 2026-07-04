@@ -3,13 +3,23 @@
 /*
  * Kidversa Theme - Tailwind CSS v4
  *
- * All brand colors are defined here as the single source of truth.
- * Use Tailwind utility classes: bg-primary, text-accent, border-primary-light, etc.
- *
- * Available tokens:
- *   primary / primary-light / primary-dark / primary-50..900
- *   accent  / accent-light  / accent-dark  / accent-50..900
+ * Custom animations:
+ *   animate-fade-in-up     — fadeInUp 0.4s ease-out (auth page transitions)
+ *   animate-fade-in-up-sm  — fadeInUpSm 0.3s ease-out (subtle entrance)
+ *   animate-splash-pop     — splashPop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)
+ *   animate-splash-slide   — splashSlideUp 0.6s ease-out
  */
+
+@theme {
+  --animate-fade-in-up: fadeInUp 0.4s ease-out;
+  --animate-fade-in-up-sm: fadeInUpSm 0.3s ease-out;
+  --animate-splash-pop: splashPop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  --animate-splash-slide: splashSlideUp 0.6s ease-out forwards;
+  --animate-float: float 8s ease-in-out infinite;
+  --animate-float-slow: floatSlow 12s ease-in-out infinite;
+}
+
+/* ── Brand Colors ── */
 
 @theme {
   --color-primary: #5B2C8D;
@@ -106,7 +116,7 @@
 }
 
 body {
-  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;
@@ -114,4 +124,55 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+/* ===== Custom Animations ===== */
+
+/* Auth page transitions */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUpSm {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Splash screen logo pop */
+@keyframes splashPop {
+  0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+  60% { transform: scale(1.15) rotate(2deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes splashSlideUp {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Step indicator pulse */
+@keyframes stepPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 44, 141, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(91, 44, 141, 0); }
+}
+
+/* Shimmer for skeleton loading */
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* Floating background blobs */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33% { transform: translateY(-16px) rotate(1deg); }
+  66% { transform: translateY(8px) rotate(-1deg); }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+  25% { transform: translateY(-12px) translateX(6px) scale(1.02); }
+  50% { transform: translateY(4px) translateX(-4px) scale(0.98); }
+  75% { transform: translateY(-8px) translateX(4px) scale(1.01); }
 }

@@ -11,7 +11,7 @@ export function DonutStat() {
   const { user } = useAuth()
 
   return (
-    <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-primary to-primary-light p-6 text-white shadow-sm">
+    <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-primary to-primary-light p-6 text-white shadow-sm group">
       <div className="relative z-10">
         <p className="text-[10px] font-bold tracking-[0.15em] uppercase opacity-80 mb-2">
           EDUTOURISM
@@ -23,7 +23,8 @@ export function DonutStat() {
           Kelola program edutourism Anda dengan mudah. Pantau sesi, peserta, dan laporan dalam satu tempat.
         </p>
       </div>
-      <div className="absolute -right-6 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+      <div className="absolute -right-6 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl transition-all duration-700 group-hover:scale-150 group-hover:opacity-60 group-hover:-translate-x-4 group-hover:-translate-y-4" />
+      <div className="absolute -left-10 -top-10 w-24 h-24 bg-white/5 rounded-full blur-3xl transition-all duration-700 group-hover:scale-125" />
     </div>
   )
 }

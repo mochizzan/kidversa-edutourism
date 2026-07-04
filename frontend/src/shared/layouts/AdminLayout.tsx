@@ -9,8 +9,9 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { ROUTES } from '../../core/constants/app'
 import { cn } from '../../core/utils'
 import { useAuth } from '../../core/hooks/useAuth'
@@ -47,7 +48,8 @@ const menuSections = [
 ]
 
 const AdminLayout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { logout } = useAuth()
@@ -61,66 +63,96 @@ const AdminLayout = () => {
     navigate('/auth/login', { replace: true })
   }
 
+  const closeDrawer = useCallback(() => setMobileDrawerOpen(false), [])
+  const isCollapsed = sidebarCollapsed
+
   return (
     <div className="flex h-screen bg-background">
       {/* Mobile backdrop */}
-      {sidebarOpen && (
+      {mobileDrawerOpen && (
         <div
           className="lg:hidden fixed inset-0 z-40 bg-black/50"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeDrawer}
         />
       )}
 
       {/* Sidebar */}
       <aside
         className={cn(
-          'z-50 h-screen bg-surface-container-low border-r border-outline-variant flex flex-col transition-all duration-300 shrink-0',
+          'z-50 h-screen bg-surface-container-low border-r border-outline-variant flex flex-col shrink-0 overflow-hidden',
           'fixed lg:relative',
-          sidebarOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-20'
+          // Mobile: slide in/out — transition-transform; Desktop: collapse via width
+          'transition-transform duration-300 ease-out lg:transition-[width] lg:duration-200 lg:ease-out',
+          // Mobile: drawer pattern (full overlay)
+          'w-64',
+          mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full',
+          // Desktop lg+: collapsible sidebar, always visible
+          isCollapsed ? 'lg:w-20' : 'lg:w-64',
+          'lg:translate-x-0'
         )}
       >
-        {/* Logo */}
-        <div className="p-6 border-b border-outline-variant">
-          <Link to={ROUTES.HOME} className="flex items-center gap-3">
+        {/* Logo + Close button */}
+        <div className="flex items-center h-16 lg:h-20 px-6 border-b border-outline-variant shrink-0">
+          <Link to={ROUTES.HOME} className="flex items-center gap-3 min-w-0 flex-1">
             <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
-            {sidebarOpen && <span className="text-xl font-bold text-on-surface">Kidversa</span>}
+            <span className={cn(
+              'text-xl font-bold text-on-surface truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
+              isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'
+            )}>Kidversa</span>
           </Link>
+          {/* Close button — mobile only */}
+          <button
+            onClick={closeDrawer}
+            className="lg:hidden shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors -mr-1"
+            aria-label="Tutup sidebar"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+        <nav className="flex-1 overflow-y-auto p-3">
           {menuSections.map((section) => (
-            <div key={section.section}>
-              {sidebarOpen && (
-                <h3 className="px-4 mb-2 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
-                  {section.section}
-                </h3>
-              )}
-              <div className="space-y-1">
+            <div key={section.section} className={cn(
+              'transition-all duration-150',
+              isCollapsed ? 'mb-1' : 'mb-6'
+            )}>
+              <h3
+                className={cn(
+                  'px-3 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest transition-all duration-150 overflow-hidden',
+                  isCollapsed
+                    ? 'max-h-0 opacity-0 mb-0 py-0'
+                    : 'max-h-8 opacity-100 mb-2'
+                )}
+              >
+                {section.section}
+              </h3>
+              <div className="flex flex-col gap-1">
                 {section.items.map((item) => {
                   const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                  const linkEl = (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => setSidebarOpen(false)}
-                      className={cn(
-                        'flex items-center gap-3 px-4 py-3 rounded-xl transition-colors',
-                        isActive
-                          ? 'bg-primary-container text-on-primary-container font-medium'
-                          : 'text-on-surface-variant hover:bg-surface-container',
-                        !sidebarOpen && 'justify-center'
-                      )}
-                    >
-                      {item.icon}
-                      {sidebarOpen && <span className="text-sm">{item.label}</span>}
-                    </Link>
-                  )
-                  return !sidebarOpen ? (
-                    <Tooltip key={item.path} content={item.label}>
-                      {linkEl}
+                  return (
+                    <Tooltip key={item.path} content={isCollapsed ? item.label : ''}>
+                      <Link
+                        to={item.path}
+                        onClick={closeDrawer}
+                        className={cn(
+                          'flex items-center py-3 rounded-xl transition-all duration-200 w-full',
+                          isCollapsed ? 'px-[18px]' : 'px-3',
+                          isActive
+                            ? 'bg-primary-container text-on-primary-container font-medium'
+                            : 'text-on-surface-variant hover:bg-surface-container'
+                        )}
+                      >
+                        <span className="flex items-center justify-center shrink-0 w-5 h-5">
+                          {item.icon}
+                        </span>
+                        <span className={cn(
+                          'text-sm truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
+                          isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
+                        )}>{item.label}</span>
+                      </Link>
                     </Tooltip>
-                  ) : linkEl
+                  )
                 })}
               </div>
             </div>
@@ -128,40 +160,53 @@ const AdminLayout = () => {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-outline-variant space-y-2">
-          {/* Desktop toggle — lg+ only */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="hidden lg:flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-surface-container rounded-xl transition-colors text-on-surface-variant text-sm"
-          >
-            {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
-            {sidebarOpen && <span>Tutup Sidebar</span>}
-          </button>
-          {/* Logout */}
-          {!sidebarOpen ? (
-            <Tooltip content="Keluar">
+        <div className="p-3 border-t border-outline-variant shrink-0">
+          <div className="flex flex-col gap-1">
+            <Tooltip content={isCollapsed ? 'Perluas Sidebar' : ''}>
               <button
-                onClick={handleLogout}
-                className="flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-error-container rounded-xl transition-colors text-on-surface-variant hover:text-on-error-container justify-center"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className={cn(
+                  'flex items-center py-3 rounded-xl hover:bg-surface-container transition-all duration-200 text-on-surface-variant text-sm w-full hidden lg:flex',
+                  isCollapsed ? 'px-[18px]' : 'px-3'
+                )}
               >
-                <LogOut className="w-5 h-5" />
+                {isCollapsed ? (
+                  <PanelLeftOpen className="w-5 h-5 shrink-0" />
+                ) : (
+                  <PanelLeftClose className="w-5 h-5 shrink-0" />
+                )}
+                <span className={cn(
+                  'truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
+                  isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
+                )}>
+                  {isCollapsed ? 'Perluas Sidebar' : 'Tutup Sidebar'}
+                </span>
               </button>
             </Tooltip>
-          ) : (
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-2 w-full text-left hover:bg-error-container rounded-xl transition-colors text-sm text-on-surface-variant hover:text-on-error-container"
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Keluar</span>
-            </button>
-          )}
+            <Tooltip content={isCollapsed ? 'Keluar' : ''}>
+              <button
+                onClick={handleLogout}
+                className={cn(
+                  'flex items-center py-3 rounded-xl hover:bg-surface-container transition-all duration-200 text-sm text-on-surface-variant hover:text-on-error-container hover:bg-error-container w-full',
+                  isCollapsed ? 'px-[18px]' : 'px-3'
+                )}
+              >
+                <LogOut className="w-5 h-5 shrink-0" />
+                <span className={cn(
+                  'truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
+                  isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
+                )}>
+                  Keluar
+                </span>
+              </button>
+            </Tooltip>
+          </div>
         </div>
       </aside>
 
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        <AppHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <AppHeader onMenuToggle={() => setMobileDrawerOpen((prev) => !prev)} />
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="p-6 lg:p-8">
             <Outlet />

@@ -1,51 +1,47 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { MOCK_DEFAULT_PASSWORD } from '../../../core/config/mock-accounts'
+import { cn } from '../../../core/utils'
 
-// Rate limiting constants
+// ── Rate limiting ──
 const MAX_ATTEMPTS = 5
-const LOCKOUT_DURATION = 5 * 60 * 1000 // 5 minutes
+const LOCKOUT_DURATION = 5 * 60 * 1000
 const ATTEMPTS_KEY = 'kidversa_login_attempts'
 const LOCKOUT_KEY = 'kidversa_lockout_until'
 
-// Zod schema
 const loginSchema = z.object({
   email: z.string().email('Format email tidak valid'),
   password: z.string().min(8, 'Password minimal 8 karakter'),
-  honeypot: z.string().max(0, 'Robot terdeteksi').optional().or(z.literal('')),
+  honeypot: z.string().max(0).optional().or(z.literal('')),
 })
 
 type LoginFormData = z.infer<typeof loginSchema>
 
-// Rate limiting helpers
 function getLoginAttempts(): number {
-  const val = sessionStorage.getItem(ATTEMPTS_KEY)
-  return val ? parseInt(val, 10) : 0
+  const v = sessionStorage.getItem(ATTEMPTS_KEY)
+  return v ? parseInt(v, 10) : 0
 }
-
-function setLoginAttempts(count: number): void {
-  sessionStorage.setItem(ATTEMPTS_KEY, String(count))
+function setLoginAttempts(c: number) {
+  sessionStorage.setItem(ATTEMPTS_KEY, String(c))
 }
-
 function getLockoutUntil(): number {
-  const val = sessionStorage.getItem(LOCKOUT_KEY)
-  return val ? parseInt(val, 10) : 0
+  const v = sessionStorage.getItem(LOCKOUT_KEY)
+  return v ? parseInt(v, 10) : 0
 }
-
-function setLockoutUntil(timestamp: number): void {
-  sessionStorage.setItem(LOCKOUT_KEY, String(timestamp))
+function setLockoutUntil(ts: number) {
+  sessionStorage.setItem(LOCKOUT_KEY, String(ts))
 }
-
-function clearRateLimit(): void {
+function clearRateLimit() {
   sessionStorage.removeItem(ATTEMPTS_KEY)
   sessionStorage.removeItem(LOCKOUT_KEY)
 }
 
+/* ── Component ── */
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [generalError, setGeneralError] = useState<string | null>(null)
@@ -63,196 +59,182 @@ const LoginPage = () => {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      honeypot: '',
-    },
+    defaultValues: { email: '', password: '', honeypot: '' },
   })
 
-  // Check lockout on mount
+  // ── Lockout check ──
   useEffect(() => {
-    const checkLockout = () => {
-      const lockoutUntil = getLockoutUntil()
-      if (lockoutUntil > Date.now()) {
+    const check = () => {
+      const until = getLockoutUntil()
+      if (until > Date.now()) {
         setIsLocked(true)
-        setLockoutTimeLeft(Math.ceil((lockoutUntil - Date.now()) / 1000))
+        setLockoutTimeLeft(Math.ceil((until - Date.now()) / 1000))
       } else {
         setIsLocked(false)
         setLockoutTimeLeft(0)
       }
     }
-
-    checkLockout()
-    const interval = setInterval(checkLockout, 1000)
-    return () => clearInterval(interval)
+    check()
+    const iv = setInterval(check, 1000)
+    return () => clearInterval(iv)
   }, [])
 
-  // Redirect if already authenticated
+  // ── Redirect if authed ──
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate(returnUrl, { replace: true })
-    }
+    if (isAuthenticated) navigate(returnUrl, { replace: true })
   }, [isAuthenticated, navigate, returnUrl])
 
-  const onSubmit = useCallback(async (data: LoginFormData) => {
-    setGeneralError(null)
+  // ── Submit ──
+  const onSubmit = useCallback(
+    async (data: LoginFormData) => {
+      setGeneralError(null)
+      if (data.honeypot?.length) return
+      if (getLockoutUntil() > Date.now()) { setIsLocked(true); return }
 
-    // Honeypot check
-    if (data.honeypot && data.honeypot.length > 0) {
-      // Silently reject
-      return
-    }
-
-    // Rate limit check
-    const lockoutUntil = getLockoutUntil()
-    if (lockoutUntil > Date.now()) {
-      setIsLocked(true)
-      return
-    }
-
-    try {
-      await login(data.email, data.password)
-      // Success - clear rate limit
-      clearRateLimit()
-      // Navigation handled by useEffect above
-    } catch (err) {
-      const attempts = getLoginAttempts() + 1
-      setLoginAttempts(attempts)
-
-      if (attempts >= MAX_ATTEMPTS) {
-        const lockoutEnd = Date.now() + LOCKOUT_DURATION
-        setLockoutUntil(lockoutEnd)
-        setIsLocked(true)
-        setGeneralError(`Terlalu banyak percobaan. Coba lagi dalam ${LOCKOUT_DURATION / 60000} menit`)
-      } else {
-        const remaining = MAX_ATTEMPTS - attempts
-        if (err instanceof Error) {
-          switch (err.message) {
-            case 'EMAIL_NOT_FOUND':
-            case 'INVALID_PASSWORD':
-              setGeneralError(
-                remaining < MAX_ATTEMPTS
-                  ? `Email atau password salah. Sisa percobaan: ${remaining}`
-                  : 'Email atau password salah'
-              )
-              break
-            case 'ACCOUNT_INACTIVE':
-              setGeneralError('Akun tidak aktif. Hubungi administrator')
-              break
-            default:
-              setGeneralError('Terjadi kesalahan. Silakan coba lagi')
-          }
+      try {
+        await login(data.email, data.password)
+        clearRateLimit()
+      } catch (err) {
+        const attempts = getLoginAttempts() + 1
+        setLoginAttempts(attempts)
+        if (attempts >= MAX_ATTEMPTS) {
+          const end = Date.now() + LOCKOUT_DURATION
+          setLockoutUntil(end)
+          setIsLocked(true)
+          setGeneralError('Terlalu banyak percobaan. Coba lagi dalam 5 menit.')
         } else {
-          setGeneralError('Terjadi kesalahan. Silakan coba lagi')
+          const remaining = MAX_ATTEMPTS - attempts
+          if (err instanceof Error) {
+            switch (err.message) {
+              case 'EMAIL_NOT_FOUND':
+              case 'INVALID_PASSWORD':
+                setGeneralError(
+                  `Email atau password salah. Sisa percobaan: ${remaining}`,
+                )
+                break
+              case 'ACCOUNT_INACTIVE':
+                setGeneralError('Akun tidak aktif. Hubungi administrator.')
+                break
+              default:
+                setGeneralError('Terjadi kesalahan. Silakan coba lagi.')
+            }
+          } else {
+            setGeneralError('Terjadi kesalahan. Silakan coba lagi.')
+          }
         }
       }
-    }
-  }, [login])
+    },
+    [login],
+  )
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-        Masuk ke Akun
-      </h2>
+    <>
+      {/* ── Header ── */}
+      <div className="flex flex-col items-center mb-7">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark shadow-lg shadow-primary/25 flex items-center justify-center mb-3">
+          <img
+            src="/logo.png"
+            alt="Kidversa"
+            className="w-8 h-8 object-contain"
+          />
+        </div>
+        <h2 className="text-xl font-bold text-on-surface tracking-tight text-center">
+          Selamat datang kembali
+        </h2>
+        <p className="text-sm text-on-surface-variant/60 mt-1.5 text-center max-w-[220px] leading-relaxed">
+          Masuk ke akun Kidversa Anda
+        </p>
+      </div>
 
-      {/* General Error Alert */}
+      {/* ── Error ── */}
       {generalError && (
-        <div className="mb-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          <AlertCircle className="w-5 h-5 shrink-0" />
+        <div className="mb-4 flex items-start gap-2.5 p-3.5 bg-error-container rounded-xl text-on-error-container text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{generalError}</span>
         </div>
       )}
 
-      {/* Lockout Warning */}
       {isLocked && lockoutTimeLeft > 0 && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm text-center">
+        <div className="mb-4 p-3.5 bg-accent-50 border border-accent-200 rounded-xl text-accent-800 text-sm text-center">
           <p className="font-medium">Akun terkunci sementara</p>
-          <p>Coba lagi dalam {Math.ceil(lockoutTimeLeft / 60)} menit {lockoutTimeLeft % 60} detik</p>
+          <p className="text-sm mt-0.5">
+            Coba lagi dalam {Math.ceil(lockoutTimeLeft / 60)} menit{' '}
+            {lockoutTimeLeft % 60} detik
+          </p>
         </div>
       )}
 
+      {/* ── Form ── */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Honeypot field - hidden from users */}
-        <div
-          style={{
-            position: 'absolute',
-            left: '-9999px',
-            opacity: 0,
-            height: 0,
-            width: 0,
-            overflow: 'hidden',
-            pointerEvents: 'none',
-          }}
-          aria-hidden="true"
-        >
+        {/* Honeypot */}
+        <div aria-hidden="true" className="absolute -left-[9999px] opacity-0 h-0 w-0 overflow-hidden pointer-events-none">
           <label htmlFor="login-website">Website</label>
-          <input
-            id="login-website"
-            type="text"
-            tabIndex={-1}
-            autoComplete="off"
-            {...register('honeypot')}
-          />
+          <input id="login-website" type="text" tabIndex={-1} autoComplete="off" {...register('honeypot')} />
         </div>
 
         {/* Email */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
             Email
           </label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
             <input
               type="email"
               {...register('email')}
-              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                errors.email ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={cn(
+                'w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm outline-none transition-all duration-200',
+                'bg-surface-container-low',
+                'placeholder:text-on-surface-variant/35',
+                'focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15',
+                errors.email
+                  ? 'border-error text-on-surface'
+                  : 'border-outline-variant/60 text-on-surface',
+              )}
               placeholder="email@example.com"
               disabled={isSubmitting || isLocked}
               aria-invalid={!!errors.email}
-              aria-describedby={errors.email ? 'login-email-error' : undefined}
             />
           </div>
           {errors.email && (
-            <p id="login-email-error" className="mt-1 text-sm text-red-600">
-              {errors.email.message}
-            </p>
+            <p className="mt-1 text-xs text-error font-medium">{errors.email.message}</p>
           )}
         </div>
 
         {/* Password */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
             Password
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
             <input
               type={showPassword ? 'text' : 'password'}
               {...register('password')}
-              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
-                errors.password ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={cn(
+                'w-full pl-10 pr-11 py-2.5 rounded-xl border text-sm outline-none transition-all duration-200',
+                'bg-surface-container-low',
+                'placeholder:text-on-surface-variant/35',
+                'focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15',
+                errors.password
+                  ? 'border-error text-on-surface'
+                  : 'border-outline-variant/60 text-on-surface',
+              )}
               placeholder="Masukkan password"
               disabled={isSubmitting || isLocked}
               aria-invalid={!!errors.password}
-              aria-describedby={errors.password ? 'login-password-error' : undefined}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface-variant transition-colors"
               tabIndex={-1}
             >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
           {errors.password && (
-            <p id="login-password-error" className="mt-1 text-sm text-red-600">
-              {errors.password.message}
-            </p>
+            <p className="mt-1 text-xs text-error font-medium">{errors.password.message}</p>
           )}
         </div>
 
@@ -260,12 +242,19 @@ const LoginPage = () => {
         <button
           type="submit"
           disabled={isSubmitting || isLocked}
-          className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className={cn(
+            'w-full py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 mt-1',
+            'bg-gradient-to-r from-primary to-primary-dark text-on-primary',
+            'hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5',
+            'active:scale-[0.98] active:translate-y-0',
+            'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:hover:translate-y-0 disabled:hover:scale-100',
+            'flex items-center justify-center gap-2',
+          )}
         >
           {isSubmitting ? (
             <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              <span>Memproses...</span>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-on-primary border-t-transparent" />
+              <span>Memproses…</span>
             </>
           ) : (
             'Masuk'
@@ -273,24 +262,37 @@ const LoginPage = () => {
         </button>
       </form>
 
-      {/* Demo Hint */}
-      <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-100">
-        <p className="text-xs text-purple-700 text-center">
-          <strong>Demo:</strong> admin@kidversa.id / {MOCK_DEFAULT_PASSWORD}
+      {/* ── Divider ── */}
+      <div className="flex items-center gap-3 my-5">
+        <span className="flex-1 h-px bg-outline-variant/40" />
+        <span className="text-[11px] text-on-surface-variant/40 font-medium tracking-wider uppercase">
+          Info Demo
+        </span>
+        <span className="flex-1 h-px bg-outline-variant/40" />
+      </div>
+
+      {/* ── Demo hint ── */}
+      <div className="p-3 rounded-xl bg-primary-container/40 border border-primary-100/60">
+        <p className="text-xs text-on-primary-container/60 text-center leading-relaxed">
+          <span className="font-semibold text-on-primary-container/80">Demo:</span>{' '}
+          admin@kidversa.id / {MOCK_DEFAULT_PASSWORD}
         </p>
-        <p className="text-xs text-purple-500 text-center mt-1">
-          Akun lain: koordinator@kidversa.id, f1@kidversa.id
+        <p className="text-[11px] text-on-primary-container/40 text-center mt-0.5">
+          Juga tersedia: koordinator@kidversa.id &bull; f1@kidversa.id
         </p>
       </div>
 
-      {/* Register link */}
-      <p className="mt-6 text-center text-sm text-gray-600">
+      {/* ── Register link ── */}
+      <p className="mt-6 text-center text-sm text-on-surface-variant/50">
         Belum punya akun?{' '}
-        <Link to="/auth/register" className="text-primary hover:text-primary-dark font-semibold">
+        <Link
+          to="/auth/register"
+          className="text-primary font-semibold hover:text-primary-dark transition-colors"
+        >
           Daftar sekarang
         </Link>
       </p>
-    </div>
+    </>
   )
 }
 

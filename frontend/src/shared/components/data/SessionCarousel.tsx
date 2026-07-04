@@ -23,9 +23,9 @@ function SessionCard({ session }: { session: SessionCardData }) {
   const [saved, setSaved] = useState(session.isSaved)
 
   return (
-    <div className="min-w-[220px] flex-1 bg-surface rounded-2xl p-3 shadow-sm group snap-start">
+    <div className="min-w-[220px] flex-1 bg-surface rounded-2xl p-3 shadow-sm group snap-start transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
       <div className="relative rounded-xl overflow-hidden aspect-[16/10] mb-3">
-        <div className={cn('w-full h-full', session.image)} />
+        <div className={cn('w-full h-full transition-transform duration-300 group-hover:scale-105', session.image)} />
         <button
           onClick={() => setSaved(!saved)}
           className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-surface/90 flex items-center justify-center"

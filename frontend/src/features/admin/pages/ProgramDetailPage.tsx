@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -23,15 +24,22 @@ const contentTypes = [
 
 const ProgramDetailPage = () => {
   const { programId } = useParams<{ programId: string }>()
+  const navigate = useNavigate()
+  const isNew = programId === 'new'
   const [program, setProgram] = useState<Program | null>(null)
   const [stages, setStages] = useState<ProgramStage[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!isNew)
   const [activeTab, setActiveTab] = useState('info')
   const [editingStage, setEditingStage] = useState<ProgramStage | null>(null)
   const [showStageForm, setShowStageForm] = useState(false)
 
+  // Create form state
+  const [newName, setNewName] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [creating, setCreating] = useState(false)
+
   useEffect(() => {
-    if (!programId) return
+    if (!programId || isNew) return
     ;(async () => {
       setLoading(true)
       const p = await programService.getById(programId)
@@ -41,6 +49,17 @@ const ProgramDetailPage = () => {
       setLoading(false)
     })()
   }, [programId])
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return
+    setCreating(true)
+    try {
+      const created = await programService.create({ name: newName, description: newDesc })
+      navigate(`/admin/programs/${created.id}`, { replace: true })
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const handleSaveStage = async (data: Partial<ProgramStage>) => {
     if (!programId) return
@@ -68,6 +87,63 @@ const ProgramDetailPage = () => {
     await programService.deleteStage(programId, stageId)
     const s = await programService.getStages(programId)
     setStages(s)
+  }
+
+  if (isNew) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Buat Program Baru"
+          subtitle="Tambahkan program edutourism baru."
+          breadcrumbs={[
+            { label: 'Programs', href: '/admin/programs' },
+            { label: 'Buat Baru' },
+          ]}
+        />
+
+        <Card>
+          <form
+            className="space-y-4 max-w-2xl"
+            onSubmit={(e) => { e.preventDefault(); handleCreate() }}
+          >
+            <div>
+              <label className="block text-sm font-medium text-on-surface mb-1">Nama Program *</label>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
+                placeholder="Nama program"
+                required
+                disabled={creating}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-on-surface mb-1">Deskripsi</label>
+              <textarea
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
+                rows={4}
+                placeholder="Deskripsi program (opsional)"
+                disabled={creating}
+              />
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <Button
+                variant="secondary"
+                onClick={() => navigate('/admin/programs')}
+                disabled={creating}
+              >
+                Batal
+              </Button>
+              <Button type="submit" disabled={creating || !newName.trim()}>
+                {creating ? 'Menyimpan…' : 'Simpan Program'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+    )
   }
 
   if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>

@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { cn } from '../../../core/utils'
 
 interface PageHeaderProps {
@@ -27,12 +28,12 @@ export function PageHeader({
             <span key={index} className="flex items-center gap-1.5">
               {index > 0 && <span className="text-on-surface-variant/40">/</span>}
               {crumb.href ? (
-                <a
-                  href={crumb.href}
+                <Link
+                  to={crumb.href}
                   className="hover:text-on-surface transition-colors"
                 >
                   {crumb.label}
-                </a>
+                </Link>
               ) : (
                 <span className="text-on-surface font-medium">{crumb.label}</span>
               )}

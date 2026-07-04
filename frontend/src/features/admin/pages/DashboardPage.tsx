@@ -17,8 +17,14 @@ import {
 const DashboardPage = () => {
   return (
     <div className="grid grid-cols-12 gap-6">
-      {/* Left column */}
-      <div className="col-span-12 xl:col-span-9 space-y-6">
+      {/* Right sidebar — FIRST in DOM so it wraps to TOP on mobile/tablet */}
+      <div className="col-span-12 xl:col-span-3 xl:order-2 space-y-6">
+        <DonutStat />
+        <TeamList members={teamMembers} />
+      </div>
+
+      {/* Left column — SECOND in DOM, order-1 on desktop */}
+      <div className="col-span-12 xl:col-span-9 xl:order-1 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <CategoryCard
             icon={FolderOpen}
@@ -119,11 +125,6 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* Right sidebar */}
-      <div className="col-span-12 xl:col-span-3 space-y-6">
-        <DonutStat />
-        <TeamList members={teamMembers} />
-      </div>
     </div>
   )
 }

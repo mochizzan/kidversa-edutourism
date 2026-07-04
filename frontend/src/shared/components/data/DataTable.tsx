@@ -161,7 +161,7 @@ export function DataTable<T>({
                   <tr key={index}>
                     {columns.map((_, colIndex) => (
                       <td key={colIndex} className="px-4 py-3">
-                        <div className="h-4 bg-surface-container-high rounded animate-pulse" />
+                        <div className="h-4 bg-surface-container-high rounded" />
                       </td>
                     ))}
                   </tr>

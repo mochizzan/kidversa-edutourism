@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -25,9 +25,9 @@ const UsersPage = () => {
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const isSearchMounted = useRef(false)
 
   const load = async () => {
-    setLoading(true)
     try {
       const res = await userService.getAll({ page, limit: 10, search })
       setUsers(res.data)
@@ -42,6 +42,10 @@ const UsersPage = () => {
   }, [page])
 
   useEffect(() => {
+    if (!isSearchMounted.current) {
+      isSearchMounted.current = true
+      return
+    }
     const timeout = setTimeout(load, 300)
     return () => clearTimeout(timeout)
   }, [search])

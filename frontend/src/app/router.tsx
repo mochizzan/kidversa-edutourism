@@ -15,17 +15,18 @@ const SuspenseWrapper = ({ children }: { children: React.ReactNode }) => (
   <Suspense fallback={<Loading />}>{children}</Suspense>
 )
 
-const LoginPage = lazy(() => import('../features/auth/pages/LoginPage'))
-const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage'))
+import LoginPage from '../features/auth/pages/LoginPage'
+import RegisterPage from '../features/auth/pages/RegisterPage'
+import ProgramsPage from '../features/admin/pages/ProgramsPage'
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 
 const AdminDashboardPage = lazy(() => import('../features/admin/pages/DashboardPage'))
-const ProgramsPage = lazy(() => import('../features/admin/pages/ProgramsPage'))
 const ProgramDetailPage = lazy(() => import('../features/admin/pages/ProgramDetailPage'))
 const SessionsPage = lazy(() => import('../features/admin/pages/SessionsPage'))
 const SessionDetailPage = lazy(() => import('../features/admin/pages/SessionDetailPage'))
 const ContentPage = lazy(() => import('../features/admin/pages/ContentPage'))
 const FramesPage = lazy(() => import('../features/admin/pages/FramesPage'))
+const FrameUploadPage = lazy(() => import('../features/admin/pages/FrameUploadPage'))
 const UsersPage = lazy(() => import('../features/admin/pages/UsersPage'))
 
 const FasilitatorDashboardPage = lazy(() => import('../features/fasilitator/pages/DashboardPage'))
@@ -48,19 +49,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'login',
-        element: (
-          <SuspenseWrapper>
-            <LoginPage />
-          </SuspenseWrapper>
-        ),
+        element: <LoginPage />,
       },
       {
         path: 'register',
-        element: (
-          <SuspenseWrapper>
-            <RegisterPage />
-          </SuspenseWrapper>
-        ),
+        element: <RegisterPage />,
       },
     ],
   },
@@ -85,11 +78,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'programs',
-            element: (
-              <SuspenseWrapper>
-                <ProgramsPage />
-              </SuspenseWrapper>
-            ),
+            element: <ProgramsPage />,
           },
           {
             path: 'programs/:programId',
@@ -120,6 +109,14 @@ export const router = createBrowserRouter([
             element: (
               <SuspenseWrapper>
                 <ContentPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'frames/upload',
+            element: (
+              <SuspenseWrapper>
+                <FrameUploadPage />
               </SuspenseWrapper>
             ),
           },

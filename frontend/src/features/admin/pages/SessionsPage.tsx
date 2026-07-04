@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Eye, Play, X, Calendar } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -12,21 +12,27 @@ import type { Column } from '../../../shared/components/data/DataTable'
 import type { Session } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 
+// Module-level cache: persists across re-mounts so back-navigation is instant
+let _sessionCache: Session[] = []
+let _totalCache = 0
+
 const SessionsPage = () => {
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [loading, setLoading] = useState(true)
+  const [sessions, setSessions] = useState<Session[]>(_sessionCache)
+  const [loading, setLoading] = useState(_sessionCache.length === 0)
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [total, setTotal] = useState(_totalCache)
   const [search, setSearch] = useState('')
   const [statusFilter] = useState<string>('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const isSearchMounted = useRef(false)
 
   const load = async () => {
-    setLoading(true)
     try {
       const res = await sessionService.getAll({ page, limit: 10, search, status: statusFilter || undefined })
       setSessions(res.data)
       setTotal(res.total)
+      _sessionCache = res.data
+      _totalCache = res.total
     } finally {
       setLoading(false)
     }
@@ -37,6 +43,10 @@ const SessionsPage = () => {
   }, [page])
 
   useEffect(() => {
+    if (!isSearchMounted.current) {
+      isSearchMounted.current = true
+      return
+    }
     const timeout = setTimeout(load, 300)
     return () => clearTimeout(timeout)
   }, [search, statusFilter])
