@@ -50,9 +50,8 @@ CLAUDE.md
 .docs/
 .img/
 
-# Internal docs & plans (not for version control)
-docs/internal/
-docs/plans/
+# Docs & plans (not for version control)
+docs/
 
 # Go
 kidversa-server
