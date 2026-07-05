@@ -42,9 +42,13 @@ logs/
 # Vite / build cache
 .vite/
 
-# Claude AI config (project-specific, not for version control)
+# Claude AI config & tools (not for version control)
 CLAUDE.md
 .claude/
+.codegraph/
+.kilo/
+.docs/
+.img/
 
 # Internal docs & plans (not for version control)
 docs/internal/
