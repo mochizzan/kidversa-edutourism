@@ -42,8 +42,9 @@ logs/
 # Vite / build cache
 .vite/
 
-# Internal docs (not for version control)
+# Internal docs & plans (not for version control)
 docs/internal/
+docs/plans/
 
 # Go
 kidversa-server
