@@ -53,5 +53,8 @@ CLAUDE.md
 # Docs & plans (not for version control)
 docs/
 
+# Images & assets
+img/
+
 # Go
 kidversa-server
