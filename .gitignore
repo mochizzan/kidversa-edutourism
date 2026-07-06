@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Vite / build cache
+.vite/
+
+# Claude AI config & tools (not for version control)
+CLAUDE.md
+.claude/
+.codegraph/
+.kilo/
+.docs/
+.img/
+
+# Docs & plans (not for version control)
+docs/
+
+# Images & assets
+img/
+
+# Go
+kidversa-server

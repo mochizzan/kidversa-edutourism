@@ -23,8 +23,8 @@ const LoginPage = () => {
 
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const returnUrl = searchParams.get('returnUrl') || '/admin/dashboard'
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated, getRedirectPath } = useAuth()
+  const returnUrl = searchParams.get('returnUrl') || getRedirectPath()
   const { isLocked, lockoutTimeLeft, recordFailedAttempt, clearRateLimit } = useRateLimit()
 
   const {

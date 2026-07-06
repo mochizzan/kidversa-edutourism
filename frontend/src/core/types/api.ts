@@ -70,10 +70,12 @@ export interface CreateUserDTO {
   role: UserRole
   name: string
   phone?: string
+  avatar_url?: string
 }
 
 export interface UpdateUserDTO extends Partial<CreateUserDTO> {
   is_active?: boolean
+  avatar_url?: string
 }
 
 export interface CreateAssessmentDTO {

@@ -69,6 +69,7 @@ export const authSession = {
 
 // Get all accounts (seed + any registered users)
 function getAllAccounts() {
+  const updatedUsers = mockStorage.get<User[]>('users_v1', [])
   const registered = mockStorage.get<User[]>('registered_users', [])
   const seedAccounts = MOCK_ACCOUNTS.map((a) => ({
     id: a.id,
@@ -81,7 +82,24 @@ function getAllAccounts() {
     is_active: a.is_active,
     created_at: '2026-01-01T00:00:00.000Z',
   }))
-  return [...seedAccounts, ...registered]
+  const base = [...seedAccounts, ...registered]
+
+  // Overlay profile fields from users_v1, preserving password_hash from auth source
+  for (const u of updatedUsers) {
+    const idx = base.findIndex((a) => a.id === u.id)
+    if (idx !== -1) {
+      base[idx] = {
+        ...base[idx],
+        name: u.name,
+        email: u.email,
+        phone: u.phone,
+        avatar_url: u.avatar_url,
+        is_active: u.is_active,
+      }
+    }
+  }
+
+  return base
 }
 
 // Simulate network delay

@@ -21,7 +21,7 @@ export function Card({ children, className, title, subtitle, actions, padding = 
   return (
     <div className={cn('bg-surface rounded-2xl shadow-sm', className)}>
       {(title || actions) && (
-        <div className="flex items-center justify-between mb-4">
+        <div className={cn(paddings[padding], 'pb-4 flex items-center justify-between')}>
           <div>
             {title && <h3 className="text-lg font-semibold text-on-surface">{title}</h3>}
             {subtitle && <p className="text-sm text-on-surface-variant mt-0.5">{subtitle}</p>}
@@ -29,7 +29,9 @@ export function Card({ children, className, title, subtitle, actions, padding = 
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
       )}
-      <div className={paddings[padding]}>{children}</div>
+      <div className={cn(paddings[padding], { 'pt-0': title || actions })}>
+        {children}
+      </div>
     </div>
   )
 }

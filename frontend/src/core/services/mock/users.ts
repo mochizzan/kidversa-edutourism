@@ -43,7 +43,7 @@ const getById = async (id: string): Promise<User | null> => {
 const create = async (data: CreateUserDTO): Promise<User> => {
   await new Promise((r) => setTimeout(r, 300))
   const users = init()
-  const user: User = {
+    const user: User = {
     id: `u-${Date.now()}`,
     tenant_id: data.tenant_id,
     email: data.email,
@@ -51,6 +51,7 @@ const create = async (data: CreateUserDTO): Promise<User> => {
     role: data.role,
     name: data.name,
     phone: data.phone,
+    avatar_url: data.avatar_url,
     is_active: true,
     created_at: new Date().toISOString(),
   }

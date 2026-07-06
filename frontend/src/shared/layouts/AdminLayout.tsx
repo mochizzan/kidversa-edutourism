@@ -11,6 +11,11 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   X,
+  Radio,
+  FileCheck,
+  Video,
+  ClipboardList,
+  ShieldCheck,
 } from 'lucide-react'
 import { useState, useCallback } from 'react'
 import { ROUTES } from '../../core/constants/app'
@@ -19,32 +24,45 @@ import { useAuth } from '../../core/hooks/useAuth'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Tooltip } from '../components/ui/Tooltip'
 import { UserRole } from '../../core/types/enums'
+import type { ReactNode } from 'react'
 
-const adminMenuSections = [
+interface MenuItem {
+  label: string
+  path: string
+  icon: ReactNode
+  roles: UserRole[]
+}
+
+const menuSections: { section: string; items: MenuItem[] }[] = [
   {
     section: 'OVERVIEW',
     items: [
-      { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+      { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
+      { label: 'Live Monitor', path: '/admin/live', icon: <Radio className="w-5 h-5" />, roles: [UserRole.KOORDINATOR, UserRole.ADMIN_WISATA] },
     ],
   },
   {
     section: 'PROGRAM',
     items: [
-      { label: 'Programs', path: '/admin/programs', icon: <FolderOpen className="w-5 h-5" /> },
-      { label: 'Sessions', path: '/admin/sessions', icon: <Calendar className="w-5 h-5" /> },
+      { label: 'Programs', path: '/admin/programs', icon: <FolderOpen className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA] },
+      { label: 'Sessions', path: '/admin/sessions', icon: <Calendar className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
+      { label: 'Reports', path: '/admin/reports', icon: <FileCheck className="w-5 h-5" />, roles: [UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
+      { label: 'Missions', path: '/admin/missions', icon: <ClipboardList className="w-5 h-5" />, roles: [UserRole.ADMIN_WISATA] },
     ],
   },
   {
     section: 'CONTENT',
     items: [
-      { label: 'Content Manager', path: '/admin/content', icon: <FileText className="w-5 h-5" /> },
-      { label: 'Frame Manager', path: '/admin/frames', icon: <Image className="w-5 h-5" /> },
+      { label: 'Content Manager', path: '/admin/content', icon: <FileText className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA] },
+      { label: 'Frame Manager', path: '/admin/frames', icon: <Image className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA] },
+      { label: 'Recordings', path: '/admin/recordings', icon: <Video className="w-5 h-5" />, roles: [UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
     ],
   },
   {
     section: 'SETTINGS',
     items: [
-      { label: 'Users', path: '/admin/users', icon: <Users className="w-5 h-5" /> },
+      { label: 'Users', path: '/admin/users', icon: <Users className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA] },
+      { label: 'Consent Monitor', path: '/admin/consent', icon: <ShieldCheck className="w-5 h-5" />, roles: [UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
     ],
   },
 ]
@@ -68,27 +86,13 @@ const AdminLayout = () => {
   const closeDrawer = useCallback(() => setMobileDrawerOpen(false), [])
   const isCollapsed = sidebarCollapsed
 
-  // Role-based menu sections
-  const menuSections = user?.role === UserRole.FASILITATOR
-    ? [{
-        section: 'OVERVIEW',
-        items: [
-          { label: 'Dashboard', path: '/fasilitator/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-        ],
-      }, {
-        section: 'AKTIVITAS',
-        items: [
-          { label: 'Activities', path: '/fasilitator/activities', icon: <Calendar className="w-5 h-5" /> },
-        ],
-      }]
-    : adminMenuSections.map(section => ({
-        ...section,
-        items: section.items.map(item => ({
-          ...item,
-          path: user?.role === UserRole.KOORDINATOR || user?.role === UserRole.ADMIN_WISATA || user?.role === UserRole.SUPER_ADMIN
-            ? item.path : item.path,
-        })),
-      }))
+  // Filter menu items by user role
+  const visibleSections = menuSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => user && item.roles.includes(user.role)),
+    }))
+    .filter((section) => section.items.length > 0)
 
   return (
     <div className="flex h-screen bg-background">
@@ -105,12 +109,9 @@ const AdminLayout = () => {
         className={cn(
           'z-50 h-screen bg-surface-container-low border-r border-outline-variant flex flex-col shrink-0 overflow-hidden',
           'fixed lg:relative',
-          // Mobile: slide in/out — transition-transform; Desktop: collapse via width
           'transition-transform duration-300 ease-out lg:transition-[width] lg:duration-200 lg:ease-out',
-          // Mobile: drawer pattern (full overlay)
           'w-64',
           mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full',
-          // Desktop lg+: collapsible sidebar, always visible
           isCollapsed ? 'lg:w-20' : 'lg:w-64',
           'lg:translate-x-0'
         )}
@@ -124,7 +125,6 @@ const AdminLayout = () => {
               isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'
             )}>Kidversa</span>
           </Link>
-          {/* Close button — mobile only */}
           <button
             onClick={closeDrawer}
             className="lg:hidden shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors -mr-1"
@@ -136,7 +136,7 @@ const AdminLayout = () => {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-3">
-          {menuSections.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.section} className={cn(
               'transition-all duration-150',
               isCollapsed ? 'mb-1' : 'mb-6'

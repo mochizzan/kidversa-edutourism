@@ -1,7 +1,8 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import AdminLayout from '../shared/layouts/AdminLayout'
-import MainLayout from '../shared/layouts/MainLayout'
 import AuthLayout from '../shared/layouts/AuthLayout'
+import FasilitatorLayout from '../shared/layouts/FasilitatorLayout'
+import ParentLayout from '../shared/layouts/ParentLayout'
 import ProtectedRoute from '../shared/components/auth/ProtectedRoute'
 import { UserRole } from '../core/types/enums'
 import { lazy, Suspense } from 'react'
@@ -21,6 +22,7 @@ import RegisterPage from '../features/auth/pages/RegisterPage'
 import ProgramsPage from '../features/admin/pages/ProgramsPage'
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'))
 
+// ── Admin pages (lazy) ──
 const AdminDashboardPage = lazy(() => import('../features/admin/pages/DashboardPage'))
 const ProgramDetailPage = lazy(() => import('../features/admin/pages/ProgramDetailPage'))
 const SessionsPage = lazy(() => import('../features/admin/pages/SessionsPage'))
@@ -29,17 +31,37 @@ const ContentPage = lazy(() => import('../features/admin/pages/ContentPage'))
 const FramesPage = lazy(() => import('../features/admin/pages/FramesPage'))
 const FrameUploadPage = lazy(() => import('../features/admin/pages/FrameUploadPage'))
 const UsersPage = lazy(() => import('../features/admin/pages/UsersPage'))
+const LiveMonitorPage = lazy(() => import('../features/admin/pages/LiveMonitorPage'))
+const ReportListPage = lazy(() => import('../features/admin/pages/ReportListPage'))
+const ReportSessionPage = lazy(() => import('../features/admin/pages/ReportSessionPage'))
+const ReportReviewPage = lazy(() => import('../features/admin/pages/ReportReviewPage'))
+const MissionBankPage = lazy(() => import('../features/admin/pages/MissionBankPage'))
+const RecordingReviewPage = lazy(() => import('../features/admin/pages/RecordingReviewPage'))
+const RecordingDetailPage = lazy(() => import('../features/admin/pages/RecordingDetailPage'))
+const ConsentMonitorPage = lazy(() => import('../features/admin/pages/ConsentMonitorPage'))
 
+// ── Fasilitator pages (lazy) ──
 const FasilitatorDashboardPage = lazy(() => import('../features/fasilitator/pages/DashboardPage'))
 const FasilitatorActivitiesPage = lazy(() => import('../features/fasilitator/pages/ActivitiesPage'))
-const ParentDashboardPage = lazy(() => import('../features/parent/pages/DashboardPage'))
-const ParentStoriesPage = lazy(() => import('../features/parent/pages/StoriesPage'))
+const FasilitatorGroupsPage = lazy(() => import('../features/fasilitator/pages/GroupsPage'))
+const FasilitatorGroupPage = lazy(() => import('../features/fasilitator/pages/GroupPage'))
+const FasilitatorChildAssessmentPage = lazy(() => import('../features/fasilitator/pages/ChildAssessmentPage'))
+const FasilitatorCameraPage = lazy(() => import('../features/fasilitator/pages/CameraPage'))
+const FasilitatorSmartPhotoPage = lazy(() => import('../features/fasilitator/pages/SmartPhotoPage'))
+const FasilitatorRecordingPage = lazy(() => import('../features/fasilitator/pages/RecordingPage'))
+const FasilitatorProfilePage = lazy(() => import('../features/fasilitator/pages/ProfilePage'))
+
+// ── Parent pages (lazy, token-based) ──
+const ParentConsentFormPage = lazy(() => import('../features/parent/pages/ConsentFormPage'))
+const ParentReportPage = lazy(() => import('../features/parent/pages/ReportPage'))
+const ParentMissionsPage = lazy(() => import('../features/parent/pages/MissionsPage'))
 
 export const router = createBrowserRouter([
   {
     path: '/',
     element: <Navigate to="/auth/login" replace />,
   },
+  // ── Auth routes ──
   {
     path: '/auth',
     element: <AuthLayout />,
@@ -60,7 +82,11 @@ export const router = createBrowserRouter([
   },
   // ── Admin routes (SUPER_ADMIN, ADMIN_WISATA, KOORDINATOR) ──
   {
-    element: <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA, UserRole.KOORDINATOR]} />,
+    element: (
+      <ProtectedRoute
+        allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA, UserRole.KOORDINATOR]}
+      />
+    ),
     children: [
       {
         path: '/admin',
@@ -75,6 +101,22 @@ export const router = createBrowserRouter([
             element: (
               <SuspenseWrapper>
                 <AdminDashboardPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'live',
+            element: (
+              <SuspenseWrapper>
+                <LiveMonitorPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'live/:sessionId',
+            element: (
+              <SuspenseWrapper>
+                <LiveMonitorPage />
               </SuspenseWrapper>
             ),
           },
@@ -138,17 +180,73 @@ export const router = createBrowserRouter([
               </SuspenseWrapper>
             ),
           },
+          {
+            path: 'reports',
+            element: (
+              <SuspenseWrapper>
+                <ReportListPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'reports/:sessionId',
+            element: (
+              <SuspenseWrapper>
+                <ReportSessionPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'reports/:sessionId/review/:reportId',
+            element: (
+              <SuspenseWrapper>
+                <ReportReviewPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'missions',
+            element: (
+              <SuspenseWrapper>
+                <MissionBankPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'recordings',
+            element: (
+              <SuspenseWrapper>
+                <RecordingReviewPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'recordings/:recordingId',
+            element: (
+              <SuspenseWrapper>
+                <RecordingDetailPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'consent',
+            element: (
+              <SuspenseWrapper>
+                <ConsentMonitorPage />
+              </SuspenseWrapper>
+            ),
+          },
         ],
       },
     ],
   },
-  // ── Fasilitator routes ──
+  // ── Fasilitator routes (mobile-first with FasilitatorLayout) ──
   {
     element: <ProtectedRoute allowedRoles={[UserRole.FASILITATOR]} />,
     children: [
       {
         path: '/fasilitator',
-        element: <AdminLayout />,
+        element: <FasilitatorLayout />,
         children: [
           {
             index: true,
@@ -170,42 +268,102 @@ export const router = createBrowserRouter([
               </SuspenseWrapper>
             ),
           },
+          {
+            path: 'groups',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorGroupsPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'camera',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorCameraPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'profile',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorProfilePage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'groups/:groupId',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorGroupPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'groups/:groupId/children/:childId',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorChildAssessmentPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'groups/:groupId/children/:childId/photo',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorSmartPhotoPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'groups/:groupId/children/:childId/record',
+            element: (
+              <SuspenseWrapper>
+                <FasilitatorRecordingPage />
+              </SuspenseWrapper>
+            ),
+          },
         ],
       },
     ],
   },
-  // ── Parent routes ──
+  // ── Parent routes (public, token-based access) ──
   {
-    element: <ProtectedRoute allowedRoles={[UserRole.PARENT]} />,
+    path: '/parent',
+    element: <ParentLayout />,
     children: [
       {
-        path: '/parent',
-        element: <MainLayout />,
-        children: [
-          {
-            index: true,
-            element: <Navigate to="/parent/dashboard" replace />,
-          },
-          {
-            path: 'dashboard',
-            element: (
-              <SuspenseWrapper>
-                <ParentDashboardPage />
-              </SuspenseWrapper>
-            ),
-          },
-          {
-            path: 'stories',
-            element: (
-              <SuspenseWrapper>
-                <ParentStoriesPage />
-              </SuspenseWrapper>
-            ),
-          },
-        ],
+        index: true,
+        element: <Navigate to="/parent/report" replace />,
+      },
+      {
+        path: 'consent',
+        element: (
+          <SuspenseWrapper>
+            <ParentConsentFormPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'report',
+        element: (
+          <SuspenseWrapper>
+            <ParentReportPage />
+          </SuspenseWrapper>
+        ),
+      },
+      {
+        path: 'missions',
+        element: (
+          <SuspenseWrapper>
+            <ParentMissionsPage />
+          </SuspenseWrapper>
+        ),
       },
     ],
   },
+  // ── 404 ──
   {
     path: '*',
     element: (

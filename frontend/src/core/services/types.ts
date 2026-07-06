@@ -108,6 +108,8 @@ export interface PhotoService {
 export interface RecordingService {
   getBySession(sessionId: string): Promise<Recording[]>
   getByParticipant(participantId: string): Promise<Recording[]>
+  getById(id: string): Promise<Recording | null>
+  update(id: string, data: Partial<Recording>): Promise<Recording>
   upload(participantId: string, sessionStageId: string, file: File): Promise<Recording>
   delete(id: string): Promise<void>
 }

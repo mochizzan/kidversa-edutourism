@@ -6,6 +6,7 @@ export interface User {
   role: import('./enums').UserRole
   name: string
   phone?: string
+  avatar_url?: string
   is_active: boolean
   created_at: string
 }

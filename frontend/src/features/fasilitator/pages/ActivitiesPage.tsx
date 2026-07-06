@@ -1,61 +1,149 @@
-import { Plus, Calendar, Clock, Users, Edit, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { Calendar, Users, CheckCircle, XCircle } from 'lucide-react'
+import { useAuth } from '../../../core/hooks/useAuth'
+import { sessionService } from '../../../core/services/sessions'
+import { assessmentService } from '../../../core/services/assessments'
+import { programService } from '../../../core/services/programs'
+import { PageHeader } from '../../../shared/components/ui/PageHeader'
+import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ErrorState } from '../../../shared/components/feedback/ErrorState'
+import { Badge } from '../../../shared/components/ui/Badge'
+import { formatDate } from '../../../shared/utils'
+import { SessionStatus } from '../../../core/types/enums'
+import type { Session } from '../../../core/types'
+
+interface ActivityItem {
+  id: string
+  session: Session
+  stageName: string
+  childrenAssessed: number
+  status: 'COMPLETED' | 'CANCELLED'
+}
+
+function SkeletonRow() {
+  return (
+    <div className="bg-surface rounded-2xl p-5 shadow-sm border border-outline-variant/50 animate-pulse">
+      <div className="h-5 bg-surface-container-high rounded w-2/3 mb-3" />
+      <div className="flex gap-4">
+        <div className="h-4 bg-surface-container-high rounded w-28" />
+        <div className="h-4 bg-surface-container-high rounded w-20" />
+      </div>
+    </div>
+  )
+}
 
 const ActivitiesPage = () => {
+  const { user } = useAuth()
+
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activities, setActivities] = useState<ActivityItem[]>([])
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
-  const activities = [
-    {
-      id: '1',
-      title: 'Storytelling: Petualangan di Laut',
-      date: '2025-01-20',
-      time: '09:00 - 10:00',
-      participants: 15,
-      status: 'upcoming',
-    },
-    {
-      id: '2',
-      title: 'Kuis: Pengetahuan Alam',
-      date: '2025-01-20',
-      time: '13:00 - 14:00',
-      participants: 12,
-      status: 'upcoming',
-    },
-    {
-      id: '3',
-      title: 'Workshop: Membuat Origami',
-      date: '2025-01-19',
-      time: '10:00 - 11:30',
-      participants: 18,
-      status: 'completed',
-    },
-  ]
+  const fetchActivities = useCallback(async () => {
+    if (!user) return
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Fetch completed and cancelled sessions
+      const res = await sessionService.getAll({ limit: 100 })
+      const historySessions = res.data.filter(
+        (s) => s.status === SessionStatus.COMPLETED || s.status === SessionStatus.CANCELLED,
+      )
+
+      const items: ActivityItem[] = []
+
+      for (const session of historySessions) {
+        const detail = await sessionService.getById(session.id)
+        if (!detail) continue
+
+        // Find stages assigned to this fasilitator
+        const myStages = detail.stages.filter((s) => s.fasilitator_id === user.id)
+        if (myStages.length === 0) continue
+
+        // Get program stages for name lookup
+        const programStages = await programService.getStages(detail.program_id)
+        const stageNameMap = new Map(programStages.map((ps) => [ps.id, ps.name]))
+
+        // Get assessment count for this session
+        const assessments = await assessmentService.getBySession(session.id)
+        const assessedParticipantIds = new Set(assessments.map((a) => a.participant_id))
+
+        // Use the first stage name as representative
+        const firstStage = myStages[0]
+        const stageName = stageNameMap.get(firstStage.program_stage_id) ?? 'Stage'
+
+        items.push({
+          id: session.id,
+          session,
+          stageName,
+          childrenAssessed: assessedParticipantIds.size,
+          status: session.status as 'COMPLETED' | 'CANCELLED',
+        })
+      }
+
+      setActivities(items)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memuat aktivitas')
+    } finally {
+      setLoading(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    fetchActivities()
+  }, [fetchActivities])
 
   const filteredActivities = activities.filter(
-    (activity) => activity.date === selectedDate
+    (a) => a.session.session_date === selectedDate,
   )
 
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Aktivitas</h1>
-        <button className="flex items-center gap-2 bg-accent text-primary-dark px-4 py-2 rounded-lg hover:bg-accent-light transition-colors">
-          <Plus className="w-5 h-5" />
-          Tambah Aktivitas
-        </button>
+  // ── Loading skeleton ──
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Aktivitas Saya" subtitle="Riwayat sesi dan stage yang telah dikerjakan." />
+        <div className="bg-surface rounded-2xl p-4 shadow-sm border border-outline-variant/50 animate-pulse">
+          <div className="h-10 bg-surface-container-high rounded w-48" />
+        </div>
+        <div className="grid gap-4">
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </div>
       </div>
+    )
+  }
+
+  // ── Error state ──
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Aktivitas Saya" />
+        <ErrorState message={error} onRetry={fetchActivities} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Aktivitas Saya"
+        subtitle="Riwayat sesi dan stage yang telah dikerjakan."
+      />
 
       {/* Date Filter */}
-      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 mb-6">
+      <div className="bg-surface rounded-2xl p-4 shadow-sm border border-outline-variant/50">
         <div className="flex items-center gap-4">
-          <Calendar className="w-5 h-5 text-gray-400" />
+          <Calendar className="w-5 h-5 text-on-surface-variant shrink-0" />
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-accent focus:border-transparent"
+            className="border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface bg-surface focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
           />
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-on-surface-variant">
             {filteredActivities.length} aktivitas ditemukan
           </span>
         </div>
@@ -66,54 +154,56 @@ const ActivitiesPage = () => {
         {filteredActivities.map((activity) => (
           <div
             key={activity.id}
-            className="bg-white rounded-xl shadow-sm p-6 border border-gray-100"
+            className="bg-surface rounded-2xl p-5 shadow-sm border border-outline-variant/50 hover:shadow-md transition-shadow"
           >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-lg font-semibold text-gray-800">{activity.title}</h3>
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      activity.status === 'completed'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-blue-100 text-blue-800'
-                    }`}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                  <h3 className="text-base font-semibold text-on-surface">
+                    {activity.session.name}
+                  </h3>
+                  <Badge
+                    variant={activity.status === 'COMPLETED' ? 'success' : 'danger'}
+                    size="sm"
                   >
-                    {activity.status === 'completed' ? 'Selesai' : 'Mendatang'}
-                  </span>
+                    {activity.status === 'COMPLETED' ? 'Selesai' : 'Dibatalkan'}
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-6 text-sm text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>{activity.date}</span>
+
+                <p className="text-sm text-on-surface-variant mb-3">
+                  {activity.stageName}
+                </p>
+
+                <div className="flex items-center gap-4 text-sm text-on-surface-variant flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 shrink-0" />
+                    <span>{formatDate(activity.session.session_date)}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{activity.time}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4" />
-                    <span>{activity.participants} peserta</span>
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-4 h-4 shrink-0" />
+                    <span>{activity.childrenAssessed} anak dinilai</span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button className="p-2 text-gray-400 hover:text-accent hover:bg-accent-50 rounded-lg transition-colors">
-                  <Edit className="w-5 h-5" />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                  <Trash2 className="w-5 h-5" />
-                </button>
+
+              {/* Status icon */}
+              <div className="shrink-0 mt-1">
+                {activity.status === 'COMPLETED' ? (
+                  <CheckCircle className="w-6 h-6 text-green-500" />
+                ) : (
+                  <XCircle className="w-6 h-6 text-red-400" />
+                )}
               </div>
             </div>
           </div>
         ))}
 
-        {filteredActivities.length === 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-12 border border-gray-100 text-center">
-            <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">Tidak ada aktivitas untuk tanggal ini</p>
-          </div>
+        {filteredActivities.length === 0 && !loading && (
+          <EmptyState
+            icon={<Calendar className="w-12 h-12" />}
+            title="Belum ada aktivitas"
+            description="Tidak ada sesi selesai atau dibatalkan pada tanggal ini."
+          />
         )}
       </div>
     </div>
