@@ -17,8 +17,8 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
     tenant_id: 't-1',
     email: 'admin@kidversa.id',
     password: 'password123',
-    role: UserRole.ADMIN_WISATA,
-    name: 'Admin Wisata',
+    role: UserRole.ADMIN,
+    name: 'Admin',
     phone: '081234567890',
     is_active: true,
   },
@@ -50,7 +50,7 @@ export const MOCK_ACCOUNTS: MockAccount[] = [
     role: UserRole.FASILITATOR,
     name: 'Fasilitator Ikan',
     phone: '081234567894',
-    is_active: false, // inactive for testing
+    is_active: false,
   },
 ]
 

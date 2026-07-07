@@ -19,10 +19,10 @@ import {
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { photoService } from '../../../core/services/photos'
+import { programService } from '../../../core/services/programs'
 import type { Assessment, SmartPhoto, Session } from '../../../core/types'
 import { ReportStatus } from '../../../core/types/enums'
 import { formatDate, cn } from '../../../core/utils'
-import { seedProgramStages } from '../../../core/services/mock/data/seed'
 
 /* ── Status helpers ── */
 const statusBadge: Record<string, 'neutral' | 'warning' | 'success' | 'primary'> = {
@@ -64,23 +64,23 @@ function ReportView() {
 
         if (sess) setSession(sess)
 
-        // Filter assessments for this participant
         const partAssessments = sessAssessments.filter(
           (a) => a.participant_id === participant.id
         )
         setAssessments(partAssessments)
 
-        // Build stage name map: session_stage_id -> program stage name
-        const stageNamesMap: Record<string, string> = {}
-        sessStages.forEach((ss) => {
-          const pgStage = seedProgramStages.find((ps) => ps.id === ss.program_stage_id)
-          if (pgStage) {
-            stageNamesMap[ss.id] = pgStage.name
-          }
-        })
-        setStageNames(stageNamesMap)
+        if (sess) {
+          const programStages = await programService.getStages(sess.program_id)
+          const stageNamesMap: Record<string, string> = {}
+          sessStages.forEach((ss) => {
+            const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
+            if (pgStage) {
+              stageNamesMap[ss.id] = pgStage.name
+            }
+          })
+          setStageNames(stageNamesMap)
+        }
 
-        // Find report photo
         const reportPhoto =
           sessPhotos.find(
             (p) => p.participant_id === participant.id && p.is_report_photo
@@ -135,7 +135,7 @@ function ReportView() {
 
   /* ── Render ── */
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-report">
       {/* Header */}
       <div className="text-center">
         <h1 className="text-xl font-bold text-on-surface">Laporan Perkembangan</h1>
@@ -253,13 +253,13 @@ function ReportView() {
       )}
 
       {/* Download PDF */}
-      <Button className="w-full" variant="secondary" onClick={handlePrint}>
+      <Button className="w-full no-print" variant="secondary" onClick={handlePrint}>
         <Printer className="w-4 h-4 mr-2" /> Download / Cetak PDF
       </Button>
 
       {/* Print toast */}
       {showPrintToast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-on-surface text-surface px-4 py-2 rounded-xl shadow-lg text-sm z-50">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-on-surface text-surface px-4 py-2 rounded-xl shadow-lg text-sm z-50 no-print">
           Gunakan browser: File &rarr; Print atau Ctrl+P
         </div>
       )}

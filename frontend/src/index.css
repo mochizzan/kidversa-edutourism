@@ -247,3 +247,72 @@ body {
   0%   { background-position: -200% center; }
   100% { background-position: 200% center; }
 }
+
+/* ── Print Styles ── */
+
+@media print {
+  /* Hide app chrome */
+  nav,
+  header,
+  aside,
+  .sidebar,
+  .bottom-nav,
+  button,
+  .no-print,
+  .toast-container,
+  [role="dialog"],
+  [role="alert"] {
+    display: none !important;
+  }
+
+  /* Force print-friendly layout */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Utility classes */
+  .print-only {
+    display: block !important;
+  }
+
+  .print-report {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 1rem !important;
+    box-shadow: none !important;
+  }
+
+  /* Preserve brand colors */
+  .text-primary,
+  .bg-primary,
+  .text-accent,
+  .bg-accent {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Clean page breaks */
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  img {
+    page-break-inside: avoid;
+  }
+
+  /* Print report header */
+  .print-report::before {
+    content: "Kidversa Edutourism";
+    display: block;
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #5B2C8D;
+  }
+}

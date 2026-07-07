@@ -15,7 +15,8 @@ import { Button } from '../../../shared/components/ui/Button'
 import { cn } from '../../../core/utils'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { recordingService } from '../../../core/services/recordings'
-import { seedParticipants, seedProgramStages, seedSessionStages } from '../../../core/services/mock/data/seed'
+import { sessionService } from '../../../core/services/sessions'
+import { programService } from '../../../core/services/programs'
 import type { Participant } from '../../../core/types'
 
 const MAX_DURATION = 90 // seconds
@@ -56,23 +57,51 @@ const RecordingPage = () => {
   const [saveError, setSaveError] = useState('')
 
   /* ── Derived ── */
-  const participant: Participant | null = childId
-    ? seedParticipants.find((p) => p.id === childId) ?? null
-    : null
+  const [participant, setParticipant] = useState<Participant | null>(null)
+  const [recordingSessionStageId, setRecordingSessionStageId] = useState<string | null>(null)
+  const [dataLoading, setDataLoading] = useState(true)
 
-  // Find the session stage for recording
-  const recordingSessionStageId: string | null = participant
-    ? (() => {
-        const sessionStages = seedSessionStages.filter(
-          (ss) => ss.session_id === participant.session_id,
-        )
-        for (const ss of sessionStages) {
-          const progStage = seedProgramStages.find((ps) => ps.id === ss.program_stage_id)
-          if (progStage?.is_recording_stage) return ss.id
+  useEffect(() => {
+    if (!childId) {
+      setDataLoading(false)
+      return
+    }
+
+    let cancelled = false
+
+    const loadData = async () => {
+      try {
+        const part = await sessionService.getParticipantById(childId)
+        if (cancelled) return
+        setParticipant(part)
+
+        if (part?.session_id) {
+          const session = await sessionService.getById(part.session_id)
+          if (cancelled) return
+
+          if (session) {
+            const sessionStages = await sessionService.getStages(part.session_id)
+            const programStages = await programService.getStages(session.program_id)
+            
+            for (const ss of sessionStages) {
+              const progStage = programStages.find((ps) => ps.id === ss.program_stage_id)
+              if (progStage?.is_recording_stage) {
+                setRecordingSessionStageId(ss.id)
+                break
+              }
+            }
+          }
         }
-        return null
-      })()
-    : null
+      } catch {
+        if (!cancelled) setParticipant(null)
+      } finally {
+        if (!cancelled) setDataLoading(false)
+      }
+    }
+
+    loadData()
+    return () => { cancelled = true }
+  }, [childId])
 
   /* ── Browser Support Check ── */
   const isBrowserSupported = typeof MediaRecorder !== 'undefined'
@@ -266,18 +295,12 @@ const RecordingPage = () => {
         { type: recordedBlob.type },
       )
 
-      // Override duration in storage after upload
       const recording = await recordingService.upload(childId, recordingSessionStageId, file)
-
-      // Set accurate duration in mock storage
-      const { mockStorage } = await import('../../../core/services/mock/db')
-      const all = mockStorage.get<any[]>('recordings_v1', [])
-      const saved = all.find((r: any) => r.id === recording.id)
-      if (saved) {
-        saved.duration_seconds = Math.max(1, duration)
-        saved.file_size_bytes = recordedBlob.size
-      }
-      mockStorage.set('recordings_v1', all)
+      
+      await recordingService.update(recording.id, {
+        duration_seconds: Math.max(1, duration),
+        file_size_bytes: recordedBlob.size,
+      })
 
       navigate(-1)
     } catch {
@@ -312,6 +335,15 @@ const RecordingPage = () => {
   /* ══════════════════════════════════════════════════
      RENDER
      ══════════════════════════════════════════════════ */
+
+  if (dataLoading) {
+    return (
+      <div className="h-screen h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-surface text-on-surface">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <p className="text-sm text-on-surface-variant">Memuat data peserta...</p>
+      </div>
+    )
+  }
 
   if (!participant) {
     return (

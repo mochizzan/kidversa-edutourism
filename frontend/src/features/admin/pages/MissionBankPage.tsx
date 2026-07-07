@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Power, PowerOff, Search, ChevronLeft, ChevronRight, Loader2, AlertCircle, Home, Users, School, FileText } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
-import { Input } from '../../../shared/components/ui/Input'
 import { Select } from '../../../shared/components/ui/Select'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { missionService } from '../../../core/services/missions'
 import { programService } from '../../../core/services/programs'
-import type { MissionBank, Program, ProgramStage } from '../../../core/types'
+import type { MissionBank, Program } from '../../../core/types'
 import { MissionCategory } from '../../../core/types'
 import { cn } from '../../../core/utils'
 
@@ -28,6 +28,7 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
 }
 
 const MissionBankPage = () => {
+  const navigate = useNavigate()
   const { addToast } = useGlobalToast()
 
   // Filters
@@ -46,15 +47,14 @@ const MissionBankPage = () => {
 
   // Programs for dropdown
   const [programs, setPrograms] = useState<Program[]>([])
-  const [stages, setStages] = useState<ProgramStage[]>([])
 
   // Stats
   const [stats, setStats] = useState<Record<string, number>>({ HOME: 0, PARENT: 0, SCHOOL: 0 })
 
-  // Modal state
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingMission, setEditingMission] = useState<MissionBank | null>(null)
-  const [saving, setSaving] = useState(false)
+  // Modal state - REMOVED
+  // const [modalOpen, setModalOpen] = useState(false)
+  // const [editingMission, setEditingMission] = useState<MissionBank | null>(null)
+  // const [saving, setSaving] = useState(false)
 
   // Delete / deactivate
   const [deactivateTarget, setDeactivateTarget] = useState<MissionBank | null>(null)
@@ -126,78 +126,19 @@ const MissionBankPage = () => {
     loadStats()
   }, [loadStats])
 
-  // Load stages when program changes for the modal
-  const loadStages = useCallback(async (programId: string) => {
-    if (!programId) {
-      setStages([])
-      return
-    }
-    try {
-      const res = await programService.getStages(programId)
-      setStages(res)
-    } catch {
-      setStages([])
-    }
-  }, [])
-
-  // Open create modal
-  const handleOpenCreate = () => {
-    setEditingMission(null)
-    setModalOpen(true)
-    if (selectedProgram) loadStages(selectedProgram)
-  }
-
-  // Open edit modal
-  const handleOpenEdit = (mission: MissionBank) => {
-    setEditingMission(mission)
-    setModalOpen(true)
-    loadStages(mission.program_id)
-  }
-
-  // Save mission
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setSaving(true)
-    const fd = new FormData(e.currentTarget)
-    const program_id = fd.get('program_id') as string
-    const category = fd.get('category') as MissionCategory
-    const title_child = fd.get('title_child') as string
-    const title_parent = fd.get('title_parent') as string
-    const description_parent = fd.get('description_parent') as string
-    const related_stage_ids = fd.getAll('stage_ids') as string[]
-
-    try {
-      if (editingMission) {
-        await missionService.update(editingMission.id, {
-          program_id,
-          category,
-          title_child,
-          title_parent,
-          description_parent: description_parent || undefined,
-          related_stage_ids: related_stage_ids.length > 0 ? related_stage_ids : undefined,
-        })
-        addToast({ type: 'success', message: 'Misi berhasil diperbarui' })
-      } else {
-        await missionService.create({
-          program_id,
-          category,
-          title_child,
-          title_parent,
-          description_parent: description_parent || undefined,
-          related_stage_ids: related_stage_ids.length > 0 ? related_stage_ids : undefined,
-        })
-        addToast({ type: 'success', message: 'Misi baru berhasil ditambahkan' })
-      }
-      setModalOpen(false)
-      setEditingMission(null)
-      loadMissions()
-      loadStats()
-    } catch {
-      addToast({ type: 'error', message: 'Gagal menyimpan misi' })
-    } finally {
-      setSaving(false)
-    }
-  }
+  // Load stages when program changes
+  // const loadStages = useCallback(async (programId: string) => {
+  //   if (!programId) {
+  //     setStages([])
+  //     return
+  //   }
+  //   try {
+  //     const res = await programService.getStages(programId)
+  //     setStages(res)
+  //   } catch {
+  //     setStages([])
+  //   }
+  // }, [])
 
   // Toggle active
   const handleToggleActive = async (mission: MissionBank) => {
@@ -255,7 +196,7 @@ const MissionBankPage = () => {
         title="Bank Misi"
         subtitle="Kelola bank misi untuk program edutourism."
         actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={handleOpenCreate}>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate('/admin/missions/new')}>
             Tambah Misi Baru
           </Button>
         }
@@ -363,7 +304,7 @@ const MissionBankPage = () => {
           }
           action={
             selectedProgram
-              ? { label: 'Tambah Misi Baru', onClick: handleOpenCreate }
+              ? { label: 'Tambah Misi Baru', onClick: () => navigate('/admin/missions/new') }
               : undefined
           }
         />
@@ -416,17 +357,9 @@ const MissionBankPage = () => {
                 {mission.related_stage_ids && mission.related_stage_ids.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {mission.related_stage_ids.map((stageId) => {
-                      const stage = stages.find((s) => s.id === stageId) || {
-                        id: stageId,
-                        name: stageId,
-                      }
-                      const stageName =
-                        stage.name === stageId
-                          ? `Stage ${stageId.slice(-4)}`
-                          : stage.name
                       return (
                         <Badge key={stageId} variant="accent" size="sm">
-                          {stageName}
+                          {`Stage ${stageId.slice(-4)}`}
                         </Badge>
                       )
                     })}
@@ -439,7 +372,7 @@ const MissionBankPage = () => {
                     variant="ghost"
                     size="sm"
                     icon={<Pencil className="w-4 h-4" />}
-                    onClick={() => handleOpenEdit(mission)}
+                    onClick={() => navigate(`/admin/missions/${mission.id}/edit`)}
                   >
                     Edit
                   </Button>
@@ -496,113 +429,6 @@ const MissionBankPage = () => {
           </div>
         </div>
       )}
-
-      {/* Create / Edit Modal */}
-      <Modal
-        open={modalOpen}
-        onClose={() => { setModalOpen(false); setEditingMission(null) }}
-        title={editingMission ? 'Edit Misi' : 'Tambah Misi Baru'}
-        size="lg"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => { setModalOpen(false); setEditingMission(null) }}
-            >
-              Batal
-            </Button>
-            <Button type="submit" form="mission-form" loading={saving}>
-              {editingMission ? 'Simpan' : 'Tambah'}
-            </Button>
-          </div>
-        }
-      >
-        <form id="mission-form" className="space-y-4" onSubmit={handleSave}>
-          <Select
-            label="Program"
-            name="program_id"
-            required
-            options={programs.map((p) => ({ value: p.id, label: p.name }))}
-            defaultValue={editingMission?.program_id || selectedProgram || ''}
-            onChange={(e) => loadStages(e.target.value)}
-          />
-
-          <Select
-            label="Kategori"
-            name="category"
-            required
-            options={[
-              { value: MissionCategory.HOME, label: '🏠 HOME' },
-              { value: MissionCategory.PARENT, label: '👨‍👩‍👧 PARENT' },
-              { value: MissionCategory.SCHOOL, label: '🏫 SCHOOL' },
-            ]}
-            defaultValue={editingMission?.category || MissionCategory.HOME}
-          />
-
-          <Input
-            label="Judul (Anak)"
-            name="title_child"
-            required
-            defaultValue={editingMission?.title_child}
-            placeholder="Contoh: Gambar sapi kesukaanku"
-          />
-
-          <Input
-            label="Judul (Orang Tua)"
-            name="title_parent"
-            required
-            defaultValue={editingMission?.title_parent}
-            placeholder="Contoh: Minta anak menggambar sapi yang paling berkesan"
-          />
-
-          <div className="w-full">
-            <label className="block text-sm font-medium text-on-surface mb-1">
-              Deskripsi (Orang Tua)
-            </label>
-            <textarea
-              name="description_parent"
-              rows={3}
-              defaultValue={editingMission?.description_parent}
-              placeholder="Jelaskan aktivitas yang harus dilakukan orang tua..."
-              className="w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
-            />
-          </div>
-
-          {/* Related stages multi-select */}
-          {stages.length > 0 && (
-            <div className="w-full">
-              <label className="block text-sm font-medium text-on-surface mb-2">
-                Stage Terkait
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {stages.map((stage) => {
-                  const isSelected = editingMission?.related_stage_ids?.includes(stage.id) ?? false
-                  return (
-                    <label
-                      key={stage.id}
-                      className={cn(
-                        'flex items-center gap-2 px-3 py-2 rounded-xl border text-sm cursor-pointer transition-colors',
-                        isSelected
-                          ? 'border-primary bg-primary-container/30 text-primary'
-                          : 'border-outline-variant text-on-surface hover:border-primary/50'
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        name="stage_ids"
-                        value={stage.id}
-                        defaultChecked={isSelected}
-                        className="accent-primary w-4 h-4"
-                      />
-                      <span className="truncate">{stage.name}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </form>
-      </Modal>
 
       {/* Toggle confirmation modal */}
       <Modal

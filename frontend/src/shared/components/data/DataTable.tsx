@@ -247,6 +247,7 @@ export function DataTable<T>({
               <button
                 onClick={() => onPageChange?.(page - 1)}
                 disabled={page === 1}
+                aria-label="Halaman sebelumnya"
                 className="p-2 rounded-xl border border-outline-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -257,6 +258,7 @@ export function DataTable<T>({
               <button
                 onClick={() => onPageChange?.(page + 1)}
                 disabled={page === totalPages}
+                aria-label="Halaman berikutnya"
                 className="p-2 rounded-xl border border-outline-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />

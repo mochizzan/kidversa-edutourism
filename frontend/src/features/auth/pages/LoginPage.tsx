@@ -64,6 +64,12 @@ const LoginPage = () => {
             case 'ACCOUNT_INACTIVE':
               setGeneralError('Akun tidak aktif. Hubungi administrator.')
               break
+            case 'ACCOUNT_PENDING':
+              setGeneralError('Akun Anda masih menunggu persetujuan admin.')
+              break
+            case 'ACCOUNT_REJECTED':
+              setGeneralError('Pendaftaran Anda ditolak. Hubungi administrator.')
+              break
             default:
               setGeneralError('Terjadi kesalahan. Silakan coba lagi.')
           }

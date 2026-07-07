@@ -8,6 +8,8 @@ Kidversa Edutourism — interactive digital storytelling platform for children (
 - `frontend/` — React 19 + TypeScript 6 + Vite 8 + Tailwind CSS v4 + PWA
 - `backend/` — Go 1.26 + Echo **v5** + GORM + SQLite (scaffold only — `go.mod`/`go.sum` exist, no source files yet)
 
+> `README.md` is stale (claims Echo v4, TS 5.x, Vite 6.x, and a `backend/main.go` that doesn't exist). Trust this file and the source over README.
+
 ## Commands
 
 ### Frontend (`frontend/`)
@@ -21,7 +23,7 @@ pnpm preview          # preview production build
 ```
 
 - `pnpm build` is the only CI-equivalent check. Run it after any change.
-- `tsconfig.json` has `strict`, `noUnusedLocals`, `noUnusedParameters` — all unused imports/vars are build errors.
+- `tsconfig.json` has `strict`, `noUnusedLocals`, `noUnusedParameters`, `noUncheckedSideEffectImports` — all unused imports/vars are build errors.
 - Vite proxies `/api` → `http://localhost:8080`.
 
 ### Backend (`backend/`)
@@ -32,8 +34,8 @@ go mod tidy
 # No Go source files exist yet — backend is a stub with dependencies declared only
 ```
 
-- The backend described in `CLAUDE.md` / `docs/` (main.go, REST endpoints) does not currently exist on disk.
-- Echo v5 is declared in `go.mod` (not v4).
+- The backend described in `README.md` / `docs/` (main.go, REST endpoints) does not currently exist on disk.
+- Echo **v5** is declared in `go.mod` (not v4, despite README claims).
 
 ## Architecture
 
@@ -44,38 +46,43 @@ app/          # router.tsx (all routes), providers/
 core/         # config/, constants/, hooks/, services/, stores/, theme/, types/, utils/
 features/     # admin/, auth/, fasilitator/, parent/
 shared/       # components/{ui,data,charts,feedback,layout,auth}, hooks/, layouts/, types/, utils/
-pages/        # LandingPage, NotFoundPage
+pages/        # LandingPage, LearnerKioskPage, NotFoundPage
 ```
 
 ### Routing (`app/router.tsx`)
 
 - Root `/` → redirects to `/auth/login`
 - `/auth/*` — AuthLayout (Login, Register)
-- `/admin/*` — ProtectedRoute → AdminLayout (desktop, sidebar) for SUPER_ADMIN, ADMIN_WISATA, KOORDINATOR
-- `/fasilitator/*` — ProtectedRoute → FasilitatorLayout (mobile-first, bottom nav) for FASILITATOR
-- `/parent/*` — ParentLayout (max-width 480px, **no ProtectedRoute** — uses `?token=` query param)
+- `/admin/*` — ProtectedRoute → AdminLayout (desktop, sidebar) for `SUPER_ADMIN`, `ADMIN`, `KOORDINATOR`
+- `/fasilitator/*` — ProtectedRoute → FasilitatorLayout (mobile-first, bottom nav) for `FASILITATOR`
+- `/parent/*` — ParentLayout (max-width 480px, **no ProtectedRoute** — uses `?token=` query param via `ParentTokenGuard`)
+- `/learner/:sessionId/:stageId` — Learner Kiosk (**public, no auth** — child-facing device)
+- `*` → NotFoundPage
 
 All pages except `ProgramsPage`, `LoginPage`, `RegisterPage` are lazy-loaded via `React.lazy()` + `<Suspense>`.
 
 ### User Roles
 
-5 roles in `core/types/enums.ts` → `UserRole`: `SUPER_ADMIN`, `ADMIN_WISATA`, `KOORDINATOR`, `FASILITATOR`, `PARENT`.
+4 roles in `core/types/enums.ts` → `UserRole`: `SUPER_ADMIN`, `ADMIN`, `KOORDINATOR`, `FASILITATOR`. There is **no** `PARENT` role — parent access is token-based, not role-based.
 
 ### Mock Data System
 
-All frontend services are **localStorage-backed mocks** — no real API calls exist yet.
+All frontend services are **localStorage-backed mocks** — no real API calls are wired into pages yet.
 
 Service pattern:
 1. Interface in `core/services/types.ts`
 2. Mock impl in `core/services/mock/` (e.g. `mock/programs.ts`)
 3. Re-export in `core/services/<domain>.ts` (swap this file to wire real API)
 
+A real API client scaffold exists at `core/services/backendClient.ts` (`apiRequest`, `healthCheck`) but is gated behind a localStorage flag `kidversa_backend_enabled` — off by default. Pages do not call it yet.
+
 Mock accounts (`core/config/mock-accounts.ts`), password `password123`:
-| Email | Role |
-|---|---|
-| admin@kidversa.id | ADMIN_WISATA |
-| koordinator@kidversa.id | KOORDINATOR |
-| f1@kidversa.id | FASILITATOR |
+| Email | Role | Active |
+|---|---|---|
+| admin@kidversa.id | ADMIN | yes |
+| koordinator@kidversa.id | KOORDINATOR | yes |
+| f1@kidversa.id | FASILITATOR | yes |
+| f3@kidversa.id | FASILITATOR | **no** (inactive — cannot log in) |
 
 Mock DB utility: `core/services/mock/db.ts` (localStorage via `mockStorage`).  
 Seed data: `core/services/mock/data/seed.ts`.
@@ -83,13 +90,13 @@ Seed data: `core/services/mock/data/seed.ts`.
 ### State Management
 
 - **Zustand** (`core/stores/authStore.ts`) — auth state, token in sessionStorage
-- **TanStack React Query** — installed but **not wired** (no `QueryClientProvider`). All pages use `useState` + `useEffect` with mock services directly.
+- **TanStack React Query** — installed but **not wired** (no `QueryClientProvider`). All pages use `useState` + `useEffect` with mock services directly. Don't use `useQuery`/`useMutation` without wiring the provider first.
 - **react-hook-form** + **zod** — forms (Login, Register)
 
 ### Styling
 
 - **Tailwind CSS v4** — configured via `@theme` directive in `frontend/src/index.css`. **No `tailwind.config.js`.**
-- Brand: primary `#5B2C8D` (purple), accent `#F5A623` (amber). Full M3 color system as CSS custom properties.
+- Brand: primary `#5B2C8D` (purple), accent `#F5A623` (amber). Full M3 color system as CSS custom properties. (Constants in `core/constants/app.ts` → `COLORS`.)
 - Use `cn()` from `core/utils/cn.ts` (clsx + tailwind-merge) for all conditional classNames — never raw template strings.
 - Custom animations in `index.css`: splash, toast, fade, float, etc.
 - Font: Poppins (loaded from `index.html`).
@@ -118,6 +125,7 @@ Always check existing shared components before creating new ones.
 - `useConfirmDialog` — reusable confirmation modal with async callback
 - `useGlobalSearch` — admin-wide search with page navigation
 - `useConnectionStatus` — polls CLOUD / EDGE / OFFLINE status
+- `useHeaderNotifications`, `useHighlight` — header/notification + list-row highlight helpers
 
 ### Important Files
 
@@ -126,14 +134,17 @@ Always check existing shared components before creating new ones.
 | `frontend/src/app/router.tsx` | All route definitions |
 | `frontend/src/App.tsx` | Root: splash screen + session check |
 | `frontend/src/core/stores/authStore.ts` | Zustand auth state |
-| `frontend/src/core/services/types.ts` | 12 service interfaces |
+| `frontend/src/core/services/types.ts` | Service interfaces |
+| `frontend/src/core/services/backendClient.ts` | Real API client scaffold (gated by `kidversa_backend_enabled` flag) |
 | `frontend/src/core/types/entities.ts` | Entity/DTO types |
 | `frontend/src/core/types/enums.ts` | All enums incl. UserRole |
 | `frontend/src/core/services/mock/db.ts` | localStorage mock DB |
 | `frontend/src/core/services/mock/data/seed.ts` | Seed data |
 | `frontend/src/index.css` | Tailwind v4 theme + M3 tokens + animations |
 | `frontend/vite.config.ts` | Vite + PWA + `/api` proxy |
-| `docs/internal/FRONTEND_BUILD_BLUEPRINT_v1.md` | Build roadmap, feature scoring, UX mockups — read before starting a feature |
+| `docs/Kidversa_FSD_v1.md` | Functional spec — read before starting a feature |
+| `docs/Kidversa_BRD_v3.md` | Business requirements |
+| `docs/Kidversa_ERD_v1.md` | Entity-relationship diagram |
 
 ## Conventions
 
@@ -144,10 +155,11 @@ Always check existing shared components before creating new ones.
 
 ## Gotchas
 
-- No `.env` files — `VITE_API_BASE_URL` defaults to `http://localhost:8080` (hardcoded in constants)
-- Backend binary `kidversa-server` is gitignored; `docs/`, `img/`, `.claude/`, `.codegraph/`, `.kilo/` are gitignored
+- No `.env` files — `VITE_API_BASE_URL` defaults to `http://localhost:8080` (hardcoded in `core/constants/app.ts` and `backendClient.ts`)
+- Gitignored: `docs/`, `img/`, `CLAUDE.md`, `.claude/`, `.codegraph/`, `.kilo/`, and the backend binary `kidversa-server`
 - `noUnusedLocals`/`noUnusedParameters` are enabled — every unused import breaks the build
 - TanStack React Query is installed but has no `QueryClientProvider` — don't use `useQuery` hooks yet without wiring it up first
 - Parent routes (`/parent/*`) use `ParentTokenGuard` with `?token=` param, not the standard `ProtectedRoute` — they cannot access Zustand auth state
+- Learner Kiosk (`/learner/*`) is fully public with no auth/guard at all
 - Tailwind v4: no config file — all customization goes in `index.css` under `@theme`
 - No test framework configured — `pnpm build` is the only automated verification

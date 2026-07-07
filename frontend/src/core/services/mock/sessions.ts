@@ -8,19 +8,11 @@ import type {
   UpdateSessionDTO,
 } from '../../types'
 import { SessionStatus, GroupStatus } from '../../types'
-import { seedSessions, seedSessionStages, seedSessionGroups, seedParticipants } from './data/seed'
-import { mockStorage } from './db'
+import { getAll, getById, put, queryByIndex, deleteById } from '../storage/idb'
+import { AppError } from '../../utils/errors'
+import { getTenantScope, requireTenantId } from '../tenantScope'
 
-const SESSION_STORAGE_KEY = 'sessions_v1'
-
-const init = () => {
-  const existing = mockStorage.get<Session[]>(SESSION_STORAGE_KEY, [])
-  if (existing.length) return existing
-  mockStorage.set(SESSION_STORAGE_KEY, seedSessions)
-  return seedSessions
-}
-
-const getAll = async (params?: { page?: number; limit?: number; search?: string; status?: string }): Promise<{
+const getAll_ = async (params?: { page?: number; limit?: number; search?: string; status?: string }): Promise<{
   data: Session[]
   total: number
   page: number
@@ -28,7 +20,15 @@ const getAll = async (params?: { page?: number; limit?: number; search?: string;
   totalPages: number
 }> => {
   await new Promise((r) => setTimeout(r, 200))
-  let data = init()
+  let data = await getAll<Session>('sessions')
+
+  const scope = getTenantScope()
+  if (scope.tenantId) {
+    data = data.filter((s) => s.tenant_id === scope.tenantId)
+  } else if (scope.blocked) {
+    data = []
+  }
+  
   if (params?.search) {
     const q = params.search.toLowerCase()
     data = data.filter((s) => s.name.toLowerCase().includes(q) || s.location.toLowerCase().includes(q))
@@ -36,6 +36,7 @@ const getAll = async (params?: { page?: number; limit?: number; search?: string;
   if (params?.status) {
     data = data.filter((s) => s.status === params.status)
   }
+  
   const page = params?.page ?? 1
   const limit = params?.limit ?? 10
   const start = (page - 1) * limit
@@ -48,44 +49,51 @@ const getAll = async (params?: { page?: number; limit?: number; search?: string;
   }
 }
 
-const getById = async (id: string): Promise<(Session & { stages: SessionStage[]; groups: (SessionGroup & { participants: Participant[] })[] }) | null> => {
+const getById_ = async (id: string): Promise<(Session & { stages: SessionStage[]; groups: (SessionGroup & { participants: Participant[] })[] }) | null> => {
   await new Promise((r) => setTimeout(r, 100))
-  const session = init().find((s) => s.id === id)
+  const session = await getById<Session>('sessions', id)
   if (!session) return null
-  const stages = seedSessionStages.filter((s) => s.session_id === id)
-  const groups = seedSessionGroups
-    .filter((g) => g.session_id === id)
-    .map((g) => ({
+  
+  // Hydrate stages from IDB
+  const stages = await queryByIndex<SessionStage>('session_stages', 'session_id', id)
+  
+  // Hydrate groups from IDB
+  const groups = await queryByIndex<SessionGroup>('session_groups', 'session_id', id)
+  
+  // Hydrate participants for each group
+  const groupsWithParticipants = await Promise.all(
+    groups.map(async (g) => ({
       ...g,
-      participants: seedParticipants.filter((p) => p.group_id === g.id),
+      participants: await queryByIndex<Participant>('participants', 'group_id', g.id),
     }))
-  return { ...session, stages, groups }
+  )
+  
+  return { ...session, stages, groups: groupsWithParticipants }
 }
 
 const create = async (data: CreateSessionDTO): Promise<Session> => {
   await new Promise((r) => setTimeout(r, 300))
-  const sessions = init()
+  const tenantId = requireTenantId()
   const session: Session = {
     id: `s-${Date.now()}`,
-    tenant_id: 't-1',
+    tenant_id: tenantId,
     ...data,
     status: SessionStatus.DRAFT,
     created_by: 'u-1',
     created_at: new Date().toISOString(),
   }
-  sessions.push(session)
-  mockStorage.set(SESSION_STORAGE_KEY, sessions)
+  await put('sessions', session)
   return session
 }
 
 const update = async (id: string, data: UpdateSessionDTO): Promise<Session> => {
   await new Promise((r) => setTimeout(r, 300))
-  const sessions = init()
-  const idx = sessions.findIndex((s) => s.id === id)
-  if (idx === -1) throw new Error('Session not found')
-  sessions[idx] = { ...sessions[idx], ...data }
-  mockStorage.set(SESSION_STORAGE_KEY, sessions)
-  return sessions[idx]
+  const existing = await getById<Session>('sessions', id)
+  if (!existing) throw new AppError('NOT_FOUND', 'Session not found')
+  
+  const updated = { ...existing, ...data }
+  await put('sessions', updated)
+  return updated
 }
 
 const start = async (id: string): Promise<Session> => {
@@ -102,20 +110,22 @@ const cancel = async (id: string): Promise<Session> => {
 
 const assignFacilitator = async (sessionId: string, stageId: string, userId: string): Promise<SessionStage> => {
   await new Promise((r) => setTimeout(r, 200))
-  const stage = seedSessionStages.find((s) => s.session_id === sessionId && s.id === stageId)
-  if (!stage) throw new Error('Stage not found')
+  const stage = await getById<SessionStage>('session_stages', stageId)
+  if (!stage || stage.session_id !== sessionId) throw new AppError('NOT_FOUND', 'Stage not found')
+  
   stage.fasilitator_id = userId
+  await put('session_stages', stage)
   return stage
 }
 
 const getStages = async (sessionId: string): Promise<SessionStage[]> => {
   await new Promise((r) => setTimeout(r, 150))
-  return seedSessionStages.filter((s) => s.session_id === sessionId)
+  return await queryByIndex<SessionStage>('session_stages', 'session_id', sessionId)
 }
 
 const getGroups = async (sessionId: string): Promise<SessionGroup[]> => {
   await new Promise((r) => setTimeout(r, 150))
-  return seedSessionGroups.filter((g) => g.session_id === sessionId)
+  return await queryByIndex<SessionGroup>('session_groups', 'session_id', sessionId)
 }
 
 const createGroup = async (sessionId: string, name: string): Promise<SessionGroup> => {
@@ -127,29 +137,39 @@ const createGroup = async (sessionId: string, name: string): Promise<SessionGrou
     status: GroupStatus.WAITING,
     created_at: new Date().toISOString(),
   }
-  seedSessionGroups.push(group)
+  await put('session_groups', group)
   return group
 }
 
 const updateGroup = async (sessionId: string, groupId: string, name: string): Promise<SessionGroup> => {
   await new Promise((r) => setTimeout(r, 250))
-  const group = seedSessionGroups.find((g) => g.session_id === sessionId && g.id === groupId)
-  if (!group) throw new Error('Group not found')
+  const group = await getById<SessionGroup>('session_groups', groupId)
+  if (!group || group.session_id !== sessionId) throw new AppError('NOT_FOUND', 'Group not found')
+  
   group.name = name
+  await put('session_groups', group)
   return group
 }
 
 const deleteGroup = async (sessionId: string, groupId: string): Promise<void> => {
   await new Promise((r) => setTimeout(r, 250))
-  const idx = seedSessionGroups.findIndex((g) => g.session_id === sessionId && g.id === groupId)
-  if (idx !== -1) seedSessionGroups.splice(idx, 1)
+  const group = await getById<SessionGroup>('session_groups', groupId)
+  if (group && group.session_id === sessionId) {
+    await deleteById('session_groups', groupId)
+  }
 }
 
 const getParticipants = async (sessionId: string, groupId?: string): Promise<Participant[]> => {
   await new Promise((r) => setTimeout(r, 150))
-  let data = seedParticipants.filter((p) => p.session_id === sessionId)
-  if (groupId) data = data.filter((p) => p.group_id === groupId)
-  return data
+  if (groupId) {
+    return await queryByIndex<Participant>('participants', 'group_id', groupId)
+  }
+  return await queryByIndex<Participant>('participants', 'session_id', sessionId)
+}
+
+const getParticipantById = async (participantId: string): Promise<Participant | null> => {
+  await new Promise((r) => setTimeout(r, 100))
+  return await getById<Participant>('participants', participantId)
 }
 
 const addParticipant = async (sessionId: string, groupId: string, data: CreateParticipantDTO): Promise<Participant> => {
@@ -168,7 +188,7 @@ const addParticipant = async (sessionId: string, groupId: string, data: CreatePa
     consent_photo: false,
     created_at: new Date().toISOString(),
   }
-  seedParticipants.push(participant)
+  await put('participants', participant)
   return participant
 }
 
@@ -178,23 +198,34 @@ const updateParticipant = async (
   data: Partial<CreateParticipantDTO>
 ): Promise<Participant> => {
   await new Promise((r) => setTimeout(r, 250))
-  const participant = seedParticipants.find((p) => p.session_id === sessionId && p.id === participantId)
-  if (!participant) throw new Error('Participant not found')
+  const participant = await getById<Participant>('participants', participantId)
+  if (!participant || participant.session_id !== sessionId) throw new AppError('NOT_FOUND', 'Participant not found')
+  
   Object.assign(participant, data)
+  await put('participants', participant)
   return participant
 }
 
 const removeParticipant = async (sessionId: string, participantId: string): Promise<void> => {
   await new Promise((r) => setTimeout(r, 250))
-  const idx = seedParticipants.findIndex((p) => p.session_id === sessionId && p.id === participantId)
-  if (idx !== -1) seedParticipants.splice(idx, 1)
+  const participant = await getById<Participant>('participants', participantId)
+  if (participant && participant.session_id === sessionId) {
+    await deleteById('participants', participantId)
+  }
 }
 
 const importParticipants = async (sessionId: string, rows: CreateParticipantDTO[]): Promise<Participant[]> => {
   await new Promise((r) => setTimeout(r, 400))
-  return Promise.all(
-    rows.map((row) =>
-      addParticipant(sessionId, row.group_id, {
+  for (const row of rows) {
+    if (!row.group_id) {
+      throw new AppError('VALIDATION_ERROR', 'Group ID is required for session import')
+    }
+  }
+
+  const created: Participant[] = []
+  try {
+    for (const row of rows) {
+      const participant = await addParticipant(sessionId, row.group_id!, {
         child_name: row.child_name,
         child_age: row.child_age,
         school_name: row.school_name,
@@ -203,13 +234,20 @@ const importParticipants = async (sessionId: string, rows: CreateParticipantDTO[
         parent_email: row.parent_email,
         group_id: row.group_id,
       })
-    )
-  )
+      created.push(participant)
+    }
+    return created
+  } catch (err) {
+    for (const p of created) {
+      await deleteById('participants', p.id).catch(() => {})
+    }
+    throw err
+  }
 }
 
 export const mockSessionService = {
-  getAll,
-  getById,
+  getAll: getAll_,
+  getById: getById_,
   create,
   update,
   start,
@@ -222,6 +260,7 @@ export const mockSessionService = {
   updateGroup,
   deleteGroup,
   getParticipants,
+  getParticipantById,
   addParticipant,
   updateParticipant,
   removeParticipant,

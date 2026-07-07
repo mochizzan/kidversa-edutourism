@@ -1,5 +1,5 @@
 import type { Program, ProgramStage, StageContent, Session, SessionStage, SessionGroup, Participant, User, PhotoFrame } from '../../../types'
-import { UserRole, ContentType, StageContentFileType, SessionStatus, SessionStageStatus, GroupStatus } from '../../../types'
+import { UserRole, ContentType, StageContentFileType, SessionStatus, SessionStageStatus, GroupStatus, ApprovalStatus } from '../../../types'
 
 export const seedUsers: User[] = [
   {
@@ -7,10 +7,11 @@ export const seedUsers: User[] = [
     tenant_id: 't-1',
     email: 'admin@kidversa.id',
     password_hash: 'hashed',
-    role: 'ADMIN_WISATA' as UserRole,
-    name: 'Admin Wisata',
+    role: 'ADMIN' as UserRole,
+    name: 'Admin',
     phone: '081234567890',
     is_active: true,
+    approval_status: ApprovalStatus.APPROVED,
     created_at: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -22,6 +23,7 @@ export const seedUsers: User[] = [
     name: 'Koordinator Program',
     phone: '081234567891',
     is_active: true,
+    approval_status: ApprovalStatus.APPROVED,
     created_at: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -33,6 +35,7 @@ export const seedUsers: User[] = [
     name: 'Fasilitator Sapi',
     phone: '081234567892',
     is_active: true,
+    approval_status: ApprovalStatus.APPROVED,
     created_at: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -44,6 +47,7 @@ export const seedUsers: User[] = [
     name: 'Fasilitator Sayur',
     phone: '081234567893',
     is_active: true,
+    approval_status: ApprovalStatus.APPROVED,
     created_at: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -55,6 +59,7 @@ export const seedUsers: User[] = [
     name: 'Fasilitator Ikan',
     phone: '081234567894',
     is_active: false,
+    approval_status: ApprovalStatus.APPROVED,
     created_at: '2026-01-01T00:00:00.000Z',
   },
 ]

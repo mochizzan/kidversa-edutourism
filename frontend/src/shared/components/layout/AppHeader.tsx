@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, Video, Bell, Menu, X, Users, FolderOpen, Calendar, Image, Loader2, ChevronRight } from 'lucide-react'
+import { Search, Video, Bell, Menu, X, Users, FolderOpen, Calendar, Image, Loader2, ChevronRight, Wifi, UserCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { Tooltip } from '../ui/Tooltip'
 import { useGlobalSearch } from '../../hooks/useGlobalSearch'
+import { useHeaderNotifications } from '../../hooks/useHeaderNotifications'
+import { useTenantStore } from '../../../core/stores/tenantStore'
+import { isSuperAdmin } from '../../../core/utils/permissions'
+import { getAll } from '../../../core/services/storage/idb'
+import type { Tenant } from '../../../core/types'
 
-// ── Icon map ──
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Users: <Users className="w-4 h-4" />,
   Programs: <FolderOpen className="w-4 h-4" />,
@@ -22,16 +26,18 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const notificationRef = useRef<HTMLDivElement>(null)
   const { query, setQuery, loading, results, searched, reset } = useGlobalSearch()
+  const { notifications, unreadCount } = useHeaderNotifications()
+  const { setActiveTenant, tenants: storeTenants } = useTenantStore()
   const [focused, setFocused] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
 
-  // ── Close handler ──
   const close = useCallback(() => {
     setFocused(false)
     reset()
   }, [reset])
 
-  // ── Keyboard shortcut: Ctrl+K to focus ──
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -43,7 +49,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
     return () => document.removeEventListener('keydown', handleKey)
   }, [])
 
-  // ── Close on Escape ──
   useEffect(() => {
     if (!focused) return
     const handleKey = (e: KeyboardEvent) => {
@@ -56,7 +61,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
     return () => document.removeEventListener('keydown', handleKey)
   }, [focused, close])
 
-  // ── Close on click outside ──
   useEffect(() => {
     if (!focused) return
     const handleClick = (e: MouseEvent) => {
@@ -64,25 +68,56 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         close()
       }
     }
-    // delay so the focus click doesn't immediately close
     setTimeout(() => document.addEventListener('mousedown', handleClick), 0)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [focused, close])
 
-  // ── Navigate ──
+  useEffect(() => {
+    if (!showNotifications) return
+    const handleClick = (e: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+    setTimeout(() => document.addEventListener('mousedown', handleClick), 0)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showNotifications])
+
   const handleNavigate = (route: string) => {
     close()
     navigate(route)
   }
 
-  // ── Input focus handler ──
   const handleFocus = () => setFocused(true)
 
-  // ── Flatten results for tree rendering (preserves original order) ──
   const flatResults = results.flatMap((group) => [
     { type: 'category' as const, category: group.category, route: group.route, icon: CATEGORY_ICONS[group.category] },
     ...group.items.map((item) => ({ type: 'item' as const, category: group.category, id: item.id, label: item.label, subtitle: item.subtitle, route: item.route })),
   ])
+
+  const handleNotificationClick = async (notif: { route?: string; tenant_id?: string | null }) => {
+    setShowNotifications(false)
+    if (!notif.route) return
+
+    if (notif.tenant_id && isSuperAdmin(user)) {
+      let tenant = storeTenants.find((t) => t.id === notif.tenant_id)
+      if (!tenant) {
+        const allTenants = await getAll<Tenant>('tenants')
+        tenant = allTenants.find((t) => t.id === notif.tenant_id)
+      }
+      if (tenant) {
+        setActiveTenant(tenant)
+      }
+    }
+
+    navigate(notif.route)
+  }
+
+  const NOTIF_ICONS: Record<string, React.ReactNode> = {
+    connection: <Wifi className="w-5 h-5" />,
+    user_approval: <UserCheck className="w-5 h-5" />,
+    sync: <Loader2 className="w-5 h-5" />,
+  }
 
   return (
     <>
@@ -98,7 +133,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
           </Tooltip>
         )}
 
-        {/* ── Search area ── */}
         <div ref={wrapperRef} className="relative w-full max-w-xl">
           <div
             className={`flex items-center gap-3 transition-all duration-200 text-left px-4 ${
@@ -128,10 +162,8 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
             </kbd>
           </div>
 
-          {/* ── Dropdown results ── */}
           {focused && (
             <div className="absolute top-full left-0 right-0 bg-surface rounded-b-2xl shadow-lg overflow-hidden animate-fade-in-up-sm">
-              {/* No results yet — initial state */}
               {!searched && !loading && (
                 <div className="py-8 text-center">
                   <Search className="w-7 h-7 mx-auto mb-2 text-outline" />
@@ -139,7 +171,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
                 </div>
               )}
 
-              {/* Loading */}
               {loading && flatResults.length === 0 && (
                 <div className="flex items-center justify-center gap-2 py-8 text-on-surface-variant">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -147,7 +178,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
                 </div>
               )}
 
-              {/* No results */}
               {!loading && searched && flatResults.length === 0 && (
                 <div className="py-8 text-center">
                   <Search className="w-7 h-7 mx-auto mb-2 text-outline" />
@@ -155,7 +185,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
                 </div>
               )}
 
-              {/* Results */}
               {flatResults.length > 0 && (
                 <div className="max-h-[50vh] overflow-y-auto p-2">
                   {flatResults.map((result, idx) => {
@@ -200,19 +229,65 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
           )}
         </div>
 
-        {/* ── Right actions ── */}
         <div className="flex items-center gap-4 ml-auto shrink-0">
-          <Tooltip content="Video">
-            <button className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors">
+          <Tooltip content="Live Monitor">
+            <button
+              onClick={() => navigate('/admin/live')}
+              className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+            >
               <Video className="w-5 h-5" />
             </button>
           </Tooltip>
-          <Tooltip content="Notifikasi">
-            <button className="relative w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full" />
-            </button>
-          </Tooltip>
+          <div ref={notificationRef} className="relative">
+            <Tooltip content="Notifikasi">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-error text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            </Tooltip>
+            {showNotifications && (
+              <div className="absolute top-full right-0 mt-2 w-80 bg-surface rounded-2xl shadow-lg border border-outline-variant overflow-hidden z-50 animate-fade-in-up-sm">
+                <div className="px-4 py-3 border-b border-outline-variant">
+                  <h3 className="text-sm font-bold text-on-surface">Notifikasi</h3>
+                </div>
+                <div className="max-h-[60vh] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <Bell className="w-7 h-7 mx-auto mb-2 text-outline" />
+                      <p className="text-sm text-on-surface-variant">Tidak ada notifikasi baru</p>
+                    </div>
+                  ) : (
+                    <div className="p-2">
+                      {notifications.map((notif) => {
+                        return (
+                          <button
+                            key={notif.id}
+                            onClick={() => handleNotificationClick(notif)}
+                            className={`w-full flex items-start gap-3 p-3 rounded-xl transition-colors ${notif.route ? 'hover:bg-surface-container-low cursor-pointer' : 'cursor-default'}`}
+                          >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${notif.color}`}>
+                              {NOTIF_ICONS[notif.type] || <Bell className="w-5 h-5" />}
+                            </div>
+                            <div className="flex-1 text-left">
+                              <p className="text-sm font-medium text-on-surface">{notif.title}</p>
+                              <p className="text-xs text-on-surface-variant">{notif.description}</p>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           {user && (
             <div className="flex items-center gap-3 ml-2">
               <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full border border-outline-variant overflow-hidden flex items-center justify-center bg-primary-container text-on-primary-container font-bold text-sm">
@@ -228,7 +303,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         </div>
       </header>
 
-      {/* ── Backdrop (content area only, not header) ── */}
       {focused && (
         <div
           className="fixed inset-0 top-16 lg:top-20 z-40 bg-black/30 transition-opacity duration-200"

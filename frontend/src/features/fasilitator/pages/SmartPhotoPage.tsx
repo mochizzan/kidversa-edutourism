@@ -22,9 +22,8 @@ import { cn } from '../../../core/utils'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { photoService } from '../../../core/services/photos'
 import { frameService } from '../../../core/services/frames'
+import { sessionService } from '../../../core/services/sessions'
 import { useAuthStore } from '../../../core/stores/authStore'
-import { mockStorage } from '../../../core/services/mock/db'
-import { seedParticipants } from '../../../core/services/mock/data/seed'
 import type { SmartPhoto, PhotoFrame, Participant } from '../../../core/types'
 
 const MAX_PHOTOS = 10
@@ -85,9 +84,31 @@ const SmartPhotoPage = () => {
   const [framePickerOpen, setFramePickerOpen] = useState(false)
 
   /* ── Participant Lookup ── */
-  const participant: Participant | null = childId
-    ? seedParticipants.find((p) => p.id === childId) ?? null
-    : null
+  const [participant, setParticipant] = useState<Participant | null>(null)
+  const [dataLoading, setDataLoading] = useState(true)
+
+  useEffect(() => {
+    if (!childId) {
+      setDataLoading(false)
+      return
+    }
+
+    let cancelled = false
+
+    const loadParticipant = async () => {
+      try {
+        const part = await sessionService.getParticipantById(childId)
+        if (!cancelled) setParticipant(part)
+      } catch {
+        if (!cancelled) setParticipant(null)
+      } finally {
+        if (!cancelled) setDataLoading(false)
+      }
+    }
+
+    loadParticipant()
+    return () => { cancelled = true }
+  }, [childId])
 
   /* ── Camera Setup ── */
   useEffect(() => {
@@ -389,6 +410,10 @@ const SmartPhotoPage = () => {
 
   const handleSave = useCallback(async () => {
     if (!editorCanvasRef.current || !childId || !participant || !user) return
+    if (!participant.session_id) {
+      addToast({ type: 'error', message: 'Peserta belum masuk sesi' })
+      return
+    }
     setIsSaving(true)
 
     try {
@@ -401,21 +426,25 @@ const SmartPhotoPage = () => {
       const photo = await photoService.upload(childId, participant.session_id, file)
 
       if (selectedFrameId || isReportPhoto) {
-        const all = mockStorage.get<SmartPhoto[]>('smart_photos_v1', [])
-        const saved = all.find((p) => p.id === photo.id)
-        if (saved) {
-          saved.frame_id = selectedFrameId || undefined
-          saved.taken_by = user.id
-          if (isReportPhoto && participant.consent_photo) {
-            all.forEach((p) => {
-              if (p.participant_id === childId && p.id !== photo.id) {
-                p.is_report_photo = false
-              }
-            })
-            saved.is_report_photo = true
+        const updateData: Partial<SmartPhoto> = {}
+        if (selectedFrameId) {
+          updateData.frame_id = selectedFrameId
+        }
+        if (isReportPhoto && participant.consent_photo) {
+          updateData.is_report_photo = true
+        }
+        updateData.taken_by = user.id
+        
+        await photoService.update(photo.id, updateData)
+        
+        if (isReportPhoto && participant.consent_photo) {
+          const allPhotos = await photoService.getByParticipant(childId)
+          for (const p of allPhotos) {
+            if (p.id !== photo.id && p.is_report_photo) {
+              await photoService.update(p.id, { is_report_photo: false })
+            }
           }
         }
-        mockStorage.set('smart_photos_v1', all)
       }
 
       setCapturedPhotoDataUrl(null)
@@ -525,6 +554,15 @@ const SmartPhotoPage = () => {
       ))}
     </div>
   )
+
+  if (dataLoading) {
+    return (
+      <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-[#F8F7FC] text-[#1C1B1F]">
+        <div className="animate-spin w-10 h-10 border-4 border-[#5B2C8D] border-t-transparent rounded-full" />
+        <p className="text-sm text-[#49454F]">Memuat data peserta...</p>
+      </div>
+    )
+  }
 
   if (!participant) {
     return (

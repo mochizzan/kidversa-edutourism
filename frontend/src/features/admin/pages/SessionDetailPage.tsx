@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Loader2, AlertCircle } from 'lucide-react'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Tabs } from '../../../shared/components/ui/Tabs'
 import { Card } from '../../../shared/components/ui/Card'
+import { Button } from '../../../shared/components/ui/Button'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
+import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { sessionService } from '../../../core/services/sessions'
 import { programService } from '../../../core/services/programs'
 import { userService } from '../../../core/services/users'
@@ -17,6 +21,7 @@ import { SessionGroupsTab } from '../components/SessionGroupsTab'
 const SessionDetailPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
+  const { addToast } = useGlobalToast()
   const isNew = sessionId === 'new'
   const [session, setSession] = useState<(Session & { stages: SessionStage[]; groups: (SessionGroup & { participants: Participant[] })[] }) | null>(null)
   const [loading, setLoading] = useState(!isNew)
@@ -25,6 +30,8 @@ const SessionDetailPage = () => {
 
   // Create form state
   const [programs, setPrograms] = useState<Program[]>([])
+  const [programsLoading, setProgramsLoading] = useState(isNew)
+  const [programsError, setProgramsError] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [newProgramId, setNewProgramId] = useState('')
   const [newDate, setNewDate] = useState('')
@@ -33,25 +40,36 @@ const SessionDetailPage = () => {
   const [creating, setCreating] = useState(false)
   const programsLoaded = useRef(false)
 
-  useEffect(() => {
+  const loadSession = async () => {
     if (!sessionId || isNew) return
-    ;(async () => {
-      setLoading(true)
+    setLoading(true)
+    try {
       const s = await sessionService.getById(sessionId)
       setSession(s)
       const users = await userService.getAll({ filters: { role: 'FASILITATOR' } })
       setFacilitators(users.data)
+    } finally {
       setLoading(false)
-    })()
+    }
+  }
+
+  useEffect(() => {
+    loadSession()
   }, [sessionId])
 
   useEffect(() => {
     if (isNew && !programsLoaded.current) {
+      programsLoaded.current = true
+      setProgramsLoading(true)
+      setProgramsError(null)
       programService.getAll({ limit: 100 }).then((res) => {
         setPrograms(res.data)
         if (res.data.length > 0) setNewProgramId(res.data[0].id)
+      }).catch(() => {
+        setProgramsError('Gagal memuat daftar program.')
+      }).finally(() => {
+        setProgramsLoading(false)
       })
-      programsLoaded.current = true
     }
   }, [isNew])
 
@@ -74,6 +92,8 @@ const SessionDetailPage = () => {
         program_id: newProgramId, name: newName, session_date: newDate, location: newLocation, notes: newNotes || undefined,
       })
       navigate(`/admin/sessions/${created.id}`, { replace: true })
+    } catch (err) {
+      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal membuat sesi' })
     } finally { setCreating(false) }
   }
 
@@ -83,14 +103,47 @@ const SessionDetailPage = () => {
         <PageHeader title="Buat Sesi Baru" subtitle="Tambahkan sesi edutourism baru."
           breadcrumbs={[{ label: 'Sessions', href: '/admin/sessions' }, { label: 'Buat Baru' }]} />
         <Card>
-          <SessionCreateForm
-            programs={programs}
-            newName={newName} setNewName={setNewName}
-            newProgramId={newProgramId} setNewProgramId={setNewProgramId}
-            newDate={newDate} setNewDate={setNewDate}
-            newLocation={newLocation} setNewLocation={setNewLocation}
-            newNotes={newNotes} setNewNotes={setNewNotes}
-            creating={creating} onCancel={() => navigate('/admin/sessions')} onSubmit={handleCreate} />
+          {programsLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : programsError ? (
+            <div className="text-center py-12 space-y-3">
+              <AlertCircle className="w-10 h-10 mx-auto text-error" />
+              <p className="text-sm text-on-surface-variant">{programsError}</p>
+              <Button variant="secondary" size="sm" onClick={() => {
+                programsLoaded.current = false
+                setProgramsError(null)
+                setProgramsLoading(true)
+                programService.getAll({ limit: 100 }).then((res) => {
+                  setPrograms(res.data)
+                  if (res.data.length > 0) setNewProgramId(res.data[0].id)
+                }).catch(() => {
+                  setProgramsError('Gagal memuat daftar program.')
+                }).finally(() => {
+                  setProgramsLoading(false)
+                })
+              }}>
+                Coba Lagi
+              </Button>
+            </div>
+          ) : programs.length === 0 ? (
+            <EmptyState
+              icon={<AlertCircle className="w-12 h-12" />}
+              title="Belum ada program"
+              description="Buat program terlebih dahulu sebelum membuat sesi baru."
+              action={{ label: 'Ke Halaman Program', onClick: () => navigate('/admin/programs') }}
+            />
+          ) : (
+            <SessionCreateForm
+              programs={programs}
+              newName={newName} setNewName={setNewName}
+              newProgramId={newProgramId} setNewProgramId={setNewProgramId}
+              newDate={newDate} setNewDate={setNewDate}
+              newLocation={newLocation} setNewLocation={setNewLocation}
+              newNotes={newNotes} setNewNotes={setNewNotes}
+              creating={creating} onCancel={() => navigate('/admin/sessions')} onSubmit={handleCreate} />
+          )}
         </Card>
       </div>
     )
@@ -111,7 +164,7 @@ const SessionDetailPage = () => {
 
       {activeTab === 'info' && <SessionInfoTab session={session} programName={programMap.get(session.program_id) || session.program_id} />}
       {activeTab === 'stages' && <SessionStagesTab stages={session.stages} facilitators={facilitators} sessionId={sessionId!} stageMap={stageMap} />}
-      {activeTab === 'groups' && <SessionGroupsTab groups={session.groups} />}
+      {activeTab === 'groups' && <SessionGroupsTab sessionId={sessionId!} sessionStatus={session.status} groups={session.groups} onRefresh={loadSession} />}
     </div>
   )
 }

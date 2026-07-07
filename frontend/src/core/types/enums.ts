@@ -1,9 +1,8 @@
 export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
-  ADMIN_WISATA = 'ADMIN_WISATA',
+  ADMIN = 'ADMIN',
   KOORDINATOR = 'KOORDINATOR',
   FASILITATOR = 'FASILITATOR',
-  PARENT = 'PARENT',
 }
 
 export enum ContentType {
@@ -90,6 +89,12 @@ export enum SyncQueueStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   DONE = 'DONE',
   FAILED = 'FAILED',
+}
+
+export enum ApprovalStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
 }
 
 export enum ConnectionStatus {

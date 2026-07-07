@@ -1,16 +1,15 @@
 import { create } from 'zustand'
 import type { User } from '../types'
 import type { CreateUserDTO } from '../types'
-import { mockAuthService, authSession, registerUser } from '../services/mock/auth'
+import { localAuthService, authSession, registerUser } from '../services/local/auth'
 import { UserRole } from '../types'
 
 // Role-based redirect map
 const ROLE_REDIRECTS: Record<string, string> = {
-  [UserRole.SUPER_ADMIN]: '/admin/dashboard',
-  [UserRole.ADMIN_WISATA]: '/admin/dashboard',
+  [UserRole.SUPER_ADMIN]: '/admin/tenants',
+  [UserRole.ADMIN]: '/admin/dashboard',
   [UserRole.KOORDINATOR]: '/admin/dashboard',
   [UserRole.FASILITATOR]: '/fasilitator/dashboard',
-  [UserRole.PARENT]: '/parent/dashboard',
 }
 
 interface AuthState {
@@ -34,7 +33,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: true, // start as loading until checkSession runs
 
   login: async (email: string, password: string) => {
-    const response = await mockAuthService.login({ email, password })
+    const response = await localAuthService.login({ email, password })
     set({
       user: response.user,
       token: response.access_token,
@@ -43,12 +42,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   register: async (data: CreateUserDTO) => {
-    // Register just creates the account, does not login
     await registerUser(data)
   },
 
   logout: async () => {
-    await mockAuthService.logout()
+    await localAuthService.logout()
     set({
       user: null,
       token: null,
@@ -63,8 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = authSession.getUser()
 
       if (token && user) {
-        // Verify token is still valid by calling getMe
-        const freshUser = await mockAuthService.getMe()
+        const freshUser = await localAuthService.getMe()
         set({
           user: freshUser,
           token,
@@ -80,7 +77,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         })
       }
     } catch {
-      // Token invalid or expired
       authSession.clear()
       set({
         user: null,

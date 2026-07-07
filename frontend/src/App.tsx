@@ -4,6 +4,8 @@ import { router } from './app/router'
 import { useAuthStore } from './core/stores/authStore'
 import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
 import { ToastProvider } from './shared/components/feedback/Toast'
+import { initDB } from './core/services/storage/idb'
+import { runBootstrap } from './core/services/local/bootstrap'
 
 /* ── Splash Screen ── */
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -83,7 +85,17 @@ function App() {
   const [splashDone, setSplashDone] = useState(false)
 
   useEffect(() => {
-    checkSession()
+    const init = async () => {
+      try {
+        await initDB()
+        await runBootstrap()
+      } catch (error) {
+        console.error('Failed to initialize database:', error)
+      } finally {
+        checkSession()
+      }
+    }
+    init()
   }, [checkSession])
 
   // Splash screen (always shows at least 3.7 s)

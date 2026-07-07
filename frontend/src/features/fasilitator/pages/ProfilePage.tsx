@@ -31,10 +31,9 @@ import { cn } from '../../../core/utils'
 
 const roleLabel: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
-  ADMIN_WISATA: 'Admin Wisata',
+  ADMIN: 'Admin',
   KOORDINATOR: 'Koordinator',
   FASILITATOR: 'Fasilitator',
-  PARENT: 'Orang Tua',
 }
 
 const ProfilePage = () => {

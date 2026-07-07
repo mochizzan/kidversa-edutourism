@@ -3,7 +3,6 @@ import { useConnectionStatus } from '../../hooks/useConnectionStatus'
 import { ConnectionStatus as ConnectionStatusEnum } from '../../../core/types/enums'
 
 interface ConnectionStatusProps {
-  isSyncing?: boolean
   className?: string
 }
 
@@ -12,48 +11,24 @@ const statusConfig: Record<
   { label: string; dot: string; bg: string }
 > = {
   [ConnectionStatusEnum.CLOUD]: {
-    label: '☁️ Cloud',
+    label: 'Online Cloud',
     dot: 'bg-green-500',
     bg: 'bg-green-50 text-green-700 border-green-200',
   },
   [ConnectionStatusEnum.EDGE]: {
-    label: '🔗 Edge',
-    dot: 'bg-blue-500',
+    label: 'Menyinkronkan',
+    dot: 'bg-blue-500 animate-pulse',
     bg: 'bg-blue-50 text-blue-700 border-blue-200',
   },
   [ConnectionStatusEnum.OFFLINE]: {
-    label: '⚪ Offline',
+    label: 'Offline Lokal',
     dot: 'bg-gray-400',
     bg: 'bg-gray-50 text-gray-500 border-gray-200',
   },
 }
 
-const syncingConfig = {
-  label: '⟳ Sync',
-  dot: 'bg-yellow-500',
-  bg: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-} as const
-
-export default function ConnectionStatus({
-  isSyncing = false,
-  className,
-}: ConnectionStatusProps) {
-  const { status } = useConnectionStatus()
-
-  if (isSyncing) {
-    return (
-      <div
-        className={cn(
-          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border',
-          syncingConfig.bg,
-          className
-        )}
-      >
-        <span className={cn('w-1.5 h-1.5 rounded-full', syncingConfig.dot)} />
-        <span>{syncingConfig.label}</span>
-      </div>
-    )
-  }
+export default function ConnectionStatus({ className }: ConnectionStatusProps) {
+  const { status, pendingSyncCount } = useConnectionStatus()
 
   const config = statusConfig[status]
 
@@ -67,6 +42,11 @@ export default function ConnectionStatus({
     >
       <span className={cn('w-1.5 h-1.5 rounded-full', config.dot)} />
       <span>{config.label}</span>
+      {pendingSyncCount > 0 && status !== ConnectionStatusEnum.OFFLINE && (
+        <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px]">
+          {pendingSyncCount} pending
+        </span>
+      )}
     </div>
   )
 }

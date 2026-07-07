@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,20 +7,22 @@ import { ChevronRight, ChevronLeft, AlertCircle, Check } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { UserRole } from '../../../core/types'
 import { cn } from '../../../core/utils'
+import { getAll } from '../../../core/services/storage/idb'
+import type { Tenant } from '../../../core/types'
 import { WizardTimeline } from '../components/WizardTimeline'
 import { RegisterStepName } from '../components/RegisterStepName'
 import { RegisterStepEmail } from '../components/RegisterStepEmail'
 import { RegisterStepPassword } from '../components/RegisterStepPassword'
 import { RegisterStepTerms } from '../components/RegisterStepTerms'
 
-// ── Zod Schema ──
 const registerSchema = z
   .object({
     name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
     email: z.string().email('Format email tidak valid'),
     password: z.string().min(8, 'Password minimal 8 karakter').regex(/[A-Z]/, 'Harus ada huruf besar').regex(/[a-z]/, 'Harus ada huruf kecil').regex(/[0-9]/, 'Harus ada angka'),
     confirmPassword: z.string(),
-    role: z.nativeEnum(UserRole, { message: 'Pilih peran yang valid' }),
+    tenant_id: z.string().min(1, 'Pilih cabang/tenant'),
+    role: z.enum([UserRole.ADMIN, UserRole.KOORDINATOR, UserRole.FASILITATOR], { message: 'Pilih peran yang valid' }),
     terms: z.literal(true, { message: 'Wajib menyetujui syarat & ketentuan' }),
     honeypot: z.string().max(0).optional().or(z.literal('')),
   })
@@ -42,6 +44,7 @@ const RegisterPage = () => {
   const [showConfirm, setShowConfirm] = useState(false)
   const [generalError, setGeneralError] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [tenants, setTenants] = useState<Tenant[]>([])
 
   const navigate = useNavigate()
   const { register: registerUser } = useAuth()
@@ -56,9 +59,13 @@ const RegisterPage = () => {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: '', email: '', password: '', confirmPassword: '',
-      role: UserRole.FASILITATOR, terms: undefined as unknown as true, honeypot: '',
+      tenant_id: '', role: UserRole.FASILITATOR, terms: undefined as unknown as true, honeypot: '',
     },
   })
+
+  useEffect(() => {
+    getAll<Tenant>('tenants').then(setTenants)
+  }, [])
 
   const passwordValue = watch('password', '')
 
@@ -80,11 +87,11 @@ const RegisterPage = () => {
     setGeneralError(null)
     if (data.honeypot?.length) return
     try {
-      await registerUser({ tenant_id: 't-1', email: data.email, password: data.password, role: data.role, name: data.name })
+      await registerUser({ tenant_id: data.tenant_id, email: data.email, password: data.password, role: data.role, name: data.name })
       setIsSuccess(true)
-      setTimeout(() => navigate('/auth/login', { replace: true, state: { message: 'Registrasi berhasil! Silakan masuk.' } }), 1500)
+      setTimeout(() => navigate('/auth/login', { replace: true, state: { message: 'Registrasi berhasil! Akun Anda menunggu persetujuan admin.' } }), 2000)
     } catch (err) {
-      setGeneralError(err instanceof Error && err.message === 'EMAIL_EXISTS' ? 'Email sudah terdaftar' : 'Terjadi kesalahan. Silakan coba lagi.')
+      setGeneralError(err instanceof Error && err.message === 'EMAIL_ALREADY_EXISTS' ? 'Email sudah terdaftar' : 'Terjadi kesalahan. Silakan coba lagi.')
     }
   }
 
@@ -96,7 +103,7 @@ const RegisterPage = () => {
           <Check className="w-8 h-8 text-green-600" />
         </div>
         <h2 className="text-xl font-bold text-on-surface mb-1">Registrasi Berhasil!</h2>
-        <p className="text-sm text-on-surface-variant/60 text-center">Anda akan diarahkan ke halaman login…</p>
+        <p className="text-sm text-on-surface-variant/60 text-center max-w-[280px]">Akun Anda sedang menunggu persetujuan admin. Anda akan diarahkan ke halaman login…</p>
       </div>
     )
   }
@@ -145,7 +152,7 @@ const RegisterPage = () => {
               disabled={isSubmitting}
             />
           )}
-          {step === 3 && <RegisterStepTerms register={register} errors={errors} isSubmitting={isSubmitting} />}
+          {step === 3 && <RegisterStepTerms register={register} errors={errors} isSubmitting={isSubmitting} tenants={tenants} />}
         </div>
 
         {/* ── Submit button (only on last step) ── */}

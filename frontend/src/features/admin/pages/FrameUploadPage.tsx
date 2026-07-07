@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Upload, Image, Trash2, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Upload, Image, Trash2, AlertCircle, ArrowLeft } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
@@ -11,6 +12,7 @@ import { FrameDropZone } from '../components/FrameDropZone'
 import { FrameUploadCard } from '../components/FrameUploadCard'
 
 const FrameUploadPage = () => {
+  const navigate = useNavigate()
   const [programs, setPrograms] = useState<Program[]>([])
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
@@ -42,6 +44,10 @@ const FrameUploadPage = () => {
         breadcrumbs={[{ label: 'Frames', href: '/admin/frames' }, { label: 'Upload Frame' }]}
         actions={
           <div className="flex items-center gap-2">
+            <Button variant="ghost" icon={<ArrowLeft className="h-4 w-4" />}
+              onClick={() => navigate('/admin/frames')}>
+              Kembali
+            </Button>
             <Button variant="danger" icon={<Trash2 className="h-4 w-4" />}
               onClick={() => setShowClearConfirm(true)} disabled={items.length === 0}>
               Hapus Semua

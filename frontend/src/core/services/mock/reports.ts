@@ -1,109 +1,167 @@
-import type { Report } from '../../types'
+import type { Report, Participant, Assessment, MissionBank, SessionStage, ProgramStage } from '../../types'
 import type { ReportService } from '../types'
 import { ReportStatus } from '../../types'
-import { mockStorage } from './db'
-import { seedParticipants } from './data/seed'
+import { getById, put, queryByIndex, getAll, deleteById } from '../storage/idb'
+import { AppError } from '../../utils/errors'
+import { selectMissionsForParticipant } from '../../utils/missionSelector'
+import { generateReportNarrative } from '../../utils/reportNarrative'
 
-const STORAGE_KEY = 'reports_v1'
-
-const init = (): Report[] => {
-  const existing = mockStorage.get<Report[]>(STORAGE_KEY, [])
-  if (existing.length) return existing
-  const seed: Report[] = [
-    {
-      id: 'rpt-1',
-      participant_id: 'part-4',
-      session_id: 's-3',
-      ai_narrative_draft:
-        'Dewi Putri hari ini menunjukkan antusiasme yang luar biasa dalam mengikuti program hidroponik. Ia aktif bertanya tentang cara menanam sayur dan sangat bersemangat saat melihat tanaman tumbuh. Dewi juga pandai bekerja sama dengan teman-teman sekelompoknya.',
-      ai_narrative_final: undefined,
-      mission_ids_json: [],
-      report_pdf_url: undefined,
-      parent_access_token: 'parent-token-dewi-123',
-      status: ReportStatus.DRAFT,
-      generated_at: '2026-06-20T08:00:00.000Z',
-    },
-    {
-      id: 'rpt-2',
-      participant_id: 'part-1',
-      session_id: 's-1',
-      ai_narrative_draft:
-        'Budi Santoso mengikuti kegiatan dengan penuh semangat. Ia sangat tertarik dengan sapi dan banyak bertanya tentang makanan sapi. Budi mampu mengikuti instruksi dengan baik dan aktif berpartisipasi dalam setiap tahapan.',
-      ai_narrative_final: undefined,
-      mission_ids_json: [],
-      report_pdf_url: undefined,
-      parent_access_token: 'parent-token-budi-456',
-      status: ReportStatus.DRAFT,
-    },
-  ]
-  mockStorage.set(STORAGE_KEY, seed)
-  return seed
-}
-
-const getAll = (): Report[] => mockStorage.get<Report[]>(STORAGE_KEY, init())
+const STORE_NAME = 'reports'
 
 const getBySession = async (sessionId: string): Promise<Report[]> => {
   await new Promise((r) => setTimeout(r, 150))
-  return getAll().filter((r) => r.session_id === sessionId)
+  return await queryByIndex<Report>(STORE_NAME, 'session_id', sessionId)
 }
 
-const getById = async (id: string): Promise<Report | null> => {
+const getById_ = async (id: string): Promise<Report | null> => {
   await new Promise((r) => setTimeout(r, 100))
-  return getAll().find((r) => r.id === id) ?? null
+  return await getById<Report>(STORE_NAME, id)
 }
 
 const generate = async (sessionId: string): Promise<Report[]> => {
   await new Promise((r) => setTimeout(r, 1000))
-  const all = getAll()
-  const participants = seedParticipants.filter(
-    (p: { session_id: string }) => p.session_id === sessionId
-  )
-  const existingIds = new Set(all.map((r) => r.participant_id))
+
+  const participants = await queryByIndex<Participant>('participants', 'session_id', sessionId)
+  const existingReports = await queryByIndex<Report>(STORE_NAME, 'session_id', sessionId)
+  const existingByParticipant = new Map(existingReports.map((r) => [r.participant_id, r]))
+
+  const allMissions = await getAll<MissionBank>('mission_banks')
+  const availableMissions = allMissions.filter((m) => m.is_active)
+
+  const sessionStages = await queryByIndex<SessionStage>('session_stages', 'session_id', sessionId)
+  const programStages = await getAll<ProgramStage>('program_stages')
+  const stageNames = new Map<string, string>()
+  sessionStages.forEach((ss) => {
+    const ps = programStages.find((p) => p.id === ss.program_stage_id)
+    if (ps) stageNames.set(ss.id, ps.name)
+  })
+
+  const participantsNeedingReport: { p: Participant; assessments: Assessment[] }[] = []
+
   for (const p of participants) {
-    if (!existingIds.has(p.id)) {
-      const report: Report = {
-        id: `rpt-${Date.now()}-${p.id}`,
-        participant_id: p.id,
-        session_id: sessionId,
-        ai_narrative_draft: `${p.child_name} mengikuti kegiatan hari ini dengan baik. Anak ini menunjukkan minat yang besar dan aktif berpartisipasi. Terus kembangkan semangat belajarnya!`,
-        ai_narrative_final: undefined,
-        mission_ids_json: [],
-        report_pdf_url: undefined,
-        parent_access_token: `parent-token-${p.id}-${Date.now()}`,
-        status: ReportStatus.DRAFT,
-      }
-      all.push(report)
+    if (existingByParticipant.has(p.id)) continue
+
+    const assessments = await queryByIndex<Assessment>('assessments', 'participant_id', p.id)
+    participantsNeedingReport.push({ p, assessments })
+  }
+
+  if (participantsNeedingReport.length > 0) {
+    const missing = participantsNeedingReport
+      .filter(({ assessments }) => assessments.length === 0)
+      .map(({ p }) => p.child_name)
+
+    if (missing.length > 0) {
+      throw new AppError(
+        'CONFLICT',
+        `Peserta berikut belum memiliki penilaian: ${missing.join(', ')}. Lengkapi penilaian terlebih dahulu.`
+      )
     }
   }
-  mockStorage.set(STORAGE_KEY, all)
+
+  for (const { p, assessments } of participantsNeedingReport) {
+    const selectedMissionIds = selectMissionsForParticipant({
+      participantId: p.id,
+      assessments,
+      availableMissions,
+      sessionStages,
+    })
+
+    const narrative = generateReportNarrative({
+      childName: p.child_name,
+      assessments,
+      stageNames,
+    })
+
+    const reportId = `rpt-${Date.now()}-${p.id}`
+    const report: Report = {
+      id: reportId,
+      participant_id: p.id,
+      session_id: sessionId,
+      ai_narrative_draft: narrative,
+      ai_narrative_final: undefined,
+      mission_ids_json: selectedMissionIds,
+      report_pdf_url: undefined,
+      parent_access_token: `parent-token-${p.id}-${Date.now()}`,
+      status: ReportStatus.PENDING_REVIEW,
+    }
+    await put(STORE_NAME, report)
+
+    for (const missionId of selectedMissionIds) {
+      const pm = {
+        id: `pm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        participant_id: p.id,
+        report_id: reportId,
+        mission_bank_id: missionId,
+        is_completed: false,
+        completed_at: undefined,
+      }
+      await put('participant_missions', pm)
+    }
+
+    await new Promise((r) => setTimeout(r, 10))
+  }
+
   return getBySession(sessionId)
 }
 
-const approve = async (reportId: string): Promise<Report> => {
+const approve = async (
+  reportId: string,
+  data?: { narrative_final?: string; mission_ids?: string[] }
+): Promise<Report> => {
   await new Promise((r) => setTimeout(r, 300))
-  const all = getAll()
-  const report = all.find((r) => r.id === reportId)
-  if (!report) throw new Error('Report not found')
+  const report = await getById<Report>(STORE_NAME, reportId)
+  if (!report) throw new AppError('NOT_FOUND', 'Report not found')
+
   report.status = ReportStatus.APPROVED
-  report.ai_narrative_final = report.ai_narrative_draft
-  mockStorage.set(STORAGE_KEY, all)
+  report.ai_narrative_final = data?.narrative_final ?? report.ai_narrative_draft
+  
+  if (data?.mission_ids) {
+    report.mission_ids_json = data.mission_ids
+  }
+  
+  await put(STORE_NAME, report)
+
+  if (data?.mission_ids) {
+    const existingMissions = await queryByIndex<{ id: string; report_id: string }>(
+      'participant_missions',
+      'report_id',
+      reportId
+    )
+    for (const pm of existingMissions) {
+      await deleteById('participant_missions', pm.id)
+    }
+
+    for (const missionId of data.mission_ids) {
+      const pm = {
+        id: `pm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        participant_id: report.participant_id,
+        report_id: reportId,
+        mission_bank_id: missionId,
+        is_completed: false,
+        completed_at: undefined,
+      }
+      await put('participant_missions', pm)
+      await new Promise((r) => setTimeout(r, 5))
+    }
+  }
+
   return report
 }
 
 const send = async (reportId: string): Promise<Report> => {
   await new Promise((r) => setTimeout(r, 300))
-  const all = getAll()
-  const report = all.find((r) => r.id === reportId)
-  if (!report) throw new Error('Report not found')
+  const report = await getById<Report>(STORE_NAME, reportId)
+  if (!report) throw new AppError('NOT_FOUND', 'Report not found')
+  
   report.status = ReportStatus.SENT
   report.sent_at = new Date().toISOString()
-  mockStorage.set(STORAGE_KEY, all)
+  await put(STORE_NAME, report)
   return report
 }
 
 export const mockReportService: ReportService = {
   getBySession,
-  getById,
+  getById: getById_,
   generate,
   approve,
   send,

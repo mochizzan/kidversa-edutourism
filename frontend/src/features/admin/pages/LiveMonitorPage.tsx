@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Users,
+  Monitor,
 } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
@@ -30,7 +31,7 @@ import { ConfirmOverrideModal } from '../components/ConfirmOverrideModal'
 
 const LiveMonitorPage = () => {
   const { user } = useAuth()
-  const isKoordinator = user?.role === UserRole.KOORDINATOR || user?.role === UserRole.ADMIN_WISATA
+  const isKoordinator = user?.role === UserRole.KOORDINATOR || user?.role === UserRole.ADMIN
 
   const [activeSession, setActiveSession] = useState<Session | null>(null)
   const [groups, setGroups] = useState<LiveGroupWithProgress[]>([])
@@ -284,6 +285,29 @@ const LiveMonitorPage = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const activeGroup = groups.find(g => {
+                const { status } = getGroupStatus(g)
+                return status === 'IN_PROGRESS' || status === 'UNLOCKED'
+              })
+              if (activeGroup && activeSession) {
+                const { stageId } = getGroupStatus(activeGroup)
+                if (stageId) {
+                  window.open(`/learner/${activeSession.id}/${stageId}`, '_blank')
+                }
+              }
+            }}
+            disabled={!groups.some(g => {
+              const { status } = getGroupStatus(g)
+              return status === 'IN_PROGRESS' || status === 'UNLOCKED'
+            })}
+          >
+            <Monitor className="w-4 h-4 mr-1" />
+            Buka Kiosk
+          </Button>
           <Button
             variant={simulationOn ? 'primary' : 'secondary'}
             size="sm"

@@ -1,4 +1,4 @@
-import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
+import { Plus, Pencil, Trash2, GripVertical, FileText } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Card } from '../../../shared/components/ui/Card'
@@ -9,9 +9,10 @@ interface ProgramStagesTabProps {
   onAdd: () => void
   onEdit: (stage: ProgramStage) => void
   onDelete: (stageId: string) => void
+  onManageContent: (stage: ProgramStage) => void
 }
 
-export function ProgramStagesTab({ stages, onAdd, onEdit, onDelete }: ProgramStagesTabProps) {
+export function ProgramStagesTab({ stages, onAdd, onEdit, onDelete, onManageContent }: ProgramStagesTabProps) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -34,6 +35,7 @@ export function ProgramStagesTab({ stages, onAdd, onEdit, onDelete }: ProgramSta
                 <Badge variant="primary">{stage.content_type}</Badge>
                 {stage.is_recording_stage && <Badge variant="accent">Recording</Badge>}
                 {stage.is_photo_stage && <Badge variant="success">Photo</Badge>}
+                <Button variant="secondary" size="sm" icon={<FileText className="w-4 h-4" />} onClick={() => onManageContent(stage)}>Konten</Button>
                 <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit Stage" onClick={() => onEdit(stage)} />
                 <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Hapus Stage" onClick={() => onDelete(stage.id)} />
               </div>

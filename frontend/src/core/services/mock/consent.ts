@@ -1,47 +1,19 @@
-import type { ConsentLog } from '../../types'
+import type { ConsentLog, Participant } from '../../types'
 import type { ConsentService } from '../types'
 import { ConsentType } from '../../types'
-import { mockStorage } from './db'
-import { seedParticipants } from './data/seed'
+import { getAll, getById, put, queryByIndex } from '../storage/idb'
+import { AppError } from '../../utils/errors'
 
-const STORAGE_KEY = 'consent_logs_v1'
-
-const init = (): ConsentLog[] => {
-  const existing = mockStorage.get<ConsentLog[]>(STORAGE_KEY, [])
-  if (existing.length) return existing
-  const seed: ConsentLog[] = seedParticipants
-    .filter((p) => p.consent_at)
-    .flatMap((p) => [
-      {
-        id: `cl-${p.id}-recording`,
-        participant_id: p.id,
-        consent_type: ConsentType.RECORDING,
-        value: p.consent_recording,
-        sent_at: new Date(new Date(p.consent_at!).getTime() - 86400000 * 2).toISOString(),
-        responded_at: p.consent_at,
-      },
-      {
-        id: `cl-${p.id}-photo`,
-        participant_id: p.id,
-        consent_type: ConsentType.PHOTO,
-        value: p.consent_photo,
-        sent_at: new Date(new Date(p.consent_at!).getTime() - 86400000 * 2).toISOString(),
-        responded_at: p.consent_at,
-      },
-    ])
-  mockStorage.set(STORAGE_KEY, seed)
-  return seed
-}
-
-const getAll = (): ConsentLog[] => mockStorage.get<ConsentLog[]>(STORAGE_KEY, init())
+const STORE_NAME = 'consent_logs'
 
 const sendRequest = async (sessionId: string): Promise<void> => {
   await new Promise((r) => setTimeout(r, 300))
-  const participants = seedParticipants.filter((p) => p.session_id === sessionId)
-  const all = getAll()
+  const participants = await queryByIndex<Participant>('participants', 'session_id', sessionId)
+  const allLogs = await getAll<ConsentLog>(STORE_NAME)
+  
   for (const p of participants) {
-    if (!all.some((l) => l.participant_id === p.id && l.consent_type === ConsentType.RECORDING)) {
-      all.push({
+    if (!allLogs.some((l) => l.participant_id === p.id && l.consent_type === ConsentType.RECORDING)) {
+      await put(STORE_NAME, {
         id: `cl-${Date.now()}-${p.id}-recording`,
         participant_id: p.id,
         consent_type: ConsentType.RECORDING,
@@ -49,8 +21,8 @@ const sendRequest = async (sessionId: string): Promise<void> => {
         sent_at: new Date().toISOString(),
       })
     }
-    if (!all.some((l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO)) {
-      all.push({
+    if (!allLogs.some((l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO)) {
+      await put(STORE_NAME, {
         id: `cl-${Date.now()}-${p.id}-photo`,
         participant_id: p.id,
         consent_type: ConsentType.PHOTO,
@@ -59,14 +31,14 @@ const sendRequest = async (sessionId: string): Promise<void> => {
       })
     }
   }
-  mockStorage.set(STORAGE_KEY, all)
 }
 
 const getBySession = async (sessionId: string): Promise<ConsentLog[]> => {
   await new Promise((r) => setTimeout(r, 100))
-  const participants = seedParticipants.filter((p) => p.session_id === sessionId)
+  const participants = await queryByIndex<Participant>('participants', 'session_id', sessionId)
   const participantIds = new Set(participants.map((p) => p.id))
-  return getAll().filter((l) => participantIds.has(l.participant_id))
+  const allLogs = await getAll<ConsentLog>(STORE_NAME)
+  return allLogs.filter((l) => participantIds.has(l.participant_id))
 }
 
 const submit = async (
@@ -75,30 +47,36 @@ const submit = async (
   photo: boolean
 ): Promise<void> => {
   await new Promise((r) => setTimeout(r, 300))
-  const all = getAll()
+  
   // Find the participant by token (simplified: token = participant_id)
-  const participant = seedParticipants.find((p) => p.id === token)
-  if (!participant) throw new Error('INVALID_TOKEN')
+  const participant = await getById<Participant>('participants', token)
+  if (!participant) throw new AppError('NOT_FOUND', 'Invalid token')
+  
   // Update consent logs
-  const recLog = all.find(
+  const allLogs = await getAll<ConsentLog>(STORE_NAME)
+  const recLog = allLogs.find(
     (l) => l.participant_id === participant.id && l.consent_type === ConsentType.RECORDING
   )
   if (recLog) {
     recLog.value = recording
     recLog.responded_at = new Date().toISOString()
+    await put(STORE_NAME, recLog)
   }
-  const photoLog = all.find(
+  
+  const photoLog = allLogs.find(
     (l) => l.participant_id === participant.id && l.consent_type === ConsentType.PHOTO
   )
   if (photoLog) {
     photoLog.value = photo
     photoLog.responded_at = new Date().toISOString()
+    await put(STORE_NAME, photoLog)
   }
+  
   // Update participant consent
   participant.consent_recording = recording
   participant.consent_photo = photo
   participant.consent_at = new Date().toISOString()
-  mockStorage.set(STORAGE_KEY, all)
+  await put('participants', participant)
 }
 
 export const mockConsentService: ConsentService = {

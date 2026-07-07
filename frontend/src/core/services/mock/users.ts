@@ -1,31 +1,41 @@
 import type { PaginatedResponse, ListParams, User, CreateUserDTO, UpdateUserDTO } from '../../types'
 import type { UserService } from '../types'
-import { seedUsers } from './data/seed'
-import { mockStorage } from './db'
-
-const STORAGE_KEY = 'users_v1'
-
-const init = (): User[] => {
-  const existing = mockStorage.get<User[]>(STORAGE_KEY, [])
-  if (existing.length) return existing
-  mockStorage.set(STORAGE_KEY, seedUsers)
-  return seedUsers
-}
+import { ApprovalStatus } from '../../types'
+import { getAll as idbGetAll, getById as idbGetById, put } from '../storage/idb'
+import { AppError } from '../../utils/errors'
+import { dispatchUsersChanged } from '../../constants/app'
+import { requireTenantId } from '../tenantScope'
 
 const getAll = async (params?: ListParams): Promise<PaginatedResponse<User>> => {
   await new Promise((r) => setTimeout(r, 200))
-  let data = init()
+  let data = await idbGetAll<User>('users')
+
   if (params?.search) {
     const q = params.search.toLowerCase()
     data = data.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
   }
+
   if (params?.filters?.role) {
-    const role = params.filters!.role
-    data = data.filter((u) => u.role === role)
+    data = data.filter((u) => u.role === params.filters!.role)
   }
+
+  if (params?.filters?.approval_status) {
+    data = data.filter((u) => u.approval_status === params.filters!.approval_status)
+  }
+
+  if (params?.filters?.is_active !== undefined) {
+    const active = params.filters!.is_active === true || params.filters!.is_active === 'true'
+    data = data.filter((u) => u.is_active === active)
+  }
+
+  if (params?.filters?.tenant_id) {
+    data = data.filter((u) => u.tenant_id === params.filters!.tenant_id)
+  }
+
   const page = params?.page ?? 1
   const limit = params?.limit ?? 10
   const start = (page - 1) * limit
+
   return {
     data: data.slice(start, start + limit),
     total: data.length,
@@ -37,15 +47,16 @@ const getAll = async (params?: ListParams): Promise<PaginatedResponse<User>> => 
 
 const getById = async (id: string): Promise<User | null> => {
   await new Promise((r) => setTimeout(r, 100))
-  return init().find((u) => u.id === id) ?? null
+  return await idbGetById<User>('users', id)
 }
 
 const create = async (data: CreateUserDTO): Promise<User> => {
   await new Promise((r) => setTimeout(r, 300))
-  const users = init()
-    const user: User = {
+  const tenantId = requireTenantId(data.tenant_id)
+
+  const user: User = {
     id: `u-${Date.now()}`,
-    tenant_id: data.tenant_id,
+    tenant_id: tenantId,
     email: data.email,
     password_hash: data.password ?? 'hashed',
     role: data.role,
@@ -53,31 +64,89 @@ const create = async (data: CreateUserDTO): Promise<User> => {
     phone: data.phone,
     avatar_url: data.avatar_url,
     is_active: true,
+    approval_status: ApprovalStatus.APPROVED,
     created_at: new Date().toISOString(),
   }
-  users.push(user)
-  mockStorage.set(STORAGE_KEY, users)
+
+  await put('users', user)
+  dispatchUsersChanged()
   return user
 }
 
 const update = async (id: string, data: UpdateUserDTO): Promise<User> => {
   await new Promise((r) => setTimeout(r, 300))
-  const users = init()
-  const idx = users.findIndex((u) => u.id === id)
-  if (idx === -1) throw new Error('User not found')
-  users[idx] = { ...users[idx], ...data }
-  mockStorage.set(STORAGE_KEY, users)
-  return users[idx]
+
+  const existing = await idbGetById<User>('users', id)
+  if (!existing) {
+    throw new AppError('NOT_FOUND', 'User tidak ditemukan')
+  }
+
+  const updated = { ...existing, ...data }
+  await put('users', updated)
+  dispatchUsersChanged()
+  return updated
 }
 
 const deactivate = async (id: string): Promise<User> => {
   await new Promise((r) => setTimeout(r, 250))
-  const users = init()
-  const user = users.find((u) => u.id === id)
-  if (!user) throw new Error('User not found')
-  user.is_active = !user.is_active
-  mockStorage.set(STORAGE_KEY, users)
+
+  const user = await idbGetById<User>('users', id)
+  if (!user) {
+    throw new AppError('NOT_FOUND', 'User tidak ditemukan')
+  }
+
+  user.is_active = false
+  await put('users', user)
+  dispatchUsersChanged()
   return user
+}
+
+const approve = async (userId: string, approverId: string): Promise<User> => {
+  await new Promise((r) => setTimeout(r, 250))
+
+  const user = await idbGetById<User>('users', userId)
+  if (!user) {
+    throw new AppError('NOT_FOUND', 'User tidak ditemukan')
+  }
+
+  const updated: User = {
+    ...user,
+    approval_status: ApprovalStatus.APPROVED,
+    is_active: true,
+    approved_at: new Date().toISOString(),
+    approved_by: approverId,
+    rejected_at: undefined,
+    rejected_by: undefined,
+    rejection_reason: undefined,
+  }
+
+  await put('users', updated)
+  dispatchUsersChanged()
+  return updated
+}
+
+const reject = async (userId: string, approverId: string, reason?: string): Promise<User> => {
+  await new Promise((r) => setTimeout(r, 250))
+
+  const user = await idbGetById<User>('users', userId)
+  if (!user) {
+    throw new AppError('NOT_FOUND', 'User tidak ditemukan')
+  }
+
+  const updated: User = {
+    ...user,
+    approval_status: ApprovalStatus.REJECTED,
+    is_active: false,
+    rejected_at: new Date().toISOString(),
+    rejected_by: approverId,
+    rejection_reason: reason,
+    approved_at: undefined,
+    approved_by: undefined,
+  }
+
+  await put('users', updated)
+  dispatchUsersChanged()
+  return updated
 }
 
 export const mockUserService: UserService = {
@@ -86,4 +155,6 @@ export const mockUserService: UserService = {
   create,
   update,
   deactivate,
+  approve,
+  reject,
 }

@@ -71,10 +71,20 @@ export interface SessionService {
   deleteGroup(sessionId: string, groupId: string): Promise<void>
 
   getParticipants(sessionId: string, groupId?: string): Promise<Participant[]>
+  getParticipantById(participantId: string): Promise<Participant | null>
   addParticipant(sessionId: string, groupId: string, data: CreateParticipantDTO): Promise<Participant>
   updateParticipant(sessionId: string, participantId: string, data: Partial<CreateParticipantDTO>): Promise<Participant>
   removeParticipant(sessionId: string, participantId: string): Promise<void>
   importParticipants(sessionId: string, rows: CreateParticipantDTO[]): Promise<Participant[]>
+}
+
+// Participants
+export interface ParticipantService {
+  getAll(params?: ListParams): Promise<PaginatedResponse<Participant>>
+  getById(id: string): Promise<Participant | null>
+  create(data: CreateParticipantDTO): Promise<Participant>
+  update(id: string, data: Partial<CreateParticipantDTO>): Promise<Participant>
+  delete(id: string): Promise<void>
 }
 
 // Users
@@ -84,6 +94,8 @@ export interface UserService {
   create(data: CreateUserDTO): Promise<User>
   update(id: string, data: UpdateUserDTO): Promise<User>
   deactivate(id: string): Promise<User>
+  approve(userId: string, approverId: string): Promise<User>
+  reject(userId: string, approverId: string, reason?: string): Promise<User>
 }
 
 // Frames
@@ -101,6 +113,7 @@ export interface PhotoService {
   getByParticipant(participantId: string): Promise<SmartPhoto[]>
   upload(participantId: string, sessionId: string, file: File): Promise<SmartPhoto>
   setReportPhoto(photoId: string, isReportPhoto: boolean): Promise<SmartPhoto>
+  update(photoId: string, data: Partial<SmartPhoto>): Promise<SmartPhoto>
   delete(id: string): Promise<void>
 }
 
@@ -119,7 +132,7 @@ export interface ReportService {
   getBySession(sessionId: string): Promise<Report[]>
   getById(id: string): Promise<Report | null>
   generate(sessionId: string): Promise<Report[]>
-  approve(reportId: string): Promise<Report>
+  approve(reportId: string, data?: { narrative_final?: string; mission_ids?: string[] }): Promise<Report>
   send(reportId: string): Promise<Report>
 }
 
@@ -160,7 +173,13 @@ export interface AuthService {
 
 // Mission Bank
 export interface MissionBankService {
-  getAll(params?: ListParams): Promise<PaginatedResponse<MissionBank>>
+  getAll(params?: {
+    page?: number
+    limit?: number
+    search?: string
+    filters?: Record<string, string | boolean | undefined>
+  }): Promise<{ data: MissionBank[]; total: number; page: number; limit: number; totalPages: number }>
+  getById(id: string): Promise<MissionBank | null>
   create(data: CreateMissionBankDTO): Promise<MissionBank>
   update(id: string, data: Partial<CreateMissionBankDTO>): Promise<MissionBank>
   delete(id: string): Promise<void>

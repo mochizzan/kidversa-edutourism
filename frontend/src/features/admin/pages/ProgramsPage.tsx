@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, FolderOpen } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -15,6 +15,7 @@ import type { Program } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 
 const ProgramsPage = () => {
+  const navigate = useNavigate()
   const { data: programs, loading, page, total, setPage, setSearch, refresh } = useCrudList<Program>({
     fetchFn: (params) => programService.getAll({ ...params, limit: 10 }),
   })
@@ -62,10 +63,8 @@ const ProgramsPage = () => {
       header: 'Aksi',
       align: 'right',
       render: (item: Program) => (
-        <div className="flex items-center justify-end gap-2">
-          <Link to={`/admin/programs/${item.id}`}>
-            <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" />
-          </Link>
+          <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" onClick={() => navigate(`/admin/programs/${item.id}`)} />
           <Button
             variant="ghost"
             size="sm"
@@ -85,9 +84,7 @@ const ProgramsPage = () => {
         title="Programs"
         subtitle="Kelola program edutourism dan stage-nya."
         actions={
-          <Link to="/admin/programs/new">
-            <Button icon={<Plus className="w-4 h-4" />}>Buat Program</Button>
-          </Link>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate('/admin/programs/new')}>Buat Program</Button>
         }
       />
 
@@ -106,7 +103,7 @@ const ProgramsPage = () => {
             icon={<FolderOpen className="w-12 h-12" />}
             title="Belum ada program"
             description="Buat program pertama untuk memulai."
-            action={{ label: 'Buat Program', onClick: () => {} }}
+            action={{ label: 'Buat Program', onClick: () => navigate('/admin/programs/new') }}
           />
         }
       />

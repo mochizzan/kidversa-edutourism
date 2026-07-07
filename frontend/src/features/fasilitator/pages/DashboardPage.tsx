@@ -17,10 +17,9 @@ import type { LiveGroupWithProgress } from '../../../core/services/live'
 
 const roleLabel: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
-  ADMIN_WISATA: 'Admin Wisata',
+  ADMIN: 'Admin',
   KOORDINATOR: 'Koordinator',
   FASILITATOR: 'Fasilitator',
-  PARENT: 'Parent',
 }
 
 function SkeletonCard() {

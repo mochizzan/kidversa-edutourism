@@ -20,6 +20,7 @@ import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { photoService } from '../../../core/services/photos'
 import { missionService } from '../../../core/services/missions'
+import { programService } from '../../../core/services/programs'
 import type {
   Report,
   Participant,
@@ -31,7 +32,6 @@ import type {
 } from '../../../core/types'
 import { ReportStatus, MissionCategory } from '../../../core/types/enums'
 import { formatDate, cn } from '../../../core/utils'
-import { seedProgramStages } from '../../../core/services/mock/data/seed'
 
 /* ── Combined stage info for rendering ── */
 interface StageInfo {
@@ -94,13 +94,12 @@ const ReportReviewPage = () => {
     setError(null)
 
     try {
-      const [rpt, sess, stageAssessments, sessStages, , partPhotos] =
+      const [rpt, sess, stageAssessments, sessStages, partPhotos] =
         await Promise.all([
           reportService.getById(reportId),
           sessionService.getById(sessionId),
           assessmentService.getBySession(sessionId),
           sessionService.getStages(sessionId),
-          Promise.resolve(seedProgramStages),
           photoService.getBySession(sessionId),
         ])
 
@@ -119,20 +118,18 @@ const ReportReviewPage = () => {
       setSession(sess)
       setNarrativeText(rpt.ai_narrative_final || rpt.ai_narrative_draft || '')
 
-      // Load participant
       const participants = await sessionService.getParticipants(sessionId)
       const part = participants.find((p) => p.id === rpt.participant_id) || null
       setParticipant(part)
 
-      // Filter assessments for this participant
       const partAssessments = stageAssessments.filter(
         (a) => a.participant_id === rpt.participant_id
       )
 
-      // Build stage info with assessment lookup
+      const programStages = await programService.getStages(sess.program_id)
       const builtStageInfos: StageInfo[] = sessStages
         .map((ss) => {
-          const pgStage = seedProgramStages.find((ps) => ps.id === ss.program_stage_id)
+          const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
           if (!pgStage) return null
           const assessment = partAssessments.find(
             (a) => a.session_stage_id === ss.id
@@ -146,14 +143,12 @@ const ReportReviewPage = () => {
         .filter((s): s is NonNullable<typeof s> => s !== null) as StageInfo[]
       setStageInfos(builtStageInfos)
 
-      // Find report photo
       const reportPhoto =
         partPhotos.find(
           (p) => p.participant_id === rpt.participant_id && p.is_report_photo
         ) || null
       setPhoto(reportPhoto)
 
-      // Load missions
       const missionResult = await missionService.getAll({ limit: 50 })
       const programMissions = missionResult.data.filter(
         (m) => m.program_id === sess.program_id
@@ -185,7 +180,10 @@ const ReportReviewPage = () => {
     if (!reportId) return
     setActionLoading('approve')
     try {
-      await reportService.approve(reportId)
+      await reportService.approve(reportId, {
+        narrative_final: narrativeText,
+        mission_ids: assignedMissionIds,
+      })
       setShowApproveConfirm(false)
       await loadData()
     } catch {
@@ -283,16 +281,18 @@ const ReportReviewPage = () => {
             variant="ghost"
             size="sm"
             onClick={() => navigate(`/admin/reports/${sessionId}`)}
+            className="no-print"
           >
             <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
           </Button>
         }
+        className="no-print"
       />
 
       {/* Status banner */}
       <div
         className={cn(
-          'rounded-2xl p-4 flex items-center gap-3',
+          'rounded-2xl p-4 flex items-center gap-3 no-print',
           report.status === ReportStatus.SENT && 'bg-primary-container text-on-primary-container',
           report.status === ReportStatus.APPROVED && 'bg-green-100 text-green-700',
           report.status === ReportStatus.DRAFT && 'bg-surface-variant text-on-surface-variant',
@@ -314,7 +314,7 @@ const ReportReviewPage = () => {
       </div>
 
       {/* Main review content */}
-      <div className="grid gap-6">
+      <div className="grid gap-6 print-report">
         {/* 1. Child Identity + Photo */}
         <Card>
           <div className="flex items-start gap-5">
@@ -362,7 +362,7 @@ const ReportReviewPage = () => {
 
               {/* Photo consent warning */}
               {!photo && (
-                <p className="mt-3 text-xs text-yellow-600 flex items-center gap-1.5">
+                <p className="mt-3 text-xs text-yellow-600 flex items-center gap-1.5 no-print">
                   <Camera className="w-3.5 h-3.5" />
                   {participant.consent_photo === false
                     ? 'Izin foto tidak diberikan — foto tidak tersedia'
@@ -412,7 +412,7 @@ const ReportReviewPage = () => {
                     </p>
                   )}
                   {!assessment && (
-                    <p className="text-xs text-yellow-600">Tidak ada penilaian untuk tahap ini</p>
+                    <p className="text-xs text-yellow-600 no-print">Tidak ada penilaian untuk tahap ini</p>
                   )}
                 </div>
               ))}
@@ -426,10 +426,13 @@ const ReportReviewPage = () => {
             value={narrativeText}
             onChange={(e) => setNarrativeText(e.target.value)}
             rows={6}
-            className="w-full rounded-xl border border-outline-variant bg-surface p-4 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none resize-y"
+            className="w-full rounded-xl border border-outline-variant bg-surface p-4 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none resize-y no-print"
             placeholder="Narasi akan muncul setelah laporan di-generate..."
           />
-          <div className="flex items-center justify-between mt-2">
+          <div className="print-report whitespace-pre-wrap p-4 hidden">
+            {narrativeText}
+          </div>
+          <div className="flex items-center justify-between mt-2 no-print">
             <p className="text-xs text-on-surface-variant">
               Edit narasi sesuai kebutuhan sebelum menyetujui laporan.
             </p>
@@ -466,7 +469,7 @@ const ReportReviewPage = () => {
                           <label
                             key={mission.id}
                             className={cn(
-                              'flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors',
+                              'flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors no-print',
                               assignedMissionIds.includes(mission.id)
                                 ? 'bg-primary-container/30 border border-primary-container'
                                 : 'bg-surface-variant hover:bg-surface-container border border-transparent'
@@ -489,13 +492,20 @@ const ReportReviewPage = () => {
                           </label>
                         ))}
                       </div>
+                      <div className="hidden print:block mt-2">
+                        {catMissions.filter(m => assignedMissionIds.includes(m.id)).map(mission => (
+                          <p key={mission.id} className="text-sm">
+                            • {mission.title_child}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   )
                 }
               )}
 
               {assignedMissionIds.length > 0 && (
-                <div className="text-xs text-on-surface-variant pt-2 border-t border-outline-variant">
+                <div className="text-xs text-on-surface-variant pt-2 border-t border-outline-variant no-print">
                   {assignedMissionIds.length} misi dipilih
                 </div>
               )}
@@ -505,7 +515,7 @@ const ReportReviewPage = () => {
       </div>
 
       {/* Action buttons */}
-      <div className="flex flex-wrap items-center gap-3 bg-surface rounded-2xl p-4 border border-outline-variant sticky bottom-4 shadow-lg">
+      <div className="flex flex-wrap items-center gap-3 bg-surface rounded-2xl p-4 border border-outline-variant sticky bottom-4 shadow-lg no-print">
         <Button
           variant="ghost"
           size="sm"
@@ -547,7 +557,7 @@ const ReportReviewPage = () => {
 
       {/* Toast for print */}
       {showPrintMessage && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-on-surface text-surface px-4 py-2 rounded-xl shadow-lg text-sm z-50 animate-bounce">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-on-surface text-surface px-4 py-2 rounded-xl shadow-lg text-sm z-50 animate-bounce no-print">
           Gunakan browser Print (Ctrl+P) untuk preview PDF
         </div>
       )}

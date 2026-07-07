@@ -1,6 +1,6 @@
 export interface User {
   id: string
-  tenant_id: string
+  tenant_id?: string | null
   email: string
   password_hash: string
   role: import('./enums').UserRole
@@ -8,6 +8,12 @@ export interface User {
   phone?: string
   avatar_url?: string
   is_active: boolean
+  approval_status: import('./enums').ApprovalStatus
+  approved_at?: string
+  approved_by?: string
+  rejected_at?: string
+  rejected_by?: string
+  rejection_reason?: string
   created_at: string
 }
 
@@ -123,8 +129,8 @@ export interface GroupStageProgress {
 
 export interface Participant {
   id: string
-  session_id: string
-  group_id: string
+  session_id?: string
+  group_id?: string
   child_name: string
   child_age: number
   school_name?: string
@@ -229,15 +235,17 @@ export interface AuditLog {
 
 export interface SyncQueue {
   id: string
-  tenant_id: string
-  source_device_id: string
-  data_type: import('./enums').SyncQueueDataType
+  tenant_id: string | null
+  resource_type: string
   resource_id: string
+  action: 'create' | 'update' | 'delete' | 'upload'
   payload_json?: Record<string, unknown>
   file_url_local?: string
+  media_blob_id?: string
   status: import('./enums').SyncQueueStatus
   retry_count: number
   error_message?: string
   created_at: string
+  updated_at: string
   synced_at?: string
 }

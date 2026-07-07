@@ -2,7 +2,6 @@ import { useState, useEffect, createContext, useContext, type ReactNode } from '
 import { useSearchParams } from 'react-router-dom'
 import { reportService } from '../../../core/services/reports'
 import { sessionService } from '../../../core/services/sessions'
-import { seedParticipants } from '../../../core/services/mock/data/seed'
 import type { Report, Participant } from '../../../core/types'
 
 /* ── Context ── */
@@ -70,17 +69,14 @@ export function ParentTokenGuard({ children }: ParentTokenGuardProps) {
         }
 
         if (foundReport) {
-          // Try to load participant details
           let participant: Participant | null = null
           try {
             const participants = await sessionService.getParticipants(foundReport.session_id)
             participant = participants.find((p) => p.id === foundReport!.participant_id) || null
           } catch {
-            // Fallback to seed data
-            participant = seedParticipants.find((p) => p.id === foundReport!.participant_id) || null
+            participant = null
           }
 
-          // Check if expired (sent more than 30 days ago)
           const isExpired = foundReport.sent_at
             ? Date.now() - new Date(foundReport.sent_at).getTime() > 30 * 24 * 60 * 60 * 1000
             : false
@@ -99,8 +95,7 @@ export function ParentTokenGuard({ children }: ParentTokenGuardProps) {
           return
         }
 
-        // Not found as report token — try as participant ID (consent flow)
-        const participant = seedParticipants.find((p) => p.id === token) || null
+        const participant = await sessionService.getParticipantById(token)
 
         if (!cancelled) {
           setState({

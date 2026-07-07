@@ -1,60 +1,70 @@
 import type { Program, ProgramStage, StageContent } from '../../types'
 import type { ProgramService } from '../types'
-import { seedPrograms, seedProgramStages, seedStageContents } from './data/seed'
-import { mockStorage } from './db'
+import { getAll, getById, put, queryByIndex, deleteById } from '../storage/idb'
+import { AppError } from '../../utils/errors'
+import { getTenantScope, requireTenantId } from '../tenantScope'
 
-const STORAGE_KEY = 'programs_v1'
+const PROGRAMS_STORE = 'programs'
+const STAGES_STORE = 'program_stages'
+const CONTENTS_STORE = 'stage_contents'
 
-type ProgramWithRelations = Program & {
-  stages?: ProgramStage[]
-  contents?: StageContent[]
-}
-
-const init = (): ProgramWithRelations[] => {
-  const existing = mockStorage.get<ProgramWithRelations[]>(STORAGE_KEY, [])
-  if (existing.length) return existing
-  const data: ProgramWithRelations[] = seedPrograms.map((p) => ({
-    ...p,
-    stages: seedProgramStages
-      .filter((s) => s.program_id === p.id)
-      .sort((a: ProgramStage, b: ProgramStage) => a.sequence_order - b.sequence_order),
-    contents: [],
-  }))
-  mockStorage.set(STORAGE_KEY, data)
-  return data
-}
-
-const getAll = async (params?: { page?: number; limit?: number; search?: string }): Promise<{
-  data: ProgramWithRelations[]
+const getAll_ = async (params?: { page?: number; limit?: number; search?: string }): Promise<{
+  data: (Program & { stages?: ProgramStage[] })[]
   total: number
   page: number
   limit: number
   totalPages: number
 }> => {
   await new Promise((r) => setTimeout(r, 200))
-  const data = init()
-  let filtered = data
+  let data = await getAll<Program>(PROGRAMS_STORE)
+
+  const scope = getTenantScope()
+  if (!scope.isSuperAdmin && scope.tenantId) {
+    data = data.filter((p) => p.tenant_id === scope.tenantId)
+  } else if (scope.isSuperAdmin && scope.tenantId) {
+    data = data.filter((p) => p.tenant_id === scope.tenantId)
+  } else if (scope.isSuperAdmin && !scope.tenantId) {
+    data = []
+  }
+  
   if (params?.search) {
     const q = params.search.toLowerCase()
-    filtered = data.filter((p) => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q))
+    data = data.filter((p) => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q))
   }
+  
   const page = params?.page ?? 1
   const limit = params?.limit ?? 10
   const start = (page - 1) * limit
-  const paginated = filtered.slice(start, start + limit)
-  const stages = init().flatMap((p) => p.stages ?? [])
+  const paginated = data.slice(start, start + limit)
+  
+  // Hydrate stages for paginated programs
+  const withStages = await Promise.all(
+    paginated.map(async (p) => {
+      const stages = await queryByIndex<ProgramStage>(STAGES_STORE, 'program_id', p.id)
+      return { ...p, stages: stages.sort((a, b) => a.sequence_order - b.sequence_order) }
+    })
+  )
+  
   return {
-    data: paginated.map((p) => ({ ...p, stages: stages.filter((s) => s.program_id === p.id) })),
-    total: filtered.length,
+    data: withStages,
+    total: data.length,
     page,
     limit,
-    totalPages: Math.ceil(filtered.length / limit),
+    totalPages: Math.ceil(data.length / limit),
   }
 }
 
-const getById = async (id: string): Promise<ProgramWithRelations | null> => {
+const getById_ = async (id: string): Promise<(Program & { stages?: ProgramStage[] }) | null> => {
   await new Promise((r) => setTimeout(r, 100))
-  return init().find((p) => p.id === id) ?? null
+  const program = await getById<Program>(PROGRAMS_STORE, id)
+  if (!program) return null
+  
+  // Hydrate stages from IDB
+  const stages = await queryByIndex<ProgramStage>(STAGES_STORE, 'program_id', id)
+  return {
+    ...program,
+    stages: stages.sort((a, b) => a.sequence_order - b.sequence_order),
+  }
 }
 
 const create = async (data: {
@@ -64,18 +74,17 @@ const create = async (data: {
   tenant_id?: string
 }): Promise<Program> => {
   await new Promise((r) => setTimeout(r, 300))
-  const all = init()
+  const tenantId = requireTenantId(data.tenant_id)
   const program: Program = {
     id: `p-${Date.now()}`,
-    tenant_id: data.tenant_id ?? 't-1',
+    tenant_id: tenantId,
     name: data.name,
     description: data.description,
     thumbnail_url: data.thumbnail_url,
     is_active: true,
     created_at: new Date().toISOString(),
   }
-  all.push({ ...program, stages: [], contents: [] })
-  mockStorage.set(STORAGE_KEY, all)
+  await put(PROGRAMS_STORE, program)
   return program
 }
 
@@ -86,34 +95,30 @@ const update = async (id: string, data: {
   is_active?: boolean
 }): Promise<Program> => {
   await new Promise((r) => setTimeout(r, 300))
-  const all = init()
-  const idx = all.findIndex((p) => p.id === id)
-  if (idx === -1) throw new Error('Program not found')
-  const updated = { ...all[idx], ...data }
-  all[idx] = updated
-  mockStorage.set(STORAGE_KEY, all)
+  const existing = await getById<Program>(PROGRAMS_STORE, id)
+  if (!existing) throw new AppError('NOT_FOUND', 'Program not found')
+  
+  const updated = { ...existing, ...data }
+  await put(PROGRAMS_STORE, updated)
   return updated
 }
 
 const toggleActive = async (id: string): Promise<Program> => {
   await new Promise((r) => setTimeout(r, 250))
-  const all = init()
-  const item = all.find((p) => p.id === id)
-  if (!item) throw new Error('Program not found')
+  const item = await getById<Program>(PROGRAMS_STORE, id)
+  if (!item) throw new AppError('NOT_FOUND', 'Program not found')
   return update(id, { is_active: !item.is_active })
 }
 
 const remove = async (id: string): Promise<void> => {
   await new Promise((r) => setTimeout(r, 250))
-  const all = init().filter((p) => p.id !== id)
-  mockStorage.set(STORAGE_KEY, all)
+  await deleteById(PROGRAMS_STORE, id)
 }
 
 const getStages = async (programId: string): Promise<ProgramStage[]> => {
   await new Promise((r) => setTimeout(r, 150))
-  return init()
-    .find((p) => p.id === programId)
-    ?.stages?.sort((a, b) => a.sequence_order - b.sequence_order) ?? []
+  const stages = await queryByIndex<ProgramStage>(STAGES_STORE, 'program_id', programId)
+  return stages.sort((a, b) => a.sequence_order - b.sequence_order)
 }
 
 const createStage = async (
@@ -129,9 +134,11 @@ const createStage = async (
   }
 ): Promise<ProgramStage> => {
   await new Promise((r) => setTimeout(r, 250))
-  const all = init()
-  const program = all.find((p) => p.id === programId)
-  if (!program) throw new Error('Program not found')
+  
+  // Verify program exists
+  const program = await getById<Program>(PROGRAMS_STORE, programId)
+  if (!program) throw new AppError('NOT_FOUND', 'Program not found')
+  
   const stage: ProgramStage = {
     id: `ps-${Date.now()}`,
     program_id: programId,
@@ -144,8 +151,7 @@ const createStage = async (
     is_photo_stage: data.is_photo_stage ?? true,
     created_at: new Date().toISOString(),
   }
-  program.stages = program.stages ? [...program.stages, stage] : [stage]
-  mockStorage.set(STORAGE_KEY, all)
+  await put(STAGES_STORE, stage)
   return stage
 }
 
@@ -163,44 +169,44 @@ const updateStage = async (
   }
 ): Promise<ProgramStage> => {
   await new Promise((r) => setTimeout(r, 250))
-  const all = init()
-  const program = all.find((p) => p.id === programId)
-  if (!program?.stages) throw new Error('Program not found')
-  const idx = program.stages.findIndex((s) => s.id === stageId)
-  if (idx === -1) throw new Error('Stage not found')
-  program.stages[idx] = { ...program.stages[idx], ...data, content_type: (data.content_type ?? program.stages[idx].content_type) as ProgramStage['content_type'] } as ProgramStage
-  mockStorage.set(STORAGE_KEY, all)
-  return program.stages[idx]
+  const existing = await getById<ProgramStage>(STAGES_STORE, stageId)
+  if (!existing || existing.program_id !== programId) throw new AppError('NOT_FOUND', 'Stage not found')
+  
+  const updated = {
+    ...existing,
+    ...data,
+    content_type: (data.content_type ?? existing.content_type) as ProgramStage['content_type'],
+  }
+  await put(STAGES_STORE, updated)
+  return updated
 }
 
 const deleteStage = async (programId: string, stageId: string): Promise<void> => {
   await new Promise((r) => setTimeout(r, 250))
-  const all = init()
-  const program = all.find((p) => p.id === programId)
-  if (!program?.stages) return
-  program.stages = program.stages.filter((s) => s.id !== stageId)
-  mockStorage.set(STORAGE_KEY, all)
+  const existing = await getById<ProgramStage>(STAGES_STORE, stageId)
+  if (existing && existing.program_id === programId) {
+    await deleteById(STAGES_STORE, stageId)
+  }
 }
 
 const reorderStages = async (programId: string, stageIds: string[]): Promise<void> => {
   await new Promise((r) => setTimeout(r, 200))
-  const all = init()
-  const program = all.find((p) => p.id === programId)
-  if (!program?.stages) return
-  const map = new Map(program.stages.map((s) => [s.id, s]))
-  program.stages = stageIds
-    .map((id, index) => {
-      const stage = map.get(id)
-      if (!stage) return null
-      return { ...stage, sequence_order: index + 1 }
-    })
-    .filter(Boolean) as ProgramStage[]
-  mockStorage.set(STORAGE_KEY, all)
+  const stages = await queryByIndex<ProgramStage>(STAGES_STORE, 'program_id', programId)
+  const stageMap = new Map(stages.map((s) => [s.id, s]))
+  
+  for (let i = 0; i < stageIds.length; i++) {
+    const stage = stageMap.get(stageIds[i])
+    if (stage) {
+      stage.sequence_order = i + 1
+      await put(STAGES_STORE, stage)
+    }
+  }
 }
 
 const getContents = async (stageId: string): Promise<StageContent[]> => {
   await new Promise((r) => setTimeout(r, 150))
-  return seedStageContents.filter((c) => c.program_stage_id === stageId)
+  const contents = await queryByIndex<StageContent>(CONTENTS_STORE, 'program_stage_id', stageId)
+  return contents.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 }
 
 const createContent = async (
@@ -214,7 +220,7 @@ const createContent = async (
     ...data,
     created_at: new Date().toISOString(),
   } as StageContent
-  seedStageContents.push(content)
+  await put(CONTENTS_STORE, content)
   return content
 }
 
@@ -224,31 +230,39 @@ const updateContent = async (
   data: Partial<Omit<StageContent, 'id' | 'program_stage_id' | 'created_at'>>
 ): Promise<StageContent> => {
   await new Promise((r) => setTimeout(r, 250))
-  const content = seedStageContents.find((c) => c.id === contentId && c.program_stage_id === stageId)
-  if (!content) throw new Error('Content not found')
-  Object.assign(content, data)
-  return content
+  const existing = await getById<StageContent>(CONTENTS_STORE, contentId)
+  if (!existing || existing.program_stage_id !== stageId) throw new AppError('NOT_FOUND', 'Content not found')
+  
+  const updated = { ...existing, ...data }
+  await put(CONTENTS_STORE, updated)
+  return updated
 }
 
 const deleteContent = async (stageId: string, contentId: string): Promise<void> => {
   await new Promise((r) => setTimeout(r, 250))
-  const idx = seedStageContents.findIndex((c) => c.id === contentId && c.program_stage_id === stageId)
-  if (idx !== -1) seedStageContents.splice(idx, 1)
+  const existing = await getById<StageContent>(CONTENTS_STORE, contentId)
+  if (existing && existing.program_stage_id === stageId) {
+    await deleteById(CONTENTS_STORE, contentId)
+  }
 }
 
 const reorderContents = async (stageId: string, contentIds: string[]): Promise<void> => {
   await new Promise((r) => setTimeout(r, 200))
-  const items = seedStageContents.filter((c) => c.program_stage_id === stageId)
-  const map = new Map(items.map((c) => [c.id, c]))
-  contentIds.forEach((id, index) => {
-    const item = map.get(id)
-    if (item) item.sort_order = index + 1
-  })
+  const contents = await queryByIndex<StageContent>(CONTENTS_STORE, 'program_stage_id', stageId)
+  const contentMap = new Map(contents.map((c) => [c.id, c]))
+  
+  for (let i = 0; i < contentIds.length; i++) {
+    const content = contentMap.get(contentIds[i])
+    if (content) {
+      content.sort_order = i + 1
+      await put(CONTENTS_STORE, content)
+    }
+  }
 }
 
 export const mockProgramService: ProgramService = {
-  getAll,
-  getById,
+  getAll: getAll_,
+  getById: getById_,
   create,
   update,
   toggleActive,

@@ -60,7 +60,7 @@ export interface CreateParticipantDTO {
   parent_name: string
   parent_phone: string
   parent_email?: string
-  group_id: string
+  group_id?: string
 }
 
 export interface CreateUserDTO {

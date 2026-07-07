@@ -7,6 +7,7 @@ import {
   FileText,
   Image,
   Users,
+  UserRound,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -16,6 +17,7 @@ import {
   Video,
   ClipboardList,
   ShieldCheck,
+  Building2,
 } from 'lucide-react'
 import { useState, useCallback } from 'react'
 import { ROUTES } from '../../core/constants/app'
@@ -23,6 +25,8 @@ import { cn } from '../../core/utils'
 import { useAuth } from '../../core/hooks/useAuth'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Tooltip } from '../components/ui/Tooltip'
+import { TenantSwitcher } from '../components/ui/TenantSwitcher'
+import { TenantGuard, isTenantFreeRoute } from '../components/auth/TenantGuard'
 import { UserRole } from '../../core/types/enums'
 import type { ReactNode } from 'react'
 
@@ -37,32 +41,34 @@ const menuSections: { section: string; items: MenuItem[] }[] = [
   {
     section: 'OVERVIEW',
     items: [
-      { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
-      { label: 'Live Monitor', path: '/admin/live', icon: <Radio className="w-5 h-5" />, roles: [UserRole.KOORDINATOR, UserRole.ADMIN_WISATA] },
+      { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+      { label: 'Live Monitor', path: '/admin/live', icon: <Radio className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.KOORDINATOR, UserRole.ADMIN] },
     ],
   },
   {
     section: 'PROGRAM',
     items: [
-      { label: 'Programs', path: '/admin/programs', icon: <FolderOpen className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA] },
-      { label: 'Sessions', path: '/admin/sessions', icon: <Calendar className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
-      { label: 'Reports', path: '/admin/reports', icon: <FileCheck className="w-5 h-5" />, roles: [UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
-      { label: 'Missions', path: '/admin/missions', icon: <ClipboardList className="w-5 h-5" />, roles: [UserRole.ADMIN_WISATA] },
+      { label: 'Programs', path: '/admin/programs', icon: <FolderOpen className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+      { label: 'Sessions', path: '/admin/sessions', icon: <Calendar className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+      { label: 'Peserta', path: '/admin/participants', icon: <UserRound className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+      { label: 'Reports', path: '/admin/reports', icon: <FileCheck className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.KOORDINATOR] },
+      { label: 'Missions', path: '/admin/missions', icon: <ClipboardList className="w-5 h-5" />, roles: [UserRole.ADMIN] },
     ],
   },
   {
     section: 'CONTENT',
     items: [
-      { label: 'Content Manager', path: '/admin/content', icon: <FileText className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA] },
-      { label: 'Frame Manager', path: '/admin/frames', icon: <Image className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA] },
-      { label: 'Recordings', path: '/admin/recordings', icon: <Video className="w-5 h-5" />, roles: [UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
+      { label: 'Content Manager', path: '/admin/content', icon: <FileText className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+      { label: 'Frame Manager', path: '/admin/frames', icon: <Image className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+      { label: 'Recordings', path: '/admin/recordings', icon: <Video className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.KOORDINATOR] },
     ],
   },
   {
     section: 'SETTINGS',
     items: [
-      { label: 'Users', path: '/admin/users', icon: <Users className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA] },
-      { label: 'Consent Monitor', path: '/admin/consent', icon: <ShieldCheck className="w-5 h-5" />, roles: [UserRole.ADMIN_WISATA, UserRole.KOORDINATOR] },
+      { label: 'Tenants', path: '/admin/tenants', icon: <Building2 className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN] },
+      { label: 'Users', path: '/admin/users', icon: <Users className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+      { label: 'Consent Monitor', path: '/admin/consent', icon: <ShieldCheck className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.KOORDINATOR] },
     ],
   },
 ]
@@ -133,6 +139,13 @@ const AdminLayout = () => {
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Tenant Switcher for SUPER_ADMIN */}
+        {user?.role === UserRole.SUPER_ADMIN && (
+          <div className="px-3 py-2 border-b border-outline-variant shrink-0">
+            <TenantSwitcher />
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-3">
@@ -234,7 +247,13 @@ const AdminLayout = () => {
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="p-6 lg:p-8">
             <ErrorBoundary>
-              <Outlet />
+              {isTenantFreeRoute(location.pathname) ? (
+                <Outlet />
+              ) : (
+                <TenantGuard>
+                  <Outlet />
+                </TenantGuard>
+              )}
             </ErrorBoundary>
           </div>
         </main>

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { frameService } from '../../../core/services/frames'
+import { getTenantScope } from '../../../core/services/tenantScope'
 
 interface UploadItem {
   id: string
@@ -148,13 +149,21 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
   const handleSaveAll = useCallback(async () => {
     if (items.length === 0) return
     if (items.some((i) => !i.name.trim())) return
+
+    const scope = getTenantScope()
+    if (scope.blocked || !scope.tenantId) {
+      setErrorMessage('Pilih tenant aktif terlebih dahulu.')
+      return
+    }
+
+    const tenantId = scope.tenantId
     setIsSaving(true)
     setErrorMessage(null)
     try {
       await Promise.all(
         items.map((item, index) =>
           frameService.create({
-            tenant_id: 't-1', name: item.name.trim(),
+            tenant_id: tenantId, name: item.name.trim(),
             program_id: item.programId || undefined,
             file_url: item.preview, is_active: true, sort_order: index,
           }),

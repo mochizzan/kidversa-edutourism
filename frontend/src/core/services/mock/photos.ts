@@ -1,66 +1,19 @@
 import type { SmartPhoto } from '../../types'
 import type { PhotoService } from '../types'
 import { SyncStatus } from '../../types'
-import { mockStorage } from './db'
+import { getById, put, queryByIndex, deleteById } from '../storage/idb'
+import { AppError } from '../../utils/errors'
 
-
-const STORAGE_KEY = 'smart_photos_v1'
-
-const init = (): SmartPhoto[] => {
-  const existing = mockStorage.get<SmartPhoto[]>(STORAGE_KEY, [])
-  if (existing.length) return existing
-  const seed: SmartPhoto[] = [
-    {
-      id: 'sp-1',
-      participant_id: 'part-1',
-      session_id: 's-1',
-      frame_id: 'f-1',
-      original_file_url: '/mock/photos/budi-1-original.jpg',
-      framed_file_url: '/mock/photos/budi-1-framed.jpg',
-      is_report_photo: true,
-      taken_by: 'u-3',
-      taken_at: '2026-07-05T07:35:00.000Z',
-      sync_status: SyncStatus.SYNCED,
-    },
-    {
-      id: 'sp-2',
-      participant_id: 'part-2',
-      session_id: 's-1',
-      frame_id: 'f-2',
-      original_file_url: '/mock/photos/siti-1-original.jpg',
-      framed_file_url: '/mock/photos/siti-1-framed.jpg',
-      is_report_photo: true,
-      taken_by: 'u-3',
-      taken_at: '2026-07-05T07:36:00.000Z',
-      sync_status: SyncStatus.SYNCED,
-    },
-    {
-      id: 'sp-3',
-      participant_id: 'part-3',
-      session_id: 's-1',
-      frame_id: 'f-1',
-      original_file_url: '/mock/photos/ali-1-original.jpg',
-      framed_file_url: '/mock/photos/ali-1-framed.jpg',
-      is_report_photo: false,
-      taken_by: 'u-3',
-      taken_at: '2026-07-05T07:37:00.000Z',
-      sync_status: SyncStatus.SYNCED,
-    },
-  ]
-  mockStorage.set(STORAGE_KEY, seed)
-  return seed
-}
-
-const getAll = (): SmartPhoto[] => mockStorage.get<SmartPhoto[]>(STORAGE_KEY, init())
+const STORE_NAME = 'smart_photos'
 
 const getBySession = async (sessionId: string): Promise<SmartPhoto[]> => {
   await new Promise((r) => setTimeout(r, 150))
-  return getAll().filter((p) => p.session_id === sessionId)
+  return await queryByIndex<SmartPhoto>(STORE_NAME, 'session_id', sessionId)
 }
 
 const getByParticipant = async (participantId: string): Promise<SmartPhoto[]> => {
   await new Promise((r) => setTimeout(r, 100))
-  return getAll().filter((p) => p.participant_id === participantId)
+  return await queryByIndex<SmartPhoto>(STORE_NAME, 'participant_id', participantId)
 }
 
 const upload = async (
@@ -69,12 +22,13 @@ const upload = async (
   _file: File
 ): Promise<SmartPhoto> => {
   await new Promise((r) => setTimeout(r, 500))
-  const all = getAll()
+  
   // Check max 10 photos per participant
-  const participantPhotos = all.filter((p) => p.participant_id === participantId)
+  const participantPhotos = await queryByIndex<SmartPhoto>(STORE_NAME, 'participant_id', participantId)
   if (participantPhotos.length >= 10) {
-    throw new Error('MAX_PHOTOS_REACHED')
+    throw new AppError('VALIDATION_ERROR', 'MAX_PHOTOS_REACHED')
   }
+  
   const photo: SmartPhoto = {
     id: `sp-${Date.now()}`,
     participant_id: participantId,
@@ -87,8 +41,7 @@ const upload = async (
     taken_at: new Date().toISOString(),
     sync_status: SyncStatus.LOCAL,
   }
-  all.push(photo)
-  mockStorage.set(STORAGE_KEY, all)
+  await put(STORE_NAME, photo)
   return photo
 }
 
@@ -97,26 +50,38 @@ const setReportPhoto = async (
   isReportPhoto: boolean
 ): Promise<SmartPhoto> => {
   await new Promise((r) => setTimeout(r, 200))
-  const all = getAll()
-  const photo = all.find((p) => p.id === photoId)
-  if (!photo) throw new Error('Photo not found')
+  const photo = await getById<SmartPhoto>(STORE_NAME, photoId)
+  if (!photo) throw new AppError('NOT_FOUND', 'Photo not found')
+  
   // Unset other report photos for this participant
   if (isReportPhoto) {
-    all.forEach((p) => {
-      if (p.participant_id === photo.participant_id && p.id !== photoId) {
+    const participantPhotos = await queryByIndex<SmartPhoto>(STORE_NAME, 'participant_id', photo.participant_id)
+    for (const p of participantPhotos) {
+      if (p.id !== photoId && p.is_report_photo) {
         p.is_report_photo = false
+        await put(STORE_NAME, p)
       }
-    })
+    }
   }
+  
   photo.is_report_photo = isReportPhoto
-  mockStorage.set(STORAGE_KEY, all)
+  await put(STORE_NAME, photo)
   return photo
 }
 
 const remove = async (id: string): Promise<void> => {
   await new Promise((r) => setTimeout(r, 200))
-  const all = getAll().filter((p) => p.id !== id)
-  mockStorage.set(STORAGE_KEY, all)
+  await deleteById(STORE_NAME, id)
+}
+
+const update = async (id: string, data: Partial<SmartPhoto>): Promise<SmartPhoto> => {
+  await new Promise((r) => setTimeout(r, 200))
+  const photo = await getById<SmartPhoto>(STORE_NAME, id)
+  if (!photo) throw new AppError('NOT_FOUND', 'Photo not found')
+  
+  const updated = { ...photo, ...data }
+  await put(STORE_NAME, updated)
+  return updated
 }
 
 export const mockPhotoService: PhotoService = {
@@ -124,5 +89,6 @@ export const mockPhotoService: PhotoService = {
   getByParticipant,
   upload,
   setReportPhoto,
+  update,
   delete: remove,
 }

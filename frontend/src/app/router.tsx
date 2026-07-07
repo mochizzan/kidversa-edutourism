@@ -28,17 +28,25 @@ const ProgramDetailPage = lazy(() => import('../features/admin/pages/ProgramDeta
 const SessionsPage = lazy(() => import('../features/admin/pages/SessionsPage'))
 const SessionDetailPage = lazy(() => import('../features/admin/pages/SessionDetailPage'))
 const ContentPage = lazy(() => import('../features/admin/pages/ContentPage'))
+const ContentFormPage = lazy(() => import('../features/admin/pages/ContentFormPage'))
 const FramesPage = lazy(() => import('../features/admin/pages/FramesPage'))
+const FrameFormPage = lazy(() => import('../features/admin/pages/FrameFormPage'))
 const FrameUploadPage = lazy(() => import('../features/admin/pages/FrameUploadPage'))
 const UsersPage = lazy(() => import('../features/admin/pages/UsersPage'))
+const UserFormPage = lazy(() => import('../features/admin/pages/UserFormPage'))
 const LiveMonitorPage = lazy(() => import('../features/admin/pages/LiveMonitorPage'))
 const ReportListPage = lazy(() => import('../features/admin/pages/ReportListPage'))
 const ReportSessionPage = lazy(() => import('../features/admin/pages/ReportSessionPage'))
 const ReportReviewPage = lazy(() => import('../features/admin/pages/ReportReviewPage'))
 const MissionBankPage = lazy(() => import('../features/admin/pages/MissionBankPage'))
+const MissionFormPage = lazy(() => import('../features/admin/pages/MissionFormPage'))
 const RecordingReviewPage = lazy(() => import('../features/admin/pages/RecordingReviewPage'))
 const RecordingDetailPage = lazy(() => import('../features/admin/pages/RecordingDetailPage'))
 const ConsentMonitorPage = lazy(() => import('../features/admin/pages/ConsentMonitorPage'))
+const ParticipantsPage = lazy(() => import('../features/admin/pages/ParticipantsPage'))
+const ParticipantFormPage = lazy(() => import('../features/admin/pages/ParticipantFormPage'))
+const ParticipantDetailPage = lazy(() => import('../features/admin/pages/ParticipantDetailPage'))
+const TenantsPage = lazy(() => import('../features/admin/pages/TenantsPage'))
 
 // ── Fasilitator pages (lazy) ──
 const FasilitatorDashboardPage = lazy(() => import('../features/fasilitator/pages/DashboardPage'))
@@ -55,6 +63,9 @@ const FasilitatorProfilePage = lazy(() => import('../features/fasilitator/pages/
 const ParentConsentFormPage = lazy(() => import('../features/parent/pages/ConsentFormPage'))
 const ParentReportPage = lazy(() => import('../features/parent/pages/ReportPage'))
 const ParentMissionsPage = lazy(() => import('../features/parent/pages/MissionsPage'))
+
+// ── Learner Kiosk (public) ──
+const LearnerKioskPage = lazy(() => import('../pages/LearnerKioskPage'))
 
 export const router = createBrowserRouter([
   {
@@ -80,11 +91,11 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // ── Admin routes (SUPER_ADMIN, ADMIN_WISATA, KOORDINATOR) ──
+  // ── Admin routes (SUPER_ADMIN, ADMIN, KOORDINATOR) ──
   {
     element: (
       <ProtectedRoute
-        allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN_WISATA, UserRole.KOORDINATOR]}
+        allowedRoles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR]}
       />
     ),
     children: [
@@ -141,6 +152,14 @@ export const router = createBrowserRouter([
             ),
           },
           {
+            path: 'sessions/new',
+            element: (
+              <SuspenseWrapper>
+                <SessionDetailPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
             path: 'sessions/:sessionId',
             element: (
               <SuspenseWrapper>
@@ -149,10 +168,58 @@ export const router = createBrowserRouter([
             ),
           },
           {
+            path: 'participants',
+            element: (
+              <SuspenseWrapper>
+                <ParticipantsPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'participants/new',
+            element: (
+              <SuspenseWrapper>
+                <ParticipantFormPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'participants/:participantId/edit',
+            element: (
+              <SuspenseWrapper>
+                <ParticipantFormPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'participants/:participantId',
+            element: (
+              <SuspenseWrapper>
+                <ParticipantDetailPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
             path: 'content',
             element: (
               <SuspenseWrapper>
                 <ContentPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'content/new',
+            element: (
+              <SuspenseWrapper>
+                <ContentFormPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'content/:contentId/edit',
+            element: (
+              <SuspenseWrapper>
+                <ContentFormPage />
               </SuspenseWrapper>
             ),
           },
@@ -173,10 +240,34 @@ export const router = createBrowserRouter([
             ),
           },
           {
+            path: 'frames/:frameId/edit',
+            element: (
+              <SuspenseWrapper>
+                <FrameFormPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
             path: 'users',
             element: (
               <SuspenseWrapper>
                 <UsersPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'users/new',
+            element: (
+              <SuspenseWrapper>
+                <UserFormPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'users/:userId/edit',
+            element: (
+              <SuspenseWrapper>
+                <UserFormPage />
               </SuspenseWrapper>
             ),
           },
@@ -213,6 +304,22 @@ export const router = createBrowserRouter([
             ),
           },
           {
+            path: 'missions/new',
+            element: (
+              <SuspenseWrapper>
+                <MissionFormPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'missions/:missionId/edit',
+            element: (
+              <SuspenseWrapper>
+                <MissionFormPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
             path: 'recordings',
             element: (
               <SuspenseWrapper>
@@ -233,6 +340,14 @@ export const router = createBrowserRouter([
             element: (
               <SuspenseWrapper>
                 <ConsentMonitorPage />
+              </SuspenseWrapper>
+            ),
+          },
+          {
+            path: 'tenants',
+            element: (
+              <SuspenseWrapper>
+                <TenantsPage />
               </SuspenseWrapper>
             ),
           },
@@ -362,6 +477,15 @@ export const router = createBrowserRouter([
         ),
       },
     ],
+  },
+  // ── Learner Kiosk (public, no auth) ──
+  {
+    path: '/learner/:sessionId/:stageId',
+    element: (
+      <SuspenseWrapper>
+        <LearnerKioskPage />
+      </SuspenseWrapper>
+    ),
   },
   // ── 404 ──
   {

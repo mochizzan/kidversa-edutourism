@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Eye, Play, X, Calendar } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -15,6 +15,7 @@ import type { Session } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 
 const SessionsPage = () => {
+  const navigate = useNavigate()
   const { data: sessions, loading, page, total, setPage, setSearch, refresh } = useCrudList<Session>({
     fetchFn: (params) => sessionService.getAll({ ...params, limit: 10 }),
   })
@@ -63,10 +64,8 @@ const SessionsPage = () => {
       header: 'Aksi',
       align: 'right',
       render: (item: Session) => (
-        <div className="flex items-center justify-end gap-2">
-          <Link to={`/admin/sessions/${item.id}`}>
-            <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip="Lihat Detail" />
-          </Link>
+          <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip="Lihat Detail" onClick={() => navigate(`/admin/sessions/${item.id}`)} />
           {item.status === 'DRAFT' && (
             <Button variant="ghost" size="sm" icon={<Play className="w-4 h-4 text-green-600" />} tooltip="Mulai Sesi" onClick={() => sessionService.start(item.id).then(() => refresh())} />
           )}
@@ -82,9 +81,7 @@ const SessionsPage = () => {
         title="Sessions"
         subtitle="Kelola sesi edutourism."
         actions={
-          <Link to="/admin/sessions/new">
-            <Button icon={<Plus className="w-4 h-4" />}>Buat Sesi</Button>
-          </Link>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate('/admin/sessions/new')}>Buat Sesi</Button>
         }
       />
 
@@ -103,7 +100,7 @@ const SessionsPage = () => {
             icon={<Calendar className="w-12 h-12" />}
             title="Belum ada sesi"
             description="Buat sesi pertama untuk memulai."
-            action={{ label: 'Buat Sesi', onClick: () => {} }}
+            action={{ label: 'Buat Sesi', onClick: () => navigate('/admin/sessions/new') }}
           />
         }
       />

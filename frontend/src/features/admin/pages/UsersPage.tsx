@@ -1,79 +1,153 @@
-import { useState } from 'react'
-import { Plus, Pencil, Trash2, Camera } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Plus, Pencil, Check, X as XIcon, Ban } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
-import { Input } from '../../../shared/components/ui/Input'
-import { Select } from '../../../shared/components/ui/Select'
+import { Tabs } from '../../../shared/components/ui/Tabs'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { useCrudList } from '../../../shared/hooks/useCrudList'
 import { userService } from '../../../core/services/users'
-import { resizeImage } from '../../../core/utils/image'
-import { AvatarUploadModal } from '../../../shared/components/ui/AvatarUploadModal'
-import { Tooltip } from '../../../shared/components/ui/Tooltip'
-import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { useAuth } from '../../../core/hooks/useAuth'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
+import { canApproveUser } from '../../../core/utils/permissions'
+import { ApprovalStatus } from '../../../core/types/enums'
 import type { Column } from '../../../shared/components/data/DataTable'
-import type { User, UpdateUserDTO } from '../../../core/types'
+import type { User, Tenant } from '../../../core/types'
+import { getAll } from '../../../core/services/storage/idb'
 
-const roleOptions = [
-  { value: 'ADMIN_WISATA', label: 'Admin Wisata' },
-  { value: 'KOORDINATOR', label: 'Koordinator Program' },
-  { value: 'FASILITATOR', label: 'Fasilitator' },
+type FilterTab = 'all' | 'pending' | 'active' | 'inactive' | 'rejected'
+
+const ALLOWED_FILTERS: FilterTab[] = ['all', 'pending', 'active', 'inactive', 'rejected']
+
+function parseFilter(value: string | null): FilterTab {
+  return ALLOWED_FILTERS.includes(value as FilterTab) ? (value as FilterTab) : 'all'
+}
+
+const TABS: { key: FilterTab; label: string }[] = [
+  { key: 'all', label: 'Semua' },
+  { key: 'pending', label: 'Menunggu Persetujuan' },
+  { key: 'active', label: 'Aktif' },
+  { key: 'inactive', label: 'Nonaktif' },
+  { key: 'rejected', label: 'Ditolak' },
 ]
 
-const UsersPage = () => {
-  const { data: users, loading, page, total, setPage, setSearch, refresh } = useCrudList<User>({
-    fetchFn: (params) => userService.getAll({ ...params, limit: 10 }),
-  })
-  const [open, setOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [showAvatarModal, setShowAvatarModal] = useState(false)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
-  const { getHighlightClass } = useHighlight()
-  const { addToast } = useGlobalToast()
+function approvalBadge(status: User['approval_status']) {
+  switch (status) {
+    case ApprovalStatus.PENDING:
+      return <Badge variant="warning">Menunggu</Badge>
+    case ApprovalStatus.APPROVED:
+      return <Badge variant="success">Disetujui</Badge>
+    case ApprovalStatus.REJECTED:
+      return <Badge variant="danger">Ditolak</Badge>
+    default:
+      return <Badge variant="neutral">-</Badge>
+  }
+}
 
-  const handleAvatarUpload = async (file: File) => {
-    try {
-      const base64 = await resizeImage(file)
-      setAvatarPreview(base64)
-    } catch {
-      addToast({ type: 'error', message: 'Gagal memproses gambar' })
-      throw new Error('Gagal memproses gambar')
+const UsersPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { user: currentUser } = useAuth()
+  const { tenantId } = useTenantScope()
+  const isSuperAdminView = currentUser?.role === 'SUPER_ADMIN'
+
+  const [activeTab, setActiveTab] = useState<FilterTab>(parseFilter(searchParams.get('filter')))
+  const [tenantFilter, setTenantFilter] = useState(searchParams.get('tenant') || '')
+  const [tenants, setTenants] = useState<Tenant[]>([])
+  const [approveId, setApproveId] = useState<string | null>(null)
+  const [rejectId, setRejectId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [deactivateId, setDeactivateId] = useState<string | null>(null)
+  const { getHighlightClass } = useHighlight()
+
+  useEffect(() => {
+    getAll<Tenant>('tenants').then(setTenants)
+  }, [])
+
+  const tenantMap = new Map(tenants.map((t) => [t.id, t]))
+
+  const buildFilters = useCallback(() => {
+    const filters: Record<string, string | boolean | undefined> = {}
+
+    if (activeTab === 'pending') {
+      filters.approval_status = ApprovalStatus.PENDING
+    } else if (activeTab === 'active') {
+      filters.is_active = true
+      filters.approval_status = ApprovalStatus.APPROVED
+    } else if (activeTab === 'inactive') {
+      filters.is_active = false
+      filters.approval_status = ApprovalStatus.APPROVED
+    } else if (activeTab === 'rejected') {
+      filters.approval_status = ApprovalStatus.REJECTED
     }
+
+    const effectiveTenant = isSuperAdminView ? tenantFilter : tenantId
+    if (effectiveTenant) {
+      filters.tenant_id = effectiveTenant
+    }
+
+    return filters
+  }, [activeTab, tenantFilter, isSuperAdminView, tenantId])
+
+  const { data: users, loading, page, total, setPage, setSearch, refresh } = useCrudList<User>({
+    fetchFn: (params) => userService.getAll({ ...params, limit: 10, filters: buildFilters() }),
+    additionalFilters: buildFilters(),
+  })
+
+  useEffect(() => {
+    const spFilter = parseFilter(searchParams.get('filter'))
+    const spTenant = searchParams.get('tenant') || ''
+    let changed = false
+    if (spFilter !== activeTab) { setActiveTab(spFilter); changed = true }
+    if (spTenant !== tenantFilter) { setTenantFilter(spTenant); changed = true }
+    if (changed) setPage(1)
+  }, [searchParams])
+
+  const handleTabChange = (key: string) => {
+    setActiveTab(key as FilterTab)
+    setPage(1)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('filter', key)
+      return next
+    }, { replace: true })
   }
 
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const fd = new FormData(e.target as HTMLFormElement)
-    if (editingUser) {
-      const payload: UpdateUserDTO = {
-        name: fd.get('name') as string,
-        email: fd.get('email') as string,
-        role: fd.get('role') as User['role'],
-        phone: fd.get('phone') as string || undefined,
+  const handleTenantFilterChange = (tid: string) => {
+    setTenantFilter(tid)
+    setPage(1)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (tid) {
+        next.set('tenant', tid)
+      } else {
+        next.delete('tenant')
       }
-      if (avatarPreview) payload.avatar_url = avatarPreview
-      await userService.update(editingUser.id, payload)
-    } else {
-      await userService.create({
-        tenant_id: 't-1',
-        name: fd.get('name') as string,
-        email: fd.get('email') as string,
-        password: fd.get('password') as string,
-        role: fd.get('role') as User['role'],
-        phone: fd.get('phone') as string || undefined,
-      })
-    }
-    setAvatarPreview(null)
-    setOpen(false)
-    setEditingUser(null)
+      return next
+    }, { replace: true })
+  }
+
+  const handleApprove = async () => {
+    if (!approveId || !currentUser) return
+    await userService.approve(approveId, currentUser.id)
+    setApproveId(null)
     refresh()
   }
 
-  const handleDeactivate = async (id: string) => {
-    await userService.deactivate(id)
+  const handleReject = async () => {
+    if (!rejectId || !currentUser) return
+    await userService.reject(rejectId, currentUser.id, rejectReason || undefined)
+    setRejectId(null)
+    setRejectReason('')
+    refresh()
+  }
+
+  const handleDeactivate = async () => {
+    if (!deactivateId) return
+    await userService.deactivate(deactivateId)
+    setDeactivateId(null)
     refresh()
   }
 
@@ -102,9 +176,23 @@ const UsersPage = () => {
       header: 'Role',
       render: (item: User) => <Badge variant="primary">{item.role}</Badge>,
     },
+    ...(isSuperAdminView
+      ? [
+          {
+            key: 'tenant',
+            header: 'Tenant',
+            render: (item: User) => (
+              <span className="text-sm text-on-surface-variant">
+                {item.tenant_id ? tenantMap.get(item.tenant_id)?.name || '-' : 'Platform'}
+              </span>
+            ),
+          } as Column<User>,
+        ]
+      : []),
     {
-      key: 'phone',
-      header: 'No. HP',
+      key: 'approval_status',
+      header: 'Persetujuan',
+      render: (item: User) => approvalBadge(item.approval_status),
     },
     {
       key: 'is_active',
@@ -115,12 +203,48 @@ const UsersPage = () => {
       key: 'actions',
       header: 'Aksi',
       align: 'right',
-      render: (item: User) => (
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" onClick={() => { setEditingUser(item); setOpen(true) }} />
-          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Nonaktifkan" onClick={() => handleDeactivate(item.id)} />
-        </div>
-      ),
+      render: (item: User) => {
+        const canApprove = canApproveUser(currentUser, item.tenant_id)
+        const isPending = item.approval_status === ApprovalStatus.PENDING
+        const isApprovedActive = item.approval_status === ApprovalStatus.APPROVED && item.is_active
+
+        return (
+          <div className="flex items-center justify-end gap-2">
+            {canApprove && isPending && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<Check className="w-4 h-4 text-green-600" />}
+                  tooltip="Setujui"
+                  onClick={() => setApproveId(item.id)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<XIcon className="w-4 h-4 text-error" />}
+                  tooltip="Tolak"
+                  onClick={() => setRejectId(item.id)}
+                />
+              </>
+            )}
+            {isApprovedActive && (
+              <>
+                <Link to={`/admin/users/${item.id}/edit`}>
+                  <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" />
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={<Ban className="w-4 h-4 text-error" />}
+                  tooltip="Nonaktifkan"
+                  onClick={() => setDeactivateId(item.id)}
+                />
+              </>
+            )}
+          </div>
+        )
+      },
     },
   ]
 
@@ -130,9 +254,29 @@ const UsersPage = () => {
         title="Users"
         subtitle="Kelola pengguna sistem."
         actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => { setEditingUser(null); setOpen(true) }}>Tambah User</Button>
+          <Link to="/admin/users/new">
+            <Button icon={<Plus className="w-4 h-4" />}>Tambah User</Button>
+          </Link>
         }
       />
+
+      <Tabs tabs={TABS} activeKey={activeTab} onChange={handleTabChange} />
+
+      {isSuperAdminView && (
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-on-surface-variant font-medium">Filter Tenant:</label>
+          <select
+            value={tenantFilter}
+            onChange={(e) => handleTenantFilterChange(e.target.value)}
+            className="px-3 py-1.5 rounded-xl border text-sm outline-none bg-surface-container-low border-outline-variant/60 text-on-surface"
+          >
+            <option value="">Semua Tenant</option>
+            {tenants.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <DataTable
         data={users}
@@ -146,50 +290,43 @@ const UsersPage = () => {
         rowClassName={(item: User) => getHighlightClass(item.id)}
       />
 
-      {editingUser && (
-        <AvatarUploadModal
-          open={showAvatarModal}
-          onClose={() => setShowAvatarModal(false)}
-          currentAvatarUrl={editingUser.avatar_url}
-          onUpload={handleAvatarUpload}
-        />
-      )}
-
-      <Modal open={open} onClose={() => { setOpen(false); setEditingUser(null); setAvatarPreview(null) }} title={editingUser ? 'Edit User' : 'Tambah User'} footer={
+      <Modal open={!!approveId} onClose={() => setApproveId(null)} title="Setujui Pendaftaran" footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => { setOpen(false); setEditingUser(null); setAvatarPreview(null) }}>Batal</Button>
-          <Button type="submit" form="user-form">Simpan</Button>
+          <Button variant="secondary" onClick={() => setApproveId(null)}>Batal</Button>
+          <Button variant="primary" onClick={handleApprove}>Setujui</Button>
         </div>
       }>
-        <form id="user-form" className="space-y-4" onSubmit={handleSave}>
-          {editingUser && (
-            <div className="flex items-center gap-4 mb-4 pb-4 border-b border-outline-variant">
-              <div className="relative w-12 h-12 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0">
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="" className="w-full h-full object-cover rounded-full" />
-                ) : editingUser.avatar_url ? (
-                  <img src={editingUser.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
-                ) : (
-                  <span className="text-lg font-bold text-primary">{editingUser.name.charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-              <Tooltip content="Ubah foto profil">
-                <button
-                  type="button"
-                  onClick={() => setShowAvatarModal(true)}
-                  className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white shadow-md hover:bg-primary/90 transition-all"
-                >
-                  <Camera className="w-4 h-4" />
-                </button>
-              </Tooltip>
-            </div>
-          )}
-          <Input label="Nama Lengkap" name="name" required defaultValue={editingUser?.name} />
-          <Input label="Email" name="email" type="email" required defaultValue={editingUser?.email} />
-          {!editingUser && <Input label="Password" name="password" type="password" required />}
-          <Input label="No. HP" name="phone" defaultValue={editingUser?.phone} />
-          <Select label="Role" name="role" options={roleOptions} defaultValue={editingUser?.role || 'FASILITATOR'} />
-        </form>
+        <p className="text-sm text-on-surface-variant">Setujui pendaftaran pengguna ini? Akun akan diaktifkan.</p>
+      </Modal>
+
+      <Modal open={!!rejectId} onClose={() => { setRejectId(null); setRejectReason('') }} title="Tolak Pendaftaran" footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => { setRejectId(null); setRejectReason('') }}>Batal</Button>
+          <Button variant="danger" onClick={handleReject}>Tolak</Button>
+        </div>
+      }>
+        <div className="space-y-3">
+          <p className="text-sm text-on-surface-variant">Tolak pendaftaran pengguna ini?</p>
+          <div>
+            <label className="text-sm text-on-surface-variant mb-1 block">Alasan (opsional)</label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border text-sm outline-none bg-surface-container-low border-outline-variant/60 text-on-surface resize-none"
+              rows={3}
+              placeholder="Alasan penolakan..."
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!deactivateId} onClose={() => setDeactivateId(null)} title="Nonaktifkan User" footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDeactivateId(null)}>Batal</Button>
+          <Button variant="danger" onClick={handleDeactivate}>Nonaktifkan</Button>
+        </div>
+      }>
+        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menonaktifkan user ini?</p>
       </Modal>
     </div>
   )

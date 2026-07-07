@@ -1,7 +1,9 @@
 import type { AuthService } from '../types'
 import type { LoginDTO, LoginResponse, User, CreateUserDTO } from '../../types'
+import { ApprovalStatus } from '../../types'
 import { MOCK_ACCOUNTS } from '../../config/mock-accounts'
-import { mockStorage } from './db'
+import { getAll, put } from '../storage/idb'
+import { requireTenantId } from '../tenantScope'
 
 // Session storage keys
 const TOKEN_KEY = 'kidversa_access_token'
@@ -67,10 +69,9 @@ export const authSession = {
   },
 }
 
-// Get all accounts (seed + any registered users)
-function getAllAccounts() {
-  const updatedUsers = mockStorage.get<User[]>('users_v1', [])
-  const registered = mockStorage.get<User[]>('registered_users', [])
+// Get all accounts (seed + any registered users from IDB)
+async function getAllAccounts(): Promise<User[]> {
+  const usersFromIDB = await getAll<User>('users')
   const seedAccounts = MOCK_ACCOUNTS.map((a) => ({
     id: a.id,
     tenant_id: a.tenant_id,
@@ -80,26 +81,36 @@ function getAllAccounts() {
     name: a.name,
     phone: a.phone,
     is_active: a.is_active,
+    approval_status: ApprovalStatus.APPROVED,
     created_at: '2026-01-01T00:00:00.000Z',
   }))
-  const base = [...seedAccounts, ...registered]
 
-  // Overlay profile fields from users_v1, preserving password_hash from auth source
-  for (const u of updatedUsers) {
-    const idx = base.findIndex((a) => a.id === u.id)
-    if (idx !== -1) {
-      base[idx] = {
-        ...base[idx],
+  // Merge: IDB users overlay seed accounts (by id)
+  const accountsMap = new Map<string, User>()
+  
+  for (const acc of seedAccounts) {
+    accountsMap.set(acc.id, acc)
+  }
+  
+  for (const u of usersFromIDB) {
+    const existing = accountsMap.get(u.id)
+    if (existing) {
+      // Overlay profile fields, preserve password_hash from seed
+      accountsMap.set(u.id, {
+        ...existing,
         name: u.name,
         email: u.email,
         phone: u.phone,
         avatar_url: u.avatar_url,
         is_active: u.is_active,
-      }
+      })
+    } else {
+      // New registered user
+      accountsMap.set(u.id, u)
     }
   }
 
-  return base
+  return Array.from(accountsMap.values())
 }
 
 // Simulate network delay
@@ -111,7 +122,7 @@ export const mockAuthService: AuthService = {
   async login(data: LoginDTO): Promise<LoginResponse> {
     await delay()
 
-    const accounts = getAllAccounts()
+    const accounts = await getAllAccounts()
     const account = accounts.find((a) => a.email === data.email)
 
     if (!account) {
@@ -153,7 +164,7 @@ export const mockAuthService: AuthService = {
       throw new Error('INVALID_REFRESH_TOKEN')
     }
 
-    const accounts = getAllAccounts()
+    const accounts = await getAllAccounts()
     const account = accounts.find((a) => a.id === userId)
     if (!account || !account.is_active) {
       throw new Error('USER_NOT_FOUND')
@@ -194,7 +205,7 @@ export const mockAuthService: AuthService = {
       throw new Error('INVALID_TOKEN')
     }
 
-    const accounts = getAllAccounts()
+    const accounts = await getAllAccounts()
     const account = accounts.find((a) => a.id === userId)
     if (!account) {
       throw new Error('USER_NOT_FOUND')
@@ -219,28 +230,28 @@ export const mockAuthService: AuthService = {
 export async function registerUser(data: CreateUserDTO): Promise<User> {
   await delay(400)
 
-  const accounts = getAllAccounts()
+  const accounts = await getAllAccounts()
   const existingUser = accounts.find((a) => a.email === data.email)
   if (existingUser) {
     throw new Error('EMAIL_EXISTS')
   }
 
+  const tenantId = requireTenantId(data.tenant_id)
   const newUser: User = {
     id: `u-${Date.now()}`,
-    tenant_id: data.tenant_id || 't-1',
+    tenant_id: tenantId,
     email: data.email,
     password_hash: data.password || '',
     role: data.role,
     name: data.name,
     phone: data.phone,
     is_active: true,
+    approval_status: ApprovalStatus.APPROVED,
     created_at: new Date().toISOString(),
   }
 
-  // Save to localStorage via mockStorage
-  const registeredUsers = mockStorage.get<User[]>('registered_users', [])
-  registeredUsers.push(newUser)
-  mockStorage.set('registered_users', registeredUsers)
+  // Save to IndexedDB
+  await put('users', newUser)
 
   return newUser
 }
