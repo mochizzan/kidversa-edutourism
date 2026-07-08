@@ -267,7 +267,9 @@ const removeParticipant = async (sessionId: string, participantId: string): Prom
   await new Promise((r) => setTimeout(r, 250))
   const participant = await getById<Participant>('participants', participantId)
   if (participant && participant.session_id === sessionId) {
-    await deleteById('participants', participantId)
+    participant.session_id = undefined
+    participant.group_id = undefined
+    await put('participants', participant)
   }
 }
 

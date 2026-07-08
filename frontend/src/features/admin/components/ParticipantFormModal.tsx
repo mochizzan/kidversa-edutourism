@@ -26,6 +26,7 @@ interface ParticipantFormModalProps {
   initialData?: ParticipantFormData
   availableParticipants?: Participant[]
   onLinkExisting?: (participantId: string) => Promise<void>
+  linkedParticipantIds?: string[]
 }
 
 interface FormErrors {
@@ -45,6 +46,7 @@ export function ParticipantFormModal({
   initialData,
   availableParticipants,
   onLinkExisting,
+  linkedParticipantIds,
 }: ParticipantFormModalProps) {
   const [formData, setFormData] = useState<ParticipantFormData>({
     child_name: '',
@@ -187,34 +189,44 @@ export function ParticipantFormModal({
           <p className="text-center py-8 text-on-surface-variant text-sm">Peserta tidak ditemukan</p>
         ) : (
           <div className="max-h-96 overflow-y-auto space-y-2">
-            {filteredParticipants.map(p => (
-              <div
-                key={p.id}
-                onClick={() => { setSelectedParticipantId(p.id); setSelectError('') }}
-                className={cn(
-                  'p-4 rounded-xl border cursor-pointer transition-colors',
-                  selectedParticipantId === p.id
-                    ? 'border-primary bg-primary-container/20'
-                    : 'border-outline-variant hover:bg-surface-container-low'
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-on-surface">{p.child_name}</span>
-                      <Badge variant="neutral" size="sm">{p.child_age} th</Badge>
+            {filteredParticipants.map(p => {
+              const isLinked = linkedParticipantIds?.includes(p.id) ?? false
+              return (
+                <div
+                  key={p.id}
+                  onClick={isLinked ? undefined : () => { setSelectedParticipantId(p.id); setSelectError('') }}
+                  className={cn(
+                    'p-4 rounded-xl border transition-colors',
+                    isLinked
+                      ? 'border-outline-variant/50 opacity-60 cursor-not-allowed'
+                      : 'cursor-pointer',
+                    !isLinked && selectedParticipantId === p.id
+                      ? 'border-primary bg-primary-container/20'
+                      : !isLinked && 'border-outline-variant hover:bg-surface-container-low'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-on-surface">{p.child_name}</span>
+                        <Badge variant="neutral" size="sm">{p.child_age} th</Badge>
+                      </div>
+                      {p.school_name && <p className="text-sm text-on-surface-variant mt-0.5">{p.school_name}</p>}
+                      <p className="text-sm text-on-surface-variant">{p.parent_name} · {p.parent_phone}</p>
+                      {p.parent_email && <p className="text-xs text-on-surface-variant">{p.parent_email}</p>}
                     </div>
-                    {p.school_name && <p className="text-sm text-on-surface-variant mt-0.5">{p.school_name}</p>}
-                    <p className="text-sm text-on-surface-variant">{p.parent_name} · {p.parent_phone}</p>
-                    {p.parent_email && <p className="text-xs text-on-surface-variant">{p.parent_email}</p>}
-                  </div>
-                  <div className="flex gap-1">
-                    <Badge variant={p.consent_recording ? 'success' : 'danger'} size="sm">Recording</Badge>
-                    <Badge variant={p.consent_photo ? 'success' : 'danger'} size="sm">Photo</Badge>
+                    {isLinked ? (
+                      <Badge variant="primary" size="sm">Sudah Ditambahkan</Badge>
+                    ) : (
+                      <div className="flex gap-1">
+                        <Badge variant={p.consent_recording ? 'success' : 'danger'} size="sm">Recording</Badge>
+                        <Badge variant={p.consent_photo ? 'success' : 'danger'} size="sm">Photo</Badge>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 

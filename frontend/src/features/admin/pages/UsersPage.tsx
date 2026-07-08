@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { Plus, Pencil, Check, X as XIcon, Ban } from 'lucide-react'
+import { Plus, Pencil, Check, X as XIcon, Ban, Trash2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -61,6 +61,7 @@ const UsersPage = () => {
   const [rejectId, setRejectId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [deactivateId, setDeactivateId] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
   const { getHighlightClass } = useHighlight()
 
   useEffect(() => {
@@ -149,6 +150,13 @@ const UsersPage = () => {
     if (!deactivateId) return
     await userService.deactivate(deactivateId)
     setDeactivateId(null)
+    refresh()
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+    await userService.remove(deleteId)
+    setDeleteId(null)
     refresh()
   }
 
@@ -243,6 +251,15 @@ const UsersPage = () => {
                 />
               </>
             )}
+            {isSuperAdminView && item.id !== currentUser?.id && (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Trash2 className="w-4 h-4 text-error" />}
+                tooltip="Hapus"
+                onClick={() => setDeleteId(item.id)}
+              />
+            )}
           </div>
         )
       },
@@ -328,6 +345,15 @@ const UsersPage = () => {
         </div>
       }>
         <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menonaktifkan user ini?</p>
+      </Modal>
+
+      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Hapus User" footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDeleteId(null)}>Batal</Button>
+          <Button variant="danger" onClick={handleDelete}>Hapus</Button>
+        </div>
+      }>
+        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menghapus user ini? Tindakan ini tidak dapat dibatalkan.</p>
       </Modal>
     </div>
   )

@@ -1,7 +1,7 @@
 import type { PaginatedResponse, ListParams, User, CreateUserDTO, UpdateUserDTO } from '../../types'
 import type { UserService } from '../types'
 import { ApprovalStatus } from '../../types'
-import { getAll as idbGetAll, getById as idbGetById, put } from '../storage/idb'
+import { getAll as idbGetAll, getById as idbGetById, put, deleteById } from '../storage/idb'
 import { AppError } from '../../utils/errors'
 import { dispatchUsersChanged } from '../../constants/app'
 import { requireTenantId } from '../tenantScope'
@@ -53,6 +53,11 @@ const getById = async (id: string): Promise<User | null> => {
 const create = async (data: CreateUserDTO): Promise<User> => {
   await new Promise((r) => setTimeout(r, 300))
   const tenantId = requireTenantId(data.tenant_id)
+
+  const existingUsers = await idbGetAll<User>('users')
+  if (existingUsers.some((u) => u.email.toLowerCase() === data.email.toLowerCase())) {
+    throw new AppError('CONFLICT', 'Email sudah terdaftar')
+  }
 
   const user: User = {
     id: `u-${Date.now()}`,
@@ -149,6 +154,16 @@ const reject = async (userId: string, approverId: string, reason?: string): Prom
   return updated
 }
 
+const remove = async (userId: string): Promise<void> => {
+  await new Promise((r) => setTimeout(r, 300))
+  const user = await idbGetById<User>('users', userId)
+  if (!user) {
+    throw new AppError('NOT_FOUND', 'User tidak ditemukan')
+  }
+  await deleteById('users', userId)
+  dispatchUsersChanged()
+}
+
 export const mockUserService: UserService = {
   getAll,
   getById,
@@ -157,4 +172,5 @@ export const mockUserService: UserService = {
   deactivate,
   approve,
   reject,
+  remove,
 }

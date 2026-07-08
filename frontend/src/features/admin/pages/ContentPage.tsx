@@ -12,8 +12,9 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
 import { cn } from '../../../core/utils'
-import type { StageContent, Program } from '../../../core/types'
+import type { StageContent, Program, ProgramStage } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
+import { contentEditPath } from '../../../core/constants/app'
 
 // ── File type helpers ──
 
@@ -41,6 +42,8 @@ const ContentPage = () => {
   const [loading, setLoading] = useState(true)
   const [programs, setPrograms] = useState<Program[]>([])
   const [selectedProgram, setSelectedProgram] = useState('')
+  const [stages, setStages] = useState<ProgramStage[]>([])
+  const [selectedStage, setSelectedStage] = useState('')
   const [contents, setContents] = useState<(StageContent & { stageName: string })[]>([])
   
   const [deleteContent, setDeleteContent] = useState<{id: string, stageId: string} | null>(null)
@@ -60,30 +63,42 @@ const ContentPage = () => {
 
   // Load contents for selected program
   useEffect(() => {
-    if (!selectedProgram) return
-    
+    if (!selectedProgram) {
+      setStages([])
+      setContents([])
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
 
-    const loadProgramContents = async () => {
+    const load = async () => {
       setLoading(true)
       try {
-        const stages = await programService.getStages(selectedProgram)
+        const stgs = await programService.getStages(selectedProgram)
         if (cancelled) return
-
-        const stageContentsArrays = await Promise.all(
-          stages.map((stage) => programService.getContents(stage.id).catch(() => []))
-        )
-
-        if (cancelled) return
+        setStages(stgs)
 
         let allContents: (StageContent & { stageName: string })[] = []
-        stages.forEach((stage, i) => {
-          allContents = [
-            ...allContents, 
-            ...stageContentsArrays[i].map(c => ({ ...c, stageName: stage.name }))
-          ]
-        })
-        
+
+        if (selectedStage) {
+          const stageContents = await programService.getContents(selectedStage)
+          if (cancelled) return
+          const stageName = stgs.find((s) => s.id === selectedStage)?.name || ''
+          allContents = stageContents.map((c) => ({ ...c, stageName }))
+        } else {
+          const stageContentsArrays = await Promise.all(
+            stgs.map((s) => programService.getContents(s.id).catch(() => []))
+          )
+          if (cancelled) return
+          stgs.forEach((stage, i) => {
+            allContents = [
+              ...allContents,
+              ...stageContentsArrays[i].map((c) => ({ ...c, stageName: stage.name })),
+            ]
+          })
+        }
+
         setContents(allContents)
       } catch (error) {
         console.error('Failed to load contents', error)
@@ -92,10 +107,15 @@ const ContentPage = () => {
         if (!cancelled) setLoading(false)
       }
     }
-    
-    loadProgramContents()
+
+    load()
     return () => { cancelled = true }
-  }, [selectedProgram, addToast])
+  }, [selectedProgram, selectedStage, addToast])
+
+  const handleProgramChange = (value: string) => {
+    setSelectedProgram(value)
+    setSelectedStage('')
+  }
 
   const handleDelete = async () => {
     if (!deleteContent) return
@@ -129,10 +149,22 @@ const ContentPage = () => {
       <div className="bg-surface-container-low p-4 rounded-2xl flex flex-col sm:flex-row gap-4 items-center">
         <div className="w-full sm:w-64">
           <Select
+            label="Program"
             options={programs.map((p) => ({ value: p.id, label: p.name }))}
             value={selectedProgram}
-            onChange={(e) => setSelectedProgram(e.target.value)}
-            placeholder="Pilih Program"
+            onChange={(e) => handleProgramChange(e.target.value)}
+            placeholder="Semua Program"
+          />
+        </div>
+        <div className="w-full sm:w-64">
+          <Select
+            label="Stage"
+            options={stages.map((s) => ({ value: s.id, label: s.name }))}
+            value={selectedStage}
+            onChange={(e) => setSelectedStage(e.target.value)}
+            placeholder="Semua Stage"
+            disabled={!selectedProgram}
+            hint={!selectedProgram ? 'Pilih program terlebih dahulu' : undefined}
           />
         </div>
         <div className="text-sm text-on-surface-variant ml-auto">
@@ -148,7 +180,11 @@ const ContentPage = () => {
         <EmptyState
           icon={<Image className="w-12 h-12" />}
           title="Belum ada konten"
-          description="Pilih program lain atau buat konten baru."
+          description={
+            selectedStage
+              ? 'Tidak ada konten di stage ini. Buat konten baru atau pilih stage lain.'
+              : 'Pilih program lain atau buat konten baru.'
+          }
             action={{ label: 'Tambah Konten', onClick: () => navigate(ROUTES.ADMIN.CONTENT_NEW) }}
         />
       ) : (
@@ -178,7 +214,7 @@ const ContentPage = () => {
                 </div>
 
                 <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-outline-variant/20">
-                  <Link to={`/admin/content/${item.id}/edit`}>
+                  <Link to={contentEditPath(item.id)}>
                     <Button
                       variant="ghost" size="sm"
                       icon={<Pencil className="w-3.5 h-3.5" />}

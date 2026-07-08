@@ -1,5 +1,6 @@
 import { StageContentFileType, ContentType } from '../types/enums'
 import type { StageContent } from '../types'
+import type { ProgramService } from '../services/types'
 
 export function autoDetectFileType(file: File): StageContentFileType {
   if (file.type.startsWith('video/')) return StageContentFileType.VIDEO
@@ -44,4 +45,16 @@ export function computeDurationMinutes(contents: StageContent[]): number {
     .filter(c => c.file_type === 'VIDEO' || c.file_type === 'AUDIO')
     .reduce((sum, c) => sum + (c.duration_seconds ?? 0), 0)
   return Math.ceil(totalSeconds / 60)
+}
+
+export async function syncStageMeta(
+  programService: ProgramService,
+  programId: string,
+  stageId: string,
+): Promise<void> {
+  const contents = await programService.getContents(stageId)
+  await programService.updateStage(programId, stageId, {
+    content_type: detectContentType(contents),
+    duration_minutes: computeDurationMinutes(contents),
+  })
 }

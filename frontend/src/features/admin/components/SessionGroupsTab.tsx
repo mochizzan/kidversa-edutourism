@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Upload, UserPlus } from 'lucide-react'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Card } from '../../../shared/components/ui/Card'
@@ -10,6 +11,7 @@ import { participantService } from '../../../core/services/participants'
 import { GroupFormModal } from './GroupFormModal'
 import { ParticipantFormModal } from './ParticipantFormModal'
 import { CsvImportModal } from './CsvImportModal'
+import { ROUTES } from '../../../core/constants/app'
 import type { SessionGroup, Participant, CreateParticipantDTO } from '../../../core/types'
 import type { ImportRow } from '../utils/csvParser'
 
@@ -22,6 +24,7 @@ interface SessionGroupsTabProps {
 
 export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }: SessionGroupsTabProps) {
   const { addToast } = useGlobalToast()
+  const navigate = useNavigate()
   const isDraft = sessionStatus === 'DRAFT'
   const canModifyParticipants = sessionStatus === 'DRAFT' || sessionStatus === 'ACTIVE'
 
@@ -30,8 +33,6 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
   const [editingGroup, setEditingGroup] = useState<SessionGroup | null>(null)
 
   const [participantFormOpen, setParticipantFormOpen] = useState(false)
-  const [participantFormMode, setParticipantFormMode] = useState<'create' | 'edit'>('create')
-  const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null)
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
 
   const [csvImportOpen, setCsvImportOpen] = useState(false)
@@ -42,10 +43,12 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
   const [availableParticipants, setAvailableParticipants] = useState<Participant[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
 
+  const linkedParticipantIds = groups.flatMap(g => g.participants.map(p => p.id))
+
   const loadAvailableParticipants = async () => {
     try {
       const res = await participantService.getAll({ limit: 100 })
-      setAvailableParticipants(res.data.filter(p => !p.session_id))
+      setAvailableParticipants(res.data.filter(p => !p.session_id || p.session_id === sessionId))
     } catch {
       setAvailableParticipants([])
     }
@@ -110,18 +113,6 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
     setRefreshKey(k => k + 1)
   }
 
-  const handleEditParticipant = async (data: Omit<CreateParticipantDTO, 'group_id'>) => {
-    if (!editingParticipant) return
-    try {
-      await sessionService.updateParticipant(sessionId, editingParticipant.id, data)
-      addToast({ type: 'success', message: 'Peserta berhasil diperbarui' })
-      onRefresh()
-      setRefreshKey(k => k + 1)
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Gagal memperbarui peserta')
-    }
-  }
-
   const handleDeleteParticipant = async (participant: Participant) => {
     setConfirmParticipant(participant)
   }
@@ -130,7 +121,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
     if (!confirmParticipant) return
     try {
       await sessionService.removeParticipant(sessionId, confirmParticipant.id)
-      addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
+      addToast({ type: 'success', message: 'Peserta berhasil dilepas dari kelompok' })
       onRefresh()
       setRefreshKey(k => k + 1)
     } catch (err) {
@@ -186,16 +177,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
   }
 
   const openAddParticipantModal = (groupId: string) => {
-    setParticipantFormMode('create')
-    setEditingParticipant(null)
     setSelectedGroupId(groupId)
-    setParticipantFormOpen(true)
-  }
-
-  const openEditParticipantModal = (participant: Participant) => {
-    setParticipantFormMode('edit')
-    setEditingParticipant(participant)
-    setSelectedGroupId(participant.group_id ?? null)
     setParticipantFormOpen(true)
   }
 
@@ -263,7 +245,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
                           variant="ghost"
                           size="sm"
                           icon={<Pencil className="w-4 h-4" />}
-                          onClick={() => openEditParticipantModal(participant)}
+                          onClick={() => navigate(`${ROUTES.ADMIN.PARTICIPANTS}/${participant.id}/edit`)}
                           tooltip="Edit peserta"
                         />
                         <Button
@@ -271,7 +253,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
                           size="sm"
                           icon={<Trash2 className="w-4 h-4" />}
                           onClick={() => handleDeleteParticipant(participant)}
-                          tooltip="Hapus peserta"
+                          tooltip="Lepas peserta"
                         />
                       </div>
                     )}
@@ -307,23 +289,11 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       <ParticipantFormModal
         open={participantFormOpen}
         onClose={() => setParticipantFormOpen(false)}
-        onSubmit={handleEditParticipant}
-        mode={participantFormMode}
-        selectOnly={participantFormMode === 'create'}
+        mode="create"
+        selectOnly
         availableParticipants={availableParticipants}
         onLinkExisting={handleLinkParticipant}
-        initialData={
-          editingParticipant
-            ? {
-                child_name: editingParticipant.child_name,
-                child_age: editingParticipant.child_age,
-                school_name: editingParticipant.school_name,
-                parent_name: editingParticipant.parent_name,
-                parent_phone: editingParticipant.parent_phone,
-                parent_email: editingParticipant.parent_email,
-              }
-            : undefined
-        }
+        linkedParticipantIds={linkedParticipantIds}
       />
 
       <CsvImportModal open={csvImportOpen} onClose={() => setCsvImportOpen(false)} onImport={handleCsvImport} />
@@ -338,8 +308,9 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
 
       <ConfirmDialog
         open={!!confirmParticipant}
-        title="Hapus Peserta"
-        message={`Yakin ingin menghapus peserta "${confirmParticipant?.child_name || ''}"? Tindakan ini tidak dapat dibatalkan.`}
+        title="Lepas Peserta"
+        message={`Yakin ingin melepaskan peserta "${confirmParticipant?.child_name || ''}" dari kelompok ini? Peserta masih bisa ditambahkan kembali.`}
+        confirmLabel="Lepas"
         onConfirm={confirmDeleteParticipant}
         onClose={() => setConfirmParticipant(null)}
       />

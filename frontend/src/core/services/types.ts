@@ -98,6 +98,7 @@ export interface UserService {
   deactivate(id: string): Promise<User>
   approve(userId: string, approverId: string): Promise<User>
   reject(userId: string, approverId: string, reason?: string): Promise<User>
+  remove(userId: string): Promise<void>
 }
 
 // Frames

@@ -67,6 +67,24 @@ export const programDetailPath = (id: string) => `${ROUTES.ADMIN.PROGRAMS}/${id}
 export const programStagePath = (programId: string, stageId: string) =>
   `${ROUTES.ADMIN.PROGRAMS}/${programId}/stages/${stageId}`
 
+export const contentNewPath = (params?: { programId?: string; stageId?: string }) => {
+  const base = ROUTES.ADMIN.CONTENT_NEW
+  if (!params?.programId) return base
+  const q = new URLSearchParams()
+  q.set('programId', params.programId)
+  if (params.stageId) q.set('stageId', params.stageId)
+  return `${base}?${q.toString()}`
+}
+
+export const contentEditPath = (contentId: string, params?: { programId?: string; stageId?: string }) => {
+  const base = `${ROUTES.ADMIN.CONTENT}/${contentId}/edit`
+  if (!params?.programId) return base
+  const q = new URLSearchParams()
+  q.set('programId', params.programId)
+  if (params.stageId) q.set('stageId', params.stageId)
+  return `${base}?${q.toString()}`
+}
+
 // API
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 

@@ -67,27 +67,26 @@ Only `LoginPage` and `RegisterPage` are eager; every other page is lazy-loaded v
 
 4 roles in `core/types/enums.ts` → `UserRole`: `SUPER_ADMIN`, `ADMIN`, `KOORDINATOR`, `FASILITATOR`. There is **no** `PARENT` role — parent access is token-based, not role-based.
 
-### Mock Data System
+### Mock Data System (local-first, no real API yet)
 
-All frontend services are **localStorage-backed mocks** — no real API calls are wired into pages yet.
+Persistence is **IndexedDB** (via `idb`), not localStorage. On first run `core/services/storage/mockDb.ts` → `initMockDatabase()` seeds everything from `core/services/mock/data/seed.ts` **once** (guarded by the `kidversa_idb_migrated_v1` localStorage flag). After that, all CRUD reads/writes hit IndexedDB stores.
 
-Service pattern:
+- `core/services/mock/db.ts` (`mockStorage`) is **legacy/dead** — it's still exported but no longer used by the live data path. Don't build on it.
+- Live auth is **`core/services/local/auth.ts`** (`localAuthService`, `authSession`, `registerUser`). It bootstraps users from `MOCK_ACCOUNTS` (`core/config/mock-accounts.ts`, `BOOTSTRAP_PASSWORD = 'password123'`) into IndexedDB. The older `core/services/mock/auth.ts` is **dead code** — ignore it.
+- Bootstrap users (password `password123`):
+  | Email | Role | Active |
+  |---|---|---|
+  | admin@kidversa.id | ADMIN | yes |
+  | koordinator@kidversa.id | KOORDINATOR | yes |
+  | f1@kidversa.id | FASILITATOR | yes |
+  | f3@kidversa.id | FASILITATOR | **no** (inactive — cannot log in) |
+
+Service pattern (for domain data, e.g. users/programs/sessions):
 1. Interface in `core/services/types.ts`
-2. Mock impl in `core/services/mock/` (e.g. `mock/programs.ts`)
-3. Re-export in `core/services/<domain>.ts` (swap this file to wire real API)
+2. Impl in `core/services/mock/<domain>.ts` (IndexedDB-backed)
+3. Re-export barrel in `core/services/<domain>.ts` (e.g. `users.ts` → `mockUserService`) — swap this barrel to wire a real API.
 
-A real API client scaffold exists at `core/services/backendClient.ts` (`apiRequest`, `healthCheck`) but is gated behind a localStorage flag `kidversa_backend_enabled` — off by default. Pages do not call it yet.
-
-Mock accounts (`core/config/mock-accounts.ts`), password `password123`:
-| Email | Role | Active |
-|---|---|---|
-| admin@kidversa.id | ADMIN | yes |
-| koordinator@kidversa.id | KOORDINATOR | yes |
-| f1@kidversa.id | FASILITATOR | yes |
-| f3@kidversa.id | FASILITATOR | **no** (inactive — cannot log in) |
-
-Mock DB utility: `core/services/mock/db.ts` (localStorage via `mockStorage`).  
-Seed data: `core/services/mock/data/seed.ts`.
+A real API client scaffold exists at `core/services/backendClient.ts` (`apiRequest`, `healthCheck`) but is gated behind the localStorage flag `kidversa_backend_enabled` — **off by default**. Pages do not call it yet.
 
 ### State Management
 
@@ -138,11 +137,14 @@ Always check existing shared components before creating new ones.
 | `frontend/src/app/routes/<segment>.tsx` | Per-feature route definitions |
 | `frontend/src/App.tsx` | Root: splash screen + session check |
 | `frontend/src/core/stores/authStore.ts` | Zustand auth state |
+| `frontend/src/core/services/local/auth.ts` | Live auth (IndexedDB-backed, `localAuthService`) |
 | `frontend/src/core/services/types.ts` | Service interfaces |
 | `frontend/src/core/services/backendClient.ts` | Real API client scaffold (gated by `kidversa_backend_enabled` flag) |
 | `frontend/src/core/types/entities.ts` | Entity/DTO types |
 | `frontend/src/core/types/enums.ts` | All enums incl. UserRole |
 | `frontend/src/core/services/mock/db.ts` | localStorage mock DB |
+| `frontend/src/core/services/storage/idb.ts` | IndexedDB wrapper (`openDB`, `getAll`, `put`, …) |
+| `frontend/src/core/services/storage/mockDb.ts` | `initMockDatabase()` — one-time seed from `mock/data/seed.ts` |
 | `frontend/src/core/services/mock/data/seed.ts` | Seed data |
 | `frontend/src/index.css` | Tailwind v4 theme + M3 tokens + animations |
 | `frontend/vite.config.ts` | Vite + PWA + `/api` proxy |

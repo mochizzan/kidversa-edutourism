@@ -6,6 +6,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Tabs } from '../../../shared/components/ui/Tabs'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
+import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
 import type { Program, ProgramStage, StageContent } from '../../../core/types'
@@ -14,11 +15,13 @@ import {
   programListPath,
   programDetailPath,
   programStagePath,
+  contentNewPath,
+  contentEditPath,
 } from '../../../core/constants/app'
 import { STAGE_CONTENT_FILE_TYPE_LABELS, STAGE_CONTENT_FILE_TYPE_ICONS } from '../../../core/constants/labels'
-import { detectContentType, computeDurationMinutes } from '../../../core/utils/content'
+import { computeDurationMinutes, syncStageMeta } from '../../../core/utils/content'
 import { StageForm } from '../components/StageForm'
-import { StageContentForm, type StageContentFormValues } from '../components/StageContentForm'
+import { Plus, FileText } from 'lucide-react'
 
 const ProgramStagePage = () => {
   const { programId, stageId } = useParams<{ programId: string; stageId: string }>()
@@ -35,9 +38,7 @@ const ProgramStagePage = () => {
 
   const [activeTab, setActiveTab] = useState<'detail' | 'konten'>('detail')
   const [contents, setContents] = useState<StageContent[]>([])
-  const [editingContent, setEditingContent] = useState<StageContent | null>(null)
   const [deleteTargetContent, setDeleteTargetContent] = useState<StageContent | null>(null)
-  const [contentSaving, setContentSaving] = useState(false)
   const [contentDeleting, setContentDeleting] = useState(false)
 
   useEffect(() => {
@@ -60,15 +61,10 @@ const ProgramStagePage = () => {
   }, [programId, stageId, isNew])
 
   const loadContents = async () => {
-    if (!stageId || isNew) return
-    setContents(await programService.getContents(stageId))
-  }
-
-  const syncStageMeta = async (programId: string, stageId: string, contents: StageContent[]) => {
-    await programService.updateStage(programId, stageId, {
-      content_type: detectContentType(contents),
-      duration_minutes: computeDurationMinutes(contents),
-    })
+    if (!stageId || isNew || !programId) return
+    const list = await programService.getContents(stageId)
+    setContents(list)
+    await syncStageMeta(programService, programId, stageId)
   }
 
   useEffect(() => {
@@ -121,26 +117,6 @@ const ProgramStagePage = () => {
     }
   }
 
-  const handleContentSubmit = async (data: StageContentFormValues) => {
-    if (!stageId || !programId) return
-    setContentSaving(true)
-    try {
-      if (editingContent) {
-        await programService.updateContent(stageId, editingContent.id, data)
-      } else {
-        await programService.createContent(stageId, { ...data, sort_order: contents.length })
-      }
-      setEditingContent(null)
-      const updatedContents = await programService.getContents(stageId)
-      setContents(updatedContents)
-      await syncStageMeta(programId, stageId, updatedContents)
-    } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menyimpan konten' })
-    } finally {
-      setContentSaving(false)
-    }
-  }
-
   const handleContentDelete = async () => {
     if (!stageId || !deleteTargetContent || !programId) return
     setContentDeleting(true)
@@ -149,7 +125,7 @@ const ProgramStagePage = () => {
       setDeleteTargetContent(null)
       const updatedContents = await programService.getContents(stageId)
       setContents(updatedContents)
-      await syncStageMeta(programId, stageId, updatedContents)
+      await syncStageMeta(programService, programId, stageId)
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus konten' })
     } finally {
@@ -200,43 +176,57 @@ const ProgramStagePage = () => {
 
       {!isNew && activeTab === 'konten' && (
         <>
-          <Card>
-            <StageContentForm
-              initial={editingContent}
-              onSubmit={handleContentSubmit}
-              onCancel={() => setEditingContent(null)}
-            />
-          </Card>
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-on-surface">Daftar Konten</h4>
-            {contentSaving && <p className="text-sm text-on-surface-variant">Menyimpan...</p>}
-            {contents.length === 0 ? (
-              <p className="text-sm text-on-surface-variant">Belum ada konten untuk stage ini.</p>
-            ) : (
-              <div className="space-y-2">
-                {contents.map((content) => (
-                  <div key={content.id} className="flex items-center justify-between p-3 bg-surface-variant rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {STAGE_CONTENT_FILE_TYPE_ICONS[content.file_type]}
-                      <div>
-                        <p className="text-sm font-medium text-on-surface">{content.title}</p>
-                        <p className="text-xs text-on-surface-variant">
-                          {STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type]} · {content.duration_seconds ?? 0}s
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!content.is_active && <Badge variant="neutral">Nonaktif</Badge>}
-                      <Button variant="ghost" size="sm" onClick={() => setEditingContent(content)}>Edit</Button>
-                      <Button variant="ghost" size="sm" onClick={() => setDeleteTargetContent(content)} className="text-error">
-                        Hapus
-                      </Button>
+          <div className="flex justify-between items-center">
+            <h4 className="text-lg font-semibold text-on-surface">Daftar Konten</h4>
+            <Button
+              icon={<Plus className="w-4 h-4" />}
+              onClick={() => navigate(contentNewPath({ programId, stageId }))}
+            >
+              Tambah Konten
+            </Button>
+          </div>
+
+          {contents.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon={<FileText className="w-12 h-12" />}
+                title="Belum ada konten"
+                description="Klik 'Tambah Konten' untuk menambahkan konten ke stage ini."
+              />
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {contents.map((content) => (
+                <div key={content.id} className="flex items-center justify-between p-3 bg-surface-variant rounded-lg">
+                  <div className="flex items-center gap-3">
+                    {STAGE_CONTENT_FILE_TYPE_ICONS[content.file_type]}
+                    <div>
+                      <p className="text-sm font-medium text-on-surface">{content.title}</p>
+                      <p className="text-xs text-on-surface-variant">
+                        {STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type]} · {content.duration_seconds ?? 0}s
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div className="flex items-center gap-2">
+                    {!content.is_active && <Badge variant="neutral">Nonaktif</Badge>}
+                    <Button
+                      variant="ghost" size="sm"
+                      onClick={() => navigate(contentEditPath(content.id, { programId, stageId }))}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost" size="sm"
+                      onClick={() => setDeleteTargetContent(content)}
+                      className="text-error"
+                    >
+                      Hapus
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 

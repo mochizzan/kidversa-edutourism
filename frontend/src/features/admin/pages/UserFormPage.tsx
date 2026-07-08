@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import type { Resolver } from 'react-hook-form'
+import { z } from 'zod'
 import { ROUTES } from '../../../core/constants/app'
 import { Save, Loader2, Camera } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -14,12 +18,40 @@ import { getTenantScope } from '../../../core/services/tenantScope'
 import { resizeImage } from '../../../core/utils/image'
 import type { UpdateUserDTO } from '../../../core/types'
 import { UserRole } from '../../../core/types'
+import { PasswordStrengthBar } from '../../auth/components/PasswordStrengthBar'
 
 const roleOptions = [
   { value: UserRole.ADMIN, label: 'Admin' },
   { value: UserRole.KOORDINATOR, label: 'Koordinator Program' },
   { value: UserRole.FASILITATOR, label: 'Fasilitator' },
 ]
+
+const createUserSchema = z.object({
+  name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
+  email: z.string().email('Format email tidak valid'),
+  password: z
+    .string()
+    .min(8, 'Password minimal 8 karakter')
+    .regex(/[A-Z]/, 'Harus ada huruf besar')
+    .regex(/[a-z]/, 'Harus ada huruf kecil')
+    .regex(/[0-9]/, 'Harus ada angka'),
+  confirmPassword: z.string(),
+  phone: z.string().optional(),
+  role: z.nativeEnum(UserRole),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: 'Password tidak cocok',
+  path: ['confirmPassword'],
+})
+
+const updateUserSchema = z.object({
+  name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
+  email: z.string().email('Format email tidak valid'),
+  phone: z.string().optional(),
+  role: z.nativeEnum(UserRole),
+})
+
+type CreateFormData = z.infer<typeof createUserSchema>
+type UpdateFormData = z.infer<typeof updateUserSchema>
 
 const UserFormPage = () => {
   const navigate = useNavigate()
@@ -33,25 +65,30 @@ const UserFormPage = () => {
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    phone: '',
-    role: UserRole.FASILITATOR,
+  const form = useForm<CreateFormData>({
+    resolver: zodResolver(isEdit ? updateUserSchema : createUserSchema) as unknown as Resolver<CreateFormData>,
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      phone: '',
+      role: UserRole.FASILITATOR,
+    },
   })
+
+  const { register, handleSubmit, reset, watch, formState: { errors } } = form
 
   useEffect(() => {
     if (isEdit && userId) {
       userService.getById(userId).then((foundUser) => {
         if (foundUser) {
-          setForm({
+          reset({
             name: foundUser.name,
             email: foundUser.email,
-            password: '',
             phone: foundUser.phone || '',
             role: foundUser.role,
-          })
+          } as UpdateFormData)
           setAvatarPreview(foundUser.avatar_url || null)
         } else {
           addToast({ type: 'error', message: 'User tidak ditemukan' })
@@ -60,7 +97,7 @@ const UserFormPage = () => {
         setLoading(false)
       })
     }
-  }, [isEdit, userId, addToast, navigate])
+  }, [isEdit, userId, addToast, navigate, reset])
 
   const handleAvatarUpload = async (file: File) => {
     try {
@@ -72,21 +109,15 @@ const UserFormPage = () => {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.name || !form.email || (!isEdit && !form.password)) {
-      addToast({ type: 'error', message: 'Lengkapi semua field yang wajib' })
-      return
-    }
-
+  const onSubmit = async (data: CreateFormData) => {
     setSaving(true)
     try {
       if (isEdit && userId) {
         const payload: UpdateUserDTO = {
-          name: form.name,
-          email: form.email,
-          role: form.role,
-          phone: form.phone || undefined,
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          phone: data.phone || undefined,
         }
         if (avatarPreview) payload.avatar_url = avatarPreview
         
@@ -99,13 +130,14 @@ const UserFormPage = () => {
           setSaving(false)
           return
         }
+        const createData = data as CreateFormData
         await userService.create({
           tenant_id: scope.tenantId,
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          role: form.role,
-          phone: form.phone || undefined,
+          name: createData.name,
+          email: createData.email,
+          password: createData.password,
+          role: createData.role,
+          phone: createData.phone || undefined,
           avatar_url: avatarPreview || undefined,
         })
         addToast({ type: 'success', message: 'User baru berhasil ditambahkan' })
@@ -137,16 +169,16 @@ const UserFormPage = () => {
         ]}
       />
 
-      <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl">
         <div className="bg-surface rounded-2xl p-6 shadow-sm space-y-6">
-          
+           
           <div className="flex items-center gap-4 pb-6 border-b border-outline-variant">
             <div className="relative w-16 h-16 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0">
               {avatarPreview ? (
                 <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover rounded-full" />
               ) : (
                 <span className="text-xl font-bold text-primary">
-                  {form.name ? form.name.charAt(0).toUpperCase() : 'U'}
+                  {watch('name') ? watch('name').charAt(0).toUpperCase() : 'U'}
                 </span>
               )}
             </div>
@@ -169,39 +201,49 @@ const UserFormPage = () => {
             <Input
               label="Nama Lengkap"
               required
-              value={form.name}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              error={errors.name?.message}
+              {...register('name')}
             />
 
             <Input
               label="Email"
               type="email"
               required
-              value={form.email}
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+              error={errors.email?.message}
+              {...register('email')}
             />
 
             {!isEdit && (
-              <Input
-                label="Password"
-                type="password"
-                required
-                value={form.password}
-                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-              />
+              <>
+                <Input
+                  label="Password"
+                  type="password"
+                  required
+                  error={errors.password?.message}
+                  {...register('password')}
+                />
+                <Input
+                  label="Konfirmasi Password"
+                  type="password"
+                  required
+                  error={errors.confirmPassword?.message}
+                  {...register('confirmPassword')}
+                />
+                <PasswordStrengthBar password={watch('password') || ''} />
+              </>
             )}
 
             <Input
               label="No. HP"
-              value={form.phone}
-              onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+              error={errors.phone?.message}
+              {...register('phone')}
             />
 
             <Select
               label="Role"
               options={roleOptions}
-              value={form.role}
-              onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as UserRole }))}
+              error={errors.role?.message}
+              {...register('role')}
             />
           </div>
         </div>
