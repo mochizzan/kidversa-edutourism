@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Upload, Image, Trash2, AlertCircle, ArrowLeft } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -41,11 +42,11 @@ const FrameUploadPage = () => {
     <div className="space-y-6">
       <PageHeader
         title="Upload Frame"
-        breadcrumbs={[{ label: 'Frames', href: '/admin/frames' }, { label: 'Upload Frame' }]}
+        breadcrumbs={[{ label: 'Frames', href: ROUTES.ADMIN.FRAMES }, { label: 'Upload Frame' }]}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" icon={<ArrowLeft className="h-4 w-4" />}
-              onClick={() => navigate('/admin/frames')}>
+              onClick={() => navigate(ROUTES.ADMIN.FRAMES)}>
               Kembali
             </Button>
             <Button variant="danger" icon={<Trash2 className="h-4 w-4" />}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, Video, Bell, Menu, X, Users, FolderOpen, Calendar, Image, Loader2, ChevronRight, Wifi, UserCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { Tooltip } from '../ui/Tooltip'
 import { useGlobalSearch } from '../../hooks/useGlobalSearch'
@@ -232,7 +233,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         <div className="flex items-center gap-4 ml-auto shrink-0">
           <Tooltip content="Live Monitor">
             <button
-              onClick={() => navigate('/admin/live')}
+              onClick={() => navigate(ROUTES.ADMIN.LIVE)}
               className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
             >
               <Video className="w-5 h-5" />

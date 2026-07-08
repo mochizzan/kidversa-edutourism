@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Upload, Image, Pencil, Trash2, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -59,7 +60,7 @@ const FramesPage = () => {
         title="Frame Manager"
         subtitle="Kelola frame PNG untuk Smart Photo."
         actions={
-          <Button icon={<Upload className="w-4 h-4" />} onClick={() => navigate('/admin/frames/upload')}>Upload Frame</Button>
+          <Button icon={<Upload className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.FRAME_UPLOAD)}>Upload Frame</Button>
         }
       />
 
@@ -79,7 +80,7 @@ const FramesPage = () => {
             icon={<Image className="w-12 h-12" />}
             title="Belum ada frame"
             description="Upload frame PNG untuk mulai menggunakan Smart Photo."
-            action={{ label: 'Upload Frame', onClick: () => navigate('/admin/frames/upload') }}
+            action={{ label: 'Upload Frame', onClick: () => navigate(ROUTES.ADMIN.FRAME_UPLOAD) }}
           />
         ) : (
           frames.map((frame) => (

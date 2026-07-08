@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../../core/hooks/useAuth'
 import type { UserRole } from '../../../core/types'
+import { ROUTES } from '../../../core/constants/app'
 
 interface ProtectedRouteProps {
   children?: React.ReactNode
@@ -29,7 +30,7 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   if (!isAuthenticated) {
     return (
       <Navigate
-        to={`/auth/login?returnUrl=${encodeURIComponent(location.pathname)}`}
+        to={`${ROUTES.AUTH.LOGIN}?returnUrl=${encodeURIComponent(location.pathname)}`}
         replace
       />
     )

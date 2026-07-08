@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import {
   ArrowLeft,
   Star,
@@ -221,7 +222,7 @@ const ReportReviewPage = () => {
         <PageHeader
           title="Memuat..."
           breadcrumbs={[
-            { label: 'Laporan', href: '/admin/reports' },
+            { label: 'Laporan', href: ROUTES.ADMIN.REPORTS },
             { label: sessionId ? 'Session' : '', href: sessionId ? `/admin/reports/${sessionId}` : undefined },
             { label: 'Review' },
           ].filter((b) => b.label)}
@@ -242,7 +243,7 @@ const ReportReviewPage = () => {
         <PageHeader
           title="Error"
           breadcrumbs={[
-            { label: 'Laporan', href: '/admin/reports' },
+            { label: 'Laporan', href: ROUTES.ADMIN.REPORTS },
             { label: 'Review' },
           ]}
         />
@@ -269,7 +270,7 @@ const ReportReviewPage = () => {
         title={participant.child_name}
         subtitle="Review dan kelola laporan peserta"
         breadcrumbs={[
-          { label: 'Laporan', href: '/admin/reports' },
+          { label: 'Laporan', href: ROUTES.ADMIN.REPORTS },
           {
             label: session.name,
             href: `/admin/reports/${sessionId}`,

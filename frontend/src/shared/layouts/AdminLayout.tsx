@@ -26,52 +26,54 @@ import { useAuth } from '../../core/hooks/useAuth'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Tooltip } from '../components/ui/Tooltip'
 import { TenantSwitcher } from '../components/ui/TenantSwitcher'
-import { TenantGuard, isTenantFreeRoute } from '../components/auth/TenantGuard'
+import { ADMIN_ROUTE_ACCESS, RouteAccess } from '../../core/utils/permissions'
 import { UserRole } from '../../core/types/enums'
 import type { ReactNode } from 'react'
+
+const iconByPath: Record<string, ReactNode> = {
+  dashboard: <LayoutDashboard className="w-5 h-5" />,
+  live: <Radio className="w-5 h-5" />,
+  programs: <FolderOpen className="w-5 h-5" />,
+  sessions: <Calendar className="w-5 h-5" />,
+  participants: <UserRound className="w-5 h-5" />,
+  reports: <FileCheck className="w-5 h-5" />,
+  missions: <ClipboardList className="w-5 h-5" />,
+  content: <FileText className="w-5 h-5" />,
+  frames: <Image className="w-5 h-5" />,
+  recordings: <Video className="w-5 h-5" />,
+  tenants: <Building2 className="w-5 h-5" />,
+  users: <Users className="w-5 h-5" />,
+  consent: <ShieldCheck className="w-5 h-5" />,
+}
 
 interface MenuItem {
   label: string
   path: string
   icon: ReactNode
-  roles: UserRole[]
 }
 
-const menuSections: { section: string; items: MenuItem[] }[] = [
-  {
-    section: 'OVERVIEW',
-    items: [
-      { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-      { label: 'Live Monitor', path: '/admin/live', icon: <Radio className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.KOORDINATOR, UserRole.ADMIN] },
-    ],
-  },
-  {
-    section: 'PROGRAM',
-    items: [
-      { label: 'Programs', path: '/admin/programs', icon: <FolderOpen className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-      { label: 'Sessions', path: '/admin/sessions', icon: <Calendar className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-      { label: 'Peserta', path: '/admin/participants', icon: <UserRound className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-      { label: 'Reports', path: '/admin/reports', icon: <FileCheck className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.KOORDINATOR] },
-      { label: 'Missions', path: '/admin/missions', icon: <ClipboardList className="w-5 h-5" />, roles: [UserRole.ADMIN] },
-    ],
-  },
-  {
-    section: 'CONTENT',
-    items: [
-      { label: 'Content Manager', path: '/admin/content', icon: <FileText className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-      { label: 'Frame Manager', path: '/admin/frames', icon: <Image className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-      { label: 'Recordings', path: '/admin/recordings', icon: <Video className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.KOORDINATOR] },
-    ],
-  },
-  {
-    section: 'SETTINGS',
-    items: [
-      { label: 'Tenants', path: '/admin/tenants', icon: <Building2 className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN] },
-      { label: 'Users', path: '/admin/users', icon: <Users className="w-5 h-5" />, roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-      { label: 'Consent Monitor', path: '/admin/consent', icon: <ShieldCheck className="w-5 h-5" />, roles: [UserRole.ADMIN, UserRole.KOORDINATOR] },
-    ],
-  },
-]
+const SECTION_ORDER = ['OVERVIEW', 'PROGRAM', 'CONTENT', 'SETTINGS']
+
+function buildMenuSections(userRole: string | undefined): { section: string; items: MenuItem[] }[] {
+  if (!userRole) return []
+  const bySection = new Map<string, MenuItem[]>()
+  ADMIN_ROUTE_ACCESS.forEach((access: RouteAccess) => {
+    if (access.roles.includes(userRole as RouteAccess['roles'][number])) {
+      const item: MenuItem = {
+        label: access.label,
+        path: `/admin/${access.path}`,
+        icon: iconByPath[access.path],
+      }
+      const items = bySection.get(access.section) ?? []
+      items.push(item)
+      bySection.set(access.section, items)
+    }
+  })
+  return SECTION_ORDER.filter((s) => bySection.has(s)).map((section) => ({
+    section,
+    items: bySection.get(section) ?? [],
+  }))
+}
 
 const AdminLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -81,24 +83,19 @@ const AdminLayout = () => {
   const { user, logout } = useAuth()
 
   if (location.pathname === '/admin') {
-    return <Navigate to="/admin/dashboard" replace />
+    return <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />
   }
 
   const handleLogout = async () => {
     await logout()
-    navigate('/auth/login', { replace: true })
+    navigate(ROUTES.AUTH.LOGIN, { replace: true })
   }
 
   const closeDrawer = useCallback(() => setMobileDrawerOpen(false), [])
   const isCollapsed = sidebarCollapsed
 
-  // Filter menu items by user role
-  const visibleSections = menuSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => user && item.roles.includes(user.role)),
-    }))
-    .filter((section) => section.items.length > 0)
+  // Filter menu items by user role (derived from ADMIN_ROUTE_ACCESS)
+  const visibleSections = buildMenuSections(user?.role)
 
   return (
     <div className="flex h-screen bg-background">
@@ -247,13 +244,7 @@ const AdminLayout = () => {
         <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="p-6 lg:p-8">
             <ErrorBoundary>
-              {isTenantFreeRoute(location.pathname) ? (
-                <Outlet />
-              ) : (
-                <TenantGuard>
-                  <Outlet />
-                </TenantGuard>
-              )}
+              <Outlet />
             </ErrorBoundary>
           </div>
         </main>

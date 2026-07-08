@@ -3,13 +3,14 @@ import type { User } from '../types'
 import type { CreateUserDTO } from '../types'
 import { localAuthService, authSession, registerUser } from '../services/local/auth'
 import { UserRole } from '../types'
+import { ROUTES } from '../constants/app'
 
 // Role-based redirect map
 const ROLE_REDIRECTS: Record<string, string> = {
-  [UserRole.SUPER_ADMIN]: '/admin/tenants',
-  [UserRole.ADMIN]: '/admin/dashboard',
-  [UserRole.KOORDINATOR]: '/admin/dashboard',
-  [UserRole.FASILITATOR]: '/fasilitator/dashboard',
+  [UserRole.SUPER_ADMIN]: ROUTES.ADMIN.TENANTS,
+  [UserRole.ADMIN]: ROUTES.ADMIN.DASHBOARD,
+  [UserRole.KOORDINATOR]: ROUTES.ADMIN.DASHBOARD,
+  [UserRole.FASILITATOR]: ROUTES.FASILITATOR.DASHBOARD,
 }
 
 interface AuthState {
@@ -94,7 +95,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   getRedirectPath: () => {
     const { user } = get()
-    if (!user) return '/auth/login'
-    return ROLE_REDIRECTS[user.role] || '/admin/dashboard'
+    if (!user) return ROUTES.AUTH.LOGIN
+    return ROLE_REDIRECTS[user.role] || ROUTES.ADMIN.DASHBOARD
   },
 }))

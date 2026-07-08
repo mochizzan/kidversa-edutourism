@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Save, Loader2, Upload } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Input } from '../../../shared/components/ui/Input'
@@ -127,7 +128,7 @@ const ContentFormPage = () => {
         })
         addToast({ type: 'success', message: 'Konten baru berhasil ditambahkan' })
       }
-      navigate('/admin/content')
+      navigate(ROUTES.ADMIN.CONTENT)
     } catch {
       addToast({ type: 'error', message: 'Gagal menyimpan konten' })
     } finally {
@@ -149,7 +150,7 @@ const ContentFormPage = () => {
         title={isEdit ? 'Edit Konten' : 'Tambah Konten Baru'}
         subtitle={isEdit ? 'Perbarui detail konten stage' : 'Buat konten baru untuk stage'}
         breadcrumbs={[
-          { label: 'Content Manager', href: '/admin/content' },
+          { label: 'Content Manager', href: ROUTES.ADMIN.CONTENT },
           { label: isEdit ? 'Edit' : 'Tambah' },
         ]}
       />
@@ -224,7 +225,7 @@ const ContentFormPage = () => {
         </div>
 
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" type="button" onClick={() => navigate('/admin/content')}>
+          <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.CONTENT)}>
             Batal
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>

@@ -8,12 +8,6 @@ interface TenantGuardProps {
   children: React.ReactNode
 }
 
-const TENANT_FREE_ROUTES = ['/admin/tenants']
-
-export function isTenantFreeRoute(pathname: string): boolean {
-  return TENANT_FREE_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '/'))
-}
-
 export function TenantGuard({ children }: TenantGuardProps) {
   const { user } = useAuth()
   const { requiresSelection } = useTenantScope()

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Plus, Pencil, Power, PowerOff, Search, ChevronLeft, ChevronRight, Loader2, AlertCircle, Home, Users, School, FileText } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Select } from '../../../shared/components/ui/Select'
+import { Input } from '../../../shared/components/ui/Input'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
@@ -196,7 +198,7 @@ const MissionBankPage = () => {
         title="Bank Misi"
         subtitle="Kelola bank misi untuk program edutourism."
         actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate('/admin/missions/new')}>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.MISSION_NEW)}>
             Tambah Misi Baru
           </Button>
         }
@@ -224,7 +226,7 @@ const MissionBankPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="bg-surface-container-low p-4 rounded-2xl flex flex-col sm:flex-row gap-4 items-end">
         <div className="w-full sm:w-64">
           <Select
             options={[
@@ -236,17 +238,15 @@ const MissionBankPage = () => {
               setSelectedProgram(e.target.value)
               setPage(1)
             }}
-            placeholder="Pilih Program"
+            placeholder="Semua Program"
           />
         </div>
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
-          <input
-            type="text"
+        <div className="flex-1">
+          <Input
+            leftIcon={<Search className="w-4 h-4" />}
             placeholder="Cari misi..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-outline-variant bg-surface pl-10 pr-3 py-2 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
           />
         </div>
       </div>
@@ -304,7 +304,7 @@ const MissionBankPage = () => {
           }
           action={
             selectedProgram
-              ? { label: 'Tambah Misi Baru', onClick: () => navigate('/admin/missions/new') }
+              ? { label: 'Tambah Misi Baru', onClick: () => navigate(ROUTES.ADMIN.MISSION_NEW) }
               : undefined
           }
         />

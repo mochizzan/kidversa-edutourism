@@ -5,7 +5,7 @@ import { getAll } from '../../core/services/storage/idb'
 import type { User, Tenant } from '../../core/types'
 import { UserRole, ApprovalStatus } from '../../core/types/enums'
 import { isSuperAdmin, isAdmin } from '../../core/utils/permissions'
-import { USERS_CHANGED_EVENT } from '../../core/constants/app'
+import { USERS_CHANGED_EVENT, ROUTES } from '../../core/constants/app'
 
 export interface HeaderNotification {
   id: string
@@ -77,8 +77,8 @@ export function useHeaderNotifications() {
           const count = pendingList.length
 
           const route = isSuperAdmin(user)
-            ? `/admin/users?filter=pending&tenant=${tenantId}`
-            : '/admin/users?filter=pending'
+            ? `${ROUTES.ADMIN.USERS}?filter=pending&tenant=${tenantId}`
+            : `${ROUTES.ADMIN.USERS}?filter=pending`
 
           notifs.push({
             id: `approval-${tenantId}`,

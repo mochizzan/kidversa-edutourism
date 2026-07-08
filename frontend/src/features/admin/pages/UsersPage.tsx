@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Plus, Pencil, Check, X as XIcon, Ban } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -254,7 +255,7 @@ const UsersPage = () => {
         title="Users"
         subtitle="Kelola pengguna sistem."
         actions={
-          <Link to="/admin/users/new">
+          <Link to={ROUTES.ADMIN.USER_NEW}>
             <Button icon={<Plus className="w-4 h-4" />}>Tambah User</Button>
           </Link>
         }

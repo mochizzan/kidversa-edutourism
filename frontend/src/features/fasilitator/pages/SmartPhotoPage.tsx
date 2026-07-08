@@ -20,6 +20,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { cn } from '../../../core/utils'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { photoService } from '../../../core/services/photos'
 import { frameService } from '../../../core/services/frames'
 import { sessionService } from '../../../core/services/sessions'
@@ -79,6 +80,7 @@ const SmartPhotoPage = () => {
 
   /* ── Fullscreen ── */
   const [fullscreenPhoto, setFullscreenPhoto] = useState<SmartPhoto | null>(null)
+  const [confirmDeletePhoto, setConfirmDeletePhoto] = useState(false)
 
   /* ── Frame Picker Modal ── */
   const [framePickerOpen, setFramePickerOpen] = useState(false)
@@ -904,16 +906,7 @@ const SmartPhotoPage = () => {
             <X className="w-6 h-6" />
           </button>
           <button
-            onClick={async () => {
-              if (!childId) return
-              try {
-                await photoService.delete(fullscreenPhoto.id)
-                setFullscreenPhoto(null)
-                await loadPhotos()
-              } catch {
-                console.error('Gagal menghapus foto')
-              }
-            }}
+            onClick={() => setConfirmDeletePhoto(true)}
             className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#B3261E] text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-md hover:bg-[#8C2017] transition-all"
           >
             <Trash2 className="w-4 h-4" />
@@ -921,6 +914,25 @@ const SmartPhotoPage = () => {
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDeletePhoto}
+        title="Hapus Foto"
+        message="Yakin ingin menghapus foto ini? Tindakan ini tidak dapat dibatalkan."
+        onConfirm={async () => {
+          if (!fullscreenPhoto) return
+          try {
+            await photoService.delete(fullscreenPhoto.id)
+            setFullscreenPhoto(null)
+            await loadPhotos()
+          } catch {
+            addToast({ type: 'error', message: 'Gagal menghapus foto' })
+          } finally {
+            setConfirmDeletePhoto(false)
+          }
+        }}
+        onClose={() => setConfirmDeletePhoto(false)}
+      />
     </div>
     </div>
   )

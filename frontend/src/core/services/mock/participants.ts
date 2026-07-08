@@ -3,7 +3,7 @@ import type { ListParams, PaginatedResponse } from '../../types'
 import type { ParticipantService } from '../types'
 import { AppError } from '../../utils/errors'
 import { getAll as idbGetAll, getById as idbGetById, put, deleteById, queryByIndex } from '../storage/idb'
-import { getTenantScope } from '../tenantScope'
+import { getTenantScope, requireTenantId } from '../tenantScope'
 
 const STORE_NAME = 'participants'
 
@@ -33,15 +33,16 @@ const getAll = async (params?: ListParams): Promise<PaginatedResponse<Participan
   const scope = getTenantScope()
   if (scope.tenantId || scope.blocked) {
     const sessions = await idbGetAll<Session>('sessions')
-    const sessionTenantMap = new Map(sessions.map((s) => [s.id, s.tenant_id]))
     const validSessionIds = new Set(
       sessions.filter((s) => s.tenant_id === scope.tenantId).map((s) => s.id)
     )
 
     data = data.filter((p) => {
-      if (!p.session_id) return false
-      if (!sessionTenantMap.has(p.session_id)) return false
-      return validSessionIds.has(p.session_id)
+      // Path 1: participant has direct tenant_id match
+      if (p.tenant_id && p.tenant_id === scope.tenantId) return true
+      // Path 2: participant linked to a session in this tenant
+      if (p.session_id && validSessionIds.has(p.session_id)) return true
+      return false
     })
   }
 
@@ -61,8 +62,10 @@ const getById = async (id: string): Promise<Participant | null> => {
 
 const create = async (data: CreateParticipantDTO): Promise<Participant> => {
   await new Promise((r) => setTimeout(r, 250))
+  const tenantId = requireTenantId()
   const participant: Participant = {
     id: `part-${Date.now()}`,
+    tenant_id: tenantId,
     child_name: data.child_name,
     child_age: data.child_age,
     school_name: data.school_name,

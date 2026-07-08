@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Plus, Pencil, Trash2, Eye } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
@@ -160,7 +161,7 @@ const ParticipantsPage = () => {
         title="Peserta"
         subtitle="Kelola data peserta dan pantau progres sesi mereka."
         actions={
-          <Link to="/admin/participants/new">
+          <Link to={ROUTES.ADMIN.PARTICIPANT_NEW}>
             <Button icon={<Plus className="w-4 h-4" />}>Tambah Peserta</Button>
           </Link>
         }

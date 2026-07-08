@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Plus, Pencil, Trash2, Play, Image, Music, Gamepad2, Loader2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -117,7 +118,7 @@ const ContentPage = () => {
         title="Content Manager"
         subtitle="Kelola konten stage: video, gambar, audio, game."
         actions={
-          <Link to="/admin/content/new">
+          <Link to={ROUTES.ADMIN.CONTENT_NEW}>
             <Button icon={<Plus className="w-4 h-4" />}>
               Tambah Konten
             </Button>
@@ -148,7 +149,7 @@ const ContentPage = () => {
           icon={<Image className="w-12 h-12" />}
           title="Belum ada konten"
           description="Pilih program lain atau buat konten baru."
-          action={{ label: 'Tambah Konten', onClick: () => navigate('/admin/content/new') }}
+            action={{ label: 'Tambah Konten', onClick: () => navigate(ROUTES.ADMIN.CONTENT_NEW) }}
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

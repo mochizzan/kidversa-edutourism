@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { ArrowLeft, Loader2, Video, FileText, CheckCircle2, SkipForward, Mic } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -150,7 +151,7 @@ const RecordingDetailPage = () => {
   if (error || !recording) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/admin/recordings')}>
+        <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.RECORDINGS)}>
           Kembali
         </Button>
         <ErrorState message={error || 'Rekaman tidak ditemukan'} onRetry={loadRecording} />
@@ -160,7 +161,7 @@ const RecordingDetailPage = () => {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/admin/recordings')}>
+      <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.RECORDINGS)}>
         Kembali
       </Button>
 

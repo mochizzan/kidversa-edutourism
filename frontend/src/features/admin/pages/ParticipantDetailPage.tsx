@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Pencil, Trash2, School2, UserRound, Phone, Mail, CalendarDays } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
@@ -8,6 +9,7 @@ import { Card } from '../../../shared/components/ui/Card'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { participantService } from '../../../core/services/participants'
 import type { Participant } from '../../../core/types'
 
@@ -18,6 +20,7 @@ const ParticipantDetailPage = () => {
 
   const [participant, setParticipant] = useState<Participant | null>(null)
   const [loading, setLoading] = useState(true)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!participantId) {
@@ -47,9 +50,11 @@ const ParticipantDetailPage = () => {
     try {
       await participantService.delete(participant.id)
       addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
-      navigate('/admin/participants')
+      navigate(ROUTES.ADMIN.PARTICIPANTS)
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus peserta' })
+    } finally {
+      setConfirmOpen(false)
     }
   }
 
@@ -62,7 +67,7 @@ const ParticipantDetailPage = () => {
       <ErrorState
         title="Peserta tidak ditemukan"
         message="Data peserta yang dicari tidak tersedia."
-        action={{ label: 'Kembali', onClick: () => navigate('/admin/participants') }}
+        action={{ label: 'Kembali', onClick: () => navigate(ROUTES.ADMIN.PARTICIPANTS) }}
       />
     )
   }
@@ -71,7 +76,7 @@ const ParticipantDetailPage = () => {
     <div className="space-y-6">
       <PageHeader
         breadcrumbs={[
-          { label: 'Peserta', href: '/admin/participants' },
+          { label: 'Peserta', href: ROUTES.ADMIN.PARTICIPANTS },
           { label: participant.child_name },
         ]}
         title={participant.child_name}
@@ -81,7 +86,7 @@ const ParticipantDetailPage = () => {
             <Link to={`/admin/participants/${participant.id}/edit`}>
               <Button variant="secondary" icon={<Pencil className="w-4 h-4" />}>Edit</Button>
             </Link>
-            <Button variant="danger" icon={<Trash2 className="w-4 h-4" />} onClick={handleDelete}>Hapus</Button>
+            <Button variant="danger" icon={<Trash2 className="w-4 h-4" />} onClick={() => setConfirmOpen(true)}>Hapus</Button>
           </div>
         }
       />
@@ -108,6 +113,14 @@ const ParticipantDetailPage = () => {
           )}
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Hapus Peserta"
+        message={`Yakin ingin menghapus peserta "${participant.child_name}"?\n\nPeserta yang sudah terhubung ke sesi atau memiliki aktivitas tidak dapat dihapus. Tindakan ini tidak dapat dibatalkan.`}
+        onConfirm={handleDelete}
+        onClose={() => setConfirmOpen(false)}
+      />
     </div>
   )
 }

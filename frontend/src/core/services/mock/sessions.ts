@@ -6,9 +6,10 @@ import type {
   CreateParticipantDTO,
   CreateSessionDTO,
   UpdateSessionDTO,
+  ProgramStage,
 } from '../../types'
-import { SessionStatus, GroupStatus } from '../../types'
-import { getAll, getById, put, queryByIndex, deleteById } from '../storage/idb'
+import { SessionStatus, GroupStatus, SessionStageStatus } from '../../types'
+import { getAll, getById, put, putMany, queryByIndex, deleteById, deleteByIndex } from '../storage/idb'
 import { AppError } from '../../utils/errors'
 import { getTenantScope, requireTenantId } from '../tenantScope'
 
@@ -83,6 +84,18 @@ const create = async (data: CreateSessionDTO): Promise<Session> => {
     created_at: new Date().toISOString(),
   }
   await put('sessions', session)
+  try {
+    const programStages = await queryByIndex<ProgramStage>('program_stages', 'program_id', data.program_id)
+    const sessionStages: SessionStage[] = programStages.map(ps => ({
+      id: `ss-${Date.now()}-${ps.sequence_order}`,
+      session_id: session.id,
+      program_stage_id: ps.id,
+      status: SessionStageStatus.WAITING,
+    }))
+    if (sessionStages.length > 0) await putMany('session_stages', sessionStages)
+  } catch {
+    /* stages will be empty — acceptable */
+  }
   return session
 }
 
@@ -106,6 +119,37 @@ const complete = async (id: string): Promise<Session> => {
 
 const cancel = async (id: string): Promise<Session> => {
   return update(id, { status: SessionStatus.CANCELLED })
+}
+
+const delete_ = async (id: string): Promise<void> => {
+  await new Promise((r) => setTimeout(r, 300))
+  const session = await getById<Session>('sessions', id)
+  if (!session) throw new AppError('NOT_FOUND', 'Session not found')
+  if (session.status === SessionStatus.ACTIVE || session.status === SessionStatus.COMPLETED) {
+    throw new AppError('VALIDATION_ERROR', 'Hanya sesi DRAFT atau CANCELLED yang dapat dihapus')
+  }
+
+  const [stages, groups] = await Promise.all([
+    queryByIndex<SessionStage>('session_stages', 'session_id', id),
+    queryByIndex<SessionGroup>('session_groups', 'session_id', id),
+  ])
+
+  await Promise.all([
+    deleteByIndex('session_stages', 'session_id', id),
+    deleteByIndex('participants', 'session_id', id),
+    deleteByIndex('smart_photos', 'session_id', id),
+    deleteByIndex('reports', 'session_id', id),
+    deleteByIndex('session_groups', 'session_id', id),
+    ...groups.flatMap(g => [
+      deleteByIndex('group_stage_progress', 'group_id', g.id),
+    ]),
+    ...stages.flatMap(s => [
+      deleteByIndex('assessments', 'session_stage_id', s.id),
+      deleteByIndex('recordings', 'session_stage_id', s.id),
+    ]),
+  ])
+
+  await deleteById('sessions', id)
 }
 
 const assignFacilitator = async (sessionId: string, stageId: string, userId: string): Promise<SessionStage> => {
@@ -174,8 +218,10 @@ const getParticipantById = async (participantId: string): Promise<Participant | 
 
 const addParticipant = async (sessionId: string, groupId: string, data: CreateParticipantDTO): Promise<Participant> => {
   await new Promise((r) => setTimeout(r, 250))
+  const session = await getById<Session>('sessions', sessionId)
   const participant: Participant = {
     id: `part-${Date.now()}`,
+    tenant_id: session?.tenant_id,
     session_id: sessionId,
     group_id: groupId,
     child_name: data.child_name,
@@ -188,6 +234,17 @@ const addParticipant = async (sessionId: string, groupId: string, data: CreatePa
     consent_photo: false,
     created_at: new Date().toISOString(),
   }
+  await put('participants', participant)
+  return participant
+}
+
+const linkParticipant = async (sessionId: string, groupId: string, participantId: string): Promise<Participant> => {
+  await new Promise((r) => setTimeout(r, 250))
+  const participant = await getById<Participant>('participants', participantId)
+  if (!participant) throw new AppError('NOT_FOUND', 'Peserta tidak ditemukan')
+  if (participant.session_id) throw new AppError('CONFLICT', 'Peserta sudah masuk dalam sesi lain')
+  participant.session_id = sessionId
+  participant.group_id = groupId
   await put('participants', participant)
   return participant
 }
@@ -253,6 +310,7 @@ export const mockSessionService = {
   start,
   complete,
   cancel,
+  delete: delete_,
   assignFacilitator,
   getStages,
   getGroups,
@@ -262,6 +320,7 @@ export const mockSessionService = {
   getParticipants,
   getParticipantById,
   addParticipant,
+  linkParticipant,
   updateParticipant,
   removeParticipant,
   importParticipants,

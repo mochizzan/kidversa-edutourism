@@ -14,13 +14,13 @@ const MainLayout = () => {
           </Link>
           <div className="flex items-center gap-4">
             <Link
-              to={ROUTES.AUTH}
+              to={ROUTES.AUTH.BASE}
               className="text-white hover:text-accent transition-colors"
             >
               Masuk
             </Link>
             <Link
-              to={`${ROUTES.AUTH}?mode=register`}
+              to={`${ROUTES.AUTH.BASE}?mode=register`}
               className="bg-accent text-primary-dark px-4 py-2 rounded-lg font-semibold hover:bg-accent-light transition-colors"
             >
               Daftar

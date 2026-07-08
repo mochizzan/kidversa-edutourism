@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Loader2, Save } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Card } from '../../../shared/components/ui/Card'
@@ -52,7 +53,7 @@ const ParticipantFormPage = () => {
 
         if (!found) {
           addToast({ type: 'error', message: 'Peserta tidak ditemukan' })
-          navigate('/admin/participants', { replace: true })
+          navigate(ROUTES.ADMIN.PARTICIPANTS, { replace: true })
           return
         }
 
@@ -67,7 +68,7 @@ const ParticipantFormPage = () => {
       } catch {
         if (!cancelled) {
           addToast({ type: 'error', message: 'Gagal memuat data peserta' })
-          navigate('/admin/participants', { replace: true })
+          navigate(ROUTES.ADMIN.PARTICIPANTS, { replace: true })
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -143,7 +144,7 @@ const ParticipantFormPage = () => {
         addToast({ type: 'success', message: 'Peserta berhasil ditambahkan' })
       }
 
-      navigate('/admin/participants')
+      navigate(ROUTES.ADMIN.PARTICIPANTS)
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menyimpan peserta' })
     } finally {
@@ -165,7 +166,7 @@ const ParticipantFormPage = () => {
         title={isEdit ? 'Edit Peserta' : 'Tambah Peserta Baru'}
         subtitle={isEdit ? 'Perbarui data peserta' : 'Buat data peserta baru tanpa penempatan sesi'}
         breadcrumbs={[
-          { label: 'Peserta', href: '/admin/participants' },
+          { label: 'Peserta', href: ROUTES.ADMIN.PARTICIPANTS },
           { label: isEdit ? 'Edit' : 'Tambah' },
         ]}
       />
@@ -228,7 +229,7 @@ const ParticipantFormPage = () => {
         </Card>
 
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" type="button" onClick={() => navigate('/admin/participants')}>
+          <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.PARTICIPANTS)}>
             Batal
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>

@@ -129,6 +129,7 @@ export interface GroupStageProgress {
 
 export interface Participant {
   id: string
+  tenant_id?: string
   session_id?: string
   group_id?: string
   child_name: string

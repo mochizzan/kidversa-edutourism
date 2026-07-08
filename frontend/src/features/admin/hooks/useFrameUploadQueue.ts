@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { frameService } from '../../../core/services/frames'
+import { ROUTES } from '../../../core/constants/app'
 import { getTenantScope } from '../../../core/services/tenantScope'
 
 interface UploadItem {
@@ -169,7 +170,7 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
           }),
         ),
       )
-      navigate('/admin/frames')
+      navigate(ROUTES.ADMIN.FRAMES)
     } catch {
       setErrorMessage('Gagal menyimpan frame. Silakan coba lagi.')
     } finally {

@@ -18,11 +18,54 @@ export const COLORS = {
 // Routes
 export const ROUTES = {
   HOME: '/',
-  AUTH: '/auth',
-  ADMIN: '/admin',
-  FASILITATOR: '/fasilitator',
-  PARENT: '/parent',
+  AUTH: {
+    BASE: '/auth',
+    LOGIN: '/auth/login',
+    REGISTER: '/auth/register',
+  },
+  ADMIN: {
+    BASE: '/admin',
+    DASHBOARD: '/admin/dashboard',
+    LIVE: '/admin/live',
+    PROGRAMS: '/admin/programs',
+    PROGRAM_NEW: '/admin/programs/new',
+    SESSIONS: '/admin/sessions',
+    SESSION_NEW: '/admin/sessions/new',
+    PARTICIPANTS: '/admin/participants',
+    PARTICIPANT_NEW: '/admin/participants/new',
+    REPORTS: '/admin/reports',
+    MISSIONS: '/admin/missions',
+    MISSION_NEW: '/admin/missions/new',
+    CONTENT: '/admin/content',
+    CONTENT_NEW: '/admin/content/new',
+    FRAMES: '/admin/frames',
+    FRAME_UPLOAD: '/admin/frames/upload',
+    RECORDINGS: '/admin/recordings',
+    USERS: '/admin/users',
+    USER_NEW: '/admin/users/new',
+    TENANTS: '/admin/tenants',
+    CONSENT: '/admin/consent',
+  },
+  FASILITATOR: {
+    BASE: '/fasilitator',
+    DASHBOARD: '/fasilitator/dashboard',
+    GROUPS: '/fasilitator/groups',
+    CAMERA: '/fasilitator/camera',
+    PROFILE: '/fasilitator/profile',
+  },
+  PARENT: {
+    BASE: '/parent',
+    REPORT: '/parent/report',
+    CONSENT: '/parent/consent',
+    MISSIONS: '/parent/missions',
+  },
 } as const
+
+// Parameterized path builders (backward-compatible)
+export const programListPath = () => ROUTES.ADMIN.PROGRAMS
+export const programDetailPath = (id: string) => `${ROUTES.ADMIN.PROGRAMS}/${id}`
+export const programStagePath = (programId: string, stageId: string) =>
+  `${ROUTES.ADMIN.PROGRAMS}/${programId}/stages/${stageId}`
 
 // API
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'

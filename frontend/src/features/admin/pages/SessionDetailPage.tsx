@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Tabs } from '../../../shared/components/ui/Tabs'
@@ -22,7 +23,7 @@ const SessionDetailPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const { addToast } = useGlobalToast()
-  const isNew = sessionId === 'new'
+  const isNew = !sessionId || sessionId === 'new'
   const [session, setSession] = useState<(Session & { stages: SessionStage[]; groups: (SessionGroup & { participants: Participant[] })[] }) | null>(null)
   const [loading, setLoading] = useState(!isNew)
   const [activeTab, setActiveTab] = useState('info')
@@ -58,13 +59,13 @@ const SessionDetailPage = () => {
   }, [sessionId])
 
   useEffect(() => {
-    if (isNew && !programsLoaded.current) {
+    if (!programsLoaded.current) {
       programsLoaded.current = true
       setProgramsLoading(true)
       setProgramsError(null)
       programService.getAll({ limit: 100 }).then((res) => {
         setPrograms(res.data)
-        if (res.data.length > 0) setNewProgramId(res.data[0].id)
+        if (isNew && res.data.length > 0) setNewProgramId(res.data[0].id)
       }).catch(() => {
         setProgramsError('Gagal memuat daftar program.')
       }).finally(() => {
@@ -74,15 +75,17 @@ const SessionDetailPage = () => {
   }, [isNew])
 
   const programMap = useMemo(() => new Map(programs.map(p => [p.id, p.name])), [programs])
-  const stageMap = useMemo(() => {
-    const map = new Map<string, string>()
-    programs.forEach(p => {
-      if ('stages' in p) {
-        (p.stages as Array<{ id: string; name: string }>)?.forEach(s => map.set(s.id, s.name))
-      }
-    })
-    return map
-  }, [programs])
+  const [stageMap, setStageMap] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    if (session?.program_id) {
+      programService.getStages(session.program_id).then((stages) => {
+        const map = new Map<string, string>()
+        stages.forEach(s => map.set(s.id, s.name))
+        setStageMap(map)
+      })
+    }
+  }, [session?.program_id])
 
   const handleCreate = async () => {
     if (!newName.trim() || !newProgramId || !newDate || !newLocation.trim()) return
@@ -101,7 +104,7 @@ const SessionDetailPage = () => {
     return (
       <div className="space-y-6">
         <PageHeader title="Buat Sesi Baru" subtitle="Tambahkan sesi edutourism baru."
-          breadcrumbs={[{ label: 'Sessions', href: '/admin/sessions' }, { label: 'Buat Baru' }]} />
+          breadcrumbs={[{ label: 'Sessions', href: ROUTES.ADMIN.SESSIONS }, { label: 'Buat Baru' }]} />
         <Card>
           {programsLoading ? (
             <div className="flex items-center justify-center py-16">
@@ -132,7 +135,7 @@ const SessionDetailPage = () => {
               icon={<AlertCircle className="w-12 h-12" />}
               title="Belum ada program"
               description="Buat program terlebih dahulu sebelum membuat sesi baru."
-              action={{ label: 'Ke Halaman Program', onClick: () => navigate('/admin/programs') }}
+              action={{ label: 'Ke Halaman Program', onClick: () => navigate(ROUTES.ADMIN.PROGRAMS) }}
             />
           ) : (
             <SessionCreateForm
@@ -142,7 +145,7 @@ const SessionDetailPage = () => {
               newDate={newDate} setNewDate={setNewDate}
               newLocation={newLocation} setNewLocation={setNewLocation}
               newNotes={newNotes} setNewNotes={setNewNotes}
-              creating={creating} onCancel={() => navigate('/admin/sessions')} onSubmit={handleCreate} />
+              creating={creating} onCancel={() => navigate(ROUTES.ADMIN.SESSIONS)} onSubmit={handleCreate} />
           )}
         </Card>
       </div>
@@ -155,7 +158,7 @@ const SessionDetailPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader title={session.name} subtitle={`${session.location} · ${formatDate(session.session_date)}`}
-        breadcrumbs={[{ label: 'Sessions', href: '/admin/sessions' }, { label: session.name }]}
+        breadcrumbs={[{ label: 'Sessions', href: ROUTES.ADMIN.SESSIONS }, { label: session.name }]}
         actions={<Badge variant={session.status === 'ACTIVE' ? 'success' : session.status === 'COMPLETED' ? 'primary' : 'neutral'}>{session.status}</Badge>}
       />
 

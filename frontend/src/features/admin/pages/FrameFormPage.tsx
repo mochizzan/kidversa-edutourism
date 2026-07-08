@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Save, Loader2, Image } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Input } from '../../../shared/components/ui/Input'
@@ -45,7 +46,7 @@ const FrameFormPage = () => {
             })
           } else {
             addToast({ type: 'error', message: 'Frame tidak ditemukan' })
-            navigate('/admin/frames')
+            navigate(ROUTES.ADMIN.FRAMES)
           }
         } catch {
           addToast({ type: 'error', message: 'Gagal memuat frame' })
@@ -71,7 +72,7 @@ const FrameFormPage = () => {
         program_id: form.program_id || undefined,
       })
       addToast({ type: 'success', message: 'Frame berhasil diperbarui' })
-      navigate('/admin/frames')
+      navigate(ROUTES.ADMIN.FRAMES)
     } catch {
       addToast({ type: 'error', message: 'Gagal menyimpan frame' })
     } finally {
@@ -93,7 +94,7 @@ const FrameFormPage = () => {
         title="Edit Frame"
         subtitle="Perbarui detail frame"
         breadcrumbs={[
-          { label: 'Frames', href: '/admin/frames' },
+          { label: 'Frames', href: ROUTES.ADMIN.FRAMES },
           { label: 'Edit' },
         ]}
       />
@@ -132,7 +133,7 @@ const FrameFormPage = () => {
         </div>
 
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" type="button" onClick={() => navigate('/admin/frames')}>
+          <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.FRAMES)}>
             Batal
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>

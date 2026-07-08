@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { ChevronRight, ChevronLeft, AlertCircle, Check } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { UserRole } from '../../../core/types'
+import { ROUTES } from '../../../core/constants/app'
 import { cn } from '../../../core/utils'
 import { getAll } from '../../../core/services/storage/idb'
 import type { Tenant } from '../../../core/types'
@@ -89,7 +90,7 @@ const RegisterPage = () => {
     try {
       await registerUser({ tenant_id: data.tenant_id, email: data.email, password: data.password, role: data.role, name: data.name })
       setIsSuccess(true)
-      setTimeout(() => navigate('/auth/login', { replace: true, state: { message: 'Registrasi berhasil! Akun Anda menunggu persetujuan admin.' } }), 2000)
+      setTimeout(() => navigate(ROUTES.AUTH.LOGIN, { replace: true, state: { message: 'Registrasi berhasil! Akun Anda menunggu persetujuan admin.' } }), 2000)
     } catch (err) {
       setGeneralError(err instanceof Error && err.message === 'EMAIL_ALREADY_EXISTS' ? 'Email sudah terdaftar' : 'Terjadi kesalahan. Silakan coba lagi.')
     }
@@ -211,7 +212,7 @@ const RegisterPage = () => {
       {/* ── Login link ── */}
       <p className="mt-6 text-center text-sm text-on-surface-variant/50">
         Sudah punya akun?{' '}
-        <Link to="/auth/login" className="text-primary font-semibold hover:text-primary-dark transition-colors">Masuk</Link>
+        <Link to={ROUTES.AUTH.LOGIN} className="text-primary font-semibold hover:text-primary-dark transition-colors">Masuk</Link>
       </p>
     </>
   )

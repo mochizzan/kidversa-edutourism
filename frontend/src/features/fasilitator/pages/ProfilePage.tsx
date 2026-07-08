@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { Card } from '../../../shared/components/ui/Card'
+import { ROUTES } from '../../../core/constants/app'
 import { Button } from '../../../shared/components/ui/Button'
 import { resizeImage } from '../../../core/utils/image'
 import { userService } from '../../../core/services/users'
@@ -49,7 +50,7 @@ const ProfilePage = () => {
 
   const handleLogout = async () => {
     await logout()
-    navigate('/auth/login', { replace: true })
+    navigate(ROUTES.AUTH.LOGIN, { replace: true })
   }
 
   const handleAvatarUpload = async (file: File) => {
@@ -271,19 +272,19 @@ const ProfilePage = () => {
             icon={LayoutDashboard}
             title='Dashboard'
             desc='Lihat ringkasan aktivitas'
-            onClick={() => navigate('/fasilitator/dashboard')}
+            onClick={() => navigate(ROUTES.FASILITATOR.DASHBOARD)}
           />
           <QuickMenuItem
             icon={Users}
             title='Kelompok'
             desc='Kelola semua kelompok'
-            onClick={() => navigate('/fasilitator/groups')}
+            onClick={() => navigate(ROUTES.FASILITATOR.GROUPS)}
           />
           <QuickMenuItem
             icon={Camera}
             title='Kamera'
             desc='Buka kamera untuk scan QR'
-            onClick={() => navigate('/fasilitator/camera')}
+            onClick={() => navigate(ROUTES.FASILITATOR.CAMERA)}
           />
         </div>
       </div>

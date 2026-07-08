@@ -45,13 +45,13 @@ const LandingPage = () => {
         {/* CTA Buttons */}
         <div className="mt-16 flex flex-col sm:flex-row gap-4 justify-center">
           <Link
-            to={ROUTES.AUTH}
+            to={ROUTES.AUTH.BASE}
             className="bg-accent text-primary-dark px-8 py-4 rounded-lg font-semibold text-lg hover:bg-accent-light transition-colors"
           >
             Mulai Sekarang
           </Link>
           <Link
-            to={`${ROUTES.AUTH}?mode=register`}
+            to={`${ROUTES.AUTH.BASE}?mode=register`}
             className="bg-white/20 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white/30 transition-colors"
           >
             Daftar Gratis

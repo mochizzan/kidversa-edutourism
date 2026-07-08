@@ -42,24 +42,26 @@ go mod tidy
 ### Frontend Structure (`frontend/src/`)
 
 ```
-app/          # router.tsx (all routes), providers/
+app/          # router.tsx (thin assembler) + routes/ (per-feature route defs), providers/
 core/         # config/, constants/, hooks/, services/, stores/, theme/, types/, utils/
 features/     # admin/, auth/, fasilitator/, parent/
 shared/       # components/{ui,data,charts,feedback,layout,auth}, hooks/, layouts/, types/, utils/
 pages/        # LandingPage, LearnerKioskPage, NotFoundPage
 ```
 
-### Routing (`app/router.tsx`)
+### Routing (`app/routes/` + `app/router.tsx`)
 
+- Routes are split per feature under `app/routes/` (`auth.tsx`, `admin.tsx`, `fasilitator.tsx`, `parent.tsx`, `learner.tsx`, `index.tsx`). `app/router.tsx` just assembles them via `createBrowserRouter`. Add new routes to the matching `app/routes/<segment>.tsx`, not `router.tsx`.
+- `app/routes/helpers.tsx` provides `guardedRoute(path, segment, Component)` (wraps in `RouteGuard` + `SuspenseWrapper`) and `lazyRoute(path, Component)` (Suspense only). Use these instead of hand-writing boilerplate.
 - Root `/` → redirects to `/auth/login`
-- `/auth/*` — AuthLayout (Login, Register)
-- `/admin/*` — ProtectedRoute → AdminLayout (desktop, sidebar) for `SUPER_ADMIN`, `ADMIN`, `KOORDINATOR`
-- `/fasilitator/*` — ProtectedRoute → FasilitatorLayout (mobile-first, bottom nav) for `FASILITATOR`
-- `/parent/*` — ParentLayout (max-width 480px, **no ProtectedRoute** — uses `?token=` query param via `ParentTokenGuard`)
+- `/auth/*` — AuthLayout (Login, Register) — both **eager** imports (not lazy)
+- `/admin/*` — `AdminLayout` with per-route `RouteGuard segment="..."` (NOT `ProtectedRoute`); guards desktop sidebar roles `SUPER_ADMIN`, `ADMIN`, `KOORDINATOR`
+- `/fasilitator/*` — `ProtectedRoute allowedRoles={[FASILITATOR]}` → `FasilitatorLayout` (mobile-first, bottom nav)
+- `/parent/*` — `ParentLayout` (max-width 480px, **no ProtectedRoute** — uses `?token=` query param via `ParentTokenGuard`)
 - `/learner/:sessionId/:stageId` — Learner Kiosk (**public, no auth** — child-facing device)
 - `*` → NotFoundPage
 
-All pages except `ProgramsPage`, `LoginPage`, `RegisterPage` are lazy-loaded via `React.lazy()` + `<Suspense>`.
+Only `LoginPage` and `RegisterPage` are eager; every other page is lazy-loaded via `React.lazy()` + `<Suspense>`.
 
 ### User Roles
 
@@ -131,7 +133,9 @@ Always check existing shared components before creating new ones.
 
 | File | Purpose |
 |---|---|
-| `frontend/src/app/router.tsx` | All route definitions |
+| `frontend/src/app/router.tsx` | Route assembler — imports `app/routes/*` |
+| `frontend/src/app/routes/helpers.tsx` | `guardedRoute`, `lazyRoute`, `SuspenseWrapper` |
+| `frontend/src/app/routes/<segment>.tsx` | Per-feature route definitions |
 | `frontend/src/App.tsx` | Root: splash screen + session check |
 | `frontend/src/core/stores/authStore.ts` | Zustand auth state |
 | `frontend/src/core/services/types.ts` | Service interfaces |
@@ -151,7 +155,8 @@ Always check existing shared components before creating new ones.
 - UI text: **Bahasa Indonesia**
 - Feature modules: `features/<role>/pages/`, `features/<role>/components/`, `features/<role>/hooks/`
 - Entity types: `core/types/entities.ts`; enums: `core/types/enums.ts`; constants: `core/constants/app.ts`
-- New pages: add to `router.tsx` as `React.lazy()` import with `<Suspense>` fallback
+- Navigation paths live in `core/constants/app.ts` → `ROUTES` (nested `AUTH`/`ADMIN`/`FASILITATOR`/`PARENT` objects). Always use `ROUTES.*` instead of hardcoded path strings. The flat `programListPath()`/`programDetailPath()`/`programStagePath()` builders are also exported there (was `core/constants/routes.ts`, now deleted). `ROUTES.AUTH` is an object — use `ROUTES.AUTH.BASE`/`.LOGIN`/`.REGISTER`, never treat it as a string.
+- New pages: add to the matching `app/routes/<segment>.tsx` as a `React.lazy()` import (top-level, consumed by `guardedRoute` or `lazyRoute`). Do NOT add a `React.lazy` import that isn't used in a route — `noUnusedLocals` will fail the build.
 
 ## Gotchas
 

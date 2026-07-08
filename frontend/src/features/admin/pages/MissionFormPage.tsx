@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Save, Loader2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Input } from '../../../shared/components/ui/Input'
@@ -106,7 +107,7 @@ const MissionFormPage = () => {
         })
         addToast({ type: 'success', message: 'Misi baru berhasil ditambahkan' })
       }
-      navigate('/admin/missions')
+      navigate(ROUTES.ADMIN.MISSIONS)
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menyimpan misi' })
     } finally {
@@ -128,7 +129,7 @@ const MissionFormPage = () => {
         title={isEdit ? 'Edit Misi' : 'Tambah Misi Baru'}
         subtitle={isEdit ? 'Perbarui detail misi' : 'Buat misi baru untuk program'}
         breadcrumbs={[
-          { label: 'Bank Misi', href: '/admin/missions' },
+          { label: 'Bank Misi', href: ROUTES.ADMIN.MISSIONS },
           { label: isEdit ? 'Edit' : 'Tambah' },
         ]}
       />
@@ -227,7 +228,7 @@ const MissionFormPage = () => {
         </div>
 
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" type="button" onClick={() => navigate('/admin/missions')}>
+          <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.MISSIONS)}>
             Batal
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>

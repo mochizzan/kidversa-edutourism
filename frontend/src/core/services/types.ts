@@ -61,6 +61,7 @@ export interface SessionService {
   start(id: string): Promise<Session>
   complete(id: string): Promise<Session>
   cancel(id: string): Promise<Session>
+  delete(id: string): Promise<void>
 
   assignFacilitator(sessionId: string, stageId: string, userId: string): Promise<SessionStage>
   getStages(sessionId: string): Promise<SessionStage[]>
@@ -73,6 +74,7 @@ export interface SessionService {
   getParticipants(sessionId: string, groupId?: string): Promise<Participant[]>
   getParticipantById(participantId: string): Promise<Participant | null>
   addParticipant(sessionId: string, groupId: string, data: CreateParticipantDTO): Promise<Participant>
+  linkParticipant(sessionId: string, groupId: string, participantId: string): Promise<Participant>
   updateParticipant(sessionId: string, participantId: string, data: Partial<CreateParticipantDTO>): Promise<Participant>
   removeParticipant(sessionId: string, participantId: string): Promise<void>
   importParticipants(sessionId: string, rows: CreateParticipantDTO[]): Promise<Participant[]>

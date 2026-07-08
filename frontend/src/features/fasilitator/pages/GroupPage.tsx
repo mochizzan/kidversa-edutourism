@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Users, Target } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
+import { ROUTES } from '../../../core/constants/app'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { useConfirmDialog } from '../../../shared/hooks/useConfirmDialog'
@@ -156,7 +157,7 @@ const GroupPage = () => {
       // In a real app, this would call a service to advance the group
       await new Promise((r) => setTimeout(r, 500))
       confirm.dismiss()
-      navigate('/fasilitator/dashboard')
+      navigate(ROUTES.FASILITATOR.DASHBOARD)
     } catch {
       // Error handling
     } finally {
@@ -183,7 +184,7 @@ const GroupPage = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Kelompok" breadcrumbs={[{ label: 'Dashboard', href: '/fasilitator/dashboard' }, { label: 'Error' }]} />
+          <PageHeader title="Kelompok" breadcrumbs={[{ label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD }, { label: 'Error' }]} />
         <ErrorState message={error} onRetry={fetchData} />
       </div>
     )
@@ -211,7 +212,7 @@ const GroupPage = () => {
         title={group.name}
         subtitle={programStageName ?? 'Stage'}
         breadcrumbs={[
-          { label: 'Dashboard', href: '/fasilitator/dashboard' },
+          { label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD },
           { label: group.name },
         ]}
         actions={

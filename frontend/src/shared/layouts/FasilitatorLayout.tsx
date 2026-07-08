@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import { cn } from '../../core/utils'
 import { useAuth } from '../../core/hooks/useAuth'
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary'
+import { ROUTES } from '../../core/constants/app'
 import {
   LayoutDashboard,
   Users,
@@ -14,22 +15,22 @@ import {
 const navItems = [
   {
     label: 'Dashboard',
-    path: '/fasilitator/dashboard',
+    path: ROUTES.FASILITATOR.DASHBOARD,
     icon: LayoutDashboard,
   },
   {
     label: 'Groups',
-    path: '/fasilitator/groups',
+    path: ROUTES.FASILITATOR.GROUPS,
     icon: Users,
   },
   {
     label: 'Camera',
-    path: '/fasilitator/camera',
+    path: ROUTES.FASILITATOR.CAMERA,
     icon: Camera,
   },
   {
     label: 'Profile',
-    path: '/fasilitator/profile',
+    path: ROUTES.FASILITATOR.PROFILE,
     icon: User,
   },
 ] as const

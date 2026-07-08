@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Star, Camera, Video, Save, ShieldCheck, ShieldX } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
+import { ROUTES } from '../../../core/constants/app'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
@@ -233,7 +234,7 @@ const ChildAssessmentPage = () => {
       <PageHeader
         title="Penilaian Anak"
         breadcrumbs={[
-          { label: 'Dashboard', href: '/fasilitator/dashboard' },
+          { label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD },
           { label: participant.child_name },
         ]}
       />

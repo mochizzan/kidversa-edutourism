@@ -48,3 +48,31 @@ export function requiresActiveTenant(user: User | null): boolean {
 export function getApprovalNotificationRoles(): UserRole[] {
   return [UserRole.SUPER_ADMIN, UserRole.ADMIN]
 }
+
+export interface RouteAccess {
+  path: string
+  label: string
+  roles: UserRole[]
+  tenantFree?: boolean
+  section: string
+}
+
+export const ADMIN_ROUTE_ACCESS: RouteAccess[] = [
+  { path: 'dashboard', section: 'OVERVIEW', label: 'Dashboard', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'live', section: 'OVERVIEW', label: 'Live Monitor', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'programs', section: 'PROGRAM', label: 'Programs', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { path: 'sessions', section: 'PROGRAM', label: 'Sessions', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'participants', section: 'PROGRAM', label: 'Peserta', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'reports', section: 'PROGRAM', label: 'Reports', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'missions', section: 'PROGRAM', label: 'Missions', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { path: 'content', section: 'CONTENT', label: 'Content Manager', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { path: 'frames', section: 'CONTENT', label: 'Frame Manager', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { path: 'recordings', section: 'CONTENT', label: 'Recordings', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'tenants', section: 'SETTINGS', label: 'Tenants', roles: [UserRole.SUPER_ADMIN], tenantFree: true },
+  { path: 'users', section: 'SETTINGS', label: 'Users', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { path: 'consent', section: 'SETTINGS', label: 'Consent Monitor', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+]
+
+export function getRouteAccess(segment: string): RouteAccess | undefined {
+  return ADMIN_ROUTE_ACCESS.find((r) => r.path === segment)
+}

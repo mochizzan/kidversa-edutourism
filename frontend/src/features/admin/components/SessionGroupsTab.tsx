@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, Upload, UserPlus } from 'lucide-react'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { sessionService } from '../../../core/services/sessions'
+import { participantService } from '../../../core/services/participants'
 import { GroupFormModal } from './GroupFormModal'
 import { ParticipantFormModal } from './ParticipantFormModal'
 import { CsvImportModal } from './CsvImportModal'
@@ -21,6 +23,7 @@ interface SessionGroupsTabProps {
 export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }: SessionGroupsTabProps) {
   const { addToast } = useGlobalToast()
   const isDraft = sessionStatus === 'DRAFT'
+  const canModifyParticipants = sessionStatus === 'DRAFT' || sessionStatus === 'ACTIVE'
 
   const [groupFormOpen, setGroupFormOpen] = useState(false)
   const [groupFormMode, setGroupFormMode] = useState<'create' | 'edit'>('create')
@@ -33,6 +36,25 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
 
   const [csvImportOpen, setCsvImportOpen] = useState(false)
 
+  const [confirmGroup, setConfirmGroup] = useState<SessionGroup & { participants: Participant[] } | null>(null)
+  const [confirmParticipant, setConfirmParticipant] = useState<Participant | null>(null)
+
+  const [availableParticipants, setAvailableParticipants] = useState<Participant[]>([])
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const loadAvailableParticipants = async () => {
+    try {
+      const res = await participantService.getAll({ limit: 100 })
+      setAvailableParticipants(res.data.filter(p => !p.session_id))
+    } catch {
+      setAvailableParticipants([])
+    }
+  }
+
+  useEffect(() => {
+    loadAvailableParticipants()
+  }, [refreshKey])
+
   const existingGroupNames = groups.map((g) => g.name)
 
   const handleCreateGroup = async (name: string) => {
@@ -40,6 +62,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       await sessionService.createGroup(sessionId, name)
       addToast({ type: 'success', message: 'Kelompok berhasil ditambahkan' })
       onRefresh()
+      setRefreshKey(k => k + 1)
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Gagal membuat kelompok')
     }
@@ -51,6 +74,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       await sessionService.updateGroup(sessionId, editingGroup.id, name)
       addToast({ type: 'success', message: 'Kelompok berhasil diperbarui' })
       onRefresh()
+      setRefreshKey(k => k + 1)
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Gagal memperbarui kelompok')
     }
@@ -61,29 +85,29 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       addToast({ type: 'error', message: 'Tidak dapat menghapus kelompok yang memiliki peserta' })
       return
     }
+    setConfirmGroup(group)
+  }
 
-    const confirmed = window.confirm(`Yakin ingin menghapus kelompok "${group.name}"?`)
-
-    if (!confirmed) return
-
+  const confirmDeleteGroup = async () => {
+    if (!confirmGroup) return
     try {
-      await sessionService.deleteGroup(sessionId, group.id)
+      await sessionService.deleteGroup(sessionId, confirmGroup.id)
       addToast({ type: 'success', message: 'Kelompok berhasil dihapus' })
       onRefresh()
+      setRefreshKey(k => k + 1)
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus kelompok' })
+    } finally {
+      setConfirmGroup(null)
     }
   }
 
-  const handleAddParticipant = async (data: Omit<CreateParticipantDTO, 'group_id'>) => {
+  const handleLinkParticipant = async (participantId: string) => {
     if (!selectedGroupId) return
-    try {
-      await sessionService.addParticipant(sessionId, selectedGroupId, { ...data, group_id: selectedGroupId })
-      addToast({ type: 'success', message: 'Peserta berhasil ditambahkan' })
-      onRefresh()
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Gagal menambahkan peserta')
-    }
+    await sessionService.linkParticipant(sessionId, selectedGroupId, participantId)
+    addToast({ type: 'success', message: 'Peserta berhasil ditambahkan ke kelompok' })
+    onRefresh()
+    setRefreshKey(k => k + 1)
   }
 
   const handleEditParticipant = async (data: Omit<CreateParticipantDTO, 'group_id'>) => {
@@ -92,22 +116,27 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       await sessionService.updateParticipant(sessionId, editingParticipant.id, data)
       addToast({ type: 'success', message: 'Peserta berhasil diperbarui' })
       onRefresh()
+      setRefreshKey(k => k + 1)
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Gagal memperbarui peserta')
     }
   }
 
   const handleDeleteParticipant = async (participant: Participant) => {
-    const confirmed = window.confirm(`Yakin ingin menghapus peserta "${participant.child_name}"?`)
+    setConfirmParticipant(participant)
+  }
 
-    if (!confirmed) return
-
+  const confirmDeleteParticipant = async () => {
+    if (!confirmParticipant) return
     try {
-      await sessionService.removeParticipant(sessionId, participant.id)
+      await sessionService.removeParticipant(sessionId, confirmParticipant.id)
       addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
       onRefresh()
+      setRefreshKey(k => k + 1)
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus peserta' })
+    } finally {
+      setConfirmParticipant(null)
     }
   }
 
@@ -228,33 +257,39 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
                   <div className="flex items-center gap-2">
                     <Badge variant={participant.consent_recording ? 'success' : 'danger'}>Recording</Badge>
                     <Badge variant={participant.consent_photo ? 'success' : 'danger'}>Photo</Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Pencil className="w-4 h-4" />}
-                      onClick={() => openEditParticipantModal(participant)}
-                      tooltip="Edit peserta"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Trash2 className="w-4 h-4" />}
-                      onClick={() => handleDeleteParticipant(participant)}
-                      tooltip="Hapus peserta"
-                    />
+                    {canModifyParticipants && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={<Pencil className="w-4 h-4" />}
+                          onClick={() => openEditParticipantModal(participant)}
+                          tooltip="Edit peserta"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={<Trash2 className="w-4 h-4" />}
+                          onClick={() => handleDeleteParticipant(participant)}
+                          tooltip="Hapus peserta"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
 
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<UserPlus className="w-4 h-4" />}
-                onClick={() => openAddParticipantModal(group.id)}
-                className="w-full"
-              >
-                Tambah Peserta
-              </Button>
+              {canModifyParticipants && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<UserPlus className="w-4 h-4" />}
+                  onClick={() => openAddParticipantModal(group.id)}
+                  className="w-full"
+                >
+                  Tambah Peserta
+                </Button>
+              )}
             </div>
           </Card>
         ))
@@ -272,8 +307,11 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       <ParticipantFormModal
         open={participantFormOpen}
         onClose={() => setParticipantFormOpen(false)}
-        onSubmit={participantFormMode === 'create' ? handleAddParticipant : handleEditParticipant}
+        onSubmit={handleEditParticipant}
         mode={participantFormMode}
+        selectOnly={participantFormMode === 'create'}
+        availableParticipants={availableParticipants}
+        onLinkExisting={handleLinkParticipant}
         initialData={
           editingParticipant
             ? {
@@ -289,6 +327,22 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       />
 
       <CsvImportModal open={csvImportOpen} onClose={() => setCsvImportOpen(false)} onImport={handleCsvImport} />
+
+      <ConfirmDialog
+        open={!!confirmGroup}
+        title="Hapus Kelompok"
+        message={`Yakin ingin menghapus kelompok "${confirmGroup?.name || ''}"? Tindakan ini tidak dapat dibatalkan.`}
+        onConfirm={confirmDeleteGroup}
+        onClose={() => setConfirmGroup(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmParticipant}
+        title="Hapus Peserta"
+        message={`Yakin ingin menghapus peserta "${confirmParticipant?.child_name || ''}"? Tindakan ini tidak dapat dibatalkan.`}
+        onConfirm={confirmDeleteParticipant}
+        onClose={() => setConfirmParticipant(null)}
+      />
     </div>
   )
 }

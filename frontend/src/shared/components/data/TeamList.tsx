@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 
 interface TeamMember {
   id: string
@@ -45,7 +46,7 @@ export function TeamList({ members, onViewAll }: TeamListProps) {
         ))}
       </ul>
       <button
-        onClick={() => onViewAll?.() ?? navigate('/admin/users')}
+        onClick={() => onViewAll?.() ?? navigate(ROUTES.ADMIN.USERS)}
         className="w-full mt-5 py-3 rounded-xl bg-surface-container-low text-primary text-sm font-bold transition-all duration-200 hover:bg-primary hover:text-on-primary hover:shadow-md active:scale-[0.98]"
       >
         Lihat Semua

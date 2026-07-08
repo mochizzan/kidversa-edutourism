@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { userService } from '../../core/services/users'
 import { programService } from '../../core/services/programs'
+import { ROUTES } from '../../core/constants/app'
 import { sessionService } from '../../core/services/sessions'
 import { frameService } from '../../core/services/frames'
 
@@ -53,29 +54,29 @@ export function useGlobalSearch(): UseGlobalSearchResult {
       if (usersRes.data.length > 0) {
         groups.push({
           category: 'Users',
-          route: '/admin/users',
-          items: usersRes.data.map((u) => ({ id: u.id, label: u.name, subtitle: `${u.email} · ${u.role}`, route: `/admin/users?highlight=${u.id}` })),
+          route: ROUTES.ADMIN.USERS,
+          items: usersRes.data.map((u) => ({ id: u.id, label: u.name, subtitle: `${u.email} · ${u.role}`, route: `${ROUTES.ADMIN.USERS}?highlight=${u.id}` })),
         })
       }
       if (programsRes.data.length > 0) {
         groups.push({
           category: 'Programs',
-          route: '/admin/programs',
-          items: programsRes.data.map((p) => ({ id: p.id, label: p.name, subtitle: p.description ?? '', route: `/admin/programs?highlight=${p.id}` })),
+          route: ROUTES.ADMIN.PROGRAMS,
+          items: programsRes.data.map((p) => ({ id: p.id, label: p.name, subtitle: p.description ?? '', route: `${ROUTES.ADMIN.PROGRAMS}?highlight=${p.id}` })),
         })
       }
       if (sessionsRes.data.length > 0) {
         groups.push({
           category: 'Sessions',
-          route: '/admin/sessions',
-          items: sessionsRes.data.map((s: { id: string; name: string; location: string; status: string }) => ({ id: s.id, label: s.name, subtitle: `${s.location} · ${s.status}`, route: `/admin/sessions?highlight=${s.id}` })),
+          route: ROUTES.ADMIN.SESSIONS,
+          items: sessionsRes.data.map((s: { id: string; name: string; location: string; status: string }) => ({ id: s.id, label: s.name, subtitle: `${s.location} · ${s.status}`, route: `${ROUTES.ADMIN.SESSIONS}?highlight=${s.id}` })),
         })
       }
       if (framesRes.data.length > 0) {
         groups.push({
           category: 'Frames',
-          route: '/admin/frames',
-          items: framesRes.data.map((f) => ({ id: f.id, label: f.name, subtitle: f.is_active ? 'Aktif' : 'Nonaktif', route: `/admin/frames?highlight=${f.id}` })),
+          route: ROUTES.ADMIN.FRAMES,
+          items: framesRes.data.map((f) => ({ id: f.id, label: f.name, subtitle: f.is_active ? 'Aktif' : 'Nonaktif', route: `${ROUTES.ADMIN.FRAMES}?highlight=${f.id}` })),
         })
       }
       setResults(groups)

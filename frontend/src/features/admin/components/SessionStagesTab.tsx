@@ -1,4 +1,6 @@
 import { Card } from '../../../shared/components/ui/Card'
+import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { Layers } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
 import type { SessionStage, User } from '../../../core/types'
 
@@ -10,10 +12,22 @@ interface SessionStagesTabProps {
 }
 
 export function SessionStagesTab({ stages, facilitators, sessionId, stageMap }: SessionStagesTabProps) {
+  if (!stages || stages.length === 0) {
+    return (
+      <Card>
+        <EmptyState
+          icon={<Layers className="w-12 h-12" />}
+          title="Belum ada stage"
+          description="Stage akan otomatis dibuat dari program saat sesi dibuat."
+        />
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <div className="space-y-3">
-        {stages?.map((stage: SessionStage) => (
+        {stages.map((stage: SessionStage) => (
           <div key={stage.id} className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl">
             <div>
               <p className="font-medium text-on-surface">{stageMap.get(stage.program_stage_id) || stage.program_stage_id}</p>

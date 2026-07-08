@@ -185,6 +185,9 @@ const deleteStage = async (programId: string, stageId: string): Promise<void> =>
   await new Promise((r) => setTimeout(r, 250))
   const existing = await getById<ProgramStage>(STAGES_STORE, stageId)
   if (existing && existing.program_id === programId) {
+    // Cascade delete orphaned stage contents
+    const orphan = await queryByIndex<StageContent>(CONTENTS_STORE, 'program_stage_id', stageId)
+    await Promise.all(orphan.map((c) => deleteById(CONTENTS_STORE, c.id)))
     await deleteById(STAGES_STORE, stageId)
   }
 }

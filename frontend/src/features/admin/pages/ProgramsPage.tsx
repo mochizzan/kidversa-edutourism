@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, FolderOpen } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -84,7 +85,7 @@ const ProgramsPage = () => {
         title="Programs"
         subtitle="Kelola program edutourism dan stage-nya."
         actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate('/admin/programs/new')}>Buat Program</Button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.PROGRAM_NEW)}>Buat Program</Button>
         }
       />
 
@@ -103,7 +104,7 @@ const ProgramsPage = () => {
             icon={<FolderOpen className="w-12 h-12" />}
             title="Belum ada program"
             description="Buat program pertama untuk memulai."
-            action={{ label: 'Buat Program', onClick: () => navigate('/admin/programs/new') }}
+            action={{ label: 'Buat Program', onClick: () => navigate(ROUTES.ADMIN.PROGRAM_NEW) }}
           />
         }
       />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { Save, Loader2, Camera } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Input } from '../../../shared/components/ui/Input'
@@ -54,7 +55,7 @@ const UserFormPage = () => {
           setAvatarPreview(foundUser.avatar_url || null)
         } else {
           addToast({ type: 'error', message: 'User tidak ditemukan' })
-          navigate('/admin/users')
+          navigate(ROUTES.ADMIN.USERS)
         }
         setLoading(false)
       })
@@ -109,7 +110,7 @@ const UserFormPage = () => {
         })
         addToast({ type: 'success', message: 'User baru berhasil ditambahkan' })
       }
-      navigate('/admin/users')
+      navigate(ROUTES.ADMIN.USERS)
     } catch (err) {
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menyimpan user' })
     } finally {
@@ -131,7 +132,7 @@ const UserFormPage = () => {
         title={isEdit ? 'Edit User' : 'Tambah User Baru'}
         subtitle={isEdit ? 'Perbarui detail pengguna' : 'Buat akun pengguna baru'}
         breadcrumbs={[
-          { label: 'Users', href: '/admin/users' },
+          { label: 'Users', href: ROUTES.ADMIN.USERS },
           { label: isEdit ? 'Edit' : 'Tambah' },
         ]}
       />
@@ -206,7 +207,7 @@ const UserFormPage = () => {
         </div>
 
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" type="button" onClick={() => navigate('/admin/users')}>
+          <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.USERS)}>
             Batal
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { useRateLimit } from '../hooks/useRateLimit'
+import { ROUTES } from '../../../core/constants/app'
 import { LoginForm } from '../components/LoginForm'
 import { DemoHint } from '../components/DemoHint'
 
@@ -138,7 +139,7 @@ const LoginPage = () => {
       {/* ── Register link ── */}
       <p className="mt-6 text-center text-sm text-on-surface-variant/50">
         Belum punya akun?{' '}
-        <Link to="/auth/register" className="text-primary font-semibold hover:text-primary-dark transition-colors">
+        <Link to={ROUTES.AUTH.REGISTER} className="text-primary font-semibold hover:text-primary-dark transition-colors">
           Daftar sekarang
         </Link>
       </p>

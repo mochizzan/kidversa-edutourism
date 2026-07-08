@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import { FolderOpen, Calendar, Users, FileText, Play, BarChart3 } from 'lucide-react'
 import { Tabs } from '../../../shared/components/ui/Tabs'
 import { CategoryCard } from '../../../shared/components/ui/CategoryCard'
@@ -162,7 +163,7 @@ const DashboardPage = () => {
             timestamp: new Date().toISOString(),
             icon: Play,
             color: 'text-green-600 bg-green-100',
-            route: '/admin/sessions',
+            route: ROUTES.ADMIN.SESSIONS,
           })
         }
 
@@ -175,7 +176,7 @@ const DashboardPage = () => {
             timestamp: new Date().toISOString(),
             icon: FileText,
             color: 'text-purple-600 bg-purple-100',
-            route: '/admin/reports',
+            route: ROUTES.ADMIN.REPORTS,
           })
         }
 
@@ -266,21 +267,21 @@ const DashboardPage = () => {
                 title={loading ? '...' : `${stats.totalPrograms} Program`}
                 subtitle="Total program"
                 iconBg="bg-primary-container text-primary"
-                onClick={() => navigate('/admin/programs')}
+                onClick={() => navigate(ROUTES.ADMIN.PROGRAMS)}
               />
               <CategoryCard
                 icon={Calendar}
                 title={loading ? '...' : `${stats.activeSessions} Sesi`}
                 subtitle="Sesi aktif"
                 iconBg="bg-secondary-container text-secondary"
-                onClick={() => navigate('/admin/sessions')}
+                onClick={() => navigate(ROUTES.ADMIN.SESSIONS)}
               />
               <CategoryCard
                 icon={Users}
                 title={loading ? '...' : `${stats.totalParticipants} Peserta`}
                 subtitle="Total peserta"
                 iconBg="bg-tertiary-container text-tertiary"
-                onClick={() => navigate('/admin/participants')}
+                onClick={() => navigate(ROUTES.ADMIN.PARTICIPANTS)}
               />
             </div>
 

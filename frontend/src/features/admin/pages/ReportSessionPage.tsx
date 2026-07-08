@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
 import {
   FileText,
   Send,
@@ -187,7 +188,7 @@ const ReportSessionPage = () => {
         <PageHeader
           title="Memuat..."
           breadcrumbs={[
-            { label: 'Laporan', href: '/admin/reports' },
+            { label: 'Laporan', href: ROUTES.ADMIN.REPORTS },
             { label: 'Detail' },
           ]}
         />
@@ -209,12 +210,12 @@ const ReportSessionPage = () => {
         <PageHeader
           title="Error"
           breadcrumbs={[
-            { label: 'Laporan', href: '/admin/reports' },
+            { label: 'Laporan', href: ROUTES.ADMIN.REPORTS },
             { label: 'Detail' },
           ]}
         />
         <div className="flex gap-2 justify-center">
-          <Button variant="secondary" onClick={() => navigate('/admin/reports')}>
+          <Button variant="secondary" onClick={() => navigate(ROUTES.ADMIN.REPORTS)}>
             Kembali
           </Button>
         </div>
@@ -230,11 +231,11 @@ const ReportSessionPage = () => {
         title={session.name}
         subtitle={`${formatDate(session.session_date)} — ${session.location}`}
         breadcrumbs={[
-          { label: 'Laporan', href: '/admin/reports' },
+          { label: 'Laporan', href: ROUTES.ADMIN.REPORTS },
           { label: session.name },
         ]}
         actions={
-          <Button variant="ghost" size="sm" onClick={() => navigate('/admin/reports')}>
+          <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.ADMIN.REPORTS)}>
             <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
           </Button>
         }
