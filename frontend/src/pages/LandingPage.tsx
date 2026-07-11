@@ -60,7 +60,7 @@ const LandingPage = () => {
 
         {/* Footer */}
         <div className="mt-16 text-primary-300 text-sm">
-          <p>© 2025 Kidversa Edutourism. Built with ❤️</p>
+          <p>© 2026 Kidversa Edutourism</p>
         </div>
       </div>
     </div>

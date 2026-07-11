@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   Radio,
   Calendar,
@@ -33,11 +34,15 @@ const LiveMonitorPage = () => {
   const { user } = useAuth()
   const isKoordinator = user?.role === UserRole.KOORDINATOR || user?.role === UserRole.ADMIN
 
+  const { sessionId: urlSessionId } = useParams<{ sessionId: string }>()
+  const navigate = useNavigate()
+
   const [activeSession, setActiveSession] = useState<Session | null>(null)
   const [groups, setGroups] = useState<LiveGroupWithProgress[]>([])
   const [timeline, setTimeline] = useState<TimelineEventRow[]>([])
   const [stages, setStages] = useState<SessionStage[]>([])
   const [programStages, setProgramStages] = useState<ProgramStage[]>([])
+  const [allActiveSessions, setAllActiveSessions] = useState<Session[]>([])
   const [stageNames, setStageNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -56,9 +61,18 @@ const LiveMonitorPage = () => {
       const activeSessions = result.data.filter(
         (s: Session) => s.status === SessionStatus.ACTIVE
       )
+      setAllActiveSessions(activeSessions)
 
-      if (activeSessions.length > 0) {
-        const session = activeSessions[0]
+      let session: Session | null = null
+      if (urlSessionId) {
+        session = activeSessions.find((s) => s.id === urlSessionId) || null
+      }
+      if (!session && activeSessions.length > 0) {
+        session = activeSessions[0]
+        if (session) navigate(`/admin/live/${session.id}`, { replace: true })
+      }
+
+      if (session) {
         setActiveSession(session)
 
         const [groupsData, timelineData, sessionStages, programStagesData] = await Promise.all([
@@ -92,11 +106,11 @@ const LiveMonitorPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [urlSessionId])
 
   useEffect(() => {
     fetchData()
-  }, [fetchData])
+  }, [fetchData, urlSessionId])
 
   // Polling every 5 seconds
   useEffect(() => {
@@ -119,7 +133,7 @@ const LiveMonitorPage = () => {
   // Simulation
   useEffect(() => {
     if (simulationOn && activeSession) {
-      simulationRef.current = window.setInterval(async () => {
+      const runTick = async () => {
         try {
           await liveService.simulateProgress(activeSession.id)
           const [groupsData, timelineData] = await Promise.all([
@@ -131,7 +145,9 @@ const LiveMonitorPage = () => {
         } catch {
           // silent
         }
-      }, 12000)
+      }
+      runTick()
+      simulationRef.current = window.setInterval(runTick, 12000)
     } else {
       if (simulationRef.current) {
         clearInterval(simulationRef.current)
@@ -142,6 +158,10 @@ const LiveMonitorPage = () => {
       if (simulationRef.current) clearInterval(simulationRef.current)
     }
   }, [simulationOn, activeSession])
+
+  const handleSessionChange = (newId: string) => {
+    navigate(`/admin/live/${newId}`)
+  }
 
   const handleConfirm = async (groupId: string, action: 'skip' | 'jump' | 'reset', reason: string, targetStageId?: string) => {
     if (!activeSession || !user) return
@@ -174,43 +194,87 @@ const LiveMonitorPage = () => {
   const handleUnlock = async (groupId: string, sessionStageId: string) => {
     if (!user || !activeSession) return
     await liveService.unlockStage(groupId, sessionStageId, user.id)
+    const group = groups.find((g) => g.group.id === groupId)
+    const ss = stages.find((s) => s.id === sessionStageId)
+    const ps = programStages.find((p) => p.id === ss?.program_stage_id)
     await liveService.addTimelineEvent(
       activeSession.id,
       groupId,
       'stage:unlock',
-      'Koordinator konfirmasi pindah stage',
+      `${group?.group.name || 'Kelompok'} di-unlock ke "${ps?.name || 'Stage'}"`,
       user.id
     )
     await fetchData()
   }
 
   const handleComplete = async (groupId: string, sessionStageId: string) => {
-    if (!activeSession) return
+    if (!activeSession || !user) return
     await liveService.completeStage(groupId, sessionStageId)
+    const group = groups.find((g) => g.group.id === groupId)
+    const ss = stages.find((s) => s.id === sessionStageId)
+    const ps = programStages.find((p) => p.id === ss?.program_stage_id)
+    await liveService.addTimelineEvent(
+      activeSession.id,
+      groupId,
+      'group:completed',
+      `${group?.group.name || 'Kelompok'} menyelesaikan "${ps?.name || 'Stage'}"`,
+      user.id
+    )
     await fetchData()
   }
 
   const getGroupStatus = (g: LiveGroupWithProgress) => {
+    if (g.progress.length === 0) {
+      return { status: 'LOCKED' as const, stageId: undefined }
+    }
+
     const active = g.progress.find(
       (p) => p.status === GroupStageProgressStatus.IN_PROGRESS
     )
-    if (active) return { status: 'IN_PROGRESS', stageId: active.session_stage_id }
+    if (active) return { status: 'IN_PROGRESS' as const, stageId: active.session_stage_id }
+
     const unlocked = g.progress.find(
       (p) => p.status === GroupStageProgressStatus.UNLOCKED
     )
-    if (unlocked) return { status: 'UNLOCKED', stageId: unlocked.session_stage_id }
-    const completed = g.progress.every(
+    if (unlocked) return { status: 'UNLOCKED' as const, stageId: unlocked.session_stage_id }
+
+    const allDone = g.progress.every(
       (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED
     )
-    if (completed) return { status: 'COMPLETED', stageId: undefined }
-    return { status: 'LOCKED', stageId: undefined }
+    if (allDone) return { status: 'COMPLETED' as const, stageId: undefined }
+
+    const hasDone = g.progress.some(
+      (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED
+    )
+    if (hasDone) return { status: 'COMPLETED' as const, stageId: undefined }
+
+    return { status: 'LOCKED' as const, stageId: undefined }
   }
 
   const getActiveStageIndex = (g: LiveGroupWithProgress) => {
-    const idx = g.progress.findIndex(
+    const activeProgress = g.progress.find(
       (p) => p.status === GroupStageProgressStatus.IN_PROGRESS || p.status === GroupStageProgressStatus.UNLOCKED
     )
-    return idx >= 0 ? idx : g.progress.length
+    if (!activeProgress) return { current: 0, total: programStages.length }
+
+    const ss = stages.find((s) => s.id === activeProgress.session_stage_id)
+    const ps = programStages.find((p) => p.id === ss?.program_stage_id)
+
+    return {
+      current: ps?.sequence_order ?? 0,
+      total: programStages.length,
+    }
+  }
+
+  const getNextLockedStageId = (g: LiveGroupWithProgress): string | undefined => {
+    const sorted = [...g.progress].sort((a, b) => {
+      const sa = stages.find((s) => s.id === a.session_stage_id)
+      const sb = stages.find((s) => s.id === b.session_stage_id)
+      const pa = programStages.find((p) => p.id === sa?.program_stage_id)
+      const pb = programStages.find((p) => p.id === sb?.program_stage_id)
+      return (pa?.sequence_order ?? 0) - (pb?.sequence_order ?? 0)
+    })
+    return sorted.find((p) => p.status === GroupStageProgressStatus.LOCKED)?.session_stage_id
   }
 
   // ── Loading ──
@@ -253,9 +317,11 @@ const LiveMonitorPage = () => {
     )
   }
 
-  // Ensure `allCompleted` is defined
+  // `allCompleted` = semua stage COMPLETED/SKIPPED (cek record langsung, bukan derived status)
   const allCompleted = groups.length > 0 && groups.every(
-    (g) => getGroupStatus(g).status === 'COMPLETED'
+    (g) => g.progress.length > 0 && g.progress.every(
+      (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED
+    )
   )
 
   return (
@@ -276,15 +342,34 @@ const LiveMonitorPage = () => {
               <Clock className="w-4 h-4" />
               {activeSession.location}
             </span>
-            <Badge variant="success">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                Live
-              </span>
-            </Badge>
+            {groups.some((g) => {
+              const { status } = getGroupStatus(g)
+              return status === 'IN_PROGRESS' || status === 'UNLOCKED'
+            }) && (
+              <Badge variant="success">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  Live
+                </span>
+              </Badge>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {allActiveSessions.length > 1 && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-on-surface-variant font-medium">Sesi:</label>
+              <select
+                value={activeSession?.id || ''}
+                onChange={(e) => handleSessionChange(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border text-sm bg-surface-container-low border-outline-variant/60 text-on-surface"
+              >
+                {allActiveSessions.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} — {s.session_date}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <Button
             variant="secondary"
             size="sm"
@@ -330,12 +415,38 @@ const LiveMonitorPage = () => {
         </div>
       )}
 
+      {/* Stats summary */}
+      {groups.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Total', value: groups.length, icon: Users, color: 'text-on-surface' },
+            { label: 'Selesai', value: groups.filter((g) => g.progress.length > 0 && g.progress.every((p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED)).length, icon: CheckCircle2, color: 'text-green-600' },
+            { label: 'Berlangsung', value: groups.filter((g) => { const s = getGroupStatus(g).status; return s === 'IN_PROGRESS' || s === 'UNLOCKED' }).length, icon: Play, color: 'text-amber-600' },
+            { label: 'Menunggu', value: groups.filter((g) => getGroupStatus(g).status === 'LOCKED').length, icon: Monitor, color: 'text-gray-500' },
+          ].map((stat) => (
+            <div key={stat.label} className="bg-surface rounded-xl p-4 border border-outline-variant/40">
+              <div className="flex items-center gap-2 text-on-surface-variant text-sm mb-1">
+                <stat.icon className="w-4 h-4" />
+                <span>{stat.label}</span>
+              </div>
+              <p className={cn('text-2xl font-bold', stat.color)}>{stat.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Groups grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {groups.map((g) => {
+        {(() => {
+          const sortedGroups = [...groups].sort((a, b) => {
+            const order = { IN_PROGRESS: 0, UNLOCKED: 1, COMPLETED: 2, LOCKED: 3 }
+            const sa = getGroupStatus(a).status
+            const sb = getGroupStatus(b).status
+            return (order[sa] ?? 4) - (order[sb] ?? 4)
+          })
+          return sortedGroups.map((g) => {
           const { status, stageId } = getGroupStatus(g)
-          const currentIdx = getActiveStageIndex(g)
-          const totalStages = g.progress.length
+          const activeIdx = getActiveStageIndex(g)
           const statusConfig = {
             IN_PROGRESS: { label: '🟡 SEDANG', variant: 'warning' as const },
             UNLOCKED: { label: '🟢 SIAP', variant: 'primary' as const },
@@ -380,7 +491,7 @@ const LiveMonitorPage = () => {
                   🎯 {stageNames[stageId || ''] || '-'}
                 </span>
                 <span className="text-on-surface-variant font-medium">
-                  Stage {currentIdx + 1}/{totalStages}
+                  Stage {activeIdx.current}/{activeIdx.total}
                 </span>
               </div>
 
@@ -402,15 +513,18 @@ const LiveMonitorPage = () => {
                     Selesai
                   </Button>
                 )}
-                {status === 'COMPLETED' && !allCompleted && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => handleUnlock(g.group.id, stageId!)}
-                  >
-                    Konfirmasi Pindah
-                  </Button>
-                )}
+                {status === 'COMPLETED' && !allCompleted && (() => {
+                  const nextLockedId = getNextLockedStageId(g)
+                  return nextLockedId ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleUnlock(g.group.id, nextLockedId)}
+                    >
+                      Konfirmasi Pindah
+                    </Button>
+                  ) : null
+                })()}
                 {isKoordinator && (
                   <div className="flex items-center gap-1">
                     <Button
@@ -460,7 +574,8 @@ const LiveMonitorPage = () => {
               })()}
             </div>
           )
-        })}
+          })
+        })()}
       </div>
 
       {/* Timeline */}

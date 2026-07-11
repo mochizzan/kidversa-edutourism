@@ -1,3 +1,3 @@
-import { mockParticipantService } from './mock/participants'
+import { idbParticipantService } from './idb/participants'
 
-export const participantService = mockParticipantService
+export const participantService = idbParticipantService

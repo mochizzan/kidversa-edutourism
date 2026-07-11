@@ -14,7 +14,7 @@ const StoriesPage = () => {
       category: 'Sejarah',
       ageGroup: '6-8 tahun',
       status: 'Published',
-      createdAt: '2025-01-15',
+      createdAt: '2026-01-15',
     },
     {
       id: '2',
@@ -22,7 +22,7 @@ const StoriesPage = () => {
       category: 'Lingkungan',
       ageGroup: '9-12 tahun',
       status: 'Draft',
-      createdAt: '2025-01-14',
+      createdAt: '2026-01-14',
     },
     {
       id: '3',
@@ -30,7 +30,7 @@ const StoriesPage = () => {
       category: 'Budaya',
       ageGroup: '6-8 tahun',
       status: 'Published',
-      createdAt: '2025-01-13',
+      createdAt: '2026-01-13',
     },
   ]
 

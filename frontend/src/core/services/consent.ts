@@ -1,2 +1,2 @@
-import { mockConsentService } from './mock/consent'
-export const consentService = mockConsentService
+import { idbConsentService } from './idb/consent'
+export const consentService = idbConsentService

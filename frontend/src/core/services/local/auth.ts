@@ -2,7 +2,7 @@ import type { AuthService } from '../types'
 import type { LoginDTO, LoginResponse, User, CreateUserDTO } from '../../types'
 import { ApprovalStatus } from '../../types'
 import { getAll, put, getById } from '../storage/idb'
-import { BOOTSTRAP_USERS, runBootstrap, isBootstrapped } from './bootstrap'
+import { BOOTSTRAP_USERS, runBootstrap } from './bootstrap'
 import { dispatchUsersChanged } from '../../constants/app'
 
 const TOKEN_KEY = 'kidversa_access_token'
@@ -319,4 +319,4 @@ export async function deactivateUser(userId: string): Promise<User> {
   return { ...userWithoutPassword, password_hash: '' }
 }
 
-export { isBootstrapped, runBootstrap }
+export { runBootstrap }

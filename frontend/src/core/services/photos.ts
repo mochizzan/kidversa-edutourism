@@ -1,2 +1,2 @@
-import { mockPhotoService } from './mock/photos'
-export const photoService = mockPhotoService
+import { idbPhotoService } from './idb/photos'
+export const photoService = idbPhotoService

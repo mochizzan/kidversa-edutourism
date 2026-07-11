@@ -1,4 +1,4 @@
 import type { ProgramService } from './types'
-import { mockProgramService } from './mock/programs'
+import { idbProgramService } from './idb/programs'
 
-export const programService: ProgramService = mockProgramService
+export const programService: ProgramService = idbProgramService

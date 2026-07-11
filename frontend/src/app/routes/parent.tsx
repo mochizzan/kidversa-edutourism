@@ -10,12 +10,16 @@ const ParentMissionsPage = lazy(() => import('../../features/parent/pages/Missio
 export const parentRoutes: RouteObject[] = [
   {
     path: '/parent',
-    element: <ParentLayout />,
     children: [
       { index: true, element: <Navigate to="/parent/report" replace /> },
-      lazyRoute('consent', ParentConsentFormPage),
       lazyRoute('report', ParentReportPage),
-      lazyRoute('missions', ParentMissionsPage),
+      {
+        element: <ParentLayout />,
+        children: [
+          lazyRoute('consent', ParentConsentFormPage),
+          lazyRoute('missions', ParentMissionsPage),
+        ],
+      },
     ],
   },
 ]

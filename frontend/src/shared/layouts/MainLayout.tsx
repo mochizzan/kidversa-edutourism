@@ -39,7 +39,7 @@ const MainLayout = () => {
       {/* Footer */}
       <footer className="container mx-auto px-4 py-8 mt-16">
         <div className="text-center text-primary-300 text-sm">
-          <p>© 2025 Kidversa Edutourism. Built with ❤️</p>
+          <p>© 2026 Kidversa Edutourism</p>
         </div>
       </footer>
     </div>

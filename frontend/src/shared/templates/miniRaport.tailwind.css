@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@source "../templates/miniRaport.ts";
+
+@theme {
+  --font-sans: 'Nunito', sans-serif;
+  --font-signature: 'Caveat', cursive;
+  --color-brand-purple: #4c2e81;
+  --color-brand-badge: #5c3898;
+  --color-brand-lightPurple: #f6f2fb;
+  --color-brand-green: #80bd35;
+  --color-brand-darkGreen: #689c27;
+  --color-brand-lightGreen: #f0f7ec;
+  --color-brand-blue: #ebf6fa;
+  --color-brand-yellow: #fffde8;
+  --color-brand-star: #ffc107;
+  --color-brand-text: #334155;
+}

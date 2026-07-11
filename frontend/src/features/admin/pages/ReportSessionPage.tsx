@@ -26,21 +26,7 @@ import { assessmentService } from '../../../core/services/assessments'
 import type { Session, Report, Participant, Assessment } from '../../../core/types'
 import { ReportStatus } from '../../../core/types/enums'
 import { formatDate } from '../../../core/utils'
-
-/* ── Status helpers ── */
-const statusBadge: Record<string, 'neutral' | 'warning' | 'success' | 'primary'> = {
-  [ReportStatus.DRAFT]: 'neutral',
-  [ReportStatus.PENDING_REVIEW]: 'warning',
-  [ReportStatus.APPROVED]: 'success',
-  [ReportStatus.SENT]: 'primary',
-}
-
-const statusLabel: Record<string, string> = {
-  [ReportStatus.DRAFT]: 'Draft',
-  [ReportStatus.PENDING_REVIEW]: 'Review',
-  [ReportStatus.APPROVED]: 'Disetujui',
-  [ReportStatus.SENT]: 'Terkirim',
-}
+import { reportStatusBadge, reportStatusLabel } from '../../../core/constants/reportStatus'
 
 /* ── Extended report with participant data ── */
 interface ReportItem {
@@ -344,8 +330,8 @@ const ReportSessionPage = () => {
                     <p className="font-medium text-on-surface truncate">
                       {item.participant.child_name}
                     </p>
-                    <Badge variant={statusBadge[item.report.status]} size="sm">
-                      {statusLabel[item.report.status]}
+                    <Badge variant={reportStatusBadge[item.report.status]} size="sm">
+                      {reportStatusLabel[item.report.status]}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-3 text-sm text-on-surface-variant mt-0.5">

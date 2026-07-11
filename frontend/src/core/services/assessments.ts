@@ -1,2 +1,2 @@
-import { mockAssessmentService } from './mock/assessments'
-export const assessmentService = mockAssessmentService
+import { idbAssessmentService } from './idb/assessments'
+export const assessmentService = idbAssessmentService

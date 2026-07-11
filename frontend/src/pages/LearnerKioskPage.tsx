@@ -26,8 +26,14 @@ const LearnerKioskPage = () => {
 
     const loadData = async () => {
       try {
-        const stages = await sessionService.getStages(sessionId)
-        const foundStage = stages.find((s) => s.id === stageId)
+        const session = await sessionService.getById(sessionId)
+        if (!session) {
+          setError('Sesi tidak ditemukan')
+          setLoading(false)
+          return
+        }
+
+        const foundStage = session.stages.find((s) => s.id === stageId)
         
         if (!foundStage) {
           setError('Stage tidak ditemukan')
@@ -37,7 +43,7 @@ const LearnerKioskPage = () => {
 
         setStage(foundStage)
 
-        const programStages = await programService.getStages(foundStage.program_stage_id.split('-')[0] || '')
+        const programStages = await programService.getStages(session.program_id)
         const programStage = programStages.find((ps) => ps.id === foundStage.program_stage_id)
         
         if (programStage) {

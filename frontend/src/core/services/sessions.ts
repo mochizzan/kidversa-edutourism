@@ -1,2 +1,2 @@
-import { mockSessionService } from './mock/sessions'
-export const sessionService = mockSessionService
+import { idbSessionService } from './idb/sessions'
+export const sessionService = idbSessionService

@@ -1,2 +1,2 @@
-import { mockFrameService } from './mock/frames'
-export const frameService = mockFrameService
+import { idbFrameService } from './idb/frames'
+export const frameService = idbFrameService

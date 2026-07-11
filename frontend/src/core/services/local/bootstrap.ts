@@ -1,4 +1,4 @@
-import { getAll, put, getById, clearStore } from '../storage/idb'
+import { getAll, put } from '../storage/idb'
 import type { User, Tenant } from '../../types'
 import { UserRole, ApprovalStatus } from '../../types'
 
@@ -46,11 +46,6 @@ export const BOOTSTRAP_USERS: User[] = [
 ]
 
 const BOOTSTRAP_FLAG = 'kidversa_idb_bootstrapped_v2'
-const ACTIVE_TENANT_KEY = 'kidversa_active_tenant_id'
-
-export async function isBootstrapped(): Promise<boolean> {
-  return localStorage.getItem(BOOTSTRAP_FLAG) === 'true'
-}
 
 export async function markBootstrapped(): Promise<void> {
   localStorage.setItem(BOOTSTRAP_FLAG, 'true')
@@ -76,50 +71,4 @@ export async function runBootstrap(): Promise<void> {
   }
 
   await markBootstrapped()
-}
-
-const BUSINESS_STORES: string[] = [
-  'programs', 'program_stages', 'stage_contents', 'photo_frames',
-  'mission_banks', 'sessions', 'session_stages', 'session_groups',
-  'group_stage_progress', 'participants', 'assessments', 'smart_photos',
-  'recordings', 'reports', 'participant_missions', 'consent_logs',
-  'timeline_events', 'sync_queue', 'media_blobs',
-]
-
-export async function resetLocalDatabase(): Promise<void> {
-  for (const store of BUSINESS_STORES) {
-    await clearStore(store as Parameters<typeof clearStore>[0])
-  }
-
-  await clearStore('users')
-  await clearStore('tenants')
-
-  for (const tenant of BOOTSTRAP_TENANTS) {
-    await put('tenants', tenant)
-  }
-  for (const user of BOOTSTRAP_USERS) {
-    await put('users', user)
-  }
-
-  localStorage.removeItem(ACTIVE_TENANT_KEY)
-  localStorage.removeItem(BOOTSTRAP_FLAG)
-  await markBootstrapped()
-}
-
-export async function verifyBootstrapCredentials(
-  email: string,
-  password: string
-): Promise<User | null> {
-  const user = BOOTSTRAP_USERS.find(
-    u => u.email.toLowerCase() === email.toLowerCase() && u.password_hash === password
-  )
-  return user || null
-}
-
-export async function getTenantById(id: string): Promise<Tenant | null> {
-  return getById<Tenant>('tenants', id)
-}
-
-export async function getAllTenants(): Promise<Tenant[]> {
-  return getAll<Tenant>('tenants')
 }

@@ -106,7 +106,7 @@ const RecordingPage = () => {
   /* ── Browser Support Check ── */
   const isBrowserSupported = typeof MediaRecorder !== 'undefined'
 
-  /* ── Storage Quota Warning (mock) ── */
+  /* ── Storage Quota Warning ── */
   const [storageWarning, setStorageWarning] = useState(false)
   useEffect(() => {
     try {

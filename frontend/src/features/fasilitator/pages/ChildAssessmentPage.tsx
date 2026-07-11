@@ -4,6 +4,7 @@ import { Star, Camera, Video, Save, ShieldCheck, ShieldX } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { ROUTES } from '../../../core/constants/app'
 import { sessionService } from '../../../core/services/sessions'
+import { liveService } from '../../../core/services/live'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { cn } from '../../../core/utils'
@@ -19,47 +20,57 @@ interface ChildDetail {
   sessionStage: SessionStage | undefined
 }
 
-function findChildInSessions(
+async function findChildInSessions(
   childId: string,
 ): Promise<ChildDetail | null> {
-  // Recursively search sessions for this child
-  return new Promise(async (resolve) => {
-    const res = await sessionService.getAll({ limit: 100 })
-    for (const session of res.data) {
-      const detail = await sessionService.getById(session.id)
-      if (!detail) continue
+  const res = await sessionService.getAll({ limit: 100 })
+  for (const session of res.data) {
+    const detail = await sessionService.getById(session.id)
+    if (!detail) continue
 
-      const participant = detail.groups
-        .flatMap((g) => g.participants)
-        .find((p) => p.id === childId)
+    const participant = detail.groups
+      .flatMap((g) => g.participants)
+      .find((p) => p.id === childId)
+    if (!participant) continue
 
-      if (participant) {
-        // Find the group and its current stage
-        const group = detail.groups.find((g) =>
-          g.participants.some((p) => p.id === childId),
+    // Find the group and its current stage
+    const group = detail.groups.find((g) =>
+      g.participants.some((p) => p.id === childId),
+    )
+    if (!group) continue
+
+    let currentStage = detail.stages.find(
+      (s) => s.id === group.current_stage_id,
+    )
+
+    if (!currentStage && detail.stages.length > 0) {
+      const allProgress = await liveService.getProgress(detail.id)
+      const groupProg = allProgress
+        .filter((p) => p.group_id === group.id)
+        .filter((p) => p.status === 'COMPLETED' || p.status === 'IN_PROGRESS')
+        .sort(
+          (a, b) =>
+            new Date(b.completed_at ?? b.entered_at ?? '').getTime() -
+            new Date(a.completed_at ?? a.entered_at ?? '').getTime(),
         )
-        if (!group) continue
-
-        const currentStage = detail.stages.find(
-          (s) => s.id === group.current_stage_id,
-        )
-
-        // Get program stage details
-        const programStages = await programService.getStages(detail.program_id)
-        const programStage = currentStage
-          ? programStages.find((ps) => ps.id === currentStage.program_stage_id)
-          : undefined
-
-        resolve({
-          participant,
-          programStage,
-          sessionStage: currentStage,
-        })
-        return
+      if (groupProg.length > 0) {
+        currentStage = detail.stages.find((s) => s.id === groupProg[0].session_stage_id)
       }
     }
-    resolve(null)
-  })
+
+    // Get program stage details
+    const programStages = await programService.getStages(detail.program_id)
+    const programStage = currentStage
+      ? programStages.find((ps) => ps.id === currentStage.program_stage_id)
+      : undefined
+
+    return {
+      participant,
+      programStage,
+      sessionStage: currentStage,
+    }
+  }
+  return null
 }
 
 function StarRatingInput({
@@ -155,7 +166,20 @@ const ChildAssessmentPage = () => {
   }, [fetchData])
 
   const handleSave = async () => {
-    if (!childDetail?.sessionStage || !childId || !user) return
+    if (!childDetail?.sessionStage) {
+      addToast({
+        type: 'error',
+        message: 'Kelompok belum memiliki stage aktif. Buka kelompok dari dashboard fasilitator, lalu mulai sesi agar stage terkunci dan dapat dinilai.',
+      })
+      return
+    }
+    if (!childId || !user) {
+      addToast({
+        type: 'error',
+        message: 'Sesi tidak valid, silakan login ulang',
+      })
+      return
+    }
     if (starRating === 0) return
 
     setSaving(true)

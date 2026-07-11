@@ -1,17 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  Star,
-  Camera,
-  FileText,
-  Printer,
-  Target,
-  Sparkles,
-} from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { FileText, Printer, Camera } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
-import { Badge } from '../../../shared/components/ui/Badge'
-import { Card } from '../../../shared/components/ui/Card'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { Loader2 } from 'lucide-react'
 import {
   ParentTokenGuard,
   useParentToken,
@@ -20,92 +11,189 @@ import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { photoService } from '../../../core/services/photos'
 import { programService } from '../../../core/services/programs'
-import type { Assessment, SmartPhoto, Session } from '../../../core/types'
-import { ReportStatus } from '../../../core/types/enums'
-import { formatDate, cn } from '../../../core/utils'
-
-/* ── Status helpers ── */
-const statusBadge: Record<string, 'neutral' | 'warning' | 'success' | 'primary'> = {
-  [ReportStatus.DRAFT]: 'neutral',
-  [ReportStatus.PENDING_REVIEW]: 'warning',
-  [ReportStatus.APPROVED]: 'success',
-  [ReportStatus.SENT]: 'primary',
-}
-
-const statusLabel: Record<string, string> = {
-  [ReportStatus.DRAFT]: 'Draft',
-  [ReportStatus.PENDING_REVIEW]: 'Review',
-  [ReportStatus.APPROVED]: 'Disetujui',
-  [ReportStatus.SENT]: 'Terkirim',
-}
+import { missionService } from '../../../core/services/missions'
+import { userService } from '../../../core/services/users'
+import type { ProgramStage, MissionBank } from '../../../core/types'
+import { formatDate } from '../../../core/utils'
+import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
+import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
+import { DEFAULT_FACILITATOR_MESSAGE, DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
 
 /* ── Inner report component ── */
 function ReportView() {
   const { report, participant, loading: guardLoading, error: guardError } = useParentToken()
 
-  const [session, setSession] = useState<Session | null>(null)
-  const [assessments, setAssessments] = useState<Assessment[]>([])
-  const [photo, setPhoto] = useState<SmartPhoto | null>(null)
-  const [stageNames, setStageNames] = useState<Record<string, string>>({})
+  const [raportHtml, setRaportHtml] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [showPrintToast, setShowPrintToast] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth)
+  const [iframeHeight, setIframeHeight] = useState(0)
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const scaleFactor = Math.min(1, windowWidth / A4_SHEET_WIDTH)
+  const scaledHeight = iframeHeight * scaleFactor
 
   useEffect(() => {
     if (!report || !participant) return
 
     const loadDetails = async () => {
       try {
-        const [sess, sessAssessments, sessPhotos, sessStages] = await Promise.all([
-          sessionService.getById(report.session_id),
-          assessmentService.getBySession(report.session_id),
-          photoService.getBySession(report.session_id),
-          sessionService.getStages(report.session_id),
-        ])
+        const sess = await sessionService.getById(report.session_id)
+        if (!sess) {
+          setError('Sesi tidak ditemukan.')
+          setLoading(false)
+          return
+        }
 
-        if (sess) setSession(sess)
+        const [sessAssessments, sessPhotos, sessStages, programStages, missionResult] =
+          await Promise.all([
+            assessmentService.getBySession(report.session_id),
+            photoService.getBySession(report.session_id),
+            sessionService.getStages(report.session_id),
+            programService.getStages(sess.program_id),
+            missionService.getAll({ limit: 50 }),
+          ])
 
         const partAssessments = sessAssessments.filter(
           (a) => a.participant_id === participant.id
         )
-        setAssessments(partAssessments)
 
-        if (sess) {
-          const programStages = await programService.getStages(sess.program_id)
-          const stageNamesMap: Record<string, string> = {}
-          sessStages.forEach((ss) => {
-            const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
-            if (pgStage) {
-              stageNamesMap[ss.id] = pgStage.name
-            }
-          })
-          setStageNames(stageNamesMap)
-        }
+        const builtStageInfos: { programStage: ProgramStage; starRating: number }[] =
+          sessStages
+            .map((ss) => {
+              const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
+              if (!pgStage) return null
+              const assessment = partAssessments.find((a) => a.session_stage_id === ss.id)
+              return {
+                programStage: pgStage,
+                starRating: assessment?.star_rating ?? 0,
+              }
+            })
+            .filter((s): s is NonNullable<typeof s> => s !== null)
 
         const reportPhoto =
           sessPhotos.find(
             (p) => p.participant_id === participant.id && p.is_report_photo
           ) || sessPhotos.find((p) => p.participant_id === participant.id) || null
-        setPhoto(reportPhoto)
-      } catch {
+
+        const programMissions: MissionBank[] = missionResult.data.filter(
+          (m) => m.program_id === sess.program_id
+        )
+        const selected = programMissions
+          .filter((m) => (report.mission_ids_json || []).includes(m.id))
+          .map((m) => m.title_child)
+
+        let facName = DEFAULT_FACILITATOR_NAME
+        let facPhoto: string | undefined = undefined
+        if (sess.created_by) {
+          const facilitator = await userService.getById(sess.created_by)
+          if (facilitator) {
+            facName = facilitator.name || DEFAULT_FACILITATOR_NAME
+            facPhoto = facilitator.avatar_url
+          }
+        }
+
+        const narrative = report.ai_narrative_final || report.ai_narrative_draft || ''
+        const quote = narrative
+          ? (narrative.match(/^[^.!?\n]+[.!?]/)?.[0]?.trim() ||
+            narrative.split('\n')[0].trim().slice(0, 120))
+          : undefined
+
+        const html = generateMiniRaportHTML({
+          childName: participant.child_name,
+          childAge: participant.child_age,
+          sessionDate: formatDate(sess.session_date),
+          photoUrl: reportPhoto?.framed_file_url || reportPhoto?.original_file_url,
+          quote,
+          stages: builtStageInfos.map((si, i) => ({
+            name: si.programStage.name,
+            sequenceOrder: i + 1,
+            starRating: si.starRating,
+          })),
+          narrative,
+          facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
+          missions: selected,
+          facilitatorName: facName,
+          facilitatorPhotoUrl: facPhoto,
+        })
+        setRaportHtml(html)
+        setLoading(false)
+      } catch (err) {
+        console.error('Failed to load parent report:', err)
         setError('Gagal memuat detail laporan.')
+        setLoading(false)
       }
     }
 
     loadDetails()
   }, [report, participant])
 
-  const handlePrint = () => {
-    window.print()
-    setShowPrintToast(true)
-    setTimeout(() => setShowPrintToast(false), 2000)
+  /* ── Cetak: print the existing rendered iframe directly ── */
+  const handleCetak = () => {
+    iframeRef.current?.contentWindow?.print()
+  }
+
+  /* ── Unduh PDF: render a hidden iframe from the report HTML and capture it ── */
+  const handleDownloadPdf = async () => {
+    if (!raportHtml || !participant) return
+    setActionLoading('pdf')
+    try {
+      await captureRaportAsPdf(raportHtml, `raport-${participant.child_name}.pdf`)
+    } catch (err) {
+      console.error('Failed to generate PDF:', err)
+      setDownloadError('Gagal menghasilkan file PDF.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  /* ── PNG download: render a hidden iframe from the report HTML and capture it ── */
+  const handleDownloadPng = async () => {
+    if (!raportHtml || !participant) return
+    setActionLoading('png')
+    try {
+      const blob = await captureRaportAsBlob(raportHtml)
+      downloadBlob(blob, `raport-${participant.child_name}.png`)
+    } catch (err) {
+      console.error('Failed to generate PNG:', err)
+      setDownloadError('Gagal menghasilkan gambar raport.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  /* ── Auto-clear download error ── */
+  useEffect(() => {
+    if (!downloadError) return
+    const timer = setTimeout(() => setDownloadError(null), 3000)
+    return () => clearTimeout(timer)
+  }, [downloadError])
+
+  /* ── iframe auto-height ── */
+  const handleIframeLoad = () => {
+    const iframe = iframeRef.current
+    if (!iframe?.contentDocument) return
+    const height = iframe.contentDocument.body.scrollHeight
+    iframe.style.height = `${height}px`
+    setIframeHeight(height)
   }
 
   /* ── Guard loading ── */
-  if (guardLoading) {
+  if (guardLoading || loading) {
     return (
-      <div className="flex items-center justify-center py-16">
+      <div className="flex items-center justify-center min-h-screen bg-gray-200">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mx-auto" />
+          <Loader2 className="h-10 w-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="mt-4 text-sm text-on-surface-variant">Memuat laporan...</p>
         </div>
       </div>
@@ -113,9 +201,9 @@ function ReportView() {
   }
 
   /* ── Error ── */
-  if (guardError || error || !report || !participant) {
+  if (guardError || error || !report || !participant || !raportHtml) {
     return (
-      <div className="py-8">
+      <div className="min-h-screen bg-gray-200 py-8">
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
           title="Laporan tidak tersedia"
@@ -131,138 +219,57 @@ function ReportView() {
     )
   }
 
-  const narrative = report.ai_narrative_final || report.ai_narrative_draft || ''
-
-  /* ── Render ── */
+  /* ── Render: mini raport fills viewport + floating toolbar ── */
   return (
-    <div className="space-y-6 print-report">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-xl font-bold text-on-surface">Laporan Perkembangan</h1>
-        <p className="text-sm text-on-surface-variant mt-1">
-          {participant.child_name}
-        </p>
-        <div className="flex items-center justify-center gap-2 mt-2">
-          <Badge variant={statusBadge[report.status] || 'neutral'} size="sm">
-            {statusLabel[report.status] || report.status}
-          </Badge>
-          {session && (
-            <span className="text-xs text-on-surface-variant">
-              {session.name} - {formatDate(session.session_date)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Child identity + Photo */}
-      <Card>
-        <div className="flex items-start gap-5">
-          <div className="w-20 h-20 rounded-2xl bg-surface-variant flex items-center justify-center shrink-0 overflow-hidden">
-            {photo ? (
-              <img
-                src={photo.framed_file_url || photo.original_file_url}
-                alt={participant.child_name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <Camera className="w-8 h-8 text-on-surface-variant" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-on-surface">{participant.child_name}</h2>
-            <div className="text-sm text-on-surface-variant mt-1 space-y-0.5">
-              <p>Usia: {participant.child_age} tahun</p>
-              {participant.school_name && <p>Sekolah: {participant.school_name}</p>}
-              <p>Orang Tua: {participant.parent_name}</p>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Assessment scores */}
-      <Card title="Penilaian per Tahapan">
-        {assessments.length === 0 ? (
-          <p className="text-sm text-on-surface-variant py-4">
-            Belum ada data penilaian.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {assessments.map((a) => (
-              <div
-                key={a.id}
-                className="p-3 rounded-xl bg-surface-container-low"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-medium text-on-surface">
-                    {stageNames[a.session_stage_id] || 'Tahap Kegiatan'}
-                  </p>
-                  <div className="flex items-center gap-0.5">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={cn(
-                          'w-4 h-4',
-                          star <= a.star_rating
-                            ? 'text-accent fill-accent'
-                            : 'text-on-surface-variant/30'
-                        )}
-                      />
-                    ))}
-                  </div>
-                </div>
-                {a.comment && (
-                  <p className="text-sm text-on-surface-variant italic mt-1">
-                    &ldquo;{a.comment}&rdquo;
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* AI Narrative */}
-      {narrative && (
-        <Card title="Narasi Perkembangan">
-          <div className="flex items-start gap-3">
-            <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-            <p className="text-sm text-on-surface leading-relaxed">{narrative}</p>
-          </div>
-        </Card>
-      )}
-
-      {/* Missions link */}
-      {report.mission_ids_json && report.mission_ids_json.length > 0 && (
-        <Link
-          to={`/parent/missions?token=${encodeURIComponent(report.parent_access_token)}&reportId=${report.id}`}
-          className="block bg-gradient-to-r from-primary to-primary-dark rounded-2xl p-5 text-white hover:opacity-95 transition-opacity"
+    <div className="relative min-h-screen bg-gray-200 print-report">
+        <div
+          className="mx-auto overflow-hidden"
+          style={{ width: '100%', maxWidth: A4_SHEET_WIDTH }}
         >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              <Target className="w-6 h-6" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold">Lihat Misi Lanjutan</h3>
-              <p className="text-sm text-white/80 mt-0.5">
-                {report.mission_ids_json.length} misi untuk dilakukan bersama si kecil
-              </p>
-            </div>
-            <span className="text-2xl">&rarr;</span>
+          <div
+            style={{
+              width: A4_SHEET_WIDTH,
+              transform: `scale(${scaleFactor})`,
+              transformOrigin: 'top center',
+              height: scaledHeight || 'auto',
+            }}
+          >
+            <iframe
+              ref={iframeRef}
+              srcDoc={raportHtml}
+              title="Mini Raport"
+              onLoad={handleIframeLoad}
+              className="border-0 block"
+              style={{ width: A4_SHEET_WIDTH, border: 'none' }}
+            />
           </div>
-        </Link>
-      )}
+        </div>
 
-      {/* Download PDF */}
-      <Button className="w-full no-print" variant="secondary" onClick={handlePrint}>
-        <Printer className="w-4 h-4 mr-2" /> Download / Cetak PDF
-      </Button>
-
-      {/* Print toast */}
-      {showPrintToast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-on-surface text-surface px-4 py-2 rounded-xl shadow-lg text-sm z-50 no-print">
-          Gunakan browser: File &rarr; Print atau Ctrl+P
+      {downloadError && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-2 shadow-lg no-print">
+          {downloadError}
         </div>
       )}
+
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-surface rounded-2xl p-3 border border-outline-variant shadow-lg no-print">
+        <Button variant="secondary" size="sm" onClick={handleCetak}>
+          <Printer className="w-4 h-4 mr-1" /> Cetak
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={!!actionLoading}>
+          {actionLoading === 'pdf' ? (
+            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...</>
+          ) : (
+            <><FileText className="w-4 h-4 mr-1" /> Unduh PDF</>
+          )}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleDownloadPng} disabled={!!actionLoading}>
+          {actionLoading === 'png' ? (
+            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...</>
+          ) : (
+            <><Camera className="w-4 h-4 mr-1" /> Unduh PNG</>
+          )}
+        </Button>
+      </div>
     </div>
   )
 }

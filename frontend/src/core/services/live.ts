@@ -1,2 +1,2 @@
-export { mockLiveService as liveService } from './mock/live'
-export type { GroupStageProgressRow, TimelineEventRow, LiveGroupWithProgress } from './mock/live'
+export { idbLiveService as liveService } from './idb/live'
+export type { GroupStageProgressRow, TimelineEventRow, LiveGroupWithProgress } from './idb/live'

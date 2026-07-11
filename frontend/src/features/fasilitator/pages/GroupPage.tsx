@@ -2,10 +2,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Users, Target } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
+import { liveService } from '../../../core/services/live'
 import { ROUTES } from '../../../core/constants/app'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { useConfirmDialog } from '../../../shared/hooks/useConfirmDialog'
+import { useAuth } from '../../../core/hooks/useAuth'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Button } from '../../../shared/components/ui/Button'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
@@ -70,6 +73,8 @@ const GroupPage = () => {
   const { groupId } = useParams<{ groupId: string }>()
   const navigate = useNavigate()
   const confirm = useConfirmDialog()
+  const { user } = useAuth()
+  const { addToast } = useGlobalToast()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -104,7 +109,22 @@ const GroupPage = () => {
       const stageNameMap = new Map(programStages.map((ps) => [ps.id, ps.name]))
 
       // Find current session stage
-      const currentStage = detail.stages.find((s) => s.id === group.current_stage_id)
+      let currentStage = detail.stages.find((s) => s.id === group.current_stage_id)
+
+      if (!currentStage && detail.stages.length > 0) {
+        const groupsData = await liveService.getGroupsWithProgress(detail.id)
+        const groupProg = groupsData.find((g) => g.group.id === group.id)
+        const latest = groupProg?.progress
+          ?.filter((p) => p.status === 'COMPLETED' || p.status === 'IN_PROGRESS' || p.status === 'SKIPPED')
+          ?.sort(
+            (a, b) =>
+              new Date(b.completed_at ?? b.entered_at ?? '').getTime() -
+              new Date(a.completed_at ?? a.entered_at ?? '').getTime(),
+          )[0]
+        if (latest) {
+          currentStage = detail.stages.find((s) => s.id === latest.session_stage_id)
+        }
+      }
       const programStage = currentStage
         ? programStages.find((ps) => ps.id === currentStage.program_stage_id)
         : undefined
@@ -136,7 +156,12 @@ const GroupPage = () => {
   }, [fetchData])
 
   const isAssessed = (participantId: string): boolean => {
-    return assessments.some((a) => a.participant_id === participantId)
+    if (!groupDetail?.sessionStage) return false
+    return assessments.some(
+      (a) =>
+        a.participant_id === participantId &&
+        a.session_stage_id === groupDetail.sessionStage!.id,
+    )
   }
 
   const assessedCount = groupDetail
@@ -153,13 +178,19 @@ const GroupPage = () => {
     if (!groupDetail || !groupId || !groupDetail.sessionStage) return
     setCompleting(true)
     try {
-      // Simulate completing the group's current stage
-      // In a real app, this would call a service to advance the group
-      await new Promise((r) => setTimeout(r, 500))
+      await liveService.completeStage(groupId, groupDetail.sessionStage.id)
+      await liveService.addTimelineEvent(
+        groupDetail.session.id,
+        groupId,
+        'group:completed',
+        `${group.name} menyelesaikan "${groupDetail.programStageName ?? 'Stage'}"`,
+        user?.id,
+      )
       confirm.dismiss()
+      addToast({ type: 'success', message: 'Kelompok berhasil diselesaikan' })
       navigate(ROUTES.FASILITATOR.DASHBOARD)
     } catch {
-      // Error handling
+      addToast({ type: 'error', message: 'Gagal menyelesaikan kelompok' })
     } finally {
       setCompleting(false)
     }

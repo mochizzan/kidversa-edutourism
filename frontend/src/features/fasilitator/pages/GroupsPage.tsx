@@ -10,7 +10,14 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { GroupCard } from '../components/GroupCard'
 import type { Session, SessionStage, ProgramStage } from '../../../core/types'
-import type { LiveGroupWithProgress } from '../../../core/services/live'
+import type { LiveGroupWithProgress, GroupStageProgressRow } from '../../../core/services/live'
+
+function deriveGroupStatus(progress: GroupStageProgressRow[]): 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' {
+  if (progress.length === 0) return 'WAITING'
+  if (progress.some((p) => p.status === 'IN_PROGRESS' || p.status === 'UNLOCKED')) return 'IN_PROGRESS'
+  if (progress.every((p) => p.status === 'COMPLETED' || p.status === 'SKIPPED')) return 'COMPLETED'
+  return 'WAITING'
+}
 
 function SkeletonCard() {
   return (
@@ -149,7 +156,7 @@ const GroupsPage = () => {
                         ? stageNameCache[session.id]?.[item.group.current_stage_id]
                         : undefined
                     }
-                    status={item.group.status}
+                    status={deriveGroupStatus(item.progress)}
                     onClick={() => navigate(`/fasilitator/groups/${item.group.id}`)}
                   />
                 ))}

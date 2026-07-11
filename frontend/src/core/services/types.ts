@@ -55,7 +55,7 @@ export interface ProgramService {
 // Sessions
 export interface SessionService {
   getAll(params?: ListParams): Promise<PaginatedResponse<Session>>
-  getById(id: string): Promise<Session & { stages: SessionStage[]; groups: SessionGroup[] } | null>
+  getById(id: string): Promise<Session & { stages: SessionStage[]; groups: (SessionGroup & { participants: Participant[] })[] } | null>
   create(data: CreateSessionDTO): Promise<Session>
   update(id: string, data: UpdateSessionDTO): Promise<Session>
   start(id: string): Promise<Session>
@@ -144,16 +144,6 @@ export interface ConsentService {
   sendRequest(sessionId: string): Promise<void>
   getBySession(sessionId: string): Promise<ConsentLog[]>
   submit(token: string, recording: boolean, photo: boolean): Promise<void>
-}
-
-// Live session
-export interface LiveSessionEvent {
-  type: 'group:progress' | 'group:completed' | 'stage:unlock' | 'connection:change'
-  payload: Record<string, unknown>
-}
-
-export interface LiveSessionService {
-  connect(sessionId: string): EventSource
 }
 
 // Assessments

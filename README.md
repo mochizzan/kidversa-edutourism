@@ -157,6 +157,6 @@ Untuk memastikan pengujian IndexedDB berjalan murni tanpa tercampur data mock la
 
 ## 📜 License
 
-MIT © 2025 Kidversa Edutourism
+MIT © 2026 Kidversa Edutourism
 
 🚀 *Developed as a cutting-edge EdTech and Tourism Assessment Platform.*

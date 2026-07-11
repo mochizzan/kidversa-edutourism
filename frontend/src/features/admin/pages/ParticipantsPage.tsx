@@ -10,15 +10,16 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { participantService } from '../../../core/services/participants'
 import { sessionService } from '../../../core/services/sessions'
+import { assessmentService } from '../../../core/services/assessments'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { useCrudList } from '../../../shared/hooks/useCrudList'
-import type { Participant, Session } from '../../../core/types'
+import type { Assessment, Participant, Session } from '../../../core/types'
 import { SessionStatus } from '../../../core/types'
 
 interface ParticipantRow extends Participant {
   sessionName: string
   statusLabel: string
-  assessmentLabel: string
+  assessedCount: number
 }
 
 const getSessionStatusLabel = (session?: Session | null) => {
@@ -35,6 +36,7 @@ const ParticipantsPage = () => {
     fetchFn: (params) => participantService.getAll({ ...params, limit: 10 }),
   })
   const [sessionsById, setSessionsById] = useState<Record<string, Session>>({})
+  const [assessmentsByParticipant, setAssessmentsByParticipant] = useState<Record<string, Assessment[]>>({})
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -65,10 +67,35 @@ const ParticipantsPage = () => {
     }
   }, [addToast])
 
+  useEffect(() => {
+    let cancelled = false
+
+    const loadAssessments = async () => {
+      if (participants.length === 0) return
+
+      const results: Record<string, Assessment[]> = {}
+      await Promise.all(
+        participants.map(async (p) => {
+          const assessments = await assessmentService.getByParticipant(p.id)
+          results[p.id] = assessments
+        })
+      )
+
+      if (!cancelled) {
+        setAssessmentsByParticipant(results)
+      }
+    }
+
+    void loadAssessments()
+    return () => {
+      cancelled = true
+    }
+  }, [participants])
+
   const rows = useMemo<ParticipantRow[]>(() => {
     return participants.map((participant) => {
       const session = participant.session_id ? sessionsById[participant.session_id] : undefined
-      const assessmentLabel = participant.session_id ? 'Ada penilaian' : 'Belum dinilai'
+      const participantAssessments = assessmentsByParticipant[participant.id] ?? []
 
       let statusLabel = 'Belum masuk sesi'
       if (participant.session_id) {
@@ -79,10 +106,10 @@ const ParticipantsPage = () => {
         ...participant,
         sessionName: session?.name ?? 'Belum masuk sesi',
         statusLabel,
-        assessmentLabel,
+        assessedCount: participantAssessments.length,
       }
     })
-  }, [participants, sessionsById])
+  }, [participants, sessionsById, assessmentsByParticipant])
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -133,9 +160,17 @@ const ParticipantsPage = () => {
       render: (item) => <Badge variant={item.session_id ? 'primary' : 'neutral'}>{item.statusLabel}</Badge>,
     },
     {
-      key: 'assessmentLabel',
+      key: 'assessedCount',
       header: 'Penilaian',
-      render: (item) => <span>{item.assessmentLabel}</span>,
+      render: (item) => {
+        if (!item.session_id) {
+          return <Badge variant="neutral">Belum masuk sesi</Badge>
+        }
+        if (item.assessedCount > 0) {
+          return <Badge variant="success">{item.assessedCount} tahap dinilai</Badge>
+        }
+        return <Badge variant="warning">Belum dinilai</Badge>
+      },
     },
     {
       key: 'actions',

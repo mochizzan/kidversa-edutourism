@@ -1,2 +1,2 @@
-import { mockRecordingService } from './mock/recordings'
-export const recordingService = mockRecordingService
+import { idbRecordingService } from './idb/recordings'
+export const recordingService = idbRecordingService

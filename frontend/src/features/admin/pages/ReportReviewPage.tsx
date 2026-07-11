@@ -9,12 +9,14 @@ import {
   CheckCircle,
   Printer,
   Loader2,
+  FileText,
 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Card } from '../../../shared/components/ui/Card'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { reportService } from '../../../core/services/reports'
 import { sessionService } from '../../../core/services/sessions'
@@ -33,39 +35,26 @@ import type {
 } from '../../../core/types'
 import { ReportStatus, MissionCategory } from '../../../core/types/enums'
 import { formatDate, cn } from '../../../core/utils'
+import { useAuth } from '../../../core/hooks/useAuth'
+import {
+  reportStatusBadge,
+  reportStatusLabel,
+  reportStatusBg,
+} from '../../../core/constants/reportStatus'
+import {
+  DEFAULT_FACILITATOR_MESSAGE,
+  DEFAULT_FACILITATOR_NAME,
+  missionCategoryLabels,
+  missionCategoryIcons,
+} from '../../../core/constants/report'
+import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
+import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 
 /* ── Combined stage info for rendering ── */
 interface StageInfo {
   programStage: ProgramStage
   sessionStageId: string
   assessment?: Assessment
-}
-
-/* ── Status helpers ── */
-const statusBadge: Record<string, 'neutral' | 'warning' | 'success' | 'primary'> = {
-  [ReportStatus.DRAFT]: 'neutral',
-  [ReportStatus.PENDING_REVIEW]: 'warning',
-  [ReportStatus.APPROVED]: 'success',
-  [ReportStatus.SENT]: 'primary',
-}
-
-const statusLabel: Record<string, string> = {
-  [ReportStatus.DRAFT]: 'Draft',
-  [ReportStatus.PENDING_REVIEW]: 'Perlu Review',
-  [ReportStatus.APPROVED]: 'Disetujui',
-  [ReportStatus.SENT]: 'Terkirim',
-}
-
-const missionCategoryLabels: Record<string, string> = {
-  [MissionCategory.HOME]: 'Di Rumah',
-  [MissionCategory.PARENT]: 'Bersama Orang Tua',
-  [MissionCategory.SCHOOL]: 'Di Sekolah',
-}
-
-const missionCategoryIcons: Record<string, string> = {
-  [MissionCategory.HOME]: '\u{1F3E0}',
-  [MissionCategory.PARENT]: '\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}',
-  [MissionCategory.SCHOOL]: '\u{1F3EB}',
 }
 
 /* ── Page ── */
@@ -87,7 +76,10 @@ const ReportReviewPage = () => {
   const [narrativeText, setNarrativeText] = useState('')
   const [showApproveConfirm, setShowApproveConfirm] = useState(false)
   const [showSendConfirm, setShowSendConfirm] = useState(false)
-  const [showPrintMessage, setShowPrintMessage] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
+
+  const { user } = useAuth()
+  const { addToast } = useGlobalToast()
 
   const loadData = async () => {
     if (!sessionId || !reportId) return
@@ -156,7 +148,8 @@ const ReportReviewPage = () => {
       )
       setMissions(programMissions)
       setAssignedMissionIds(rpt.mission_ids_json || [])
-    } catch {
+    } catch (err) {
+      console.error('Failed to load report data:', err)
       setError('Gagal memuat data laporan.')
     } finally {
       setLoading(false)
@@ -187,7 +180,9 @@ const ReportReviewPage = () => {
       })
       setShowApproveConfirm(false)
       await loadData()
-    } catch {
+      addToast({ type: 'success', message: 'Laporan berhasil disetujui' })
+    } catch (err) {
+      console.error('Failed to approve report:', err)
       setError('Gagal menyetujui laporan.')
     } finally {
       setActionLoading(null)
@@ -202,17 +197,93 @@ const ReportReviewPage = () => {
       await reportService.send(reportId)
       setShowSendConfirm(false)
       await loadData()
-    } catch {
+      addToast({ type: 'success', message: 'Laporan berhasil dikirim ke orang tua' })
+    } catch (err) {
+      console.error('Failed to send report:', err)
       setError('Gagal mengirim laporan.')
     } finally {
       setActionLoading(null)
     }
   }
 
-  /* ── Print preview ── */
-  const handlePrint = () => {
-    setShowPrintMessage(true)
-    setTimeout(() => setShowPrintMessage(false), 2000)
+  /* ── Build mini raport HTML (shared by print + PNG) ── */
+  const buildRaportHtml = (): string | null => {
+    if (!participant || !session) return null
+    const quote = narrativeText
+      ? (narrativeText.match(/^[^.!?\n]+[.!?]/)?.[0]?.trim() ||
+        narrativeText.split('\n')[0].trim().slice(0, 120))
+      : undefined
+
+    return generateMiniRaportHTML({
+      childName: participant.child_name,
+      childAge: participant.child_age,
+      sessionDate: formatDate(session.session_date),
+      photoUrl: photo?.framed_file_url || photo?.original_file_url,
+      quote,
+      stages: stageInfos.map((si, i) => ({
+        name: si.programStage.name,
+        sequenceOrder: i + 1,
+        starRating: si.assessment?.star_rating ?? 0,
+      })),
+      narrative: narrativeText,
+      facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
+      missions: missions
+        .filter((m) => assignedMissionIds.includes(m.id))
+        .map((m) => m.title_child),
+      facilitatorName: user?.name || DEFAULT_FACILITATOR_NAME,
+      facilitatorPhotoUrl: user?.avatar_url,
+    })
+  }
+
+  /* ── Cetak: open new window + print dialog ── */
+  const handleCetak = () => {
+    const html = buildRaportHtml()
+    if (!html) return
+
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(html)
+    win.document.close()
+    setTimeout(() => {
+      try {
+        if (!win.closed) win.print()
+      } catch {
+        /* window closed */
+      }
+    }, 1500)
+  }
+
+  /* ── Unduh PDF: generate actual PDF file download ── */
+  const handleDownloadPdf = async () => {
+    if (!participant) return
+    setActionLoading('pdf')
+    try {
+      const html = buildRaportHtml()
+      if (!html) return
+      await captureRaportAsPdf(html, `raport-${participant.child_name}.pdf`)
+    } catch (err) {
+      console.error('Failed to generate PDF:', err)
+      addToast({ type: 'error', message: 'Gagal menghasilkan file PDF.' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  /* ── PNG download ── */
+  const handleDownloadPng = async () => {
+    if (!participant) return
+    setActionLoading('png')
+    try {
+      const html = buildRaportHtml()
+      if (!html) return
+      const blob = await captureRaportAsBlob(html)
+      downloadBlob(blob, `raport-${participant.child_name}.png`)
+    } catch (err) {
+      console.error('Failed to generate PNG:', err)
+      addToast({ type: 'error', message: 'Gagal menghasilkan gambar raport.' })
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   /* ── Loading ── */
@@ -277,42 +348,117 @@ const ReportReviewPage = () => {
           },
           { label: participant.child_name },
         ]}
-        actions={
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(`/admin/reports/${sessionId}`)}
-            className="no-print"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
-          </Button>
-        }
         className="no-print"
       />
 
       {/* Status banner */}
       <div
         className={cn(
-          'rounded-2xl p-4 flex items-center gap-3 no-print',
-          report.status === ReportStatus.SENT && 'bg-primary-container text-on-primary-container',
-          report.status === ReportStatus.APPROVED && 'bg-green-100 text-green-700',
-          report.status === ReportStatus.DRAFT && 'bg-surface-variant text-on-surface-variant',
-          report.status === ReportStatus.PENDING_REVIEW && 'bg-yellow-100 text-yellow-700'
+          'rounded-2xl p-4 flex flex-col gap-3 no-print',
+          reportStatusBg[report.status]
         )}
       >
-        <Badge variant={statusBadge[report.status] || 'neutral'} size="md">
-          {statusLabel[report.status] || report.status}
-        </Badge>
-        <span className="text-sm font-medium">
-          {report.status === ReportStatus.SENT
-            ? `Laporan telah dikirim pada ${report.sent_at ? formatDate(report.sent_at) : '-'}`
-            : report.status === ReportStatus.APPROVED
-            ? 'Laporan sudah disetujui dan siap dikirim ke orang tua'
-            : report.status === ReportStatus.DRAFT
-            ? 'Laporan masih dalam bentuk draft, review sebelum dikirim'
-            : 'Laporan menunggu review'}
-        </span>
+        <div className="flex items-center gap-3">
+          <Badge variant={reportStatusBadge[report.status] || 'neutral'} size="md">
+            {reportStatusLabel[report.status] || report.status}
+          </Badge>
+          <span className="text-sm font-medium">
+            {report.status === ReportStatus.SENT
+              ? `Laporan telah dikirim pada ${report.sent_at ? formatDate(report.sent_at) : '-'}`
+              : report.status === ReportStatus.APPROVED
+              ? 'Laporan sudah disetujui dan siap dikirim ke orang tua'
+              : report.status === ReportStatus.DRAFT
+              ? 'Laporan masih dalam bentuk draft, review sebelum dikirim'
+              : 'Laporan menunggu review'}
+          </span>
+        </div>
+        {report.status === ReportStatus.SENT && report.parent_access_token && (
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="text-xs bg-black/10 px-2 py-1 rounded-lg break-all">
+              {`${window.location.origin}/parent/report?token=${report.parent_access_token}`}
+            </code>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    `${window.location.origin}/parent/report?token=${report.parent_access_token}`
+                  )
+                  setCopiedLink(true)
+                  setTimeout(() => setCopiedLink(false), 2000)
+                } catch {
+                  /* clipboard unavailable */
+                }
+              }}
+            >
+              {copiedLink ? 'Tersalin' : 'Salin Link'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                window.open(
+                  `/parent/report?token=${report.parent_access_token}`,
+                  '_blank'
+                )
+              }
+            >
+              Buka Halaman Orang Tua
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Sent content summary (read-only) */}
+      {report.status === ReportStatus.SENT && (
+        <Card title="Ringkasan yang Dikirim" subtitle="Konten yang telah dikirim ke orang tua">
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
+                Narasi
+              </p>
+              <p className="text-sm text-on-surface whitespace-pre-wrap">
+                {narrativeText || '-'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
+                Misi Lanjutan
+              </p>
+              {assignedMissionIds.length === 0 ? (
+                <p className="text-sm text-on-surface-variant">Tidak ada misi dipilih</p>
+              ) : (
+                <ul className="text-sm text-on-surface space-y-1">
+                  {missions
+                    .filter((m) => assignedMissionIds.includes(m.id))
+                    .map((m) => (
+                      <li key={m.id} className="flex items-start gap-2">
+                        <span>•</span>
+                        <span>{m.title_child}</span>
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
+            {photo && (
+              <div>
+                <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
+                  Foto
+                </p>
+                <img
+                  src={photo.framed_file_url || photo.original_file_url}
+                  alt={participant.child_name}
+                  className="w-24 h-24 object-cover rounded-xl"
+                />
+              </div>
+            )}
+            <p className="text-xs text-on-surface-variant">
+              Waktu kirim: {report.sent_at ? formatDate(report.sent_at) : '-'}
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* Main review content */}
       <div className="grid gap-6 print-report">
@@ -422,6 +568,7 @@ const ReportReviewPage = () => {
         </Card>
 
         {/* 3. AI Narrative */}
+        {report.status !== ReportStatus.SENT && (
         <Card title="Narasi AI" subtitle="Draft narasi yang akan dikirim ke orang tua">
           <textarea
             value={narrativeText}
@@ -442,8 +589,10 @@ const ReportReviewPage = () => {
             </span>
           </div>
         </Card>
+        )}
 
         {/* 4. Mission Assignments */}
+        {report.status !== ReportStatus.SENT && (
         <Card
           title="Misi Lanjutan"
           subtitle="Pilih misi yang akan diberikan kepada orang tua"
@@ -513,6 +662,8 @@ const ReportReviewPage = () => {
             </div>
           )}
         </Card>
+        )}
+
       </div>
 
       {/* Action buttons */}
@@ -525,8 +676,22 @@ const ReportReviewPage = () => {
           <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
         </Button>
         <div className="flex-1" />
-        <Button variant="secondary" size="sm" onClick={handlePrint}>
-          <Printer className="w-4 h-4 mr-1" /> Preview PDF
+        <Button variant="secondary" size="sm" onClick={handleCetak} disabled={!!actionLoading}>
+          <Printer className="w-4 h-4 mr-1" /> Cetak
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={!!actionLoading}>
+          {actionLoading === 'pdf' ? (
+            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...</>
+          ) : (
+            <><FileText className="w-4 h-4 mr-1" /> Unduh PDF</>
+          )}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={handleDownloadPng} disabled={!!actionLoading}>
+          {actionLoading === 'png' ? (
+            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...</>
+          ) : (
+            <><Camera className="w-4 h-4 mr-1" /> Unduh PNG</>
+          )}
         </Button>
         {canApprove && (
           <Button
@@ -555,13 +720,6 @@ const ReportReviewPage = () => {
           </Button>
         )}
       </div>
-
-      {/* Toast for print */}
-      {showPrintMessage && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-on-surface text-surface px-4 py-2 rounded-xl shadow-lg text-sm z-50 animate-bounce no-print">
-          Gunakan browser Print (Ctrl+P) untuk preview PDF
-        </div>
-      )}
 
       {/* ── Approve confirm modal ── */}
       <Modal

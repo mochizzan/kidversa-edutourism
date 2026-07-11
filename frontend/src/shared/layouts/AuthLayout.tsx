@@ -41,7 +41,7 @@ const AuthLayout = () => {
       {/* ── Footer ── */}
       <div className="py-5 text-center relative z-10">
         <p className="text-xs text-on-surface-variant/30 font-medium tracking-wide">
-          &copy; 2025 Kidversa Edutourism
+          &copy; 2026 Kidversa Edutourism
         </p>
       </div>
     </div>
