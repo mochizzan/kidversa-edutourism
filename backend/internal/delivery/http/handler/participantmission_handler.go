@@ -48,6 +48,19 @@ func (h *ParticipantMissionHandler) Create(c *echo.Context) error {
 	return appresp.Created(c, dto.NewParticipantMissionResponse(m))
 }
 
+// List handles GET /api/participant-missions (GET ""). It dispatches on the
+// query param: ?report_id= → missions for a report; ?participant_id= → missions
+// for a participant. report_id takes precedence.
+func (h *ParticipantMissionHandler) List(c *echo.Context) error {
+	if reportID := (*c).QueryParam("report_id"); reportID != "" {
+		return h.ListByReport(c)
+	}
+	if participantID := (*c).QueryParam("participant_id"); participantID != "" {
+		return h.ListByParticipant(c)
+	}
+	return appresp.Fail(c, http.StatusBadRequest, "bad_request")
+}
+
 // ListByReport handles GET /api/participant-missions?report_id=.
 func (h *ParticipantMissionHandler) ListByReport(c *echo.Context) error {
 	reportID := (*c).QueryParam("report_id")
@@ -59,6 +72,54 @@ func (h *ParticipantMissionHandler) ListByReport(c *echo.Context) error {
 		return err
 	}
 	return appresp.OK(c, dto.NewParticipantMissionListResponse(items))
+}
+
+// ListByParticipant handles GET /api/participant-missions?participant_id=.
+func (h *ParticipantMissionHandler) ListByParticipant(c *echo.Context) error {
+	participantID := (*c).QueryParam("participant_id")
+	if participantID == "" {
+		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
+	}
+	items, err := h.repo.ListByParticipant((*c).Request().Context(), participantID)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewParticipantMissionListResponse(items))
+}
+
+// Replace handles POST /api/participant-missions/replace (bulk, transactional).
+// It atomically replaces all participant missions for a report with the given items.
+func (h *ParticipantMissionHandler) Replace(c *echo.Context) error {
+	var req dto.ParticipantMissionBulkRequest
+	if err := (*c).Bind(&req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	}
+	if err := (*c).Validate(&req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
+	items := make([]entity.ParticipantMission, 0, len(req.Items))
+	for i := range req.Items {
+		it := req.Items[i]
+		m := entity.ParticipantMission{
+			ParticipantID: it.ParticipantID,
+			ReportID:      req.ReportID,
+			MissionBankID: it.MissionBankID,
+			IsCompleted:   it.IsCompleted,
+		}
+		if m.IsCompleted {
+			now := time.Now().Format(time.RFC3339)
+			m.CompletedAt = &now
+		}
+		items = append(items, m)
+	}
+	if err := h.repo.ReplaceByReport((*c).Request().Context(), req.ReportID, items); err != nil {
+		return err
+	}
+	replaced, err := h.repo.GetByReport((*c).Request().Context(), req.ReportID)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewParticipantMissionListResponse(replaced))
 }
 
 // GetByID handles GET /api/participant-missions/:id.

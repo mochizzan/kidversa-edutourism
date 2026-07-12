@@ -33,3 +33,10 @@ func NewParticipantMissionListResponse(items []entity.ParticipantMission) *Parti
 	}
 	return &ParticipantMissionListResponse{Items: out}
 }
+
+// ParticipantMissionBulkRequest is the payload for POST /api/participant-missions/replace.
+// It atomically replaces all missions for a report with the given items.
+type ParticipantMissionBulkRequest struct {
+	ReportID string                      `json:"report_id" validate:"required"`
+	Items    []ParticipantMissionRequest `json:"items"`
+}

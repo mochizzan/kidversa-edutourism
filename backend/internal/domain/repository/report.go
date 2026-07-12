@@ -36,5 +36,10 @@ type ParticipantMissionRepository interface {
 	GetByID(ctx context.Context, id string) (*entity.ParticipantMission, error)
 	GetByReport(ctx context.Context, reportID string) ([]entity.ParticipantMission, error)
 	Update(ctx context.Context, m *entity.ParticipantMission) error
+	// ReplaceByReport atomically replaces all participant missions for a report
+	// within a single transaction (delete existing, insert the given items).
+	ReplaceByReport(ctx context.Context, reportID string, items []entity.ParticipantMission) error
+	// ListByParticipant returns all participant missions for a participant.
+	ListByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantMission, error)
 	Delete(ctx context.Context, id string) error
 }

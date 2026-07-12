@@ -52,6 +52,27 @@ func (f *fakeParticipantMissionRepo) Delete(_ context.Context, id string) error 
 	delete(f.byID, id)
 	return nil
 }
+func (f *fakeParticipantMissionRepo) ReplaceByReport(_ context.Context, reportID string, items []entity.ParticipantMission) error {
+	for k, v := range f.byID {
+		if v.ReportID == reportID {
+			delete(f.byID, k)
+		}
+	}
+	for i := range items {
+		items[i].ID = uuid.NewString()
+		f.byID[items[i].ID] = &items[i]
+	}
+	return nil
+}
+func (f *fakeParticipantMissionRepo) ListByParticipant(_ context.Context, participantID string) ([]entity.ParticipantMission, error) {
+	out := make([]entity.ParticipantMission, 0)
+	for _, v := range f.byID {
+		if v.ParticipantID == participantID {
+			out = append(out, *v)
+		}
+	}
+	return out, nil
+}
 
 func TestParticipantMissionToggleFlipsCompletion(t *testing.T) {
 	repo := newFakeParticipantMissionRepo()

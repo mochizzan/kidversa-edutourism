@@ -70,3 +70,40 @@ func (r *GormParticipantMissionRepository) Delete(ctx context.Context, id string
 	}
 	return nil
 }
+
+// ReplaceByReport atomically replaces all participant missions for a report:
+// deletes the existing rows and inserts the provided items within one transaction.
+func (r *GormParticipantMissionRepository) ReplaceByReport(ctx context.Context, reportID string, items []entity.ParticipantMission) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("report_id = ?", reportID).Delete(&ParticipantMissionModel{}).Error; err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+		if len(items) == 0 {
+			return nil
+		}
+		models := make([]ParticipantMissionModel, 0, len(items))
+		for i := range items {
+			models = append(models, *participantMissionModelFromEntity(&items[i]))
+		}
+		if err := tx.Create(&models).Error; err != nil {
+			if isDuplicate(err) {
+				return apperrors.Conflict("conflict", err)
+			}
+			return apperrors.Internal("internal_error", err)
+		}
+		return nil
+	})
+}
+
+// ListByParticipant returns all participant missions for the given participant.
+func (r *GormParticipantMissionRepository) ListByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantMission, error) {
+	var models []ParticipantMissionModel
+	if err := r.db.WithContext(ctx).Where("participant_id = ?", participantID).Order("created_at DESC").Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	out := make([]entity.ParticipantMission, 0, len(models))
+	for i := range models {
+		out = append(out, *models[i].ToEntity())
+	}
+	return out, nil
+}
