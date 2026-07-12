@@ -89,7 +89,10 @@ func (r *GormSessionRepository) UpdateSession(ctx context.Context, s *entity.Ses
 }
 
 func (r *GormSessionRepository) DeleteSession(ctx context.Context, id string) error {
-	if err := r.db.WithContext(ctx).Delete(&SessionModel{}, "id = ?", id).Error; err != nil {
+	// Hard delete so FK cascades (session_stages, session_groups, participants,
+	// group_stage_progress, timeline_events) actually fire. GORM soft-delete leaves
+	// the row present and the cascade never triggers, orphaning child rows.
+	if err := r.db.WithContext(ctx).Unscoped().Delete(&SessionModel{}, "id = ?", id).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
@@ -282,8 +285,65 @@ func (r *GormSessionRepository) UpdateParticipant(ctx context.Context, p *entity
 }
 
 func (r *GormSessionRepository) DeleteParticipant(ctx context.Context, id string) error {
+	// Guard: refuse to delete a participant that is still operationally linked or
+	// has child records. This mirrors the frontend parity intent — a participant
+	// that still carries session/group membership or assessment/photo/recording/
+	// report/consent data must be unlinked/cleared first (or archived), not dropped
+	// outright, to avoid dangling foreign keys and lost history.
+	var p ParticipantModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&p).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NotFound("not_found", err)
+		}
+		return apperrors.Internal("internal_error", err)
+	}
+	if p.SessionID != nil || p.GroupID != nil {
+		return apperrors.Conflict("participant_not_deletable", nil)
+	}
+	// Count child rows referencing this participant across the content tables.
+	// Tables created later (B15) are skipped gracefully until they exist.
+	childTables := []struct {
+		table string
+		col   string
+	}{
+		{"participant_missions", "participant_id"},
+		{"smart_photos", "participant_id"},
+		{"recordings", "participant_id"},
+		{"assessments", "participant_id"},
+		{"reports", "participant_id"},
+		{"consent_logs", "participant_id"},
+	}
+	for _, ct := range childTables {
+		exists, err := tableExists(ctx, r.db, ct.table)
+		if err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+		if !exists {
+			continue
+		}
+		var n int64
+		if err := r.db.WithContext(ctx).Table(ct.table).Where(ct.col+" = ?", id).Count(&n).Error; err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+		if n > 0 {
+			return apperrors.Conflict("participant_not_deletable", nil)
+		}
+	}
+	// Safe to soft-delete (auditable; matches existing behaviour otherwise).
 	if err := r.db.WithContext(ctx).Delete(&ParticipantModel{}, "id = ?", id).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
+}
+
+// tableExists reports whether a table is present in the current database.
+func tableExists(ctx context.Context, db *gorm.DB, name string) (bool, error) {
+	var cnt int64
+	if err := db.WithContext(ctx).
+		Table("information_schema.tables").
+		Where("table_schema = DATABASE() AND table_name = ?", name).
+		Count(&cnt).Error; err != nil {
+		return false, err
+	}
+	return cnt > 0, nil
 }

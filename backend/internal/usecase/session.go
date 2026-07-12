@@ -207,8 +207,18 @@ func (u *SessionUsecase) CancelSession(ctx context.Context, id string) (*entity.
 	return s, nil
 }
 
-// DeleteSession removes a session (soft delete cascades to stages/groups/participants via DB).
+// DeleteSession removes a session. Sessions in ACTIVE or COMPLETED state are
+// protected (their data is operationally live or archived) and cannot be deleted;
+// callers must cancel an ACTIVE session first. The underlying delete is a hard
+// delete so FK cascades to stages/groups/participants fire.
 func (u *SessionUsecase) DeleteSession(ctx context.Context, id string) error {
+	s, err := u.repo.GetSessionByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if s.Status == entity.SessionActive || s.Status == entity.SessionCompleted {
+		return apperrors.Conflict("session_not_deletable", nil)
+	}
 	return u.repo.DeleteSession(ctx, id)
 }
 
