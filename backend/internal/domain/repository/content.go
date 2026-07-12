@@ -12,6 +12,12 @@ type PhotoRepository interface {
 	GetByID(ctx context.Context, id string) (*entity.SmartPhoto, error)
 	List(ctx context.Context, f PhotoFilter, page, limit int) (*Paginated[entity.SmartPhoto], error)
 	Update(ctx context.Context, p *entity.SmartPhoto) error
+	// UpdateFields applies a partial (map) update to a photo. Use this instead of
+	// Update(struct) so zero/false values are persisted (GORM zero-value bug, C2).
+	UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error
+	// SetReportPhoto marks photoID as the exclusive report photo for the given
+	// participant+session, clearing is_report_photo on all others in that scope.
+	SetReportPhoto(ctx context.Context, participantID, sessionID, photoID string) error
 	Delete(ctx context.Context, id string) error
 }
 
@@ -29,6 +35,9 @@ type RecordingRepository interface {
 	GetByID(ctx context.Context, id string) (*entity.Recording, error)
 	List(ctx context.Context, f RecordingFilter, page, limit int) (*Paginated[entity.Recording], error)
 	Update(ctx context.Context, r *entity.Recording) error
+	// UpdateFields applies a partial (map) update to a recording. Use this instead
+	// of Update(struct) so zero/false values are persisted (GORM zero-value bug, C2).
+	UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error
 	Delete(ctx context.Context, id string) error
 }
 

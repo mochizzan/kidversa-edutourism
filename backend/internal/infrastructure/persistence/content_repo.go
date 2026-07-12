@@ -56,6 +56,33 @@ func (r *GormPhotoRepository) Update(ctx context.Context, p *entity.SmartPhoto) 
 	return nil
 }
 
+// UpdateFields applies a partial (map) update, so zero/false values persist (C2).
+func (r *GormPhotoRepository) UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error {
+	if err := r.db.WithContext(ctx).Model(&SmartPhotoModel{}).Where("id = ?", id).Updates(fields).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// SetReportPhoto marks photoID as the exclusive is_report_photo for its
+// participant+session scope, clearing the flag on all other photos in scope.
+func (r *GormPhotoRepository) SetReportPhoto(ctx context.Context, participantID, sessionID, photoID string) error {
+	if err := r.db.WithContext(ctx).
+		Model(&SmartPhotoModel{}).
+		Where("participant_id = ? AND session_id = ?", participantID, sessionID).
+		Where("is_report_photo = ?", true).
+		Update("is_report_photo", false).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	if err := r.db.WithContext(ctx).
+		Model(&SmartPhotoModel{}).
+		Where("id = ?", photoID).
+		Update("is_report_photo", true).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
 func (r *GormPhotoRepository) Delete(ctx context.Context, id string) error {
 	if err := r.db.WithContext(ctx).Delete(&SmartPhotoModel{}, "id = ?", id).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
@@ -133,6 +160,14 @@ func (r *GormRecordingRepository) Update(ctx context.Context, rec *entity.Record
 		if isDuplicate(err) {
 			return apperrors.Conflict("conflict", err)
 		}
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// UpdateFields applies a partial (map) update, so zero/false values persist (C2).
+func (r *GormRecordingRepository) UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error {
+	if err := r.db.WithContext(ctx).Model(&RecordingModel{}).Where("id = ?", id).Updates(fields).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil

@@ -46,6 +46,13 @@ func (f *fakePhotoRepo) Delete(_ context.Context, id string) error {
 	delete(f.byID, id)
 	return nil
 }
+func (f *fakePhotoRepo) UpdateFields(_ context.Context, id string, _ map[string]interface{}) error {
+	if _, ok := f.byID[id]; !ok {
+		return repoErrNotFound
+	}
+	return nil
+}
+func (f *fakePhotoRepo) SetReportPhoto(_ context.Context, _, _, _ string) error { return nil }
 
 func TestPhotoListReturnsCreated(t *testing.T) {
 	repo := newFakePhotoRepo()
