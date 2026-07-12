@@ -1,0 +1,26 @@
+# docker-compose runs ONLY the backend. MariaDB 12 is already running on the host
+# (separate container `mariadb-12`), so we do NOT spawn a new database here.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Override DB_HOST to reach the host's MariaDB via the docker bridge gateway.
+    environment:
+      DB_HOST: host.docker.internal
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: admin
+      DB_NAME: kidversa
+      JWT_SECRET: change-me-to-a-long-random-32-byte-secret-string
+      CORS_ORIGINS: http://localhost:5173
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: Lax
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./uploads:/app/uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    stop_grace_period: 30s

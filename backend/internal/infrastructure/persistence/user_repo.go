@@ -1,0 +1,171 @@
+package persistence
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"gorm.io/gorm"
+
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/domain/entity"
+	"kidversa-edutourism-backend/internal/domain/repository"
+)
+
+// GormUserRepository implements repository.UserRepository.
+type GormUserRepository struct {
+	db *gorm.DB
+}
+
+// NewUserRepository builds a GORM-backed user repository.
+func NewUserRepository(db *gorm.DB) repository.UserRepository {
+	return &GormUserRepository{db: db}
+}
+
+func (r *GormUserRepository) Create(ctx context.Context, u *entity.User) error {
+	m := userModelFromEntity(u)
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		if isDuplicate(err) {
+			return apperrors.Conflict("conflict", err)
+		}
+		return apperrors.Internal("internal_error", err)
+	}
+	*u = *m.ToEntity()
+	return nil
+}
+
+func (r *GormUserRepository) GetByID(ctx context.Context, id string) (*entity.User, error) {
+	var m UserModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+func (r *GormUserRepository) GetByEmail(ctx context.Context, email string) (*entity.User, error) {
+	var m UserModel
+	if err := r.db.WithContext(ctx).Where("email = ?", strings.ToLower(email)).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+func (r *GormUserRepository) List(ctx context.Context, f repository.UserFilter, page, limit int) (*repository.Paginated[entity.User], error) {
+	q := r.db.WithContext(ctx).Model(&UserModel{})
+	if f.TenantID != "" {
+		q = q.Where("tenant_id = ?", f.TenantID)
+	}
+	if f.Role != "" {
+		q = q.Where("role = ?", f.Role)
+	}
+	if f.ApprovalStatus != "" {
+		q = q.Where("approval_status = ?", f.ApprovalStatus)
+	}
+	if f.IsActive != nil {
+		q = q.Where("is_active = ?", *f.IsActive)
+	}
+	if f.Search != "" {
+		like := "%" + strings.ToLower(f.Search) + "%"
+		q = q.Where("LOWER(name) LIKE ? OR LOWER(email) LIKE ?", like, like)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+
+	var models []UserModel
+	offset := (page - 1) * limit
+	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.User, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return &repository.Paginated[entity.User]{Items: items, Total: int(total)}, nil
+}
+
+func (r *GormUserRepository) Update(ctx context.Context, u *entity.User) error {
+	m := userModelFromEntity(u)
+	if err := r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", u.ID).Updates(m).Error; err != nil {
+		if isDuplicate(err) {
+			return apperrors.Conflict("conflict", err)
+		}
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+func (r *GormUserRepository) Delete(ctx context.Context, id string) error {
+	if err := r.db.WithContext(ctx).Delete(&UserModel{}, "id = ?", id).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+func (r *GormUserRepository) Approve(ctx context.Context, id, approverID string) (*entity.User, error) {
+	var m UserModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	now := time.Now().Format("2006-01-02T15:04:05Z07:00")
+	m.IsActive = true
+	m.ApprovalStatus = entity.ApprovalApproved
+	m.ApprovedAt = &now
+	m.ApprovedBy = &approverID
+	m.RejectedAt = nil
+	m.RejectedBy = nil
+	m.RejectionReason = ""
+	if err := r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", id).Updates(m).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+func (r *GormUserRepository) Reject(ctx context.Context, id, approverID, reason string) (*entity.User, error) {
+	var m UserModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	now := time.Now().Format("2006-01-02T15:04:05Z07:00")
+	m.IsActive = false
+	m.ApprovalStatus = entity.ApprovalRejected
+	m.RejectedAt = &now
+	m.RejectedBy = &approverID
+	m.RejectionReason = reason
+	m.ApprovedAt = nil
+	m.ApprovedBy = nil
+	if err := r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", id).Updates(m).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+func (r *GormUserRepository) Deactivate(ctx context.Context, id string) (*entity.User, error) {
+	var m UserModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	m.IsActive = false
+	if err := r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", id).Updates(m).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}

@@ -44,7 +44,7 @@ Tiap method interface = 1 endpoint. Interface di `types.ts`: `ProgramService, Se
 ### 0.4 Entity → Tabel (20 entitas domain + 1 tabel auth-infra, ringkas)
 User, Tenant, Program, ProgramStage, StageContent, PhotoFrame, MissionBank, Session, SessionStage, SessionGroup, GroupStageProgress, Participant, Assessment, SmartPhoto, Recording, Report, ParticipantMission, ConsentLog, TimelineEventRow, **Notification**.
 Tabel auth-infra (bukan entitas domain, lihat §10.1): `refresh_tokens` (opaque refresh token + denylist jti).
-> Catatan: field lengkap entitas tersedia di eksplorasi `C:\Users\zan\kidversa_schema_exploration.md` & `C:\Users\zan\kidversa-endpoint-map.md` (artefak eksplorasi di luar repo). Plan ini **self-contained** untuk implementasi; dua file tersebut hanya referensi suplementer. Saran: pindahkan ke `docs/` di repo agar review tak bergantung path absolut Windows.
+> Catatan: field lengkap entitas tersedia di eksplorasi `.hermes/plans/schema-exploration.md` & `.hermes/plans/endpoint-map.md` (artefak eksplorasi, sudah dipindah ke repo). Plan ini **self-contained** untuk implementasi; dua file tersebut hanya referensi suplementer. Review SSE/resilience terkonsolidasi di §10.12–§10.14 (sumber: `.hermes/plans/sse-ressement-review.md`, `.hermes/plans/realtime-scaling-review.md`).
 **Catatan `media_blobs`:** (IndexedDB) **TIDAK dibuat tabel**. File foto/rekaman disimpan ke disk (`uploads/`), URL/path absolut relatif disimpan di kolom MariaDB: `smart_photos.original_file_url`, `recordings.file_url`, `programs.thumbnail_url`, `photo_frames.file_url`. Blob tidak disimpan di DB.
 
 ### 0.5 Enum → tipe kolom MariaDB (15 enum)
@@ -331,7 +331,7 @@ ALTER TABLE reports
 
 ---
 
-## 3. PETA ENDPOINT REST (dari `types.ts`, 1:1 — lengkap dari `C:\Users\zan\kidversa-endpoint-map.md`)
+## 3. PETA ENDPOINT REST (dari `types.ts`, 1:1 — lengkap dari `.hermes/plans/endpoint-map.md`)
 
 **AUTH** `/api/auth`: `POST /login`, `POST /register`, `POST /refresh`, `GET /me`, `POST /logout`, `POST /change-password`, `POST /kiosk-token`, `POST /parent-token`. (§10.1: `/change-password` wajib revoke semua refresh token user + denylist jti aktif.)
 **TENANTS** `/api/tenants` (SUPER_ADMIN): GET/POST, `/:id` GET/PUT/DELETE.
@@ -636,6 +636,31 @@ Temuan tambahan dari review mendalam (edge-case OWASP, konsistensi, operasional)
 - **Health readiness (LOW, T0.11):** `/health` lakukan `db.Exec("SELECT 1")`; gagal → 503 (readiness), sukses → 200 (liveness). Dipakai orchestrator / compose `healthcheck`.
 - **Register clarity (LOW, §3):** `POST /api/auth/register` self-service → buat user `approval_status='pending'`, role default `FASILITATOR` (atau tanpa role sampai disetujui), `is_active=0`. Bukan auto-login; admin approval (`/:id/approve`) mengaktifkan.
 - **CSRF SSE (terkait §10.6):** karena SSE auth pakai cookie, validasi header `Origin` == `CORS_ORIGINS` di middleware SSE (tolak cross-origin tak terdaftar) sebagai mitigasi CSRF (`EventSource` tak bisa set header khusus). Cookie atribut env-driven (`COOKIE_SECURE`/`COOKIE_SAMESITE`) — di dev (HTTP) `SameSite=Lax`, di prod (HTTPS) `Secure;SameSite=None`.
+
+### 10.12 SSE scale-out decision & abstraction (sari `docs/backend-plan/realtime-scaling-review.md`, F-1/F-2/F-6/F-9)
+- **Constraint tertulis (HIGH):** v1 = **single-instance only**. Multi-replica tidak didukung sampai `RedisBackend` landing. Cegah deployer naif jalankan 2 replica lalu silently lose cross-replica push.
+- **Trigger scale-out:** SSE clients > ~2.000/instance, ATAU hub in-memory footprint (channels×clients×buffer) mendekati memory limit container, ATAU deploy >1 replica (HA/rolling). Dokumentasikan kriteria ini eksplisit.
+- **`RealtimeChannel` interface sekarang (HIGH, F-2):** definisikan `Backend` interface di `internal/pkg/sse/backend.go` (`Subscribe(ctx,channel) (<-chan Event, func(), error)`, `Publish(ctx,channel,ev) error`, `Shutdown(ctx) error`). Semua usecase/handler depend pada interface, BUKAN `*Hub`. `InMemoryBackend` = hub saat ini; `RedisBackend` (skala) = `PUBLISH sse:{channel}` + goroutine `SUBSCRIBE` per replica feed local hub. Wire di `main.go` via `REALTIME_BACKEND=memory|redis`. Ini ubah "Redis nanti = rewrite" jadi "Redis nanti = config flag".
+- **`jti` denylist juga interface (MED, F-9):** `TokenRevoker` (`Revoke(ctx,jti,ttl)`, `IsRevoked(ctx,jti) bool`) dengan `InMemoryRevoker` (v1) + `RedisRevoker` (`SET jti 1 NX EX <ttl>`). Flag `REVOKER_BACKEND=memory|redis`. Sama pola dengan F-2.
+
+### 10.13 Graceful shutdown (sari review, F-7)
+- `ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)` di `main.go`.
+- On `<-ctx.Done()`: `hub.Shutdown(ctx)` (tutup semua subscriber channel, kirim `retry:` hint terakhir agar `EventSource` reconnect halus) → `e.Shutdown(boundedCtx ~20s)` → `sqlDB.Close()`/Redis close.
+- `Hub.Shutdown` tutup tiap client channel + goroutine per-channel → stream loop kena `<-ctx.Done()` lalu return.
+- **Docker:** `stop_grace_period: 30s` di compose (T0.6) agar drain 20s muat sebelum SIGKILL. Gabung dengan §10.14 DB-replay → rolling deploy seamless.
+
+### 10.14 SSE resilience & reconnect (sari `docs/backend-plan/sse-resilience-review.md`, F-SSE-1..F-SSE-10 + scaling F-3/F-4/F-5/F-8/F-10/F-11)
+Terapkan ke reference code §10.6 sebelum coding SSE (Phase 6). **Top 3 wajib:** F-SSE-1/6 (flush), F-SSE-3/4 (replay), F-SSE-9 (narrative).
+- **Flush tiap tulisan (HIGH, F-SSE-1/6):** setelah SETIAP `fmt.Fprint` event DAN keepalive, panggil `c.Response().Flush()` dan `if err != nil { return }`. Tanpa ini keepalive mengendap di buffer Go, proxy idle timer tetap jalan → koneksi keburu mati; dan write error diabaikan = goroutine + memory leak abadi. Keepalive **configurable** `SSE_KEEPALIVE_SEC` default 15 (bukan 25). Dokumentasikan kontrak proxy: nginx `proxy_read_timeout 3600s` + `proxy_buffering off` (atau andalkan `X-Accel-Buffering: no`).
+- **Replay code nyata (HIGH, F-SSE-3):** `Hub` reference code §10.6 baru punya `perChannel{counter uint64 atomic; buf *ring.Ring cap 64}` + `eventEntry{counter; dbCreatedAt; ev}`. `Publish` increment counter atomik, stamp `ev.id`, append ring. Tambah `ReplaySince(ch, since uint64) []Event` (counter > since); bila `since` lebih tua dari ring head → return `errGap` → handler fallback DB. Kirim `id: <counter>\n` tiap baris.
+- **Layered recovery, selalu snapshot dulu (HIGH, F-SSE-4):** (1) pada SETIAP connect (fresh/reconnect) kirim `snapshot` DB state dulu (dashboard self-heal dari snapshot); (2) bila `Last-Event-ID` dalam window 64 → `ReplaySince` untuk hindari flicker; (3) bila di luar window → fallback query `timeline_events WHERE session_id=? AND created_at >= <oldestBufferedTS>` (mapping counter→DB via `dbCreatedAt` di ring entry, F-SSE-10). Net: live channel loss-tolerant, timeline channel lossless. **Ini mengatasi restart data-loss** (F-4 scaling): ring buffer di memory hilang tiap restart, DB = source of truth.
+- **Context & cleanup (HIGH, F-SSE-5):** `ctx := c.Request().Context()` (JANGAN `context.Background()`) di SSE handler; `defer unsub()` di dalam `fn` `c.Stream`. Deteksi disconnect dipercepat oleh flush-error return.
+- **Snapshot tidak di stream loop (MED, F-3):** fetch snapshot SEBELUM masuk loop / sebelum tulis header SSE → GORM conn dikembalikan ke pool sebelum streaming. Jangan ada DB query di dalam `select` loop. Komentar di `hub.go`: "SSE holds zero DB conns; Publish pure in-memory; only one-shot snapshot reads DB."
+- **Narrative generation per-report, bukan per-viewer (HIGH, F-SSE-9/F-5):** jalankan SATU generator per `reportID` via `singleflight`/`sync.Map` in-flight, publish chunk ke `report:<id>:narrative`. Persist progresif ke `reports.ai_narrative` (atau chunk table) → subscriber dapat prefix dari DB + live chunk; reconnect replay prefix + lanjut. Bind ctx ke **report job** (hard timeout), bukan viewer connection. Cegah duplikasi (100 client = 100 generate berbeda) & truncasi.
+- **Per-channel drop policy (MED, F-SSE-8):** `live:*`,`notif:*` → `PolicyDrop` (drop + counter; snapshot recover). `report:<id>:narrative` → `PolicyBlock` (backpressure, jangan drop teks narasi).
+- **Metrics nyata, bukan vaporware (MED, F-SSE-7/F-8):** tambah `atomic.Int64` di Hub (`connected, published, dropped, slowClients`); expose via JSON `/debug/sse` atau meta `/health`. Hindari per-drop `log.Warn` (spam saat thundering herd) — set flag "behind" lalu warn sekali. Bila scale-out: `prometheus/client_golang` + `/metrics`. Ganti `log.Warn` stdlib dengan `log/slog` ber-request-ID untuk debugging SSE lifecycle.
+- **Memory bounds (LOW/MED, F-10):** dokumentasikan `clients×256 + channels×64×eventSize`; tambah `MaxSSEConnections` guard (reject 503 bila lewat). Pertimbangkan shrink per-client buffer ke 64.
+- **Delivery semantics (MED, F-11):** dokumentasikan "SSE = best-effort, latest-state; NOT guaranteed-delivery" + periodic snapshot self-heal agar klien lambat tak "frozen di state lama".
 
 ---
 

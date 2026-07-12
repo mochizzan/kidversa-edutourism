@@ -1,0 +1,255 @@
+package persistence
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	"gorm.io/gorm"
+
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/domain/entity"
+	"kidversa-edutourism-backend/internal/domain/repository"
+)
+
+// GormSessionRepository implements repository.SessionRepository.
+type GormSessionRepository struct {
+	db *gorm.DB
+}
+
+// NewSessionRepository builds a GORM-backed session repository.
+func NewSessionRepository(db *gorm.DB) repository.SessionRepository {
+	return &GormSessionRepository{db: db}
+}
+
+// Transaction runs fn inside a DB transaction, passing a repository bound to the tx.
+func (r *GormSessionRepository) Transaction(ctx context.Context, fn func(tx repository.SessionRepository) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(&GormSessionRepository{db: tx})
+	})
+}
+
+func (r *GormSessionRepository) CreateSession(ctx context.Context, s *entity.Session) error {
+	m := sessionModelFromEntity(s)
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	*s = *m.ToEntity()
+	return nil
+}
+
+func (r *GormSessionRepository) GetSessionByID(ctx context.Context, id string) (*entity.Session, error) {
+	var m SessionModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+func (r *GormSessionRepository) ListSessions(ctx context.Context, f repository.SessionFilter, page, limit int) (*repository.Paginated[entity.Session], error) {
+	q := r.db.WithContext(ctx).Model(&SessionModel{})
+	if f.TenantID != "" {
+		q = q.Where("tenant_id = ?", f.TenantID)
+	}
+	if f.Status != "" {
+		q = q.Where("status = ?", f.Status)
+	}
+	if f.SessionDate != "" {
+		q = q.Where("session_date = ?", f.SessionDate)
+	}
+	if f.Search != "" {
+		like := "%" + strings.ToLower(f.Search) + "%"
+		q = q.Where("LOWER(name) LIKE ? OR LOWER(location) LIKE ?", like, like)
+	}
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	var models []SessionModel
+	offset := (page - 1) * limit
+	if err := q.Order("session_date DESC, created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.Session, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return &repository.Paginated[entity.Session]{Items: items, Total: int(total)}, nil
+}
+
+func (r *GormSessionRepository) UpdateSession(ctx context.Context, s *entity.Session) error {
+	m := sessionModelFromEntity(s)
+	if err := r.db.WithContext(ctx).Model(&SessionModel{}).Where("id = ?", s.ID).Updates(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+func (r *GormSessionRepository) DeleteSession(ctx context.Context, id string) error {
+	if err := r.db.WithContext(ctx).Delete(&SessionModel{}, "id = ?", id).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// --- Session stages ---
+
+func (r *GormSessionRepository) CreateSessionStage(ctx context.Context, s *entity.SessionStage) error {
+	m := sessionStageModelFromEntity(s)
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	*s = *m.ToEntity()
+	return nil
+}
+
+func (r *GormSessionRepository) ListSessionStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
+	var models []SessionStageModel
+	if err := r.db.WithContext(ctx).Where("session_id = ?", sessionID).Order("created_at ASC").Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.SessionStage, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return items, nil
+}
+
+func (r *GormSessionRepository) UpdateSessionStage(ctx context.Context, s *entity.SessionStage) error {
+	m := sessionStageModelFromEntity(s)
+	if err := r.db.WithContext(ctx).Model(&SessionStageModel{}).Where("id = ?", s.ID).Updates(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// --- Session groups ---
+
+func (r *GormSessionRepository) CreateSessionGroup(ctx context.Context, g *entity.SessionGroup) error {
+	m := sessionGroupModelFromEntity(g)
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	*g = *m.ToEntity()
+	return nil
+}
+
+func (r *GormSessionRepository) GetSessionGroupByID(ctx context.Context, id string) (*entity.SessionGroup, error) {
+	var m SessionGroupModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+func (r *GormSessionRepository) ListSessionGroups(ctx context.Context, sessionID string) ([]entity.SessionGroup, error) {
+	var models []SessionGroupModel
+	if err := r.db.WithContext(ctx).Where("session_id = ?", sessionID).Order("created_at ASC").Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.SessionGroup, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return items, nil
+}
+
+func (r *GormSessionRepository) UpdateSessionGroup(ctx context.Context, g *entity.SessionGroup) error {
+	m := sessionGroupModelFromEntity(g)
+	if err := r.db.WithContext(ctx).Model(&SessionGroupModel{}).Where("id = ?", g.ID).Updates(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+func (r *GormSessionRepository) DeleteSessionGroup(ctx context.Context, id string) error {
+	if err := r.db.WithContext(ctx).Delete(&SessionGroupModel{}, "id = ?", id).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// --- Group stage progress ---
+
+func (r *GormSessionRepository) CreateGroupStageProgress(ctx context.Context, p *entity.GroupStageProgress) error {
+	m := groupStageProgressModelFromEntity(p)
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	*p = *m.ToEntity()
+	return nil
+}
+
+func (r *GormSessionRepository) ListGroupStageProgress(ctx context.Context, sessionStageID string) ([]entity.GroupStageProgress, error) {
+	var models []GroupStageProgressModel
+	if err := r.db.WithContext(ctx).Where("session_stage_id = ?", sessionStageID).Order("created_at ASC").Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.GroupStageProgress, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return items, nil
+}
+
+// --- Participants ---
+
+func (r *GormSessionRepository) CreateParticipant(ctx context.Context, p *entity.Participant) error {
+	m := participantModelFromEntity(p)
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	*p = *m.ToEntity()
+	return nil
+}
+
+func (r *GormSessionRepository) GetParticipantByID(ctx context.Context, id string) (*entity.Participant, error) {
+	var m ParticipantModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+func (r *GormSessionRepository) ListParticipants(ctx context.Context, sessionID, groupID string) ([]entity.Participant, error) {
+	q := r.db.WithContext(ctx).Model(&ParticipantModel{})
+	if sessionID != "" {
+		q = q.Where("session_id = ?", sessionID)
+	}
+	if groupID != "" {
+		q = q.Where("group_id = ?", groupID)
+	}
+	var models []ParticipantModel
+	if err := q.Order("created_at ASC").Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.Participant, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return items, nil
+}
+
+func (r *GormSessionRepository) UpdateParticipant(ctx context.Context, p *entity.Participant) error {
+	m := participantModelFromEntity(p)
+	if err := r.db.WithContext(ctx).Model(&ParticipantModel{}).Where("id = ?", p.ID).Updates(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+func (r *GormSessionRepository) DeleteParticipant(ctx context.Context, id string) error {
+	if err := r.db.WithContext(ctx).Delete(&ParticipantModel{}, "id = ?", id).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
