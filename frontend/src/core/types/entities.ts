@@ -14,6 +14,7 @@ export interface User {
   rejected_at?: string
   rejected_by?: string
   rejection_reason?: string
+  must_change_password?: boolean
   created_at: string
 }
 
