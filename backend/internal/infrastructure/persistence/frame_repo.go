@@ -76,6 +76,14 @@ func (r *GormFrameRepository) Update(ctx context.Context, f *entity.PhotoFrame) 
 	return nil
 }
 
+// UpdateFields applies a partial (map) update, so zero/false values persist (C2).
+func (r *GormFrameRepository) UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error {
+	if err := r.db.WithContext(ctx).Model(&PhotoFrameModel{}).Where("id = ?", id).Updates(fields).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
 func (r *GormFrameRepository) Delete(ctx context.Context, id string) error {
 	if err := r.db.WithContext(ctx).Delete(&PhotoFrameModel{}, "id = ?", id).Error; err != nil {
 		return apperrors.Internal("internal_error", err)

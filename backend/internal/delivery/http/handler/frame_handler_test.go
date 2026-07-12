@@ -48,6 +48,12 @@ func (f *fakeFrameRepo) Update(_ context.Context, fr *entity.PhotoFrame) error {
 	return nil
 }
 func (f *fakeFrameRepo) Delete(_ context.Context, id string) error { delete(f.byID, id); return nil }
+func (f *fakeFrameRepo) UpdateFields(_ context.Context, id string, _ map[string]interface{}) error {
+	if _, ok := f.byID[id]; !ok {
+		return repoErrNotFound
+	}
+	return nil
+}
 
 func TestFrameCreatePersists(t *testing.T) {
 	repo := newFakeFrameRepo()

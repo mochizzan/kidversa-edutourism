@@ -51,5 +51,22 @@ func (h *FrameHandler) Delete(c *echo.Context) error {
 	return appresp.NoContent(c)
 }
 
+// Deactivate handles POST /api/frames/:id/deactivate (set IsActive=false via map, C2).
+func (h *FrameHandler) Deactivate(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	fields := map[string]interface{}{"is_active": false}
+	if err := h.repo.UpdateFields((*c).Request().Context(), id, fields); err != nil {
+		return err
+	}
+	updated, err := h.repo.GetByID((*c).Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewFrameResponse(updated))
+}
+
 // ensure import referenced.
 var _ = appmiddleware.GetUserID
