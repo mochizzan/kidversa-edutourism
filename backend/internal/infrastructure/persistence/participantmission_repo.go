@@ -75,7 +75,7 @@ func (r *GormParticipantMissionRepository) Delete(ctx context.Context, id string
 // deletes the existing rows and inserts the provided items within one transaction.
 func (r *GormParticipantMissionRepository) ReplaceByReport(ctx context.Context, reportID string, items []entity.ParticipantMission) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("report_id = ?", reportID).Delete(&ParticipantMissionModel{}).Error; err != nil {
+		if err := tx.Unscoped().Where("report_id = ?", reportID).Delete(&ParticipantMissionModel{}).Error; err != nil {
 			return apperrors.Internal("internal_error", err)
 		}
 		if len(items) == 0 {

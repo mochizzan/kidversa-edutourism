@@ -89,6 +89,21 @@ type ConsentLogModel struct {
 // TableName pins the table name.
 func (ConsentLogModel) TableName() string { return "consent_logs" }
 
+// BeforeCreate generates a UUID if missing and stamps audit fields.
+// Without this hook, Create/SendRequest would persist with an empty id and
+// trip the PRIMARY KEY (duplicate ” entry).
+func (m *ConsentLogModel) BeforeCreate(*gorm.DB) error {
+	if m.ID == "" {
+		m.ID = newUUID()
+	}
+	now := time.Now()
+	if m.CreatedAt.IsZero() {
+		m.CreatedAt = now
+	}
+	m.UpdatedAt = m.CreatedAt
+	return nil
+}
+
 // ToEntity maps the model back to the domain entity.
 func (m *ConsentLogModel) ToEntity() *entity.ConsentLog {
 	e := m.ConsentLog
