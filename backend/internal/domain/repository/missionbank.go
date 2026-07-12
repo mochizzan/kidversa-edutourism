@@ -20,6 +20,9 @@ type MissionBankRepository interface {
 	GetByID(ctx context.Context, id string) (*entity.MissionBank, error)
 	List(ctx context.Context, f MissionBankFilter, page, limit int) (*Paginated[entity.MissionBank], error)
 	Update(ctx context.Context, m *entity.MissionBank) error
+	// UpdateFields applies a partial (map) update. Use instead of Update(struct) so
+	// zero/false values persist (GORM zero-value bug, C2).
+	UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error
 	Delete(ctx context.Context, id string) error
 }
 
@@ -36,5 +39,8 @@ type FrameRepository interface {
 	GetByID(ctx context.Context, id string) (*entity.PhotoFrame, error)
 	List(ctx context.Context, f FrameFilter, page, limit int) (*Paginated[entity.PhotoFrame], error)
 	Update(ctx context.Context, f *entity.PhotoFrame) error
+	// UpdateFields applies a partial (map) update. Use instead of Update(struct) so
+	// zero/false values persist (GORM zero-value bug, C2).
+	UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error
 	Delete(ctx context.Context, id string) error
 }
