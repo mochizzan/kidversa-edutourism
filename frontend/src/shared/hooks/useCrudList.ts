@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { ListParams, PaginatedResponse } from '../../core/types'
+import { ApiError } from '../../core/services/backendClient'
+import { useGlobalToast } from '../../shared/components/feedback/Toast'
 
 interface UseCrudListOptions<T> {
   fetchFn: (params: ListParams) => Promise<PaginatedResponse<T>>
@@ -11,6 +13,7 @@ interface UseCrudListOptions<T> {
 interface UseCrudListResult<T> {
   data: T[]
   loading: boolean
+  error: string | null
   page: number
   total: number
   search: string
@@ -25,7 +28,7 @@ interface UseCrudListResult<T> {
 const _cache = new Map<string, { data: unknown[]; total: number }>()
 
 export function useCrudList<T extends { id: string }>(
-  options: UseCrudListOptions<T>
+  options: UseCrudListOptions<T>,
 ): UseCrudListResult<T> {
   const { fetchFn, pageSize = 10, enableCache = true, additionalFilters } = options
 
@@ -34,6 +37,7 @@ export function useCrudList<T extends { id: string }>(
 
   const [data, setData] = useState<T[]>(cached?.data as T[] ?? [])
   const [loading, setLoading] = useState(!cached)
+  const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(cached?.total ?? 0)
   const [search, setSearch] = useState('')
@@ -41,7 +45,11 @@ export function useCrudList<T extends { id: string }>(
   const [refreshKey, setRefreshKey] = useState(0)
   const isSearchMounted = useRef(false)
 
+  const { addToast } = useGlobalToast()
+
   const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
       const res = await fetchFn({ page, limit: pageSize, search, ...additionalFilters })
       setData(res.data)
@@ -49,13 +57,24 @@ export function useCrudList<T extends { id: string }>(
       if (enableCache) {
         _cache.set(cacheKey, { data: res.data, total: res.total })
       }
+    } catch (err) {
+      // A 401 is handled globally (redirect to login); don't toast it here.
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Sesi berakhir. Silakan masuk kembali.')
+      } else if (err instanceof Error && 'status' in err) {
+        // Network/connection failure surfaced by backendClient as a generic Error.
+        setError('Backend tidak tersedia. Periksa koneksi lalu coba lagi.')
+        addToast({ type: 'error', message: 'Backend tidak tersedia. Coba lagi.' })
+      } else {
+        setError('Gagal memuat data. Coba lagi.')
+      }
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, fetchFn, enableCache, cacheKey, additionalFilters, refreshKey])
+  }, [page, pageSize, search, fetchFn, enableCache, cacheKey, additionalFilters, refreshKey, addToast])
 
   useEffect(() => {
-    load()
+    void load()
   }, [load])
 
   // Debounced search: skip initial mount, reset page to 1 on new search
@@ -72,9 +91,8 @@ export function useCrudList<T extends { id: string }>(
   }, [search])
 
   const refresh = useCallback(() => {
-    setLoading(true)
     setRefreshKey(k => k + 1)
   }, [])
 
-  return { data, loading, page, total, search, setPage, setSearch, refresh, deleteId, setDeleteId }
+  return { data, loading, error, page, total, search, setPage, setSearch, refresh, deleteId, setDeleteId }
 }

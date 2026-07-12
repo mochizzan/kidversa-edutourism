@@ -8,8 +8,6 @@ import { useGlobalSearch } from '../../hooks/useGlobalSearch'
 import { useHeaderNotifications } from '../../hooks/useHeaderNotifications'
 import { useTenantStore } from '../../../core/stores/tenantStore'
 import { isSuperAdmin } from '../../../core/utils/permissions'
-import { getAll } from '../../../core/services/storage/idb'
-import type { Tenant } from '../../../core/types'
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Users: <Users className="w-4 h-4" />,
@@ -30,7 +28,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const notificationRef = useRef<HTMLDivElement>(null)
   const { query, setQuery, loading, results, searched, reset } = useGlobalSearch()
   const { notifications, unreadCount } = useHeaderNotifications()
-  const { setActiveTenant, tenants: storeTenants } = useTenantStore()
+  const { setActiveTenant, tenants } = useTenantStore()
   const [focused, setFocused] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
 
@@ -101,11 +99,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
     if (!notif.route) return
 
     if (notif.tenant_id && isSuperAdmin(user)) {
-      let tenant = storeTenants.find((t) => t.id === notif.tenant_id)
-      if (!tenant) {
-        const allTenants = await getAll<Tenant>('tenants')
-        tenant = allTenants.find((t) => t.id === notif.tenant_id)
-      }
+      let tenant = tenants.find((t) => t.id === notif.tenant_id)
       if (tenant) {
         setActiveTenant(tenant)
       }

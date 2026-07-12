@@ -1,52 +1,26 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ConnectionStatus } from '../../core/types/enums'
 import { backendClient } from '../../core/services/backendClient'
-import { syncManager } from '../../core/services/sync/syncManager'
 
 interface UseConnectionStatusResult {
-  status: ConnectionStatus
-  pendingSyncCount: number
+  status: 'online' | 'degraded' | 'reconnecting'
 }
 
+// Subscribes to the module-level connection store kept by backendClient
+// (online | degraded | reconnecting). The old IndexedDB pending-sync count is
+// gone — the backend is the single source of truth.
 export function useConnectionStatus(): UseConnectionStatusResult {
-  const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.OFFLINE)
-  const [pendingSyncCount, setPendingSyncCount] = useState(0)
+  const [status, setStatus] = useState<'online' | 'degraded' | 'reconnecting'>(
+    backendClient.getConnection(),
+  )
 
-  const checkConnection = useCallback(async () => {
-    if (!navigator.onLine) {
-      setStatus(ConnectionStatus.OFFLINE)
-      return
-    }
-
-    if (!backendClient.isBackendEnabled()) {
-      setStatus(ConnectionStatus.OFFLINE)
-      return
-    }
-
-    try {
-      const isHealthy = await backendClient.healthCheck()
-      if (isHealthy) {
-        setStatus(ConnectionStatus.CLOUD)
-      } else {
-        setStatus(ConnectionStatus.EDGE)
-      }
-    } catch {
-      setStatus(ConnectionStatus.EDGE)
-    }
-
-    try {
-      const count = await syncManager.getPendingCount()
-      setPendingSyncCount(count)
-    } catch {
-      setPendingSyncCount(0)
-    }
+  const sync = useCallback(() => {
+    setStatus(backendClient.getConnection())
   }, [])
 
   useEffect(() => {
-    checkConnection()
-    const interval = setInterval(checkConnection, 60000)
-    return () => clearInterval(interval)
-  }, [checkConnection])
+    const unsub = backendClient.subscribeConnection(sync)
+    return unsub
+  }, [sync])
 
-  return { status, pendingSyncCount }
+  return { status }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { Plus, Pencil, Check, X as XIcon, Ban, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Check, X as XIcon, Ban, Trash2, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -11,13 +11,13 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { useCrudList } from '../../../shared/hooks/useCrudList'
 import { userService } from '../../../core/services/users'
+import { tenantService } from '../../../core/services/tenants'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { canApproveUser } from '../../../core/utils/permissions'
 import { ApprovalStatus } from '../../../core/types/enums'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { User, Tenant } from '../../../core/types'
-import { getAll } from '../../../core/services/storage/idb'
 
 type FilterTab = 'all' | 'pending' | 'active' | 'inactive' | 'rejected'
 
@@ -65,7 +65,7 @@ const UsersPage = () => {
   const { getHighlightClass } = useHighlight()
 
   useEffect(() => {
-    getAll<Tenant>('tenants').then(setTenants)
+    tenantService.getAll().then(setTenants).catch(() => setTenants([]))
   }, [])
 
   const tenantMap = new Map(tenants.map((t) => [t.id, t]))
@@ -93,7 +93,7 @@ const UsersPage = () => {
     return filters
   }, [activeTab, tenantFilter, isSuperAdminView, tenantId])
 
-  const { data: users, loading, page, total, setPage, setSearch, refresh } = useCrudList<User>({
+  const { data: users, loading, error, page, total, setPage, setSearch, refresh } = useCrudList<User>({
     fetchFn: (params) => userService.getAll({ ...params, limit: 10, filters: buildFilters() }),
     additionalFilters: buildFilters(),
   })
@@ -277,6 +277,13 @@ const UsersPage = () => {
           </Link>
         }
       />
+
+      {error && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
+          <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
+          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+        </div>
+      )}
 
       <Tabs tabs={TABS} activeKey={activeTab} onChange={handleTabChange} />
 

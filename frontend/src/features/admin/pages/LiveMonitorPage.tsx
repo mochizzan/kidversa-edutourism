@@ -24,6 +24,8 @@ import { Button } from '../../../shared/components/ui/Button'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { cn } from '../../../core/utils'
+import { ApiError } from '../../../core/services/backendClient'
+import { redirectToLogin } from '../../../core/stores/authStore'
 import type { Session, SessionStage, ProgramStage } from '../../../core/types'
 import type { TimelineEventRow, LiveGroupWithProgress } from '../../../core/services/live'
 import { StageProgressBar } from '../components/StageProgressBar'
@@ -185,42 +187,53 @@ const LiveMonitorPage = () => {
         user.id
       )
       await fetchData()
-    } catch {
-      // silent
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        redirectToLogin()
+        return
+      }
     }
     setOverrideModal(null)
   }
 
   const handleUnlock = async (groupId: string, sessionStageId: string) => {
     if (!user || !activeSession) return
-    await liveService.unlockStage(groupId, sessionStageId, user.id)
-    const group = groups.find((g) => g.group.id === groupId)
-    const ss = stages.find((s) => s.id === sessionStageId)
-    const ps = programStages.find((p) => p.id === ss?.program_stage_id)
-    await liveService.addTimelineEvent(
-      activeSession.id,
-      groupId,
-      'stage:unlock',
-      `${group?.group.name || 'Kelompok'} di-unlock ke "${ps?.name || 'Stage'}"`,
-      user.id
-    )
-    await fetchData()
+    try {
+      await liveService.unlockStage(groupId, sessionStageId, user.id)
+      const group = groups.find((g) => g.group.id === groupId)
+      const ss = stages.find((s) => s.id === sessionStageId)
+      const ps = programStages.find((p) => p.id === ss?.program_stage_id)
+      await liveService.addTimelineEvent(
+        activeSession.id,
+        groupId,
+        'stage:unlock',
+        `${group?.group.name || 'Kelompok'} di-unlock ke "${ps?.name || 'Stage'}"`,
+        user.id
+      )
+      await fetchData()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) redirectToLogin()
+    }
   }
 
   const handleComplete = async (groupId: string, sessionStageId: string) => {
     if (!activeSession || !user) return
-    await liveService.completeStage(groupId, sessionStageId)
-    const group = groups.find((g) => g.group.id === groupId)
-    const ss = stages.find((s) => s.id === sessionStageId)
-    const ps = programStages.find((p) => p.id === ss?.program_stage_id)
-    await liveService.addTimelineEvent(
-      activeSession.id,
-      groupId,
-      'group:completed',
-      `${group?.group.name || 'Kelompok'} menyelesaikan "${ps?.name || 'Stage'}"`,
-      user.id
-    )
-    await fetchData()
+    try {
+      await liveService.completeStage(groupId, sessionStageId)
+      const group = groups.find((g) => g.group.id === groupId)
+      const ss = stages.find((s) => s.id === sessionStageId)
+      const ps = programStages.find((p) => p.id === ss?.program_stage_id)
+      await liveService.addTimelineEvent(
+        activeSession.id,
+        groupId,
+        'group:completed',
+        `${group?.group.name || 'Kelompok'} menyelesaikan "${ps?.name || 'Stage'}"`,
+        user.id
+      )
+      await fetchData()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) redirectToLogin()
+    }
   }
 
   const getGroupStatus = (g: LiveGroupWithProgress) => {

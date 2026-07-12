@@ -8,6 +8,8 @@ import { Input } from '../../../shared/components/ui/Input'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { participantService } from '../../../core/services/participants'
+import { ApiError } from '../../../core/services/backendClient'
+import { redirectToLogin } from '../../../core/stores/authStore'
 import type { CreateParticipantDTO } from '../../../core/types'
 
 type ParticipantFormState = {
@@ -146,7 +148,15 @@ const ParticipantFormPage = () => {
 
       navigate(ROUTES.ADMIN.PARTICIPANTS)
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menyimpan peserta' })
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          redirectToLogin()
+          return
+        }
+        addToast({ type: 'error', message: err.message || 'Gagal menyimpan peserta' })
+      } else {
+        addToast({ type: 'error', message: 'Gagal menyimpan peserta' })
+      }
     } finally {
       setSaving(false)
     }

@@ -7,9 +7,11 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
-import { getAll, put } from '../../../core/services/storage/idb'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { tenantService } from '../../../core/services/tenants'
+import { userService } from '../../../core/services/users'
 import { useTenantStore } from '../../../core/stores/tenantStore'
-import type { Tenant, User } from '../../../core/types'
+import type { Tenant } from '../../../core/types'
 
 function slugify(text: string): string {
   return text
@@ -22,6 +24,7 @@ function slugify(text: string): string {
 
 const TenantsPage = () => {
   const navigate = useNavigate()
+  const { addToast } = useGlobalToast()
   const { setTenants: setStoreTenants, setActiveTenant } = useTenantStore()
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [tenantUserCounts, setTenantUserCounts] = useState<Record<string, number>>({})
@@ -36,10 +39,11 @@ const TenantsPage = () => {
 
   const loadTenants = useCallback(async () => {
     try {
-      const [tenantList, users] = await Promise.all([
-        getAll<Tenant>('tenants'),
-        getAll<User>('users'),
+      const [tenantList, usersPage] = await Promise.all([
+        tenantService.getAll(),
+        userService.getAll({ page: 1, limit: 1000 }),
       ])
+      const users = usersPage.data
 
       const counts: Record<string, number> = {}
       for (const user of users) {
@@ -97,16 +101,10 @@ const TenantsPage = () => {
     const error = validateSlug(formSlug)
     if (error) { setFormError(error); return }
 
-    const tenant: Tenant = {
-      id: `tenant-${Date.now()}`,
-      name: formName.trim(),
-      slug: formSlug.trim(),
-      created_at: new Date().toISOString(),
-    }
-
-    await put('tenants', tenant)
+    // Tenant creation is handled server-side (bootstrap); the frontend has no
+    // mutation endpoint for tenants, so we surface an informational message.
+    addToast({ type: 'info', message: 'Pembuatan tenant dilakukan melalui administrator server.' })
     setShowCreateModal(false)
-    await loadTenants()
   }
 
   const handleSaveEdit = async () => {
@@ -114,16 +112,9 @@ const TenantsPage = () => {
     const error = validateSlug(formSlug, editTarget.id)
     if (error) { setFormError(error); return }
 
-    const updated: Tenant = {
-      ...editTarget,
-      name: formName.trim(),
-      slug: formSlug.trim(),
-    }
-
-    await put('tenants', updated)
+    addToast({ type: 'info', message: 'Pengubahan tenant dilakukan melalui administrator server.' })
     setShowEditModal(false)
     setEditTarget(null)
-    await loadTenants()
   }
 
   const handleViewUsers = (tenant: Tenant) => {

@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ConnectionStatus } from '../../core/types/enums'
 
 export interface LiveSessionState {
   groups: Record<string, {
@@ -13,13 +12,13 @@ export interface LiveSessionState {
       ratingStatus: 'unrated' | 'rated'
     }>
   }>
-  connectionStatus: ConnectionStatus
+  connectionStatus: 'online' | 'degraded' | 'reconnecting'
 }
 
 export function useLiveSession(sessionId: string) {
   const [state, setState] = useState<LiveSessionState>({
     groups: {},
-    connectionStatus: ConnectionStatus.OFFLINE,
+    connectionStatus: 'online',
   })
   const intervalRef = useRef<number | null>(null)
 
@@ -46,7 +45,7 @@ export function useLiveSession(sessionId: string) {
   }, [])
 
   useEffect(() => {
-    setState(prev => ({ ...prev, connectionStatus: ConnectionStatus.CLOUD }))
+    setState(prev => ({ ...prev, connectionStatus: 'online' }))
 
     // Simulate real-time updates every 10 seconds
     intervalRef.current = window.setInterval(simulateProgress, 10000)

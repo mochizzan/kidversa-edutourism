@@ -2,19 +2,20 @@ import { useEffect } from 'react'
 import { Building2 } from 'lucide-react'
 import { useTenantStore } from '../../../core/stores/tenantStore'
 import { useAuth } from '../../../core/hooks/useAuth'
-import { getAll } from '../../../core/services/storage/idb'
 import type { Tenant } from '../../../core/types'
 import { isSuperAdmin } from '../../../core/utils/permissions'
 import { cn } from '../../../core/utils'
 
 export function TenantSwitcher() {
   const { user } = useAuth()
-  const { activeTenant, tenants, setActiveTenant, setTenants } = useTenantStore()
+  const { activeTenant, tenants, setActiveTenant, fetchTenants } = useTenantStore()
 
   useEffect(() => {
     if (!isSuperAdmin(user)) return
-    getAll<Tenant>('tenants').then(setTenants)
-  }, [user, setTenants])
+    if (tenants.length === 0) {
+      void fetchTenants()
+    }
+  }, [user, tenants.length, fetchTenants])
 
   if (!isSuperAdmin(user)) return null
 

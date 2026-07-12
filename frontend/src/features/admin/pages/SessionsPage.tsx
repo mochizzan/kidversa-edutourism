@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { Plus, Eye, Play, X, Calendar, Trash2 } from 'lucide-react'
+import { Plus, Eye, Play, X, Calendar, Trash2, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -18,7 +18,7 @@ import { formatDate } from '../../../shared/utils'
 
 const SessionsPage = () => {
   const navigate = useNavigate()
-  const { data: sessions, loading, page, total, setPage, setSearch, refresh } = useCrudList<Session>({
+  const { data: sessions, loading, error, page, total, setPage, setSearch, refresh } = useCrudList<Session>({
     fetchFn: (params) => sessionService.getAll({ ...params, limit: 10 }),
   })
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -141,6 +141,13 @@ const SessionsPage = () => {
           <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.SESSION_NEW)}>Buat Sesi</Button>
         }
       />
+
+      {error && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
+          <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
+          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+        </div>
+      )}
 
       <DataTable
         data={sessions}

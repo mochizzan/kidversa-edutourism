@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { frameService } from '../../../core/services/frames'
 import { ROUTES } from '../../../core/constants/app'
-import { getTenantScope } from '../../../core/services/tenantScope'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
 
 interface UploadItem {
   id: string
@@ -45,6 +45,7 @@ function formatItemName(filename: string): string {
 
 export function useFrameUploadQueue(): UseFrameUploadQueueResult {
   const navigate = useNavigate()
+  const { tenantId, requiresSelection } = useTenantScope()
   const [items, setItems] = useState<UploadItem[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -151,20 +152,19 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
     if (items.length === 0) return
     if (items.some((i) => !i.name.trim())) return
 
-    const scope = getTenantScope()
-    if (scope.blocked || !scope.tenantId) {
-      setErrorMessage('Pilih tenant aktif terlebih dahulu.')
+    if (!tenantId) {
+      setErrorMessage(requiresSelection ? 'Pilih tenant aktif terlebih dahulu.' : 'Tenant belum tersedia.')
       return
     }
 
-    const tenantId = scope.tenantId
+    const tenantIdToUse = tenantId
     setIsSaving(true)
     setErrorMessage(null)
     try {
       await Promise.all(
         items.map((item, index) =>
           frameService.create({
-            tenant_id: tenantId, name: item.name.trim(),
+            tenant_id: tenantIdToUse, name: item.name.trim(),
             program_id: item.programId || undefined,
             file_url: item.preview, is_active: true, sort_order: index,
           }),
@@ -176,7 +176,7 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
     } finally {
       setIsSaving(false)
     }
-  }, [items, navigate])
+  }, [items, navigate, tenantId, requiresSelection])
 
   const hasEmptyName = items.some((i) => !i.name.trim())
 

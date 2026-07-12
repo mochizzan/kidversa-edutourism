@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { RouterProvider } from 'react-router-dom'
+import { RouterProvider, useNavigate } from 'react-router-dom'
 import { router } from './app/router'
-import { useAuthStore } from './core/stores/authStore'
+import { useAuthStore, registerUnauthorizedHandler } from './core/stores/authStore'
+import { ROUTES } from './core/constants/app'
 import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
 import { ToastProvider } from './shared/components/feedback/Toast'
 import { healthCheck } from './core/services/backendClient'
@@ -83,6 +84,12 @@ function App() {
   const { checkSession, isLoading } = useAuthStore()
   const [splashDone, setSplashDone] = useState(false)
   const [backendDown, setBackendDown] = useState(false)
+  const navigate = useNavigate()
+
+  // Route any caught 401 (refresh already failed in backendClient) to login.
+  useEffect(() => {
+    registerUnauthorizedHandler(() => navigate(ROUTES.AUTH.LOGIN, { replace: true }))
+  }, [navigate])
 
   const runStartup = async () => {
     try {

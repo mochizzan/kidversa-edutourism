@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../core/hooks/useAuth'
 import { useConnectionStatus } from './useConnectionStatus'
-import { getAll } from '../../core/services/storage/idb'
-import type { User, Tenant } from '../../core/types'
+import { userService } from '../../core/services/users'
+import { tenantService } from '../../core/services/tenants'
+import type { User } from '../../core/types'
 import { UserRole, ApprovalStatus } from '../../core/types/enums'
 import { isSuperAdmin, isAdmin } from '../../core/utils/permissions'
 import { USERS_CHANGED_EVENT, ROUTES } from '../../core/constants/app'
@@ -32,12 +33,12 @@ export function useHeaderNotifications() {
 
     const notifs: HeaderNotification[] = []
 
-    if (connectionStatus === 'OFFLINE') {
+    if (connectionStatus === 'reconnecting') {
       notifs.push({
         id: 'offline',
         type: 'connection',
-        title: 'Mode Offline',
-        description: 'Data disimpan secara lokal',
+        title: 'Backend tidak tersedia',
+        description: 'Menghubungkan kembali ke server…',
         color: 'text-orange-600 bg-orange-100',
       })
     }
@@ -45,18 +46,21 @@ export function useHeaderNotifications() {
     notifs.push({
       id: 'connection-status',
       type: 'connection',
-      title: connectionStatus === 'CLOUD' ? 'Terhubung ke Cloud' : connectionStatus === 'EDGE' ? 'Mode Edge' : 'Offline',
-      description: connectionStatus === 'CLOUD' ? 'Semua data tersinkronisasi' : 'Sinkronisasi tertunda',
-      color: connectionStatus === 'CLOUD' ? 'text-green-600 bg-green-100' : connectionStatus === 'EDGE' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100',
+      title: connectionStatus === 'online' ? 'Terhubung ke Server' : connectionStatus === 'degraded' ? 'Koneksi Terbatas' : 'Menghubungkan…',
+      description: connectionStatus === 'online' ? 'Semua data tersinkronisasi' : 'Coba lagi nanti',
+      color: connectionStatus === 'online' ? 'text-green-600 bg-green-100' : connectionStatus === 'degraded' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100',
     })
 
     const approvalRoles: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN]
     if (approvalRoles.includes(user.role)) {
       try {
-        const users = await getAll<User>('users')
-        const tenants = await getAll<Tenant>('tenants')
+        const [usersPage, tenantList] = await Promise.all([
+          userService.getAll({ page: 1, limit: 1000 }),
+          tenantService.getAll(),
+        ])
+        const users = usersPage.data
+        const tenants = tenantList
         const tenantMap = new Map(tenants.map((t) => [t.id, t]))
-
         const pendingUsers = users.filter((u) => u.approval_status === ApprovalStatus.PENDING)
 
         const relevantPending = pendingUsers.filter((pending) => {

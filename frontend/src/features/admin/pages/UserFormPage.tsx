@@ -14,7 +14,9 @@ import { Tooltip } from '../../../shared/components/ui/Tooltip'
 import { AvatarUploadModal } from '../../../shared/components/ui/AvatarUploadModal'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
-import { getTenantScope } from '../../../core/services/tenantScope'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
+import { redirectToLogin } from '../../../core/stores/authStore'
+import { ApiError } from '../../../core/services/backendClient'
 import { resizeImage } from '../../../core/utils/image'
 import type { UpdateUserDTO } from '../../../core/types'
 import { UserRole } from '../../../core/types'
@@ -57,6 +59,7 @@ const UserFormPage = () => {
   const navigate = useNavigate()
   const { userId } = useParams()
   const { addToast } = useGlobalToast()
+  const { tenantId, requiresSelection } = useTenantScope()
   const isEdit = Boolean(userId)
 
   const [saving, setSaving] = useState(false)
@@ -124,15 +127,14 @@ const UserFormPage = () => {
         await userService.update(userId, payload)
         addToast({ type: 'success', message: 'User berhasil diperbarui' })
       } else {
-        const scope = getTenantScope()
-        if (scope.blocked || !scope.tenantId) {
-          addToast({ type: 'error', message: 'Pilih tenant aktif terlebih dahulu.' })
+        if (!tenantId) {
+          addToast({ type: 'error', message: requiresSelection ? 'Pilih tenant aktif terlebih dahulu.' : 'Tenant belum tersedia.' })
           setSaving(false)
           return
         }
         const createData = data as CreateFormData
         await userService.create({
-          tenant_id: scope.tenantId,
+          tenant_id: tenantId,
           name: createData.name,
           email: createData.email,
           password: createData.password,
@@ -144,7 +146,25 @@ const UserFormPage = () => {
       }
       navigate(ROUTES.ADMIN.USERS)
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menyimpan user' })
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          redirectToLogin()
+          return
+        }
+        // Map common backend error codes to friendly messages.
+        switch (err.code) {
+          case 'validation_error':
+            addToast({ type: 'error', message: 'Data tidak valid. Periksa kembali input Anda.' })
+            break
+          case 'conflict':
+            addToast({ type: 'error', message: 'Email sudah terdaftar.' })
+            break
+          default:
+            addToast({ type: 'error', message: err.message || 'Gagal menyimpan user' })
+        }
+      } else {
+        addToast({ type: 'error', message: 'Gagal menyimpan user' })
+      }
     } finally {
       setSaving(false)
     }

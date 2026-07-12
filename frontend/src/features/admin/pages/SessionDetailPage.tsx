@@ -12,6 +12,8 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { sessionService } from '../../../core/services/sessions'
 import { programService } from '../../../core/services/programs'
 import { userService } from '../../../core/services/users'
+import { ApiError } from '../../../core/services/backendClient'
+import { redirectToLogin } from '../../../core/stores/authStore'
 import type { Session, SessionStage, SessionGroup, Participant, User, Program } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 import { SessionCreateForm } from '../components/SessionCreateForm'
@@ -96,6 +98,10 @@ const SessionDetailPage = () => {
       })
       navigate(`/admin/sessions/${created.id}`, { replace: true })
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        redirectToLogin()
+        return
+      }
       addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal membuat sesi' })
     } finally { setCreating(false) }
   }

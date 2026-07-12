@@ -21,6 +21,28 @@ const ROLE_REDIRECTS: Record<string, string> = {
   [UserRole.FASILITATOR]: ROUTES.FASILITATOR.DASHBOARD,
 }
 
+// Module-level unauthorized handler. App registers a SPA navigator here so
+// that any caught 401 (refresh already failed in backendClient) routes to
+// login without a full page reload. Defaults to a hard redirect.
+let onUnauthorized: (() => void) | null = null
+
+export function registerUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler
+}
+
+// Called when an ApiError with status 401 surfaces outside the initial
+// checkSession flow (the refresh-retry already failed in backendClient).
+// Clears tokens and routes to the login screen.
+export function redirectToLogin(): void {
+  clearTokens()
+  clearStoredUser()
+  if (onUnauthorized) {
+    onUnauthorized()
+  } else {
+    window.location.assign(ROUTES.AUTH.LOGIN)
+  }
+}
+
 // Backend envelope: every response is `{ data: ... }`.
 interface LoginResponseData {
   access_token: string
@@ -73,11 +95,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   register: async (data: CreateUserDTO) => {
+    // Transform Indonesian phone numbers to E.164 (+62...) at the service boundary.
+    const phone = data.phone
+      ? (() => {
+          const digits = data.phone.replace(/[^\d]/g, '')
+          const national = digits.startsWith('62')
+            ? digits.slice(2)
+            : digits.startsWith('0')
+              ? digits.slice(1)
+              : digits
+          return national.length >= 7 && national.length <= 13 ? `+62${national}` : data.phone
+        })()
+      : undefined
     const res = await apiRequest<{ data: User }>('POST', '/api/auth/register', {
       name: data.name,
       email: data.email,
       password: data.password,
-      phone: data.phone,
+      phone,
       tenant_id: data.tenant_id,
       role: data.role,
     })
