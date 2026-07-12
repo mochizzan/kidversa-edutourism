@@ -6,9 +6,9 @@ import (
 
 	"github.com/google/uuid"
 
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
 // TenantUsecase implements tenant administration (SUPER_ADMIN only).

@@ -4,8 +4,8 @@ package entity
 type UserRole string
 
 const (
-	RoleSuperAdmin UserRole = "SUPER_ADMIN"
-	RoleAdmin      UserRole = "ADMIN"
+	RoleSuperAdmin  UserRole = "SUPER_ADMIN"
+	RoleAdmin       UserRole = "ADMIN"
 	RoleKoordinator UserRole = "KOORDINATOR"
 	RoleFasilitator UserRole = "FASILITATOR"
 )
@@ -61,8 +61,8 @@ const (
 type SessionStageStatus string
 
 const (
-	SessionStageWaiting  SessionStageStatus = "WAITING"
-	SessionStageActive   SessionStageStatus = "ACTIVE"
+	SessionStageWaiting   SessionStageStatus = "WAITING"
+	SessionStageActive    SessionStageStatus = "ACTIVE"
 	SessionStageCompleted SessionStageStatus = "COMPLETED"
 )
 
@@ -79,11 +79,11 @@ const (
 type GroupStageProgressStatus string
 
 const (
-	ProgressLocked    GroupStageProgressStatus = "LOCKED"
-	ProgressUnlocked  GroupStageProgressStatus = "UNLOCKED"
+	ProgressLocked     GroupStageProgressStatus = "LOCKED"
+	ProgressUnlocked   GroupStageProgressStatus = "UNLOCKED"
 	ProgressInProgress GroupStageProgressStatus = "IN_PROGRESS"
-	ProgressCompleted GroupStageProgressStatus = "COMPLETED"
-	ProgressSkipped   GroupStageProgressStatus = "SKIPPED"
+	ProgressCompleted  GroupStageProgressStatus = "COMPLETED"
+	ProgressSkipped    GroupStageProgressStatus = "SKIPPED"
 )
 
 // SyncStatus enumerates sync queue states.

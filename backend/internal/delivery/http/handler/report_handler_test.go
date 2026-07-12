@@ -9,15 +9,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v5"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v5"
 
+	"kidversa-edutourism-backend/internal/delivery/http/dto"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
-	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 )
 
 // shared test sentinels (repoErrNotFound already declared in auth_handler_test.go).

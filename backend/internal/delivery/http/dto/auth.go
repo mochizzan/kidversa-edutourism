@@ -10,12 +10,12 @@ type LoginRequest struct {
 
 // RegisterRequest is the payload for POST /api/auth/register.
 type RegisterRequest struct {
-	Email    string           `json:"email" validate:"required,email"`
-	Password string           `json:"password" validate:"required,min=6"`
-	Name     string           `json:"name" validate:"required"`
-	Phone    string           `json:"phone,omitempty"`
-	TenantID string           `json:"tenant_id,omitempty"`
-	Role     entity.UserRole  `json:"role,omitempty"`
+	Email    string          `json:"email" validate:"required,email"`
+	Password string          `json:"password" validate:"required,min=6"`
+	Name     string          `json:"name" validate:"required"`
+	Phone    string          `json:"phone,omitempty"`
+	TenantID string          `json:"tenant_id,omitempty"`
+	Role     entity.UserRole `json:"role,omitempty"`
 }
 
 // RefreshRequest is the payload for POST /api/auth/refresh.

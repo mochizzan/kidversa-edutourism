@@ -9,8 +9,8 @@ import (
 
 	"github.com/labstack/echo/v5"
 
-	"kidversa-edutourism-backend/internal/domain/entity"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 )
 
 // fakeConsentRepo is an in-memory ConsentRepository for tests.

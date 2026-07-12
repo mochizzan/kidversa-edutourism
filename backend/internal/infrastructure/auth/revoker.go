@@ -11,7 +11,7 @@ import (
 
 // InMemoryRevoker is a single-instance jti denylist (v1). Swap for Redis in multi-replica.
 type InMemoryRevoker struct {
-	mu    sync.RWMutex
+	mu     sync.RWMutex
 	denied map[string]time.Time // jti -> expiry
 	stop   chan struct{}
 }

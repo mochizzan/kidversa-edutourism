@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v5"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v5"
 
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	assessmentuc "kidversa-edutourism-backend/internal/usecase/assessment"
 )
 
@@ -99,8 +99,8 @@ func TestAssessmentUpsertCreates(t *testing.T) {
 	}
 	var env struct {
 		Data struct {
-			ID        string `json:"id"`
-			StarRating int `json:"star_rating"`
+			ID         string `json:"id"`
+			StarRating int    `json:"star_rating"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {

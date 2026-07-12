@@ -31,14 +31,14 @@ func (h *MissionBankHandler) Create(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
 	}
 	m := &entity.MissionBank{
-		TenantID:           req.TenantID,
-		ProgramID:          req.ProgramID,
-		Category:           entity.MissionCategory(req.Category),
-		TitleChild:         req.TitleChild,
-		TitleParent:        req.TitleParent,
-		DescriptionParent:  req.DescriptionParent,
+		TenantID:            req.TenantID,
+		ProgramID:           req.ProgramID,
+		Category:            entity.MissionCategory(req.Category),
+		TitleChild:          req.TitleChild,
+		TitleParent:         req.TitleParent,
+		DescriptionParent:   req.DescriptionParent,
 		RelatedStageIDsJSON: entity.RawJSON(req.RelatedStageIDsJSON),
-		IsActive:           req.IsActive,
+		IsActive:            req.IsActive,
 	}
 	if err := h.repo.Create((*c).Request().Context(), m); err != nil {
 		return err

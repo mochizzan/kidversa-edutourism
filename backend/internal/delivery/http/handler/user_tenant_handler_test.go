@@ -13,9 +13,9 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/config"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
@@ -104,7 +104,7 @@ func (f *fakeUserRepoPhase3) Deactivate(_ context.Context, id string) (*entity.U
 }
 
 type fakeTenantRepoPhase3 struct {
-	byID  map[string]*entity.Tenant
+	byID   map[string]*entity.Tenant
 	bySlug map[string]*entity.Tenant
 }
 
@@ -266,7 +266,7 @@ func TestTenantHandlerCreateAndGet(t *testing.T) {
 	}
 	var env struct {
 		Data struct {
-			ID  string `json:"id"`
+			ID   string `json:"id"`
 			Slug string `json:"slug"`
 		} `json:"data"`
 	}

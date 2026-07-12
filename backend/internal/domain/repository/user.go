@@ -8,11 +8,11 @@ import (
 
 // UserFilter narrows a user list query.
 type UserFilter struct {
-	TenantID      string
-	Role          string
+	TenantID       string
+	Role           string
 	ApprovalStatus string
-	IsActive      *bool
-	Search        string
+	IsActive       *bool
+	Search         string
 }
 
 // Paginated is the generic list result.

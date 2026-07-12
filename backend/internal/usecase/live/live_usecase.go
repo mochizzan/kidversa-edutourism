@@ -3,10 +3,10 @@ package live
 import (
 	"context"
 
-	apputil "kidversa-edutourism-backend/internal/pkg/util"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/pkg/sse"
+	apputil "kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // Service implements live session + notification business logic.
@@ -132,6 +132,7 @@ func (s *Service) MarkRead(ctx context.Context, id, userID string) error {
 func (s *Service) MarkAllRead(ctx context.Context, userID string) error {
 	return s.notif.MarkAllRead(ctx, userID)
 }
+
 // Notifications fetches a recipient's notifications and unread count.
 func (s *Service) Notifications(ctx context.Context, userID, since string, limit int) ([]entity.Notification, int64, error) {
 	if limit <= 0 {

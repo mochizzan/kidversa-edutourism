@@ -12,9 +12,9 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/config"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
@@ -107,7 +107,7 @@ func TestAuthLoginSuccess(t *testing.T) {
 	hash, _ := auth.BcryptHash("password123", 4)
 	repo.Create(context.Background(), &entity.User{
 		BaseModel: entity.BaseModel{ID: "u1"},
-		Email: "admin@example.com", Name: "Admin", Role: entity.RoleAdmin,
+		Email:     "admin@example.com", Name: "Admin", Role: entity.RoleAdmin,
 		TenantID: &[]string{"t1"}[0], IsActive: true, ApprovalStatus: entity.ApprovalApproved, PasswordHash: hash,
 	})
 
@@ -155,7 +155,7 @@ func TestAuthLoginWrongPassword(t *testing.T) {
 	hash, _ := auth.BcryptHash("password123", 4)
 	repo.Create(context.Background(), &entity.User{
 		BaseModel: entity.BaseModel{ID: "u1"},
-		Email: "admin@example.com", Name: "Admin", Role: entity.RoleAdmin,
+		Email:     "admin@example.com", Name: "Admin", Role: entity.RoleAdmin,
 		TenantID: &[]string{"t1"}[0], IsActive: true, ApprovalStatus: entity.ApprovalApproved, PasswordHash: hash,
 	})
 

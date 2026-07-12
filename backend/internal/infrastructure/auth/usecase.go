@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
 // TokenRevoker abstracts the jti denylist (in-memory v1, redis later).
@@ -36,11 +36,11 @@ type RefreshRecord struct {
 
 // Usecase implements authentication business logic.
 type Usecase struct {
-	users    repository.UserRepository
-	jwt      *JWTManager
-	revoker  TokenRevoker
-	refresh  RefreshStore
-	cost     int
+	users   repository.UserRepository
+	jwt     *JWTManager
+	revoker TokenRevoker
+	refresh RefreshStore
+	cost    int
 }
 
 // NewUsecase builds the auth usecase.

@@ -16,25 +16,25 @@ func NewReportResponse(r *entity.Report) *ReportResponse {
 // PublicReportDTO is the anti-IDOR safe view returned to a parent presenting a
 // valid access token. It intentionally omits PII and the raw token.
 type PublicReportDTO struct {
-	ID             string `json:"id"`
-	ParticipantID  string `json:"participant_id"`
-	SessionID      string `json:"session_id"`
-	Status         string `json:"status"`
+	ID               string `json:"id"`
+	ParticipantID    string `json:"participant_id"`
+	SessionID        string `json:"session_id"`
+	Status           string `json:"status"`
 	AINarrativeFinal string `json:"ai_narrative_final,omitempty"`
-	MissionIDsJSON string `json:"mission_ids_json,omitempty"`
-	ReportPDFURL   string `json:"report_pdf_url,omitempty"`
+	MissionIDsJSON   string `json:"mission_ids_json,omitempty"`
+	ReportPDFURL     string `json:"report_pdf_url,omitempty"`
 }
 
 // NewPublicReportDTO builds the safe public view (no PII beyond IDs, no token).
 func NewPublicReportDTO(r *entity.Report) *PublicReportDTO {
 	return &PublicReportDTO{
-		ID:              r.ID,
-		ParticipantID:   r.ParticipantID,
-		SessionID:       r.SessionID,
-		Status:          string(r.Status),
+		ID:               r.ID,
+		ParticipantID:    r.ParticipantID,
+		SessionID:        r.SessionID,
+		Status:           string(r.Status),
 		AINarrativeFinal: r.AINarrativeFinal,
-		MissionIDsJSON:  string(r.MissionIDsJSON),
-		ReportPDFURL:    r.ReportPDFURL,
+		MissionIDsJSON:   string(r.MissionIDsJSON),
+		ReportPDFURL:     r.ReportPDFURL,
 	}
 }
 

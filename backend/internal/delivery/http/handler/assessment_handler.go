@@ -73,8 +73,8 @@ func (h *AssessmentHandler) BulkUpsert(c *echo.Context) error {
 // List handles GET /api/assessments (filter by ?participant_id= or ?session_id=).
 func (h *AssessmentHandler) List(c *echo.Context) error {
 	f := repository.AssessmentFilter{
-		ParticipantID: (*c).QueryParam("participant_id"),
-		SessionID:     (*c).QueryParam("session_id"),
+		ParticipantID:  (*c).QueryParam("participant_id"),
+		SessionID:      (*c).QueryParam("session_id"),
 		SessionStageID: (*c).QueryParam("session_stage_id"),
 	}
 	page, limit := pagination(c)

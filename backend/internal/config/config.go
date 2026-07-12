@@ -25,13 +25,13 @@ type Config struct {
 	DBLifetime time.Duration
 
 	// JWT / auth
-	JWTSecret         string
-	JWTAccessTTL      time.Duration
-	JWTRefreshTTL     time.Duration
-	BcryptCost        int
-	ReportTokenTTL    time.Duration
-	CookieSecure      bool
-	CookieSameSite    string
+	JWTSecret      string
+	JWTAccessTTL   time.Duration
+	JWTRefreshTTL  time.Duration
+	BcryptCost     int
+	ReportTokenTTL time.Duration
+	CookieSecure   bool
+	CookieSameSite string
 
 	// HTTP / server
 	ServerPort  string

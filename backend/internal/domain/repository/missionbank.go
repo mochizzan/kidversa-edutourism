@@ -8,7 +8,7 @@ import (
 
 // MissionBankFilter narrows a mission-bank list query.
 type MissionBankFilter struct {
-	TenantID string
+	TenantID  string
 	ProgramID string
 	Category  string
 	IsActive  *bool
@@ -25,7 +25,7 @@ type MissionBankRepository interface {
 
 // FrameFilter narrows a photo-frame list query.
 type FrameFilter struct {
-	TenantID string
+	TenantID  string
 	ProgramID string
 	IsActive  *bool
 }

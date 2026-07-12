@@ -8,9 +8,9 @@ import (
 
 	"gorm.io/gorm"
 
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
 // GormUserRepository implements repository.UserRepository.

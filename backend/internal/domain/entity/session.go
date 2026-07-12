@@ -36,28 +36,28 @@ type SessionGroup struct {
 // GroupStageProgress is the live progress of one group through one session stage.
 type GroupStageProgress struct {
 	BaseModel
-	GroupID      string                   `json:"group_id"`
-	SessionStageID string                 `json:"session_stage_id"`
-	Status       GroupStageProgressStatus `json:"status"`
-	EnteredAt    *string                  `json:"entered_at,omitempty"`
-	CompletedAt  *string                  `json:"completed_at,omitempty"`
-	UnlockedBy   *string                  `json:"unlocked_by,omitempty"`
-	UnlockReason string                   `json:"unlock_reason,omitempty"`
+	GroupID        string                   `json:"group_id"`
+	SessionStageID string                   `json:"session_stage_id"`
+	Status         GroupStageProgressStatus `json:"status"`
+	EnteredAt      *string                  `json:"entered_at,omitempty"`
+	CompletedAt    *string                  `json:"completed_at,omitempty"`
+	UnlockedBy     *string                  `json:"unlocked_by,omitempty"`
+	UnlockReason   string                   `json:"unlock_reason,omitempty"`
 }
 
 // Participant is a child (and their parent/guardian) in a session group.
 type Participant struct {
 	BaseModel
-	TenantID        *string `json:"tenant_id,omitempty"`
-	SessionID       *string `json:"session_id,omitempty"`
-	GroupID         *string `json:"group_id,omitempty"`
-	ChildName       string  `json:"child_name"`
-	ChildAge        int     `json:"child_age"`
-	SchoolName      string  `json:"school_name,omitempty"`
-	ParentName      string  `json:"parent_name"`
-	ParentPhone     string  `json:"parent_phone"`
-	ParentEmail     string  `json:"parent_email,omitempty"`
-	ConsentRecording bool   `json:"consent_recording"`
-	ConsentPhoto     bool   `json:"consent_photo"`
-	ConsentAt       *string `json:"consent_at,omitempty"`
+	TenantID         *string `json:"tenant_id,omitempty"`
+	SessionID        *string `json:"session_id,omitempty"`
+	GroupID          *string `json:"group_id,omitempty"`
+	ChildName        string  `json:"child_name"`
+	ChildAge         int     `json:"child_age"`
+	SchoolName       string  `json:"school_name,omitempty"`
+	ParentName       string  `json:"parent_name"`
+	ParentPhone      string  `json:"parent_phone"`
+	ParentEmail      string  `json:"parent_email,omitempty"`
+	ConsentRecording bool    `json:"consent_recording"`
+	ConsentPhoto     bool    `json:"consent_photo"`
+	ConsentAt        *string `json:"consent_at,omitempty"`
 }

@@ -14,10 +14,10 @@ type Event struct {
 	// ID is a monotonic per-channel counter (used for Last-Event-ID replay).
 	ID uint64 `json:"id"`
 	// UUID is a globally-unique id for dedupe.
-	UUID string `json:"uuid"`
-	Type string `json:"type"`
+	UUID string      `json:"uuid"`
+	Type string      `json:"type"`
 	Data interface{} `json:"data"`
-	TS   int64  `json:"ts"`
+	TS   int64       `json:"ts"`
 }
 
 // ReplayGap is returned by ReplaySince when the requested cursor is older than the buffer.

@@ -24,7 +24,7 @@ func SecurityHeaders() echo.MiddlewareFunc {
 
 // tokenBucket is a simple in-memory per-IP token bucket.
 type tokenBucket struct {
-	tokens    int
+	tokens     int
 	lastRefill time.Time
 }
 

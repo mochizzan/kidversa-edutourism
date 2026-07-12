@@ -9,16 +9,16 @@ import (
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
-	appresp "kidversa-edutourism-backend/internal/pkg/response"
-	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	"kidversa-edutourism-backend/internal/infrastructure/auth"
+	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
 // UserHandler serves /api/users/*.
 type UserHandler struct {
-	userUC *auth.UserUsecase
+	userUC   *auth.UserUsecase
 	tenantUC *auth.TenantUsecase
-	jwt    *auth.JWTManager
+	jwt      *auth.JWTManager
 }
 
 // NewUserHandler builds the user handler.
@@ -49,10 +49,10 @@ func (h *UserHandler) List(c *echo.Context) error {
 	page, _ := strconv.Atoi((*c).QueryParam("page"))
 	limit, _ := strconv.Atoi((*c).QueryParam("limit"))
 	f := repository.UserFilter{
-		Search:        (*c).QueryParam("search"),
-		Role:          (*c).QueryParam("role"),
+		Search:         (*c).QueryParam("search"),
+		Role:           (*c).QueryParam("role"),
 		ApprovalStatus: (*c).QueryParam("approval_status"),
-		TenantID:      (*c).QueryParam("tenant_id"),
+		TenantID:       (*c).QueryParam("tenant_id"),
 	}
 	if isActive := (*c).QueryParam("is_active"); isActive != "" {
 		b, err := strconv.ParseBool(isActive)

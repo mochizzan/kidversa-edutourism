@@ -13,12 +13,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
-	appresp "kidversa-edutourism-backend/internal/pkg/response"
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/config"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
 // UploadHandler serves the multipart file-upload endpoints that persist media
@@ -26,9 +26,9 @@ import (
 // Recording records. Served media is later retrieved via the authenticated
 // media handler (never e.Static).
 type UploadHandler struct {
-	cfg           *config.Config
-	photos        repository.PhotoRepository
-	recordings    repository.RecordingRepository
+	cfg        *config.Config
+	photos     repository.PhotoRepository
+	recordings repository.RecordingRepository
 }
 
 // NewUploadHandler builds the upload handler.
@@ -61,15 +61,15 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 	isReport := (*c).FormValue("is_report_photo") == "true" || (*c).FormValue("is_report_photo") == "1"
 
 	rec := &entity.SmartPhoto{
-		BaseModel:      entity.BaseModel{ID: uuid.NewString()},
-		ParticipantID:  (*c).FormValue("participant_id"),
-		SessionID:      (*c).FormValue("session_id"),
-		FrameID:        (*c).FormValue("frame_id"),
+		BaseModel:       entity.BaseModel{ID: uuid.NewString()},
+		ParticipantID:   (*c).FormValue("participant_id"),
+		SessionID:       (*c).FormValue("session_id"),
+		FrameID:         (*c).FormValue("frame_id"),
 		OriginalFileURL: storedRel,
-		IsReportPhoto:  isReport,
-		TakenBy:        takenBy,
-		TakenAt:        takenAt,
-		SyncStatus:     entity.SyncLocal,
+		IsReportPhoto:   isReport,
+		TakenBy:         takenBy,
+		TakenAt:         takenAt,
+		SyncStatus:      entity.SyncLocal,
 	}
 	if err := h.photos.Create((*c).Request().Context(), rec); err != nil {
 		// Roll back the stored file so we don't leave orphans.

@@ -22,22 +22,22 @@ type GroupWithParticipants struct {
 
 // SessionDetail is the expanded session view (stages + groups + participants).
 type SessionDetail struct {
-	Session    entity.Session
-	Stages     []entity.SessionStage
-	Groups     []GroupWithParticipants
+	Session entity.Session
+	Stages  []entity.SessionStage
+	Groups  []GroupWithParticipants
 }
 
 // ParticipantInput is the payload for creating/importing a participant.
 type ParticipantInput struct {
-	ChildName       string `json:"child_name"`
-	ChildAge        int    `json:"child_age"`
-	SchoolName      string `json:"school_name,omitempty"`
-	ParentName      string `json:"parent_name"`
-	ParentPhone     string `json:"parent_phone"`
-	ParentEmail     string `json:"parent_email,omitempty"`
-	ConsentRecording bool  `json:"consent_recording"`
-	ConsentPhoto     bool  `json:"consent_photo"`
-	GroupID         *string `json:"group_id,omitempty"`
+	ChildName        string  `json:"child_name"`
+	ChildAge         int     `json:"child_age"`
+	SchoolName       string  `json:"school_name,omitempty"`
+	ParentName       string  `json:"parent_name"`
+	ParentPhone      string  `json:"parent_phone"`
+	ParentEmail      string  `json:"parent_email,omitempty"`
+	ConsentRecording bool    `json:"consent_recording"`
+	ConsentPhoto     bool    `json:"consent_photo"`
+	GroupID          *string `json:"group_id,omitempty"`
 }
 
 // SessionRepository is the persistence contract for sessions and their sub-entities

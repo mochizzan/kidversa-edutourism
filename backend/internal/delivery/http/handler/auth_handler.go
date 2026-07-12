@@ -6,18 +6,18 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
-	"kidversa-edutourism-backend/internal/domain/entity"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
-	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
+	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
 // AuthHandler serves /api/auth/*.
 type AuthHandler struct {
-	authUC     *auth.Usecase
-	jwt        *auth.JWTManager
-	cookieName string
-	cookieSecure bool
+	authUC         *auth.Usecase
+	jwt            *auth.JWTManager
+	cookieName     string
+	cookieSecure   bool
 	cookieSameSite string
 }
 

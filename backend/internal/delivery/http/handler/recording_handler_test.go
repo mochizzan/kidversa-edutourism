@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v5"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v5"
 
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 )
 
 // fakeRecordingRepo is an in-memory RecordingRepository for tests.
@@ -21,7 +21,9 @@ type fakeRecordingRepo struct {
 	byID map[string]*entity.Recording
 }
 
-func newFakeRecordingRepo() *fakeRecordingRepo { return &fakeRecordingRepo{byID: map[string]*entity.Recording{}} }
+func newFakeRecordingRepo() *fakeRecordingRepo {
+	return &fakeRecordingRepo{byID: map[string]*entity.Recording{}}
+}
 
 func (f *fakeRecordingRepo) Create(_ context.Context, r *entity.Recording) error {
 	f.byID[r.ID] = r
@@ -44,7 +46,10 @@ func (f *fakeRecordingRepo) Update(_ context.Context, r *entity.Recording) error
 	f.byID[r.ID] = r
 	return nil
 }
-func (f *fakeRecordingRepo) Delete(_ context.Context, id string) error { delete(f.byID, id); return nil }
+func (f *fakeRecordingRepo) Delete(_ context.Context, id string) error {
+	delete(f.byID, id)
+	return nil
+}
 
 func TestRecordingReviewUpdatesStatus(t *testing.T) {
 	repo := newFakeRecordingRepo()

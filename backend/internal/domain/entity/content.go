@@ -16,32 +16,32 @@ type Assessment struct {
 // SmartPhoto is a captured photo of a participant, optionally framed.
 type SmartPhoto struct {
 	BaseModel
-	ParticipantID    string     `json:"participant_id"`
-	SessionID        string     `json:"session_id"`
-	FrameID          string     `json:"frame_id,omitempty"`
-	OriginalFileURL  string     `json:"original_file_url"`
-	FramedFileURL    string     `json:"framed_file_url,omitempty"`
-	IsReportPhoto    bool       `json:"is_report_photo"`
-	TakenBy          string     `json:"taken_by"`
-	TakenAt          string     `json:"taken_at"`
-	SyncStatus       SyncStatus `json:"sync_status"`
+	ParticipantID   string     `json:"participant_id"`
+	SessionID       string     `json:"session_id"`
+	FrameID         string     `json:"frame_id,omitempty"`
+	OriginalFileURL string     `json:"original_file_url"`
+	FramedFileURL   string     `json:"framed_file_url,omitempty"`
+	IsReportPhoto   bool       `json:"is_report_photo"`
+	TakenBy         string     `json:"taken_by"`
+	TakenAt         string     `json:"taken_at"`
+	SyncStatus      SyncStatus `json:"sync_status"`
 }
 
 // Recording is a captured audio/video of a participant at a session stage.
 type Recording struct {
 	BaseModel
-	ParticipantID   string                `json:"participant_id"`
-	SessionID       string                `json:"session_id"`
-	SessionStageID  string                `json:"session_stage_id"`
-	FileURL         string                `json:"file_url,omitempty"`
-	DurationSeconds int                   `json:"duration_seconds"`
-	FileSizeBytes   int64                 `json:"file_size_bytes,omitempty"`
-	TranscriptText  string                `json:"transcript_text,omitempty"`
-	EmotionTagsJSON RawJSON               `json:"emotion_tags_json,omitempty"`
+	ParticipantID   string                 `json:"participant_id"`
+	SessionID       string                 `json:"session_id"`
+	SessionStageID  string                 `json:"session_stage_id"`
+	FileURL         string                 `json:"file_url,omitempty"`
+	DurationSeconds int                    `json:"duration_seconds"`
+	FileSizeBytes   int64                  `json:"file_size_bytes,omitempty"`
+	TranscriptText  string                 `json:"transcript_text,omitempty"`
+	EmotionTagsJSON RawJSON                `json:"emotion_tags_json,omitempty"`
 	ReviewStatus    RecordingsReviewStatus `json:"review_status"`
-	ReviewedBy      *string `json:"reviewed_by,omitempty"`
-	ReviewedAt      *string               `json:"reviewed_at,omitempty"`
-	SyncStatus      SyncStatus            `json:"sync_status"`
+	ReviewedBy      *string                `json:"reviewed_by,omitempty"`
+	ReviewedAt      *string                `json:"reviewed_at,omitempty"`
+	SyncStatus      SyncStatus             `json:"sync_status"`
 }
 
 // Report is the generated narrative report for one participant in one session.
@@ -65,11 +65,11 @@ type Report struct {
 // ParticipantMission links a report to a completed mission from the mission bank.
 type ParticipantMission struct {
 	BaseModel
-	ParticipantID  string `json:"participant_id"`
-	ReportID       string `json:"report_id"`
-	MissionBankID  string `json:"mission_bank_id"`
-	IsCompleted    bool   `json:"is_completed"`
-	CompletedAt    *string `json:"completed_at,omitempty"`
+	ParticipantID string  `json:"participant_id"`
+	ReportID      string  `json:"report_id"`
+	MissionBankID string  `json:"mission_bank_id"`
+	IsCompleted   bool    `json:"is_completed"`
+	CompletedAt   *string `json:"completed_at,omitempty"`
 }
 
 // ConsentLog records a parent's consent response for recording/photo.
@@ -98,14 +98,14 @@ type TimelineEvent struct {
 // MissionBank is a reusable mission template (Home/Parent/School) tied to a program + tenant.
 type MissionBank struct {
 	BaseModel
-	TenantID           string         `json:"tenant_id"`
-	ProgramID          string         `json:"program_id"`
-	Category           MissionCategory `json:"category"`
-	TitleChild         string         `json:"title_child"`
-	TitleParent        string         `json:"title_parent"`
-	DescriptionParent  string         `json:"description_parent,omitempty"`
-	RelatedStageIDsJSON RawJSON       `json:"related_stage_ids_json,omitempty"`
-	IsActive           bool           `json:"is_active"`
+	TenantID            string          `json:"tenant_id"`
+	ProgramID           string          `json:"program_id"`
+	Category            MissionCategory `json:"category"`
+	TitleChild          string          `json:"title_child"`
+	TitleParent         string          `json:"title_parent"`
+	DescriptionParent   string          `json:"description_parent,omitempty"`
+	RelatedStageIDsJSON RawJSON         `json:"related_stage_ids_json,omitempty"`
+	IsActive            bool            `json:"is_active"`
 }
 
 // PhotoFrame is a decorative frame overlay (per tenant + optional program) applied to photos.

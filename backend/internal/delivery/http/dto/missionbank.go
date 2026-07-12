@@ -14,14 +14,14 @@ func NewMissionBankResponse(m *entity.MissionBank) *MissionBankResponse {
 
 // MissionBankRequest is the create/update payload.
 type MissionBankRequest struct {
-	TenantID           string `json:"tenant_id" validate:"required"`
-	ProgramID          string `json:"program_id,omitempty"`
-	Category           string `json:"category" validate:"required"`
-	TitleChild         string `json:"title_child" validate:"required"`
-	TitleParent        string `json:"title_parent" validate:"required"`
-	DescriptionParent  string `json:"description_parent,omitempty"`
+	TenantID            string `json:"tenant_id" validate:"required"`
+	ProgramID           string `json:"program_id,omitempty"`
+	Category            string `json:"category" validate:"required"`
+	TitleChild          string `json:"title_child" validate:"required"`
+	TitleParent         string `json:"title_parent" validate:"required"`
+	DescriptionParent   string `json:"description_parent,omitempty"`
 	RelatedStageIDsJSON string `json:"related_stage_ids_json,omitempty"`
-	IsActive           bool   `json:"is_active"`
+	IsActive            bool   `json:"is_active"`
 }
 
 // MissionBankListResponse carries a page of mission templates.

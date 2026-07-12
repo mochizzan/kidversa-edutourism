@@ -40,7 +40,9 @@ func Unauthorized(code string, err error) *AppError {
 func Forbidden(code string, err error) *AppError { return New(http.StatusForbidden, code, err) }
 func NotFound(code string, err error) *AppError  { return New(http.StatusNotFound, code, err) }
 func Conflict(code string, err error) *AppError  { return New(http.StatusConflict, code, err) }
-func Internal(code string, err error) *AppError  { return New(http.StatusInternalServerError, code, err) }
+func Internal(code string, err error) *AppError {
+	return New(http.StatusInternalServerError, code, err)
+}
 
 // AsAppError attempts to extract an *AppError from err, returning the status and code.
 func AsAppError(err error) (status int, code string, ok bool) {

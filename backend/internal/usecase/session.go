@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
 // SessionUsecase orchestrates session + stages + groups + participants business logic.
@@ -296,15 +296,15 @@ func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessio
 		gid = &g
 	}
 	p := &entity.Participant{
-		TenantID:        tp,
-		SessionID:       sid,
-		GroupID:         gid,
-		ChildName:       childName,
-		ChildAge:        childAge,
-		SchoolName:      schoolName,
-		ParentName:      parentName,
-		ParentPhone:     parentPhone,
-		ParentEmail:     parentEmail,
+		TenantID:         tp,
+		SessionID:        sid,
+		GroupID:          gid,
+		ChildName:        childName,
+		ChildAge:         childAge,
+		SchoolName:       schoolName,
+		ParentName:       parentName,
+		ParentPhone:      parentPhone,
+		ParentEmail:      parentEmail,
 		ConsentRecording: consentRecording,
 		ConsentPhoto:     consentPhoto,
 	}

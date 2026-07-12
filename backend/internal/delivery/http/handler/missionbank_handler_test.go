@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v5"
 	"github.com/google/uuid"
+	"github.com/labstack/echo/v5"
 
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 )
 
 // fakeMissionBankRepo is an in-memory MissionBankRepository for tests.
@@ -49,7 +49,10 @@ func (f *fakeMissionBankRepo) Update(_ context.Context, m *entity.MissionBank) e
 	f.byID[m.ID] = m
 	return nil
 }
-func (f *fakeMissionBankRepo) Delete(_ context.Context, id string) error { delete(f.byID, id); return nil }
+func (f *fakeMissionBankRepo) Delete(_ context.Context, id string) error {
+	delete(f.byID, id)
+	return nil
+}
 
 func TestMissionBankCreatePersists(t *testing.T) {
 	repo := newFakeMissionBankRepo()

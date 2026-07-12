@@ -20,7 +20,9 @@ type fakeProgramRepo struct {
 	programs map[string]*entity.Program
 }
 
-func newFakeProgramRepo() *fakeProgramRepo { return &fakeProgramRepo{programs: map[string]*entity.Program{}} }
+func newFakeProgramRepo() *fakeProgramRepo {
+	return &fakeProgramRepo{programs: map[string]*entity.Program{}}
+}
 
 func (f *fakeProgramRepo) CreateProgram(_ context.Context, p *entity.Program) error {
 	f.programs[p.ID] = p
@@ -35,8 +37,14 @@ func (f *fakeProgramRepo) GetProgramByID(_ context.Context, id string) (*entity.
 func (f *fakeProgramRepo) ListPrograms(_ context.Context, _ repository.ProgramFilter, _, _ int) (*repository.Paginated[entity.Program], error) {
 	return &repository.Paginated[entity.Program]{}, nil
 }
-func (f *fakeProgramRepo) UpdateProgram(_ context.Context, p *entity.Program) error { f.programs[p.ID] = p; return nil }
-func (f *fakeProgramRepo) DeleteProgram(_ context.Context, id string) error          { delete(f.programs, id); return nil }
+func (f *fakeProgramRepo) UpdateProgram(_ context.Context, p *entity.Program) error {
+	f.programs[p.ID] = p
+	return nil
+}
+func (f *fakeProgramRepo) DeleteProgram(_ context.Context, id string) error {
+	delete(f.programs, id)
+	return nil
+}
 func (f *fakeProgramRepo) ToggleActiveProgram(_ context.Context, id string) (*entity.Program, error) {
 	p, ok := f.programs[id]
 	if !ok {
@@ -45,16 +53,16 @@ func (f *fakeProgramRepo) ToggleActiveProgram(_ context.Context, id string) (*en
 	p.IsActive = !p.IsActive
 	return p, nil
 }
-func (f *fakeProgramRepo) CreateStage(_ context.Context, _ *entity.ProgramStage) error      { return nil }
+func (f *fakeProgramRepo) CreateStage(_ context.Context, _ *entity.ProgramStage) error { return nil }
 func (f *fakeProgramRepo) GetStageByID(_ context.Context, _ string) (*entity.ProgramStage, error) {
 	return nil, errNotFound
 }
 func (f *fakeProgramRepo) ListStages(_ context.Context, _ string) ([]entity.ProgramStage, error) {
 	return nil, nil
 }
-func (f *fakeProgramRepo) UpdateStage(_ context.Context, _ *entity.ProgramStage) error { return nil }
-func (f *fakeProgramRepo) DeleteStage(_ context.Context, _ string) error               { return nil }
-func (f *fakeProgramRepo) ReorderStages(_ context.Context, _ string, _ []string) error { return nil }
+func (f *fakeProgramRepo) UpdateStage(_ context.Context, _ *entity.ProgramStage) error   { return nil }
+func (f *fakeProgramRepo) DeleteStage(_ context.Context, _ string) error                 { return nil }
+func (f *fakeProgramRepo) ReorderStages(_ context.Context, _ string, _ []string) error   { return nil }
 func (f *fakeProgramRepo) CreateContent(_ context.Context, _ *entity.StageContent) error { return nil }
 func (f *fakeProgramRepo) GetContentByID(_ context.Context, _ string) (*entity.StageContent, error) {
 	return nil, errNotFound
@@ -67,7 +75,9 @@ func (f *fakeProgramRepo) DeleteContent(_ context.Context, _ string) error      
 func (f *fakeProgramRepo) ReorderContents(_ context.Context, _ string, _ []string) error { return nil }
 
 var errNotFound = &repoErr{msg: "not found"}
+
 type repoErr struct{ msg string }
+
 func (e *repoErr) Error() string { return e.msg }
 
 func TestProgramCreateAndToggle(t *testing.T) {

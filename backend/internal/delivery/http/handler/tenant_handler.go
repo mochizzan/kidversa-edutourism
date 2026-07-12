@@ -9,9 +9,9 @@ import (
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
-	appresp "kidversa-edutourism-backend/internal/pkg/response"
-	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	"kidversa-edutourism-backend/internal/infrastructure/auth"
+	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
 // TenantHandler serves /api/tenants/* (SUPER_ADMIN only).

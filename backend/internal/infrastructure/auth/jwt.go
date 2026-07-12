@@ -28,9 +28,9 @@ const (
 
 // JWTManager issues and parses signed JWTs (HS256).
 type JWTManager struct {
-	secret       []byte
-	accessTTL    time.Duration
-	refreshTTL   time.Duration
+	secret     []byte
+	accessTTL  time.Duration
+	refreshTTL time.Duration
 }
 
 // NewJWTManager builds a JWTManager from config.
@@ -55,12 +55,12 @@ func (m *JWTManager) Generate(userID string, tenantID *string, role string) (acc
 		TenantID: tid,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:   issuer,
-			Audience: jwt.ClaimStrings{aud},
-			Subject:  userID,
-			IssuedAt: jwt.NewNumericDate(now),
+			Issuer:    issuer,
+			Audience:  jwt.ClaimStrings{aud},
+			Subject:   userID,
+			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(m.accessTTL)),
-			ID:       uuid.NewString(),
+			ID:        uuid.NewString(),
 		},
 	}
 	access, err = jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString(m.secret)

@@ -4,9 +4,9 @@ import (
 	"github.com/labstack/echo/v5"
 	"github.com/labstack/echo/v5/middleware"
 
+	"kidversa-edutourism-backend/internal/config"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
-	"kidversa-edutourism-backend/internal/config"
 )
 
 // uploadMaxBodyBytes caps multipart uploads (25 MB) per the contract.

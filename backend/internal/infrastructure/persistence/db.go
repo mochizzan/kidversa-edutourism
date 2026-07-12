@@ -8,8 +8,8 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/config"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
 // DB wraps *gorm.DB with a helper Ping for readiness checks.
