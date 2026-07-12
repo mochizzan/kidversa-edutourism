@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
+	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
 )
@@ -94,6 +95,34 @@ func (h *ReportHandler) RevokeToken(c *echo.Context) error {
 		return nil
 	}
 	r, err := h.uc.RevokeToken((*c).Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewReportResponse(r))
+}
+
+// ListReports handles GET /api/reports?session_id= (tenant-scoped via TenantScope).
+// Returns an empty list (not an error) when no reports match (EC4).
+func (h *ReportHandler) ListReports(c *echo.Context) error {
+	f := repository.ReportFilter{
+		SessionID: (*c).QueryParam("session_id"),
+	}
+	page, limit := pagination(c)
+	res, err := h.uc.Repo().List((*c).Request().Context(), f, page, limit)
+	if err != nil {
+		return err
+	}
+	meta := &appresp.Meta{Page: page, Limit: limit, Total: res.Total}
+	return appresp.OKWithMeta(c, dto.NewReportListResponse(res.Items), meta)
+}
+
+// GetReport handles GET /api/reports/:id (tenant-scoped via TenantScope).
+func (h *ReportHandler) GetReport(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	r, err := h.uc.Repo().GetByID((*c).Request().Context(), id)
 	if err != nil {
 		return err
 	}

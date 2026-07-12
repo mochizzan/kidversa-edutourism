@@ -13,6 +13,20 @@ func NewReportResponse(r *entity.Report) *ReportResponse {
 	return &ReportResponse{Report: r}
 }
 
+// ReportListResponse carries a page of reports with pagination meta.
+type ReportListResponse struct {
+	Items []ReportResponse `json:"items"`
+}
+
+// NewReportListResponse wraps a slice of reports.
+func NewReportListResponse(items []entity.Report) *ReportListResponse {
+	out := make([]ReportResponse, 0, len(items))
+	for i := range items {
+		out = append(out, ReportResponse{Report: &items[i]})
+	}
+	return &ReportListResponse{Items: out}
+}
+
 // PublicReportDTO is the anti-IDOR safe view returned to a parent presenting a
 // valid access token. It intentionally omits PII and the raw token.
 type PublicReportDTO struct {
