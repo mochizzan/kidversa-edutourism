@@ -9,8 +9,10 @@ import (
 
 // RegisterAssessmentRoutes mounts /api/assessments/* on the given echo group.
 func RegisterAssessmentRoutes(g *echo.Group, h *AssessmentHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
-	g.POST("/upsert", h.Upsert, appmiddleware.JWTAuth(jm, "", revoker))
-	g.POST("/bulk-upsert", h.BulkUpsert, appmiddleware.JWTAuth(jm, "", revoker))
-	g.GET("", h.List, appmiddleware.JWTAuth(jm, "", revoker))
-	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, "", revoker))
+	authMW := appmiddleware.JWTAuth(jm, "", revoker)
+	scopeMW := appmiddleware.TenantScope()
+	g.POST("/upsert", h.Upsert, authMW, scopeMW)
+	g.POST("/bulk-upsert", h.BulkUpsert, authMW, scopeMW)
+	g.GET("", h.List, authMW, scopeMW)
+	g.DELETE("/:id", h.Delete, authMW, scopeMW)
 }

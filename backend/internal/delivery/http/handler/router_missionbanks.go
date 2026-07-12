@@ -9,9 +9,12 @@ import (
 
 // RegisterMissionBanksRoutes mounts /api/mission-banks/* on the given echo group.
 func RegisterMissionBanksRoutes(g *echo.Group, h *MissionBankHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
-	g.POST("", h.Create, appmiddleware.JWTAuth(jm, "", revoker))
-	g.GET("/:id", h.GetByID, appmiddleware.JWTAuth(jm, "", revoker))
-	g.GET("", h.List, appmiddleware.JWTAuth(jm, "", revoker))
-	g.PUT("/:id", h.Update, appmiddleware.JWTAuth(jm, "", revoker))
-	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, "", revoker))
+	authMW := appmiddleware.JWTAuth(jm, "", revoker)
+	scopeMW := appmiddleware.TenantScope()
+	g.POST("", h.Create, authMW, scopeMW)
+	g.GET("/:id", h.GetByID, authMW, scopeMW)
+	g.GET("", h.List, authMW, scopeMW)
+	g.PUT("/:id", h.Update, authMW, scopeMW)
+	g.DELETE("/:id", h.Delete, authMW, scopeMW)
+	g.POST("/:id/toggle-active", h.ToggleActive, authMW, scopeMW)
 }
