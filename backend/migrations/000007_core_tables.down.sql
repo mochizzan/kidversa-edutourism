@@ -1,0 +1,11 @@
+-- 000007_core_tables.down.sql
+SET FOREIGN_KEY_CHECKS=0;
+
+DROP TABLE IF EXISTS consent_logs;
+DROP TABLE IF EXISTS assessments;
+DROP TABLE IF EXISTS recordings;
+DROP TABLE IF EXISTS smart_photos;
+DROP TABLE IF EXISTS participant_missions;
+DROP TABLE IF EXISTS reports;
+
+SET FOREIGN_KEY_CHECKS=1;
