@@ -417,6 +417,14 @@ func (u *SessionUsecase) GetParticipants(ctx context.Context, sessionID, groupID
 	return u.repo.ListParticipants(ctx, sessionID, groupID)
 }
 
+// ListParticipantsGlobal lists participants across the caller's tenant scope with
+// optional session_id/group_id filters plus pagination and search. tenantID is the
+// resolved tenant from context ("" for tenant-less SUPER_ADMIN scoped calls is allowed
+// only when sessionID/groupID narrow the query).
+func (u *SessionUsecase) ListParticipantsGlobal(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*repository.Paginated[entity.Participant], error) {
+	return u.repo.ListParticipantsPaginated(ctx, tenantID, sessionID, groupID, search, page, limit)
+}
+
 // GetParticipant returns a single participant.
 func (u *SessionUsecase) GetParticipant(ctx context.Context, participantID string) (*entity.Participant, error) {
 	return u.repo.GetParticipantByID(ctx, participantID)

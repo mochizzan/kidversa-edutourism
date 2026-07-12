@@ -239,6 +239,40 @@ func (r *GormSessionRepository) ListParticipants(ctx context.Context, sessionID,
 	return items, nil
 }
 
+// ListParticipantsPaginated returns a tenant-scoped, paginated participant list
+// (global /api/participants). Supports optional session_id/group_id filters and a
+// case-insensitive search across child_name/parent_name/school_name.
+func (r *GormSessionRepository) ListParticipantsPaginated(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*repository.Paginated[entity.Participant], error) {
+	q := r.db.WithContext(ctx).Model(&ParticipantModel{})
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if sessionID != "" {
+		q = q.Where("session_id = ?", sessionID)
+	}
+	if groupID != "" {
+		q = q.Where("group_id = ?", groupID)
+	}
+	if search != "" {
+		like := "%" + strings.ToLower(search) + "%"
+		q = q.Where("LOWER(child_name) LIKE ? OR LOWER(parent_name) LIKE ? OR LOWER(school_name) LIKE ?", like, like, like)
+	}
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	var models []ParticipantModel
+	offset := (page - 1) * limit
+	if err := q.Order("created_at ASC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.Participant, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return &repository.Paginated[entity.Participant]{Items: items, Total: int(total)}, nil
+}
+
 func (r *GormSessionRepository) UpdateParticipant(ctx context.Context, p *entity.Participant) error {
 	m := participantModelFromEntity(p)
 	if err := r.db.WithContext(ctx).Model(&ParticipantModel{}).Where("id = ?", p.ID).Updates(m).Error; err != nil {

@@ -16,6 +16,7 @@ func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecyc
 	roleMW := appmiddleware.RequireRole("FASILITATOR", "ADMIN", "KOORDINATOR", "SUPER_ADMIN")
 
 	g.GET("", h.List, authMW, roleMW)
+	g.GET("/participants", ph.ListParticipantsGlobal, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("", h.Create, authMW, roleMW)
 	g.GET("/:id", h.Get, authMW, roleMW)
 	g.PUT("/:id", h.Update, authMW, roleMW)

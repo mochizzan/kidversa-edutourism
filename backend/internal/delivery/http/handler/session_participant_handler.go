@@ -82,6 +82,22 @@ func (h *SessionParticipantHandler) GetParticipant(c *echo.Context) error {
 	return appresp.OK(c, p)
 }
 
+// ListParticipantsGlobal handles the global GET /api/participants (tenant-scoped via
+// TenantScope middleware; SUPER_ADMIN may pass X-Tenant-Id to scope to a tenant).
+// Query params: session_id, group_id, page, limit, search.
+func (h *SessionParticipantHandler) ListParticipantsGlobal(c *echo.Context) error {
+	tenantID := appmiddleware.GetTenantID(c)
+	sessionID := (*c).QueryParam("session_id")
+	groupID := (*c).QueryParam("group_id")
+	search := (*c).QueryParam("search")
+	page, limit := pagination(c)
+	res, err := h.uc.ListParticipantsGlobal((*c).Request().Context(), tenantID, sessionID, groupID, search, page, limit)
+	if err != nil {
+		return err
+	}
+	return appresp.OKWithMeta(c, res.Items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
+}
+
 func (h *SessionParticipantHandler) DeleteParticipant(c *echo.Context) error {
 	pid, ok := bindUUID(c, "participantId")
 	if !ok {
