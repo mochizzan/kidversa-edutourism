@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -130,6 +131,27 @@ func (h *AuthHandler) ChangePassword(c *echo.Context) error {
 		return err
 	}
 	return appresp.NoContent(c)
+}
+
+// IssueKiosk handles POST /api/auth/kiosk (JWT-protected). It issues a single-use
+// kiosk token bound to the requested session (within the caller's tenant scope).
+func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
+	var req dto.KioskTokenRequest
+	if err := (*c).Bind(&req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	}
+	if err := (*c).Validate(&req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	if tenantID == "" {
+		return appresp.Fail(c, http.StatusBadRequest, "tenant_required")
+	}
+	token, err := h.authUC.IssueKioskToken((*c).Request().Context(), req.SessionID, tenantID, 4*time.Hour)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, map[string]string{"token": token})
 }
 
 func setSessionCookie(c *echo.Context, name, token string, secure bool, sameSite string, maxAge int) {

@@ -51,7 +51,7 @@ func main() {
 	frameRepo := persistence.NewFrameRepository(db.DB)
 
 	// Usecases.
-	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, cfg.BcryptCost)
+	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, auth.NewKioskStore(db.DB), cfg.BcryptCost)
 	userUC := auth.NewUserUsecase(userRepo)
 	tenantUC := auth.NewTenantUsecase(tenantRepo)
 	sessionUC := usecase.NewSessionUsecase(sessionRepo)
@@ -71,6 +71,7 @@ func main() {
 	registry.SessionGroup = handler.NewSessionGroupHandler(sessionUC)
 	registry.SessionParticipant = handler.NewSessionParticipantHandler(sessionUC)
 	registry.SessionParticipantBulk = handler.NewSessionParticipantBulkHandler(sessionUC)
+	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, programRepo)
 	registry.Live = handler.NewLiveHandler(liveSvc, hub)
 	registry.Notification = handler.NewNotificationHandler(liveSvc, hub)
 	registry.Assessment = handler.NewAssessmentHandler(assessmentUC)

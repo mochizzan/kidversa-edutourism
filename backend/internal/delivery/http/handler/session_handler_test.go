@@ -132,6 +132,13 @@ func (f *fakeSessionRepo) ListParticipants(_ context.Context, _, _ string) ([]en
 	}
 	return out, nil
 }
+func (f *fakeSessionRepo) ListParticipantsPaginated(_ context.Context, _, _, _, _ string, _, _ int) (*repository.Paginated[entity.Participant], error) {
+	out := make([]entity.Participant, 0, len(f.participants))
+	for _, p := range f.participants {
+		out = append(out, *p)
+	}
+	return &repository.Paginated[entity.Participant]{Items: out, Total: len(out)}, nil
+}
 func (f *fakeSessionRepo) UpdateParticipant(_ context.Context, p *entity.Participant) error {
 	f.participants[p.ID] = p
 	return nil

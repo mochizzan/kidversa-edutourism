@@ -56,7 +56,7 @@ func NewRouter(d Deps) *echo.Echo {
 	handler.RegisterSessionsRoutes(
 		api.Group("/sessions"),
 		h.Session, h.SessionLifecycle, h.SessionStage, h.SessionGroup, h.SessionParticipant, h.SessionParticipantBulk,
-		d.JWT, d.Revoker,
+		d.JWT, d.Revoker, h.Kiosk,
 	)
 
 	// Live + SSE.
