@@ -4,8 +4,7 @@ import { router } from './app/router'
 import { useAuthStore } from './core/stores/authStore'
 import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
 import { ToastProvider } from './shared/components/feedback/Toast'
-import { initDB } from './core/services/storage/idb'
-import { runBootstrap } from './core/services/local/bootstrap'
+import { healthCheck } from './core/services/backendClient'
 
 /* ── Splash Screen ── */
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -83,20 +82,48 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
 function App() {
   const { checkSession, isLoading } = useAuthStore()
   const [splashDone, setSplashDone] = useState(false)
+  const [backendDown, setBackendDown] = useState(false)
+
+  const runStartup = async () => {
+    try {
+      const ok = await healthCheck()
+      if (!ok) {
+        setBackendDown(true)
+        return
+      }
+    } catch {
+      setBackendDown(true)
+      return
+    }
+    setBackendDown(false)
+    await checkSession()
+  }
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        await initDB()
-        await runBootstrap()
-      } catch (error) {
-        console.error('Failed to initialize database:', error)
-      } finally {
-        checkSession()
-      }
-    }
-    init()
+    void runStartup()
   }, [checkSession])
+
+  // ── Backend unavailable panel ──
+  if (backendDown) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface p-8 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary-dark shadow-lg flex items-center justify-center mb-4">
+          <img src="/logo.png" alt="Kidversa" className="w-10 h-10 object-contain" />
+        </div>
+        <h1 className="text-xl font-bold text-on-surface">Backend tidak tersedia</h1>
+        <p className="text-sm text-on-surface-variant/60 mt-2 max-w-[280px] leading-relaxed">
+          Tidak dapat terhubung ke server. Pastikan server berjalan, lalu coba lagi.
+        </p>
+        <button
+          type="button"
+          onClick={() => void runStartup()}
+          className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-primary to-primary-dark text-on-primary hover:shadow-lg hover:shadow-primary/25 transition-all"
+        >
+          Coba Lagi
+        </button>
+      </div>
+    )
+  }
 
   // Splash screen (always shows at least 3.7 s)
   if (!splashDone) {
