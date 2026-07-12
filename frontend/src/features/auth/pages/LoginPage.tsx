@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
+import { ApiError } from '../../../core/services/backendClient'
 import { useRateLimit } from '../hooks/useRateLimit'
 import { ROUTES } from '../../../core/constants/app'
 import { LoginForm } from '../components/LoginForm'
@@ -50,29 +51,34 @@ const LoginPage = () => {
     try {
       await login(data.email, data.password)
       clearRateLimit()
+
+      // Force a password change if the backend/account requires it.
+      const { mustChangePassword, user } = useAuth()
+      if (mustChangePassword || user?.must_change_password) {
+        navigate(ROUTES.AUTH.CHANGE_PASSWORD, { replace: true })
+        return
+      }
     } catch (err) {
       const isLockedNow = recordFailedAttempt()
       if (isLockedNow) {
         setGeneralError('Terlalu banyak percobaan. Coba lagi dalam 5 menit.')
       } else {
-        const remaining = 5 - (Number(sessionStorage.getItem('kidversa_login_attempts')) || 0)
-        if (err instanceof Error) {
-          switch (err.message) {
-            case 'EMAIL_NOT_FOUND':
-            case 'INVALID_PASSWORD':
-              setGeneralError(`Email atau password salah. Sisa percobaan: ${remaining}`)
+        if (err instanceof ApiError) {
+          switch (err.code) {
+            case 'invalid_credentials':
+              setGeneralError('Email atau password salah.')
               break
-            case 'ACCOUNT_INACTIVE':
-              setGeneralError('Akun tidak aktif. Hubungi administrator.')
+            case 'unauthorized':
+              setGeneralError('Tidak memiliki akses.')
               break
-            case 'ACCOUNT_PENDING':
-              setGeneralError('Akun Anda masih menunggu persetujuan admin.')
-              break
-            case 'ACCOUNT_REJECTED':
-              setGeneralError('Pendaftaran Anda ditolak. Hubungi administrator.')
+            case 'MUST_CHANGE_PASSWORD':
+              navigate(ROUTES.AUTH.CHANGE_PASSWORD, { replace: true })
+              return
+            case 'validation_error':
+              setGeneralError('Data tidak valid. Periksa kembali input Anda.')
               break
             default:
-              setGeneralError('Terjadi kesalahan. Silakan coba lagi.')
+              setGeneralError(err.message || 'Terjadi kesalahan. Silakan coba lagi.')
           }
         } else {
           setGeneralError('Terjadi kesalahan. Silakan coba lagi.')

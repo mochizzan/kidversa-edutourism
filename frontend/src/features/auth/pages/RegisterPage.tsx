@@ -8,7 +8,7 @@ import { useAuth } from '../../../core/hooks/useAuth'
 import { UserRole } from '../../../core/types'
 import { ROUTES } from '../../../core/constants/app'
 import { cn } from '../../../core/utils'
-import { getAll } from '../../../core/services/storage/idb'
+import { apiRequest, ApiError } from '../../../core/services/backendClient'
 import type { Tenant } from '../../../core/types'
 import { WizardTimeline } from '../components/WizardTimeline'
 import { RegisterStepName } from '../components/RegisterStepName'
@@ -65,7 +65,9 @@ const RegisterPage = () => {
   })
 
   useEffect(() => {
-    getAll<Tenant>('tenants').then(setTenants)
+    apiRequest<{ data: Tenant[] }>('GET', '/api/tenants')
+      .then((res) => setTenants(res.data))
+      .catch(() => setTenants([]))
   }, [])
 
   const passwordValue = watch('password', '')
@@ -92,7 +94,23 @@ const RegisterPage = () => {
       setIsSuccess(true)
       setTimeout(() => navigate(ROUTES.AUTH.LOGIN, { replace: true, state: { message: 'Registrasi berhasil! Akun Anda menunggu persetujuan admin.' } }), 2000)
     } catch (err) {
-      setGeneralError(err instanceof Error && err.message === 'EMAIL_ALREADY_EXISTS' ? 'Email sudah terdaftar' : 'Terjadi kesalahan. Silakan coba lagi.')
+      if (err instanceof ApiError) {
+        switch (err.code) {
+          case 'conflict':
+            setGeneralError('Email sudah terdaftar')
+            break
+          case 'validation_error':
+            setGeneralError('Data tidak valid. Periksa kembali input Anda.')
+            break
+          case 'unauthorized':
+            setGeneralError('Tidak memiliki akses untuk mendaftar.')
+            break
+          default:
+            setGeneralError(err.message || 'Terjadi kesalahan. Silakan coba lagi.')
+        }
+      } else {
+        setGeneralError('Terjadi kesalahan. Silakan coba lagi.')
+      }
     }
   }
 
