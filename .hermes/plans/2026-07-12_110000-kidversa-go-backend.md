@@ -277,8 +277,9 @@ CREATE TABLE programs (
 --     tabel high-volume (timeline_events, recordings, smart_photos, assessments) TIDAK dipartisi di v1;
 --     bila kelak butuh partisi, ubah PK jadi (id, created_at) atau PARTITION BY KEY(id). Dokumentasikan, jangan lakukan sekarang.
 --   * reports: parent_access_token CHAR(64) NULL UNIQUE (§9), parent_token_expires_at DATETIME(3) NULL,
---     parent_token_revoked BOOLEAN NOT NULL DEFAULT 0; UNIQUE KEY uq_reports_participant_session (participant_id, session_id)
---     cegah duplikat rapor; FK reports.participant_id→participants ON DELETE RESTRICT, reports.session_id→sessions ON DELETE RESTRICT.
+--     parent_token_revoked BOOLEAN NOT NULL DEFAULT 0; FK reports.participant_id→participants ON DELETE RESTRICT,
+--     reports.session_id→sessions ON DELETE RESTRICT.
+--     CEK duplikat rapor: JANGAN pakai UNIQUE biasa (bentrok soft-delete) — pakai generated column (lihat §2.2 / §10.11).
 --   * current_stage_id di session_groups → rename ke current_session_stage_id (konvensi <entitas>_id).
 
 ### 2.2 Tabel auth-infra & notifikasi (tambahan audit iterasi-1)
@@ -317,7 +318,13 @@ CREATE TABLE notifications (
   CONSTRAINT fk_notif_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
-**Perbaikan soft-delete + unique (audit iterasi-1):** `uq_reports_participant_session (participant_id, session_id)` bentrok dengan GORM soft-delete (row `deleted_at` tetap menghuni unique index → tak bisa buat rapor baru untuk pasangan yang pernah di-soft-delete). UBAH menjadi composite **`(participant_id, session_id, deleted_at)`** agar slot terbebas saat soft-delete. Sama berlaku untuk unique lain yang mungkin soft-delete (mis. `uq_tenants_slug` — slug tenant soft-deleted tak boleh dipakai lagi; jika perlu, ikut sertakan `deleted_at`).
+**Perbaikan soft-delete + unique (audit iterasi-1, DIPERBAIKI iterasi-2):** Menambah `deleted_at` ke unique index **TIDAK** menyelesaikan masalah. Di MariaDB/MySQL, nilai NULL di unique index dianggap *distinct*, sehingga dua baris aktif (`deleted_at IS NULL`) dengan pasangan `(participant_id, session_id)` sama **tetap diizinkan** → bug duplikat rapor BELUM terselesaikan (hanya tersembunyi). Gunakan pola *generated column* agar tepat SATU baris aktif per pasangan, tanpa batas soft-delete:
+```sql
+ALTER TABLE reports
+  ADD COLUMN active_uniq TINYINT AS (CASE WHEN deleted_at IS NULL THEN 1 ELSE NULL END) VIRTUAL,
+  ADD UNIQUE KEY uq_reports_participant_session (participant_id, session_id, active_uniq);
+```
+`active_uniq = 1` hanya untuk baris aktif (satu-satunya, karena NULL diabaikan unique) → duplikat aktif terblokir; baris soft-deleted bernilai NULL (diabaikan) → histori tak terbatas. Terapkan pola sama untuk unique ber-soft-delete lain yang kritis (`uq_tenants_slug` → `(slug, active_uniq)`; atau cukup hard-restrict tenant + slug unik global tanpa soft-delete slug).
 **Default ENUM awal (audit iterasi-1):** pastikan tiap tabel punya default state awal NOT NULL: `sessions.status` DEFAULT 'DRAFT', `session_stages.status` DEFAULT 'WAITING', `session_groups.status` DEFAULT 'WAITING', `group_stage_progress.status` DEFAULT 'LOCKED', `recordings.review_status` DEFAULT 'PENDING', `reports.status` DEFAULT 'DRAFT', `consent_logs` (ConsentType wajib diisi, no default). Jangan biarkan ENUM tanpa default (rawan error insert).
 
 **Bootstrap (bukan seed demo)** `000002_bootstrap.up.sql` **TIDAK** berisi password (bcrypt tak bisa di SQL). Bootstrap dilakukan di **Go** (`cmd/migrate` setelah `up`): idempoten via `INSERT IGNORE`/`FirstOrCreate` berbasis unique (tenant slug, user email) — UUID bootstrap tetap. Superadmin password **TIDAK di-hardcode di repo**: ambil dari env `BOOTSTRAP_SUPERADMIN_PASSWORD` (fallback: generate acak + **cetak ke console sekali** + set flag `must_change_password=1` wajib ganti di first-login). Tenant `tenant-bandung` + `tenant-subang`, user `superadmin@kidversa.id` (SUPER_ADMIN global) + `admin.bandung@kidversa.id` (ADMIN, tenant-bandung). Nilai disamakan `core/services/local/bootstrap.ts`. (Revisi audit F1 CRITICAL: jangan commit plaintext `password123`.)
@@ -454,7 +461,7 @@ Setiap resource: entity → repo → usecase → handler + route + test. Urutan:
 - **Phase 5:** Sessions + Stages + Groups + Participants (termasuk `start/complete/cancel`, `import`, `link`)
 - **Phase 6:** Live + GroupStageProgress + Timeline + **SSE hub** (`pkg/sse` §8.1) + route `GET /api/live/:sessionId/stream` (§8.2) + **Notifications SSE** `GET /api/notifications/stream` (§8.3). Setiap mutasi progress/timeline → `hub.Publish`. Hapus konsep simulate.
 - **Phase 7:** Assessments, Photos, Recordings, Reports (**generate** async + SSE `narrative-stream` §8.4, approve/send), MissionBanks, ParticipantMissions, Consent, Frames.
-- **Phase 8:** File upload handler (multipart → simpan `uploads/` → kembalikan URL static). Mount `e.Static("/media", cfg.UploadDir)`.
+- **Phase 8:** File upload handler (multipart → simpan `uploads/` → kembalikan `media_id`/`file_url` internal). **Akses media lewat route terautentikasi** `GET /api/media/:kind/:id` (cek JWT + tenant scope + consent), BUKAN `e.Static` publik. Disk tetap `cfg.UploadDir` (gitignored); abstraksi `FileStore` (§7) siap swap ke MinIO/S3.
 
 ### Phase 9 — Frontend rewiring (lihat §4)
 Lakukan per fitur, jalankan `pnpm build` tiap tahap. Hapus `simulateProgress` + tombol simulasi + hardcoded parent dashboard/stories.
@@ -484,6 +491,7 @@ Event = `{ id, type, data JSON, ts }`. Handler SSE: set header `Content-Type: te
 - Fasilitator/Admin override (complete/unlock/skip/jump/reset) → usecase mutasi DB → `hub.Publish("live:<sessionId>", {type:"progress"|"timeline", data})`.
 - `GET /api/live/:sessionId/stream` (SSE, auth JWT) → client `EventSource` menerima push; **tidak ada tombol "Mulai Simulasi"**, tidak ada `setInterval` 5s.
 - `LiveMonitorPage` & fasilitator dashboard: hapus logic simulasi, subscribe SSE saja.
+- **Authz mutasi live (MEDIUM, §10.1):** endpoint `POST /groups/:groupId/stages/:stageId/unlock|complete|skip`, `POST /groups/:groupId/jump|reset`, `POST /events` **wajib** `RequireRole(FASILITATOR,ADMIN,SUPER_ADMIN)` DAN scope tenant = session terkait (session→tenant). `GET /api/live/:sessionId/stream` (SSE) butuh JWT valid + user milik tenant session yang sama (atau SUPER_ADMIN). Tolak 403 bila beda tenant.
 
 ### 8.3 Notifikasi realtime (ganti activity feed lokal di Dashboard admin)
 - `GET /api/notifications/stream` (SSE, auth JWT) → channel `notif:<role>` atau `notif:<userId>`.
@@ -550,6 +558,7 @@ Semua temuan CRITICAL/HIGH dari audit wajib diimplementasikan. Berikut spesifika
 - **Access token TTL 15m, Refresh token TTL 7d** (`JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` di config). Refresh token **opaque** disimpan di tabel `refresh_tokens(id, user_id, token_hash, expires_at, revoked_at)`; rotasi 1x-pakai + denylist `jti` saat logout/password-change. Access token claim wajib `aud`+`iss` (`jwt.WithAudience`/`WithIssuer`); `keyfunc` eksplisit `jwt.WithValidMethods([]string{"HS256"})` (tolak `none`).
 - **`X-Tenant-Id` HANYA dibaca bila `claims.Role == SUPER_ADMIN`** (T3.2). Untuk role lain, header **di-drop** & scope murni dari `claims.TenantID`. Tolak (401) bila non-SA menyertakan header ilegal. `?tenant_id=` di query **diabaikan** (selalu pakai scope server).
 - **Logout** → set `revoked_at` refresh token + tambah `jti` access ke denylist. **Penyimpanan denylist (audit iterasi-1):** v1 single-instance → in-memory `map[jti]expiry` + goroutine purge (TTL = sisa access TTL); DOKUMENTASIKAN batasan: tak ter-share antar instance — bila scale-out, ganti ke Redis (`SET jti NX EX <ttl>`). Sama untuk `refresh_tokens` (tabel, lihat §2.2) yang sudah persisten.
+- **Refresh rotation + reuse detection (OWASP, MEDIUM, iterasi-2):** tiap `/refresh` → mark refresh token lama `revoked_at` + issue pasangan baru (rotasi 1x-pakai). JIKA token refresh yang **sudah di-revoke** dipakai lagi (sinyal pencurian) → **revoke SELURUH `refresh_tokens` user** + denylist semua `jti` aktif (bunuh seluruh session family), return 401. Ini cegah token theft persisten.
 - **Password change (`/change-password`)** → verifikasi password lama (bcrypt) + simpan baru (cost §T0.2) + **revoke ALL `refresh_tokens` user (set `revoked_at`) + denylist ALL `jti` aktif** → paksa login ulang di semua device. Wajib ada karena bootstrap menandai `must_change_password=1` (§2) tapi plan awal tak punya endpoint ganti password (celah: token lama tetap valid setelah ganti password).
 
 ### 10.2 Tenant isolation (audit F9/F12)
@@ -557,7 +566,7 @@ Semua temuan CRITICAL/HIGH dari audit wajib diimplementasikan. Berikut spesifika
 
 ### 10.3 File upload (audit F5/F11)
 - Nama file **di-generate acak** (`uuid.NewString()+ext`), **abaikan `file.Filename`** (cegah path traversal & overwrite). Mapping ke DB.
-- Whitelist ekstensi + cek **magic byte** (bukan hanya Content-Type). `echo.BodyLimit` 25 MB di route upload. Serve dengan `Content-Disposition` + Content-Type aman + CSP untuk cegah stored-XSS (file `.html`). `e.Static` tanpa directory listing (aman asalkan nama acak).
+- Whitelist ekstensi + cek **magic byte** (bukan hanya Content-Type). `echo.BodyLimit` 25 MB di route upload. **Media sensitif (foto/rekaman ANAK) BUKAN public:** JANGAN serve via `e.Static` (nama uuid tak cukup sebagai akses-kontrol — siapa pun dengan URL bisa lihat). Serve lewat handler terautentikasi `GET /api/media/:kind/:id` yang cek JWT + scope tenant + (foto) consent log; file dibaca dari disk lalu `c.Blob`/`c.Attachment` dengan Content-Type aman + `Content-Disposition` + CSP cegah stored-XSS (tolak `.html`). Lihat Phase 8.
 
 ### 10.4 SQL / sort injection (audit F6)
 - `ListParams.sort` **whitelist** kolom + arah (`asc`/`desc`); tolak selain itu. Semua raw query wajib `?` placeholder. LIKE search via GORM placeholder (aman).
@@ -595,7 +604,7 @@ func (h *Hub) Publish(ch string, ev Event) {
 ```
 Handler SSE: `defer unsub()` + loop `select { case <-ctx.Done(): return; case ev := <-ch: write; case <-ticker: send keepalive }`. **TIDAK** block request path (Publish non-blocking). **Auth SSE:** `EventSource` tak bisa header → pakai **httpOnly+Secure cookie** `kidversa_session` diset saat `/login` (ubah T2.4 `Set-Cookie`). Middleware SSE baca cookie, bukan `Authorization`. Saat koneksi: kirim 1 event `snapshot` (state DB terkini) lalu delta; tulis `id: <event.id>` + handle `Last-Event-ID` untuk replay/dedupe. Hub **single-instance** di v1 (catat: scale-out butuh Redis pub/sub; bila >1 instance, event SSE hanya sampai client yang connect ke instance yang publish — butuh sticky session atau Redis pub/sub). Generator `narrative` diikat `ctx.Done()` (stop saat client putus) — cegah goroutine leak.
 
-**Model auth SSE vs REST (audit iterasi-1, resolve kontradiksi §10.6 vs §10.1/T2.4):** REST pakai `Authorization: Bearer <access_token>` (body login mengembalikan `access_token`+`refresh_token`). KARENA `EventSource` TIDAK bisa set header Authorization, `/login` JUGA menulis cookie **httpOnly+Secure+SameSite=None** `kidversa_session=<access_token>`; middleware SSE (`/api/live/*/stream`, `/api/notifications/stream`, `/api/reports/:id/narrative-stream`) membaca cookie ini (bukan Bearer). Validasi token identik (same keyfunc). **CORS wajib** `Access-Control-Allow-Credentials: true` + origin eksplisit (bukan `*`) karena cookie cross-origin (frontend :5173 → backend :8080), lihat §10.5.
+**Model auth SSE vs REST (audit iterasi-1, DIPERBAIKI iterasi-2):** REST pakai `Authorization: Bearer *** (body login mengembalikan `access_token`+`refresh_token`). KARENA `EventSource` TIDAK bisa set header Authorization, `/login` JUGA menulis cookie `kidversa_session=<access_token>`. **Atribut cookie HARUS env-driven (bukan selalu `SameSite=None;Secure`):** frontend `:5173` → backend `:8080` adalah *same-site* bagi cookie (perbedaan port tak membatalkan site), sehingga di **dev (HTTP)** cukup `SameSite=Lax` (tanpa `Secure`, karena cookie `Secure` tak terkirim via HTTP) — `SameSite=None;Secure` justru **memutus auth SSE di dev**. Di **prod (HTTPS)** gunakan `HttpOnly; Secure; SameSite=None` (cross-origin aman). Ambil dari config `COOKIE_SECURE`/`COOKIE_SAMESITE`. Middleware SSE (`/api/live/*/stream`, `/api/notifications/stream`, `/api/reports/:id/narrative-stream`) baca cookie ini (bukan Bearer); validasi token identik (same keyfunc). **CORS:** `Access-Control-Allow-Credentials: true` + origin eksplisit (bukan `*`); **Origin check** di middleware SSE (tolak Origin tak terdaftar di `CORS_ORIGINS`) sebagai mitigasi CSRF (cookie SSE rentan CSRF karena `EventSource` tak bisa set header khusus). Lihat §10.5 & §10.11.
 **Replay / Last-Event-ID (audit iterasi-1):** Hub simpan **ring buffer per-channel capped (mis. 64 event terakhir)** ber-id monoton; saat client reconnect dengan `Last-Event-ID`, replay event sejak id tersebut. Tanpa buffer, `Last-Event-ID` hanya dedupe, bukan replay. **Keepalive:** kirim comment/`:` ping tiap **25s** (di bawah idle timeout proxy ~60s). **Deteksi client lambat:** `Publish` drop + `log.Warn` (jangan block); metric counter dropped events. Pastikan `defer unsub()` dipanggil (tutup goroutine + hapus channel saat kosong).
 
 ### 10.7 Notifications persisten (audit F11/F12)
@@ -617,6 +626,16 @@ Ringkasan perbaikan tambahan agar plan koheren & bebas celah menengah:
 - **CORS credentials:** saat SSE pakai cookie cross-origin, `cors.go` set `Access-Control-Allow-Credentials: true` + origin eksplisit dari `CORS_ORIGINS` (bukan `*`); HSTS/CSP tetap (§10.5).
 - **File eksternal:** plan sudah self-contained; `kidversa_schema_exploration.md` / `kidversa-endpoint-map.md` artefak eksplorasi di luar repo (§0.2/§0.4) — sarankan dipindah ke `docs/` repo.
 - **Tenant hard-delete:** `users.tenant_id` FK `ON DELETE RESTRICT` (§2) + program/session RESTRICT → tenant tak bisa di-hard-delete bila punya data; gunakan soft-delete (tenant punya `deleted_at`). By-design, dokumentasikan.
+
+### 10.11 Iterasi-2 MEDIUM/LOW hardening (konsolidasi multi-sudut: security + konsistensi)
+Temuan tambahan dari review mendalam (edge-case OWASP, konsistensi, operasional). Perubahan berdampak langsung juga diterapkan ke §2/§8/§10 terkait (lihat diff iterasi-2).
+- **Soft-delete + unique (HIGH-correctness, perbaiki §2.2):** menambah `deleted_at` ke unique index **tidak** menyelesaikan benturan soft-delete karena NULL di unique dianggap *distinct* (dua baris aktif tetap lolos). Gunakan *generated column* `active_uniq` + `UNIQUE(participant_id, session_id, active_uniq)` — lihat §2.2. Sama untuk `uq_tenants_slug`.
+- **Connection pool (MEDIUM, §2.0D / T1.4):** setelah `gorm.Open`, panggil `sqlDB.SetMaxOpenConns(cfg.DBMaxOpen)`, `SetMaxIdleConns(cfg.DBMaxIdle)`, `SetConnMaxLifetime(cfg.DBConnMaxLifetime)`. Cegah *too many connections* & koneksi mati ke MariaDB 12. Default: MaxOpen=25, MaxIdle=10, Lifetime=1h.
+- **Transaction boundaries (MEDIUM, Phase 5/7):** tulis multi-tabel wajib di-wrap transaksi: `participant import`, `report generate` + `participant_missions`, `session start` (cascade status). Sediakan `persistence.WithTx(ctx, fn)` (GORM `Transaction`) dipanggil usecase; jangan commit parsial.
+- **Event id monoton per-channel (LOW, §10.6):** `Event.id` SSE harus *monotonic counter* per channel (atomic `uint64` di hub), BUKAN UUID — `Last-Event-ID` replay butuh urutan. UUID tetap sebagai `Event.uuid` untuk dedupe, tapi field `id:` SSE = counter.
+- **Health readiness (LOW, T0.11):** `/health` lakukan `db.Exec("SELECT 1")`; gagal → 503 (readiness), sukses → 200 (liveness). Dipakai orchestrator / compose `healthcheck`.
+- **Register clarity (LOW, §3):** `POST /api/auth/register` self-service → buat user `approval_status='pending'`, role default `FASILITATOR` (atau tanpa role sampai disetujui), `is_active=0`. Bukan auto-login; admin approval (`/:id/approve`) mengaktifkan.
+- **CSRF SSE (terkait §10.6):** karena SSE auth pakai cookie, validasi header `Origin` == `CORS_ORIGINS` di middleware SSE (tolak cross-origin tak terdaftar) sebagai mitigasi CSRF (`EventSource` tak bisa set header khusus). Cookie atribut env-driven (`COOKIE_SECURE`/`COOKIE_SAMESITE`) — di dev (HTTP) `SameSite=Lax`, di prod (HTTPS) `Secure;SameSite=None`.
 
 ---
 
