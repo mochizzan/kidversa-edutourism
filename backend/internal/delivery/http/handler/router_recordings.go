@@ -9,9 +9,9 @@ import (
 
 // RegisterRecordingsRoutes mounts /api/recordings/* on the given echo group.
 // File uploads happen at /api/recordings/upload (RegisterUploadRoutes).
-func RegisterRecordingsRoutes(g *echo.Group, h *RecordingHandler, jm *auth.JWTManager) {
-	g.GET("/:id", h.GetByID, appmiddleware.JWTAuth(jm, ""))
-	g.GET("", h.List, appmiddleware.JWTAuth(jm, ""))
-	g.POST("/:id/review", h.Review, appmiddleware.JWTAuth(jm, ""))
-	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, ""))
+func RegisterRecordingsRoutes(g *echo.Group, h *RecordingHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
+	g.GET("/:id", h.GetByID, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("", h.List, appmiddleware.JWTAuth(jm, "", revoker))
+	g.POST("/:id/review", h.Review, appmiddleware.JWTAuth(jm, "", revoker))
+	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, "", revoker))
 }

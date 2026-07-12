@@ -39,43 +39,43 @@ func NewRouter(d Deps) *echo.Echo {
 
 	// Auth routes (public + protected).
 	authGroup := api.Group("/auth")
-	handler.RegisterAuthRoutes(authGroup, d.Handlers.Auth, d.JWT, d.Config.SSECookieName())
+	handler.RegisterAuthRoutes(authGroup, d.Handlers.Auth, d.JWT, d.Config.SSECookieName(), d.Revoker)
 
 	h := d.Handlers
 
 	// Tenants (SUPER_ADMIN).
-	handler.RegisterTenantsRoutes(api.Group("/tenants"), h.Tenant, d.JWT)
+	handler.RegisterTenantsRoutes(api.Group("/tenants"), h.Tenant, d.JWT, d.Revoker)
 
 	// Users.
-	handler.RegisterUsersRoutes(api.Group("/users"), h.User, d.JWT)
+	handler.RegisterUsersRoutes(api.Group("/users"), h.User, d.JWT, d.Revoker)
 
 	// Programs + stages + contents.
-	handler.RegisterProgramsRoutes(api.Group("/programs"), h.Program, d.JWT)
+	handler.RegisterProgramsRoutes(api.Group("/programs"), h.Program, d.JWT, d.Revoker)
 
 	// Sessions + stages + groups + participants.
 	handler.RegisterSessionsRoutes(
 		api.Group("/sessions"),
 		h.Session, h.SessionLifecycle, h.SessionStage, h.SessionGroup, h.SessionParticipant, h.SessionParticipantBulk,
-		d.JWT,
+		d.JWT, d.Revoker,
 	)
 
 	// Live + SSE.
-	handler.RegisterLiveRoutes(api.Group("/live"), h.Live, d.JWT, d.Hub)
-	handler.RegisterNotificationsRoutes(api.Group("/notifications"), h.Notification, d.JWT, d.Hub)
+	handler.RegisterLiveRoutes(api.Group("/live"), h.Live, d.JWT, d.Hub, d.Revoker)
+	handler.RegisterNotificationsRoutes(api.Group("/notifications"), h.Notification, d.JWT, d.Hub, d.Revoker)
 
 	// Resources.
-	handler.RegisterAssessmentRoutes(api.Group("/assessments"), h.Assessment, d.JWT)
-	handler.RegisterPhotosRoutes(api.Group("/photos"), h.Photo, d.JWT)
-	handler.RegisterRecordingsRoutes(api.Group("/recordings"), h.Recording, d.JWT)
-	handler.RegisterReportsRoutes(api.Group("/reports"), h.Report, d.JWT)
-	handler.RegisterMissionBanksRoutes(api.Group("/mission-banks"), h.MissionBank, d.JWT)
-	handler.RegisterParticipantMissionsRoutes(api.Group("/participant-missions"), h.ParticipantMission, d.JWT)
-	handler.RegisterConsentRoutes(api.Group("/consent"), h.Consent, d.JWT)
-	handler.RegisterFramesRoutes(api.Group("/frames"), h.Frame, d.JWT)
+	handler.RegisterAssessmentRoutes(api.Group("/assessments"), h.Assessment, d.JWT, d.Revoker)
+	handler.RegisterPhotosRoutes(api.Group("/photos"), h.Photo, d.JWT, d.Revoker)
+	handler.RegisterRecordingsRoutes(api.Group("/recordings"), h.Recording, d.JWT, d.Revoker)
+	handler.RegisterReportsRoutes(api.Group("/reports"), h.Report, d.JWT, d.Revoker)
+	handler.RegisterMissionBanksRoutes(api.Group("/mission-banks"), h.MissionBank, d.JWT, d.Revoker)
+	handler.RegisterParticipantMissionsRoutes(api.Group("/participant-missions"), h.ParticipantMission, d.JWT, d.Revoker)
+	handler.RegisterConsentRoutes(api.Group("/consent"), h.Consent, d.JWT, d.Revoker)
+	handler.RegisterFramesRoutes(api.Group("/frames"), h.Frame, d.JWT, d.Revoker)
 
 	// File upload + authenticated media.
-	handler.RegisterUploadRoutes(api.Group("/api"), h.Upload, d.JWT, d.Config)
-	handler.RegisterMediaRoutes(api.Group("/media"), h.Media, d.JWT, d.Config)
+	handler.RegisterUploadRoutes(api.Group("/api"), h.Upload, d.JWT, d.Config, d.Revoker)
+	handler.RegisterMediaRoutes(api.Group("/media"), h.Media, d.JWT, d.Config, d.Revoker)
 
 	return e
 }

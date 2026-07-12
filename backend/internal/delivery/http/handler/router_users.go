@@ -9,8 +9,8 @@ import (
 
 // RegisterUsersRoutes mounts /api/users/* on the given echo group.
 // SUPER_ADMIN may operate globally; ADMIN is tenant-scoped via TenantScope.
-func RegisterUsersRoutes(g *echo.Group, h *UserHandler, jm *auth.JWTManager) {
-	authMW := appmiddleware.JWTAuth(jm, "")
+func RegisterUsersRoutes(g *echo.Group, h *UserHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
+	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMW := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN")
 	scopeMW := appmiddleware.TenantScope()
 

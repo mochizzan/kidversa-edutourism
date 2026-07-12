@@ -8,9 +8,9 @@ import (
 )
 
 // RegisterAssessmentRoutes mounts /api/assessments/* on the given echo group.
-func RegisterAssessmentRoutes(g *echo.Group, h *AssessmentHandler, jm *auth.JWTManager) {
-	g.POST("/upsert", h.Upsert, appmiddleware.JWTAuth(jm, ""))
-	g.POST("/bulk-upsert", h.BulkUpsert, appmiddleware.JWTAuth(jm, ""))
-	g.GET("", h.List, appmiddleware.JWTAuth(jm, ""))
-	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, ""))
+func RegisterAssessmentRoutes(g *echo.Group, h *AssessmentHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
+	g.POST("/upsert", h.Upsert, appmiddleware.JWTAuth(jm, "", revoker))
+	g.POST("/bulk-upsert", h.BulkUpsert, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("", h.List, appmiddleware.JWTAuth(jm, "", revoker))
+	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, "", revoker))
 }

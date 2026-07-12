@@ -17,11 +17,11 @@ import (
 //
 // The public access endpoint is intentionally OUTSIDE JWTAuth; the token itself
 // is the authorization mechanism.
-func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager) {
+func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	g.GET("/access", h.GetByAccessToken)
-	g.POST("/:id/generate", h.Generate, appmiddleware.JWTAuth(jm, ""))
-	g.POST("/:id/approve", h.Approve, appmiddleware.JWTAuth(jm, ""))
-	g.POST("/:id/send", h.Send, appmiddleware.JWTAuth(jm, ""))
-	g.POST("/:id/revoke-token", h.RevokeToken, appmiddleware.JWTAuth(jm, ""))
-	g.GET("/:id/narrative-stream", h.NarrativeStream, appmiddleware.JWTAuth(jm, ""))
+	g.POST("/:id/generate", h.Generate, appmiddleware.JWTAuth(jm, "", revoker))
+	g.POST("/:id/approve", h.Approve, appmiddleware.JWTAuth(jm, "", revoker))
+	g.POST("/:id/send", h.Send, appmiddleware.JWTAuth(jm, "", revoker))
+	g.POST("/:id/revoke-token", h.RevokeToken, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("/:id/narrative-stream", h.NarrativeStream, appmiddleware.JWTAuth(jm, "", revoker))
 }

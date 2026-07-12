@@ -10,8 +10,8 @@ import (
 // RegisterPhotosRoutes mounts /api/photos/* on the given echo group.
 // Actual file uploads happen at /api/photos/upload (RegisterUploadRoutes).
 // This group covers read/list/delete of SmartPhoto records.
-func RegisterPhotosRoutes(g *echo.Group, h *PhotoHandler, jm *auth.JWTManager) {
-	g.GET("/:id", h.GetByID, appmiddleware.JWTAuth(jm, ""))
-	g.GET("", h.List, appmiddleware.JWTAuth(jm, ""))
-	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, ""))
+func RegisterPhotosRoutes(g *echo.Group, h *PhotoHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
+	g.GET("/:id", h.GetByID, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("", h.List, appmiddleware.JWTAuth(jm, "", revoker))
+	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, "", revoker))
 }

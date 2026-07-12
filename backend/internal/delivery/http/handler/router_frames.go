@@ -8,10 +8,10 @@ import (
 )
 
 // RegisterFramesRoutes mounts /api/frames/* on the given echo group.
-func RegisterFramesRoutes(g *echo.Group, h *FrameHandler, jm *auth.JWTManager) {
-	g.POST("", h.Create, appmiddleware.JWTAuth(jm, ""))
-	g.GET("/:id", h.GetByID, appmiddleware.JWTAuth(jm, ""))
-	g.GET("", h.List, appmiddleware.JWTAuth(jm, ""))
-	g.PUT("/:id", h.Update, appmiddleware.JWTAuth(jm, ""))
-	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, ""))
+func RegisterFramesRoutes(g *echo.Group, h *FrameHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
+	g.POST("", h.Create, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("/:id", h.GetByID, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("", h.List, appmiddleware.JWTAuth(jm, "", revoker))
+	g.PUT("/:id", h.Update, appmiddleware.JWTAuth(jm, "", revoker))
+	g.DELETE("/:id", h.Delete, appmiddleware.JWTAuth(jm, "", revoker))
 }

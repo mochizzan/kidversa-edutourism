@@ -11,21 +11,21 @@ import (
 )
 
 // RegisterLiveRoutes mounts /api/live/* on the given echo group.
-func RegisterLiveRoutes(g *echo.Group, h *LiveHandler, jm *auth.JWTManager, hub *sse.Hub) {
+func RegisterLiveRoutes(g *echo.Group, h *LiveHandler, jm *auth.JWTManager, hub *sse.Hub, revoker auth.TokenRevoker) {
 	_ = hub // hub is held by the handler for SSE streaming.
-	g.GET("/:sessionId/groups", h.Groups, appmiddleware.JWTAuth(jm, ""))
-	g.GET("/:sessionId/timeline", h.Timeline, appmiddleware.JWTAuth(jm, ""))
-	g.GET("/:sessionId/stream", h.Stream, appmiddleware.JWTAuth(jm, ""))
+	g.GET("/:sessionId/groups", h.Groups, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("/:sessionId/timeline", h.Timeline, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("/:sessionId/stream", h.Stream, appmiddleware.JWTAuth(jm, "", revoker))
 
 	// Facilitator overrides (FASILITATOR/ADMIN/SUPER_ADMIN only).
-	ov := appmiddleware.JWTAuth(jm, "")
+	ov := appmiddleware.JWTAuth(jm, "", revoker)
 	roles := appmiddleware.RequireRole(string(entity.RoleFasilitator), string(entity.RoleAdmin), string(entity.RoleSuperAdmin))
 	g.POST("/groups/:groupId/stages/:stageId/unlock", h.overrideAction(live.ActionUnlock), ov, roles)
 	g.POST("/groups/:groupId/stages/:stageId/complete", h.overrideAction(live.ActionComplete), ov, roles)
 	g.POST("/groups/:groupId/stages/:stageId/skip", h.overrideAction(live.ActionSkip), ov, roles)
 	g.POST("/groups/:groupId/jump", h.Jump, ov, roles)
 	g.POST("/groups/:groupId/reset", h.Reset, ov, roles)
-	g.POST("/events", h.PublishEvent, appmiddleware.JWTAuth(jm, ""))
+	g.POST("/events", h.PublishEvent, appmiddleware.JWTAuth(jm, "", revoker))
 }
 
 // overrideAction adapts the Override method to a fixed action.

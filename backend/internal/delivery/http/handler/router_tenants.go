@@ -9,8 +9,8 @@ import (
 
 // RegisterTenantsRoutes mounts /api/tenants/* on the given echo group.
 // All tenant operations require SUPER_ADMIN.
-func RegisterTenantsRoutes(g *echo.Group, h *TenantHandler, jm *auth.JWTManager) {
-	authMW := appmiddleware.JWTAuth(jm, "")
+func RegisterTenantsRoutes(g *echo.Group, h *TenantHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
+	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMW := appmiddleware.RequireRole("SUPER_ADMIN")
 
 	g.GET("", h.List, authMW, roleMW)

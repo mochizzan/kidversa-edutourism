@@ -10,8 +10,8 @@ import (
 // RegisterProgramsRoutes mounts /api/programs/* and /api/program-stages/* on the given echo group.
 // All program operations require SUPER_ADMIN, ADMIN, or KOORDINATOR; tenant scope is enforced
 // by TenantScope (programs filtered by GetTenantID; stages/contents scoped through their program).
-func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManager) {
-	authMW := appmiddleware.JWTAuth(jm, "")
+func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
+	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMW := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR")
 	scopeMW := appmiddleware.TenantScope()
 

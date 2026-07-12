@@ -8,7 +8,7 @@ import (
 )
 
 // RegisterConsentRoutes mounts /api/consent/* on the given echo group.
-func RegisterConsentRoutes(g *echo.Group, h *ConsentHandler, jm *auth.JWTManager) {
-	g.POST("/respond", h.Respond, appmiddleware.JWTAuth(jm, ""))
-	g.GET("", h.ListByParticipant, appmiddleware.JWTAuth(jm, ""))
+func RegisterConsentRoutes(g *echo.Group, h *ConsentHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
+	g.POST("/respond", h.Respond, appmiddleware.JWTAuth(jm, "", revoker))
+	g.GET("", h.ListByParticipant, appmiddleware.JWTAuth(jm, "", revoker))
 }

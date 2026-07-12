@@ -13,10 +13,10 @@ import (
 //
 // Auth + tenant scope are enforced via middleware; per-asset consent and
 // on-disk security checks live in the handler.
-func RegisterMediaRoutes(g *echo.Group, h *MediaHandler, jm *auth.JWTManager, cfg *config.Config) {
+func RegisterMediaRoutes(g *echo.Group, h *MediaHandler, jm *auth.JWTManager, cfg *config.Config, revoker auth.TokenRevoker) {
 	sseCookie := cfg.SSECookieName()
 	g.GET("/media/:kind/:id", h.Get,
-		appmiddleware.JWTAuth(jm, sseCookie),
+		appmiddleware.JWTAuth(jm, sseCookie, revoker),
 		appmiddleware.TenantScope(),
 	)
 }

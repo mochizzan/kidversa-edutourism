@@ -22,7 +22,10 @@ const (
 // JWTAuth validates the Bearer access token (or the SSE cookie) and sets claims on the context.
 // When sseCookieName is non-empty and the Authorization header is absent, it reads the
 // httpOnly cookie (used by SSE streams, since EventSource cannot set headers).
-func JWTAuth(jm *auth.JWTManager, sseCookieName string) echo.MiddlewareFunc {
+//
+// revoker is the optional jti denylist (logout/password-change revocation). When non-nil,
+// a token whose jti is on the denylist is rejected with 401 "token_revoked".
+func JWTAuth(jm *auth.JWTManager, sseCookieName string, revoker auth.TokenRevoker) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			tokenStr := extractToken(c, sseCookieName)
@@ -32,6 +35,10 @@ func JWTAuth(jm *auth.JWTManager, sseCookieName string) echo.MiddlewareFunc {
 			claims, err := jm.Parse(tokenStr)
 			if err != nil {
 				return appresp.Fail(c, http.StatusUnauthorized, "token_invalid")
+			}
+			// Revocation check: denylist jti (logout / password change invalidates the token).
+			if revoker != nil && revoker.IsRevoked((*c).Request().Context(), claims.ID) {
+				return appresp.Fail(c, http.StatusUnauthorized, "token_revoked")
 			}
 			(*c).Set(CtxUserID, claims.UserID)
 			(*c).Set(CtxTenantID, claims.TenantID)
