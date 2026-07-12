@@ -32,3 +32,13 @@ type RecordingReviewRequest struct {
 	ReviewedBy   string  `json:"reviewed_by" validate:"required"`
 	Transcript   *string `json:"transcript_text,omitempty"`
 }
+
+// RecordingRequest is the update payload for PUT /api/recordings/:id.
+type RecordingRequest struct {
+	FileURL         string `json:"file_url,omitempty"`
+	DurationSeconds int    `json:"duration_seconds"`
+	TranscriptText  string `json:"transcript_text,omitempty"`
+	ReviewStatus    string `json:"review_status,omitempty"`
+	ReviewedBy      string `json:"reviewed_by,omitempty"`
+	ReviewedAt      string `json:"reviewed_at,omitempty"`
+}

@@ -50,6 +50,12 @@ func (f *fakeRecordingRepo) Delete(_ context.Context, id string) error {
 	delete(f.byID, id)
 	return nil
 }
+func (f *fakeRecordingRepo) UpdateFields(_ context.Context, id string, _ map[string]interface{}) error {
+	if _, ok := f.byID[id]; !ok {
+		return repoErrNotFound
+	}
+	return nil
+}
 
 func TestRecordingReviewUpdatesStatus(t *testing.T) {
 	repo := newFakeRecordingRepo()

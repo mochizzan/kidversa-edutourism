@@ -90,3 +90,40 @@ func (h *RecordingHandler) Delete(c *echo.Context) error {
 	}
 	return appresp.NoContent(c)
 }
+
+// Update handles PUT /api/recordings/:id (partial map update, C2 zero-value safe).
+func (h *RecordingHandler) Update(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	var req dto.RecordingRequest
+	if err := (*c).Bind(&req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	}
+	fields := map[string]interface{}{}
+	if req.FileURL != "" {
+		fields["file_url"] = req.FileURL
+	}
+	fields["duration_seconds"] = req.DurationSeconds
+	if req.TranscriptText != "" {
+		fields["transcript_text"] = req.TranscriptText
+	}
+	if req.ReviewStatus != "" {
+		fields["review_status"] = req.ReviewStatus
+	}
+	if req.ReviewedBy != "" {
+		fields["reviewed_by"] = req.ReviewedBy
+	}
+	if req.ReviewedAt != "" {
+		fields["reviewed_at"] = req.ReviewedAt
+	}
+	if err := h.recordings.UpdateFields((*c).Request().Context(), id, fields); err != nil {
+		return err
+	}
+	r, err := h.recordings.GetByID((*c).Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewRecordingResponse(r))
+}
