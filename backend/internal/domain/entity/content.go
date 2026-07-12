@@ -83,6 +83,13 @@ type ConsentLog struct {
 	RespondedAt   *string     `json:"responded_at,omitempty"`
 	IPAddress     string      `json:"ip_address,omitempty"`
 	UserAgent     string      `json:"user_agent,omitempty"`
+	// ConsentToken is the single-use, unguessable token used by the public
+	// respond-public flow (plan B10). Empty for rows created via the JWT flow.
+	ConsentToken string `json:"consent_token,omitempty"`
+	// ConsumedAt is set when the token-based response is recorded (replay protection).
+	ConsumedAt *string `json:"consumed_at,omitempty"`
+	// ExpiresAt is the RFC3339 expiry of the consent token.
+	ExpiresAt *string `json:"expires_at,omitempty"`
 }
 
 // TimelineEvent is a realtime log entry for the live dashboard (replaces frontend simulation).

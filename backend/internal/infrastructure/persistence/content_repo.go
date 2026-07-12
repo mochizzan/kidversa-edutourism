@@ -2,6 +2,8 @@ package persistence
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -286,6 +288,111 @@ func (r *GormConsentRepository) ListByParticipant(ctx context.Context, participa
 		out = append(out, *models[i].ToEntity())
 	}
 	return out, nil
+}
+
+// ListBySession returns all consent rows for a session.
+func (r *GormConsentRepository) ListBySession(ctx context.Context, sessionID string) ([]entity.ConsentLog, error) {
+	var models []ConsentLogModel
+	if err := r.db.WithContext(ctx).
+		Where("session_id = ?", sessionID).
+		Order("created_at DESC").
+		Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	out := make([]entity.ConsentLog, 0, len(models))
+	for i := range models {
+		out = append(out, *models[i].ToEntity())
+	}
+	return out, nil
+}
+
+// GetByToken resolves a consent-log row by its single-use token.
+func (r *GormConsentRepository) GetByToken(ctx context.Context, token string) (*entity.ConsentLog, error) {
+	var m ConsentLogModel
+	if err := r.db.WithContext(ctx).
+		Where("consent_token = ?", token).
+		First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("token_invalid", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+// SendRequest issues a single-use consent token for a (participant, session, type)
+// and persists it on a new consent-log row. The token is cryptographically random
+// (>=32 bytes hex) and expires in 24h.
+func (r *GormConsentRepository) SendRequest(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) (string, error) {
+	token, err := generateConsentToken()
+	if err != nil {
+		return "", apperrors.Internal("internal_error", err)
+	}
+	now := time.Now()
+	expiresAt := now.Add(24 * time.Hour).Format(time.RFC3339)
+	log := &entity.ConsentLog{
+		ParticipantID: participantID,
+		SessionID:     sessionID,
+		ConsentType:   consentType,
+		Value:         false,
+		SentAt:        now.Format(time.RFC3339),
+		ConsentToken:  token,
+		ExpiresAt:     &expiresAt,
+	}
+	if err := r.Create(ctx, log); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+// RespondByToken records a parent's consent decision via a single-use token
+// (public flow). Replays / expired tokens are rejected (SC6 replay protection).
+func (r *GormConsentRepository) RespondByToken(ctx context.Context, token string, value bool, ip, ua string) error {
+	if token == "" {
+		return apperrors.NotFound("token_invalid", errors.New("token required"))
+	}
+	var m ConsentLogModel
+	if err := r.db.WithContext(ctx).
+		Where("consent_token = ?", token).
+		First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.NotFound("token_invalid", err)
+		}
+		return apperrors.Internal("internal_error", err)
+	}
+	// Replay protection: already consumed or expired.
+	if m.ConsumedAt != nil {
+		return apperrors.Conflict("token_consumed", errors.New("consent token already used"))
+	}
+	if m.ExpiresAt != nil {
+		if exp, err := time.Parse(time.RFC3339, *m.ExpiresAt); err == nil && time.Now().After(exp) {
+			return apperrors.Forbidden("token_expired", errors.New("consent token expired"))
+		}
+	}
+	now := time.Now().Format(time.RFC3339)
+	updates := map[string]interface{}{
+		"value":        value,
+		"responded_at": now,
+		"consumed_at":  now,
+		"ip_address":   ip,
+		"user_agent":   ua,
+		"updated_at":   time.Now(),
+	}
+	if err := r.db.WithContext(ctx).Model(&ConsentLogModel{}).
+		Where("id = ?", m.ID).
+		Updates(updates).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// generateConsentToken returns a cryptographically-random hex token (32 bytes → 64 hex chars).
+func generateConsentToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }
 
 // TenantIDForSession returns the owning tenant of the given session.

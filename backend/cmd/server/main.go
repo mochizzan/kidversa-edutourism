@@ -80,7 +80,7 @@ func main() {
 	registry.Report = handler.NewReportHandler(reportsUC)
 	registry.MissionBank = handler.NewMissionBankHandler(missionBankRepo)
 	registry.ParticipantMission = handler.NewParticipantMissionHandler(participantMissionRepo)
-	registry.Consent = handler.NewConsentHandler(consentRepo)
+	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo)
 	registry.Frame = handler.NewFrameHandler(frameRepo)
 	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, recordingRepo)
 	registry.Media = handler.NewMediaHandler(cfg, photoRepo, recordingRepo, consentRepo, sessionRepo)

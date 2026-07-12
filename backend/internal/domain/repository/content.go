@@ -60,4 +60,14 @@ type ConsentRepository interface {
 	Respond(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType, value bool, ip, ua string) error
 	// ListByParticipant returns all consent rows for a participant.
 	ListByParticipant(ctx context.Context, participantID string) ([]entity.ConsentLog, error)
+	// ListBySession returns all consent rows for a session.
+	ListBySession(ctx context.Context, sessionID string) ([]entity.ConsentLog, error)
+	// GetByToken resolves a consent-log row by its single-use token (for PII derivation in the public flow).
+	GetByToken(ctx context.Context, token string) (*entity.ConsentLog, error)
+	// SendRequest issues a single-use consent token for a (participant, session, type)
+	// and persists it on a new consent-log row. Returns the token.
+	SendRequest(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) (string, error)
+	// RespondByToken records a parent's consent decision via a single-use token
+	// (public flow). Replays / expired tokens are rejected.
+	RespondByToken(ctx context.Context, token string, value bool, ip, ua string) error
 }

@@ -12,12 +12,18 @@ func NewConsentResponse(c *entity.ConsentLog) *ConsentResponse {
 	return &ConsentResponse{ConsentLog: c}
 }
 
-// ConsentRequest is the parent response payload.
+// ConsentRequest is the parent response payload (JWT flow).
 type ConsentRequest struct {
 	ParticipantID string `json:"participant_id" validate:"required"`
 	SessionID     string `json:"session_id" validate:"required"`
 	ConsentType   string `json:"consent_type" validate:"required"`
 	Value         bool   `json:"value"`
+}
+
+// ConsentPublicRequest is the public token-based response payload.
+type ConsentPublicRequest struct {
+	Token string `json:"token"`
+	Value bool   `json:"value"`
 }
 
 // ConsentListResponse carries a list of consent logs.

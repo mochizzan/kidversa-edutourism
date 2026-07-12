@@ -38,10 +38,28 @@ func (f *fakeConsentRepo) ListByParticipant(_ context.Context, pid string) ([]en
 	}
 	return out, nil
 }
+func (f *fakeConsentRepo) ListBySession(_ context.Context, sid string) ([]entity.ConsentLog, error) {
+	out := make([]entity.ConsentLog, 0)
+	for _, r := range f.rows {
+		if r.SessionID == sid {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+func (f *fakeConsentRepo) GetByToken(_ context.Context, _ string) (*entity.ConsentLog, error) {
+	return nil, nil
+}
+func (f *fakeConsentRepo) SendRequest(_ context.Context, pid, sid string, ct entity.ConsentType) (string, error) {
+	return "tok-" + pid, nil
+}
+func (f *fakeConsentRepo) RespondByToken(_ context.Context, _ string, _ bool, _, _ string) error {
+	return nil
+}
 
 func TestConsentRespondRecordsDecision(t *testing.T) {
 	repo := &fakeConsentRepo{}
-	h := NewConsentHandler(repo)
+	h := NewConsentHandler(repo, newFakeSessionRepo())
 
 	e := echo.New()
 	e.Validator = appmiddleware.NewValidator()
