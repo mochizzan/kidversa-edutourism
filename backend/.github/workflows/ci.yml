@@ -64,7 +64,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Enable pnpm via corepack
+        run: corepack enable && corepack prepare pnpm@latest --activate
       - name: pnpm install
-        run: node "C:/Users/zan/AppData/Roaming/npm/node_modules/pnpm/bin/pnpm.cjs" install
+        run: pnpm install
       - name: pnpm build
-        run: node "C:/Users/zan/AppData/Roaming/npm/node_modules/pnpm/bin/pnpm.cjs" build
+        run: pnpm build
