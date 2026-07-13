@@ -1,91 +1,214 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
+import { openSSE, subscribeConnection, type ConnectionState } from '../services/backendClient'
+import { arrayRequest } from '../services/apiEnvelope'
+import type { TimelineEventRow } from '../services/live'
+import type {
+  SessionGroup,
+  GroupStageProgress,
+  Participant,
+} from '../types'
+
+// Live dashboard state for a single session. The single source of truth is the
+// backend SSE stream (plus POST action responses); this hook never fabricates
+// progress locally.
 export interface LiveSessionState {
-  groups: Record<string, {
-    id: string
-    name: string
-    currentStageId: string | null
-    status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED'
-    participants: Array<{
-      id: string
-      childName: string
-      ratingStatus: 'unrated' | 'rated'
-    }>
-  }>
-  connectionStatus: 'online' | 'degraded' | 'reconnecting'
+  groups: SessionGroup[]
+  progress: GroupStageProgress[]
+  participantsByGroup: Record<string, Participant[]>
+  timeline: TimelineEventRow[]
+  connectionStatus: ConnectionState
 }
 
-export function useLiveSession(sessionId: string) {
+interface SSEEvent {
+  type: string
+  data: unknown
+}
+
+interface SnapshotData {
+  groups?: SessionGroup[]
+  progress?: GroupStageProgress[]
+  timeline?: TimelineEventRow[]
+}
+
+// The backend SSE channel emits named events. `source.onmessage` only fires for
+// unnamed events, so we must register a listener per event type.
+const STAGE_EVENTS = ['stage:unlock', 'stage:complete', 'stage:skip'] as const
+const GROUP_EVENTS = ['group:jump', 'group:reset'] as const
+const TIMELINE_EVENTS = ['timeline:override', 'timeline:group:progress', 'timeline:group:completed', 'timeline:stage:unlock'] as const
+
+// Best-effort per-group participant map (the SSE snapshot does not include
+// participants). Backed by the global participant endpoint, scoped by session_id.
+async function loadParticipantsByGroup(sessionId: string): Promise<Record<string, Participant[]>> {
+  try {
+    const all = await arrayRequest<Participant>(
+      'GET',
+      `/api/participants?session_id=${encodeURIComponent(sessionId)}`,
+    )
+    const map: Record<string, Participant[]> = {}
+    for (const p of all) {
+      const gid = p.group_id
+      if (!gid) continue
+      ;(map[gid] ??= []).push(p)
+    }
+    return map
+  } catch {
+    return {}
+  }
+}
+
+export function useLiveSession(sessionId: string | null | undefined) {
   const [state, setState] = useState<LiveSessionState>({
-    groups: {},
+    groups: [],
+    progress: [],
+    participantsByGroup: {},
+    timeline: [],
     connectionStatus: 'online',
   })
-  const intervalRef = useRef<number | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
 
-  const simulateProgress = useCallback(() => {
-    setState(prev => {
-      const groups = { ...prev.groups }
-      const groupIds = Object.keys(groups)
+  // Track the latest seen timeline id so we can dedupe echoes.
+  const seenTimelineIds = useRef<Set<string>>(new Set())
 
-      if (groupIds.length === 0) return prev
+  const handleEvent = useCallback((ev: SSEEvent) => {
+    const { type, data } = ev
 
-      // Simulate random group progress
-      const randomGroupId = groupIds[Math.floor(Math.random() * groupIds.length)]
-      const group = groups[randomGroupId]
-
-      if (group && group.status !== 'COMPLETED') {
-        groups[randomGroupId] = {
-          ...group,
-          status: 'IN_PROGRESS',
-        }
+    if (type === 'snapshot') {
+      const snap = (data ?? {}) as SnapshotData
+      const timeline = (snap.timeline ?? []).slice().sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      seenTimelineIds.current = new Set(timeline.map((t) => t.id))
+      setState((prev) => ({
+        ...prev,
+        groups: snap.groups ?? prev.groups,
+        progress: snap.progress ?? prev.progress,
+        timeline,
+        loading: false,
+      }))
+      if (snap.groups && snap.groups.length > 0 && snap.groups[0].session_id) {
+        void loadParticipantsByGroup(snap.groups[0].session_id).then((map) => {
+          setState((prev) => ({ ...prev, participantsByGroup: map }))
+        })
       }
+      return
+    }
 
-      return { ...prev, groups }
-    })
+    if ((STAGE_EVENTS as readonly string[]).includes(type)) {
+      // data is a GroupStageProgress row.
+      const row = data as GroupStageProgress
+      setState((prev) => {
+        const progress = prev.progress.filter(
+          (p) => !(p.group_id === row.group_id && p.session_stage_id === row.session_stage_id),
+        )
+        progress.push(row)
+        return { ...prev, progress }
+      })
+      return
+    }
+
+    if ((GROUP_EVENTS as readonly string[]).includes(type)) {
+      // data is a SessionGroup row.
+      const g = data as SessionGroup
+      setState((prev) => {
+        const groups = prev.groups.map((x) => (x.id === g.id ? g : x))
+        if (!groups.some((x) => x.id === g.id)) groups.push(g)
+        return { ...prev, groups }
+      })
+      return
+    }
+
+    if ((TIMELINE_EVENTS as readonly string[]).includes(type)) {
+      // data is a TimelineEvent row.
+      const t = data as TimelineEventRow
+      if (seenTimelineIds.current.has(t.id)) return
+      seenTimelineIds.current.add(t.id)
+      setState((prev) => ({
+        ...prev,
+        timeline: [t, ...prev.timeline]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+      }))
+      return
+    }
   }, [])
 
+  // Open SSE + subscribe to connection state.
   useEffect(() => {
-    setState(prev => ({ ...prev, connectionStatus: 'online' }))
+    if (!sessionId) {
+      setState((prev) => ({ ...prev, groups: [], progress: [], timeline: [], participantsByGroup: {} }))
+      setLoading(false)
+      return
+    }
 
-    // Simulate real-time updates every 10 seconds
-    intervalRef.current = window.setInterval(simulateProgress, 10000)
+    setLoading(true)
+    seenTimelineIds.current = new Set()
+
+    const source = openSSE(`/api/live/${sessionId}/stream`, (event) => {
+      // Named events are delivered with `event.type` set; unnamed events fall
+      // back to a synthetic 'message' type.
+      const parsed = (() => {
+        try {
+          return JSON.parse((event as MessageEvent).data) as unknown
+        } catch {
+          return null
+        }
+      })()
+      handleEvent({ type: event.type || 'message', data: parsed })
+    })
+
+    source.addEventListener('snapshot', (e) => {
+      const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
+      handleEvent({ type: 'snapshot', data: parsed })
+    })
+    for (const t of STAGE_EVENTS) {
+      source.addEventListener(t, (e) => {
+        const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
+        handleEvent({ type: t, data: parsed })
+      })
+    }
+    for (const t of GROUP_EVENTS) {
+      source.addEventListener(t, (e) => {
+        const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
+        handleEvent({ type: t, data: parsed })
+      })
+    }
+    for (const t of TIMELINE_EVENTS) {
+      source.addEventListener(t, (e) => {
+        const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
+        handleEvent({ type: t, data: parsed })
+      })
+    }
+
+    source.onerror = () => {
+      // EventSource auto-reconnects; reflect reconnecting state until the
+      // connection store reports otherwise.
+      setState((prev) => ({ ...prev, connectionStatus: 'reconnecting' }))
+    }
+
+    const unsub = subscribeConnection((s) => {
+      setState((prev) => ({ ...prev, connectionStatus: s }))
+    })
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
+      source.close()
+      unsub()
     }
-  }, [sessionId, simulateProgress])
+    // handleEvent is stable (useCallback deps []).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
 
-  const unlockGroup = useCallback((groupId: string) => {
-    setState(prev => {
-      const groups = { ...prev.groups }
-      if (groups[groupId]) {
-        groups[groupId] = {
-          ...groups[groupId],
-          status: 'IN_PROGRESS',
-        }
-      }
-      return { ...prev, groups }
+  // Pull participants when the session changes (SSE snapshot omits them).
+  useEffect(() => {
+    if (!sessionId) return
+    let alive = true
+    void loadParticipantsByGroup(sessionId).then((map) => {
+      if (alive) setState((prev) => ({ ...prev, participantsByGroup: map }))
     })
-  }, [])
-
-  const markGroupComplete = useCallback((groupId: string) => {
-    setState(prev => {
-      const groups = { ...prev.groups }
-      if (groups[groupId]) {
-        groups[groupId] = {
-          ...groups[groupId],
-          status: 'COMPLETED',
-        }
-      }
-      return { ...prev, groups }
-    })
-  }, [])
+    return () => { alive = false }
+  }, [sessionId])
 
   return {
     ...state,
-    unlockGroup,
-    markGroupComplete,
+    loading,
   }
 }
