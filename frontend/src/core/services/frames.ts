@@ -1,6 +1,7 @@
 import type { PaginatedResponse, ListParams, PhotoFrame } from '../types'
 import type { FrameService } from './types'
 import { apiRequest } from './backendClient'
+import { withTenantHeader } from './apiEnvelope'
 
 // Frame service — backed by /api/frames (NOT /api/photo-frames) (C3).
 // Replaces the IndexedDB barrel. Preserves the `frameService` export name and
@@ -31,6 +32,8 @@ const fetchAllPages = async (
     const res = await apiRequest<FrameListEnvelope>(
       'GET',
       `${basePath}?${qs.toString()}`,
+      undefined,
+      { headers: withTenantHeader() },
     )
     const items = res.data?.items ?? []
     all.push(...items)
@@ -72,6 +75,8 @@ const getById = async (id: string): Promise<PhotoFrame | null> => {
   const res = await apiRequest<{ data: PhotoFrame }>(
     'GET',
     `/api/frames/${id}`,
+    undefined,
+    { headers: withTenantHeader() },
   )
   return res.data ?? null
 }
@@ -91,6 +96,7 @@ const create = async (
       is_active: data.is_active,
       sort_order: data.sort_order ?? 0,
     },
+    { headers: withTenantHeader() },
   )
   return res.data
 }
@@ -111,6 +117,7 @@ const update = async (
     'PUT',
     `/api/frames/${id}`,
     body,
+    { headers: withTenantHeader() },
   )
   return res.data
 }
@@ -119,6 +126,8 @@ const deactivate = async (id: string): Promise<PhotoFrame> => {
   const res = await apiRequest<{ data: PhotoFrame }>(
     'POST',
     `/api/frames/${id}/deactivate`,
+    undefined,
+    { headers: withTenantHeader() },
   )
   return res.data
 }

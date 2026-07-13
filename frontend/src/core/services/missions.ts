@@ -1,10 +1,24 @@
 import type { MissionBank, CreateMissionBankDTO } from '../types'
 import type { MissionBankService } from './types'
 import { apiRequest } from './backendClient'
+import { withTenantHeader } from './apiEnvelope'
+import { useTenantStore } from '../stores/tenantStore'
 
 // MissionBank service — backed by /api/mission-banks (B7 for toggle-active).
 // Replaces the IndexedDB barrel. Preserves the `missionService` export name and
 // the MissionBankService signature.
+
+// The active tenant drives the tenant-scoped writes. The backend derives the
+// real tenant from the JWT; we still send it because the write DTOs require it.
+function getActiveTenantId(): string | undefined {
+  const { activeTenant } = useTenantStore.getState()
+  if (activeTenant?.id) return activeTenant.id
+  const tid =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('kidversa_active_tenant_id')
+      : null
+  return tid ?? undefined
+}
 
 // C7: RawJSON columns arrive from the backend as a JSON string (or base64 of
 // the JSON bytes, depending on GORM/MySQL driver). Normalize both forms back
@@ -81,6 +95,8 @@ const getAll = async (
   const res = await apiRequest<MissionBankListEnvelope>(
     'GET',
     `/api/mission-banks?${qs.toString()}`,
+    undefined,
+    { headers: withTenantHeader() },
   )
   const items = (res.data?.items ?? []).map(normalizeMission)
   const total = res.meta?.total ?? items.length
@@ -97,12 +113,15 @@ const getById = async (id: string): Promise<MissionBank | null> => {
   const res = await apiRequest<Envelope<MissionBank>>(
     'GET',
     `/api/mission-banks/${id}`,
+    undefined,
+    { headers: withTenantHeader() },
   )
   return res.data ? normalizeMission(res.data) : null
 }
 
 const create = async (data: CreateMissionBankDTO): Promise<MissionBank> => {
   const body: Record<string, unknown> = {
+    tenant_id: getActiveTenantId(),
     program_id: data.program_id,
     category: data.category,
     title_child: data.title_child,
@@ -117,6 +136,7 @@ const create = async (data: CreateMissionBankDTO): Promise<MissionBank> => {
     'POST',
     '/api/mission-banks',
     body,
+    { headers: withTenantHeader() },
   )
   return normalizeMission(res.data)
 }
@@ -139,18 +159,23 @@ const update = async (
     'PUT',
     `/api/mission-banks/${id}`,
     body,
+    { headers: withTenantHeader() },
   )
   return normalizeMission(res.data)
 }
 
 const remove = async (id: string): Promise<void> => {
-  await apiRequest<void>('DELETE', `/api/mission-banks/${id}`)
+  await apiRequest<void>('DELETE', `/api/mission-banks/${id}`, undefined, {
+    headers: withTenantHeader(),
+  })
 }
 
 const toggleActive = async (id: string): Promise<MissionBank> => {
   const res = await apiRequest<Envelope<MissionBank>>(
     'POST',
     `/api/mission-banks/${id}/toggle-active`,
+    undefined,
+    { headers: withTenantHeader() },
   )
   return normalizeMission(res.data)
 }

@@ -1,6 +1,8 @@
 import type { Recording } from '../types'
 import type { RecordingService } from './types'
-import { apiRequest, getApiBaseUrl, getTokens } from './backendClient'
+import { apiRequest } from './backendClient'
+import { withTenantHeader } from './apiEnvelope'
+import { uploadMultipart } from './uploadMultipart'
 
 // Recording service — backed by /api/recordings (+ /api/recordings/upload
 // multipart) (B6). Replaces the IndexedDB barrel. Preserves the
@@ -11,35 +13,36 @@ interface RecordingListEnvelope {
   meta?: { page: number; limit: number; total: number }
 }
 
-// Multipart upload helper using fetch + Bearer (apiRequest sends JSON only).
-async function uploadMultipart(
-  path: string,
-  form: FormData,
-): Promise<Recording> {
-  const token = getTokens().accessToken
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  // Do NOT set Content-Type — the browser sets the multipart boundary.
-  const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: 'POST',
-    body: form,
-    headers,
-    credentials: 'include',
-  })
-  if (!res.ok) {
-    let message = `Upload failed with status ${res.status}`
-    let code = 'unknown'
+// C7: the backend RawJSON column `emotion_tags_json` arrives as a JSON string
+// (or a base64 of the JSON bytes). Normalize it back into the typed
+// Record<string, unknown> the frontend expects.
+function parseRawJSON<T>(value: unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback
+  if (typeof value !== 'string') return value as T
+  const trimmed = value.trim()
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
     try {
-      const data = await res.json()
-      if (typeof data?.error === 'string') message = data.error
-      if (typeof data?.code === 'string') code = data.code
+      return JSON.parse(trimmed) as T
     } catch {
-      // keep defaults
+      return fallback
     }
-    throw new Error(`${code}: ${message}`)
   }
-  const env = (await res.json()) as { data: Recording }
-  return env.data
+  try {
+    const decoded = atob(trimmed)
+    return JSON.parse(decoded) as T
+  } catch {
+    return fallback
+  }
+}
+
+function normalizeRecording(raw: Recording): Recording {
+  return {
+    ...raw,
+    emotion_tags_json: parseRawJSON<Record<string, unknown> | undefined>(
+      raw.emotion_tags_json,
+      raw.emotion_tags_json,
+    ),
+  }
 }
 
 const getBySession = async (sessionId: string): Promise<Recording[]> => {
@@ -49,8 +52,10 @@ const getBySession = async (sessionId: string): Promise<Recording[]> => {
   const res = await apiRequest<RecordingListEnvelope>(
     'GET',
     `/api/recordings?${qs.toString()}`,
+    undefined,
+    { headers: withTenantHeader() },
   )
-  return res.data?.items ?? []
+  return (res.data?.items ?? []).map(normalizeRecording)
 }
 
 const getByParticipant = async (
@@ -62,16 +67,20 @@ const getByParticipant = async (
   const res = await apiRequest<RecordingListEnvelope>(
     'GET',
     `/api/recordings?${qs.toString()}`,
+    undefined,
+    { headers: withTenantHeader() },
   )
-  return res.data?.items ?? []
+  return (res.data?.items ?? []).map(normalizeRecording)
 }
 
 const getById = async (id: string): Promise<Recording | null> => {
   const res = await apiRequest<{ data: Recording }>(
     'GET',
     `/api/recordings/${id}`,
+    undefined,
+    { headers: withTenantHeader() },
   )
-  return res.data ?? null
+  return res.data ? normalizeRecording(res.data) : null
 }
 
 const update = async (
@@ -93,6 +102,7 @@ const update = async (
     'PUT',
     `/api/recordings/${id}`,
     body,
+    { headers: withTenantHeader() },
   )
   return res.data
 }
@@ -106,11 +116,13 @@ const upload = async (
   form.append('file', file)
   form.append('participant_id', participantId)
   form.append('session_stage_id', sessionStageId)
-  return uploadMultipart('/api/recordings/upload', form)
+  return uploadMultipart<Recording>('/api/recordings/upload', form)
 }
 
 const remove = async (id: string): Promise<void> => {
-  await apiRequest<void>('DELETE', `/api/recordings/${id}`)
+  await apiRequest<void>('DELETE', `/api/recordings/${id}`, undefined, {
+    headers: withTenantHeader(),
+  })
 }
 
 export const recordingService: RecordingService = {

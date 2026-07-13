@@ -1,6 +1,8 @@
 import type { SmartPhoto } from '../types'
 import type { PhotoService } from './types'
-import { apiRequest, getApiBaseUrl, getTokens } from './backendClient'
+import { apiRequest } from './backendClient'
+import { withTenantHeader } from './apiEnvelope'
+import { uploadMultipart } from './uploadMultipart'
 
 // Photo service — backed by /api/photos (+ /api/photos/upload multipart) (B5).
 // Replaces the IndexedDB barrel. Preserves the `photoService` export name and
@@ -11,37 +13,6 @@ interface PhotoListEnvelope {
   meta?: { page: number; limit: number; total: number }
 }
 
-// Multipart upload helper using fetch + Bearer (apiRequest sends JSON only).
-async function uploadMultipart(
-  path: string,
-  form: FormData,
-): Promise<SmartPhoto> {
-  const token = getTokens().accessToken
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  // Do NOT set Content-Type — the browser sets the multipart boundary.
-  const res = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: 'POST',
-    body: form,
-    headers,
-    credentials: 'include',
-  })
-  if (!res.ok) {
-    let message = `Upload failed with status ${res.status}`
-    let code = 'unknown'
-    try {
-      const data = await res.json()
-      if (typeof data?.error === 'string') message = data.error
-      if (typeof data?.code === 'string') code = data.code
-    } catch {
-      // keep defaults
-    }
-    throw new Error(`${code}: ${message}`)
-  }
-  const env = (await res.json()) as { data: SmartPhoto }
-  return env.data
-}
-
 const getBySession = async (sessionId: string): Promise<SmartPhoto[]> => {
   const qs = new URLSearchParams()
   qs.set('session_id', sessionId)
@@ -49,6 +20,8 @@ const getBySession = async (sessionId: string): Promise<SmartPhoto[]> => {
   const res = await apiRequest<PhotoListEnvelope>(
     'GET',
     `/api/photos?${qs.toString()}`,
+    undefined,
+    { headers: withTenantHeader() },
   )
   return res.data?.items ?? []
 }
@@ -62,6 +35,8 @@ const getByParticipant = async (
   const res = await apiRequest<PhotoListEnvelope>(
     'GET',
     `/api/photos?${qs.toString()}`,
+    undefined,
+    { headers: withTenantHeader() },
   )
   return res.data?.items ?? []
 }
@@ -76,20 +51,7 @@ const upload = async (
   form.append('participant_id', participantId)
   form.append('session_id', sessionId)
   form.append('is_report_photo', 'false')
-  return uploadMultipart('/api/photos/upload', form)
-}
-
-const setReportPhoto = async (
-  photoId: string,
-  isReportPhoto: boolean,
-): Promise<SmartPhoto> => {
-  // Backend POST /:id/set-report-photo enforces the exclusive flag server-side.
-  const res = await apiRequest<{ data: SmartPhoto }>(
-    'POST',
-    `/api/photos/${photoId}/set-report-photo`,
-    { is_report_photo: isReportPhoto },
-  )
-  return res.data
+  return uploadMultipart<SmartPhoto>('/api/photos/upload', form)
 }
 
 const update = async (
@@ -108,19 +70,21 @@ const update = async (
     'PUT',
     `/api/photos/${photoId}`,
     body,
+    { headers: withTenantHeader() },
   )
   return res.data
 }
 
 const remove = async (id: string): Promise<void> => {
-  await apiRequest<void>('DELETE', `/api/photos/${id}`)
+  await apiRequest<void>('DELETE', `/api/photos/${id}`, undefined, {
+    headers: withTenantHeader(),
+  })
 }
 
 export const photoService: PhotoService = {
   getBySession,
   getByParticipant,
   upload,
-  setReportPhoto,
   update,
   delete: remove,
 }
