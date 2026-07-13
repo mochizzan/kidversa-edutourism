@@ -110,6 +110,7 @@ const UsersPage = () => {
   const handleTabChange = (key: string) => {
     setActiveTab(key as FilterTab)
     setPage(1)
+    refresh()
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       next.set('filter', key)
@@ -120,6 +121,7 @@ const UsersPage = () => {
   const handleTenantFilterChange = (tid: string) => {
     setTenantFilter(tid)
     setPage(1)
+    refresh()
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       if (tid) {
