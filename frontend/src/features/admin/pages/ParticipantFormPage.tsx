@@ -8,9 +8,9 @@ import { Input } from '../../../shared/components/ui/Input'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { participantService } from '../../../core/services/participants'
+import { sessionService } from '../../../core/services/sessions'
 import { ApiError } from '../../../core/services/backendClient'
 import { redirectToLogin } from '../../../core/stores/authStore'
-import type { CreateParticipantDTO } from '../../../core/types'
 
 type ParticipantFormState = {
   child_name: string
@@ -138,12 +138,22 @@ const ParticipantFormPage = () => {
 
     setSaving(true)
     try {
+      // The backend exposes participant writes only via per-session routes
+      // (it has no global create/update). The standalone participant form has
+      // no session context, so writes are routed through the session that the
+      // participant is linked to. If the participant is not yet attached to a
+      // session, editing/creating here is unsupported by the backend.
       if (isEdit && participantId) {
-        await participantService.update(participantId, payload)
+        const existing = await participantService.getById(participantId)
+        if (!existing?.session_id) {
+          addToast({ type: 'error', message: 'Peserta belum terikat sesi; edit melalui halaman sesi' })
+          return
+        }
+        await sessionService.updateParticipant(existing.session_id, participantId, payload)
         addToast({ type: 'success', message: 'Peserta berhasil diperbarui' })
       } else {
-        await participantService.create(payload as CreateParticipantDTO)
-        addToast({ type: 'success', message: 'Peserta berhasil ditambahkan' })
+        addToast({ type: 'error', message: 'Tambah peserta harus melalui halaman sesi' })
+        return
       }
 
       navigate(ROUTES.ADMIN.PARTICIPANTS)

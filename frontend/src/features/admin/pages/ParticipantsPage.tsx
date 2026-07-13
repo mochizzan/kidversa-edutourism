@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ROUTES } from '../../../core/constants/app'
-import { Plus, Pencil, Trash2, Eye } from 'lucide-react'
+import { Pencil, Trash2, Eye } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -115,7 +114,15 @@ const ParticipantsPage = () => {
     if (!deleteId) return
 
     try {
-      await participantService.delete(deleteId)
+      // Global participant deletes are not exposed by the backend; the
+      // participant must be removed from its session instead.
+      const target = participants.find((p) => p.id === deleteId)
+      if (!target?.session_id) {
+        addToast({ type: 'error', message: 'Peserta tanpa sesi tidak dapat dihapus dari sini' })
+        setDeleteId(null)
+        return
+      }
+      await sessionService.removeParticipant(target.session_id, deleteId)
       addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
       setDeleteId(null)
       if (page > 1 && participants.length === 1) {
@@ -195,11 +202,6 @@ const ParticipantsPage = () => {
       <PageHeader
         title="Peserta"
         subtitle="Kelola data peserta dan pantau progres sesi mereka."
-        actions={
-          <Link to={ROUTES.ADMIN.PARTICIPANT_NEW}>
-            <Button icon={<Plus className="w-4 h-4" />}>Tambah Peserta</Button>
-          </Link>
-        }
       />
 
       <DataTable

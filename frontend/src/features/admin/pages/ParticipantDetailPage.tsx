@@ -12,6 +12,7 @@ import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { participantService } from '../../../core/services/participants'
+import { sessionService } from '../../../core/services/sessions'
 import type { Participant } from '../../../core/types'
 
 const ParticipantDetailPage = () => {
@@ -49,7 +50,14 @@ const ParticipantDetailPage = () => {
   const handleDelete = async () => {
     if (!participant) return
     try {
-      await participantService.delete(participant.id)
+      // Global participant deletes are not exposed by the backend; remove the
+      // participant from its session instead.
+      if (!participant.session_id) {
+        addToast({ type: 'error', message: 'Peserta tanpa sesi tidak dapat dihapus dari sini' })
+        setConfirmOpen(false)
+        return
+      }
+      await sessionService.removeParticipant(participant.session_id, participant.id)
       addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
       navigate(ROUTES.ADMIN.PARTICIPANTS)
     } catch (err) {
