@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { RouterProvider } from 'react-router-dom'
 import { router } from './app/router'
-import { useAuthStore, registerUnauthorizedHandler } from './core/stores/authStore'
+import { useAuthStore, redirectToLogin } from './core/stores/authStore'
+import { healthCheck, registerUnauthorizedHandler } from './core/services/backendClient'
 import { ROUTES } from './core/constants/app'
 import { UserRole } from './core/types/enums'
 import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
 import { ToastProvider } from './shared/components/feedback/Toast'
-import { healthCheck } from './core/services/backendClient'
 import { useTenantStore } from './core/stores/tenantStore'
 
 /* ── Splash Screen ── */
@@ -95,6 +95,18 @@ function App() {
     registerUnauthorizedHandler(() =>
       router.navigate(ROUTES.AUTH.LOGIN, { replace: true }),
     )
+    // ApiError 401 yang lepas (sudah ditangani fireUnauthorized via navigasi)
+    // tidak perlu noise di konsol. Rejection lain tetap di-log.
+    const onReject = (e: PromiseRejectionEvent) => {
+      const r = e.reason as { status?: number } | undefined
+      if (r && r.status === 401) {
+        e.preventDefault?.()
+        return
+      }
+      console.error('Unhandled promise rejection:', e.reason)
+    }
+    window.addEventListener('unhandledrejection', onReject)
+    return () => window.removeEventListener('unhandledrejection', onReject)
   }, [])
 
   const runStartup = async () => {
@@ -118,8 +130,13 @@ function App() {
     if (authState.isAuthenticated && authState.user?.role === UserRole.SUPER_ADMIN) {
       try {
         await useTenantStore.getState().fetchTenants()
-      } catch {
-        // Kegagalan fetch tenant bersifat opsional; abaikan.
+      } catch (err) {
+        // 401 berarti sesi tidak valid meski checkSession lolos ⇒ logout + login.
+        const status = (err as { status?: number })?.status
+        if (status === 401) {
+          redirectToLogin()
+        }
+        // kegagalan lain bersifat opsional; abaikan.
       }
     }
   }
