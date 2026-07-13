@@ -6,6 +6,7 @@ import {
   User,
   Shield,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Card } from '../../../shared/components/ui/Card'
@@ -16,25 +17,24 @@ import {
   useParentToken,
 } from '../../../shared/components/auth/ParentTokenGuard'
 import { consentService } from '../../../core/services/consent'
+import { ApiError } from '../../../core/services/backendClient'
 import { cn } from '../../../core/utils/cn'
 
 /* ── Inner form component (inside guard) ── */
 function ConsentForm() {
-  const { participant, token } = useParentToken()
+  const { token } = useParentToken()
 
-  const [recordingConsent, setRecordingConsent] = useState<boolean | null>(
-    participant?.consent_recording ?? null
-  )
-  const [photoConsent, setPhotoConsent] = useState<boolean | null>(
-    participant?.consent_photo ?? null
-  )
-  const [parentName, setParentName] = useState(participant?.parent_name || '')
+  const [recordingConsent, setRecordingConsent] = useState<boolean | null>(null)
+  const [photoConsent, setPhotoConsent] = useState<boolean | null>(null)
+  const [parentName, setParentName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [alreadySubmitted, setAlreadySubmitted] = useState(false)
+  const [lockedError, setLockedError] = useState<string | null>(null)
   const { addToast } = useGlobalToast()
 
   const handleSubmit = async () => {
+    if (lockedError) return
     if (!parentName.trim()) {
       addToast({ type: 'error', message: 'Silakan masukkan nama Anda.' })
       return
@@ -47,28 +47,46 @@ function ConsentForm() {
     setSubmitting(true)
 
     try {
-      // Check if already submitted
-      if (participant?.consent_at && !success) {
-        setAlreadySubmitted(true)
-        setSubmitting(false)
-        return
-      }
-
       await consentService.submit(token, recordingConsent, photoConsent)
       setSuccess(true)
     } catch (err) {
+      const code = err instanceof ApiError ? err.code : ''
       const message =
-        err instanceof Error && err.message === 'INVALID_TOKEN'
+        code === 'token_consumed'
+          ? 'Persetujuan untuk tautan ini sudah dikirim sebelumnya.'
+          : code === 'token_expired'
+          ? 'Tautan persetujuan sudah kedaluwarsa. Silakan hubungi koordinator.'
+          : code === 'token_invalid'
           ? 'Tautan tidak valid. Silakan hubungi koordinator.'
           : 'Gagal mengirim persetujuan. Silakan coba lagi.'
-      addToast({ type: 'error', message })
+      // Single-use tokens: a replay/already-consumed token means it was used.
+      if (code === 'token_consumed') {
+        setAlreadySubmitted(true)
+      } else if (code === 'token_expired' || code === 'token_invalid') {
+        setLockedError(message)
+      } else {
+        addToast({ type: 'error', message })
+      }
     } finally {
       setSubmitting(false)
     }
   }
 
-  /* ── Already submitted (show existing values) ── */
-  if (alreadySubmitted || (participant?.consent_at && !success)) {
+  /* ── Locked (invalid/expired token) ── */
+  if (lockedError) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
+          <AlertTriangle className="w-8 h-8 text-yellow-600" />
+        </div>
+        <h2 className="text-xl font-bold text-on-surface mb-2">Tautan Tidak Berlaku</h2>
+        <p className="text-sm text-on-surface-variant max-w-sm mx-auto">{lockedError}</p>
+      </div>
+    )
+  }
+
+  /* ── Already submitted (single-use token already used) ── */
+  if (alreadySubmitted) {
     return (
       <div className="text-center py-8">
         <div className="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mx-auto mb-4">
@@ -78,44 +96,18 @@ function ConsentForm() {
           Persetujuan Sudah Dikirim
         </h2>
         <p className="text-sm text-on-surface-variant mb-6">
-          Persetujuan untuk <strong>{participant?.child_name}</strong> sudah diterima sebelumnya.
+          Persetujuan dari tautan ini sudah diterima sebelumnya.
         </p>
 
         <div className="space-y-3 text-left max-w-sm mx-auto">
           <div className="flex items-center justify-between p-3 rounded-xl bg-surface-variant">
             <span className="text-sm">Izin Rekaman</span>
-            <span
-              className={cn(
-                'text-sm font-medium',
-                participant?.consent_recording ? 'text-green-600' : 'text-error'
-              )}
-            >
-              {participant?.consent_recording ? 'Ya' : 'Tidak'}
-            </span>
+            <span className="text-sm font-medium text-green-600">Sudah dikirim</span>
           </div>
           <div className="flex items-center justify-between p-3 rounded-xl bg-surface-variant">
             <span className="text-sm">Izin Foto</span>
-            <span
-              className={cn(
-                'text-sm font-medium',
-                participant?.consent_photo ? 'text-green-600' : 'text-error'
-              )}
-            >
-              {participant?.consent_photo ? 'Ya' : 'Tidak'}
-            </span>
+            <span className="text-sm font-medium text-green-600">Sudah dikirim</span>
           </div>
-          {participant?.consent_at && (
-            <p className="text-xs text-on-surface-variant text-center">
-              Dikirim pada{' '}
-              {new Date(participant.consent_at).toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </p>
-          )}
         </div>
       </div>
     )
@@ -132,7 +124,7 @@ function ConsentForm() {
           Terima Kasih!
         </h2>
         <p className="text-sm text-on-surface-variant mb-2">
-          Persetujuan untuk <strong>{participant?.child_name}</strong> berhasil dikirim.
+          Persetujuan Anda berhasil dikirim.
         </p>
         <p className="text-xs text-on-surface-variant">
           Koordinator akan memproses data partisipasi buah hati Anda.
@@ -151,9 +143,9 @@ function ConsentForm() {
             <User className="w-7 h-7" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-on-surface">{participant?.child_name}</h2>
+            <h2 className="text-lg font-bold text-on-surface">Formulir Persetujuan</h2>
             <p className="text-sm text-on-surface-variant">
-              {participant?.school_name || 'Belum terdaftar'} | {participant?.child_age} tahun
+              Orang Tua / Wali Peserta
             </p>
           </div>
         </div>
@@ -270,7 +262,7 @@ function ConsentForm() {
 /* ── Page wrapper with guard ── */
 const ConsentFormPage = () => {
   return (
-    <ParentTokenGuard>
+    <ParentTokenGuard kind="consent">
       <ConsentForm />
     </ParentTokenGuard>
   )
