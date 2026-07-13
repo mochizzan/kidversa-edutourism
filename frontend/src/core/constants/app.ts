@@ -33,7 +33,7 @@ export const ROUTES = {
     SESSIONS: '/admin/sessions',
     SESSION_NEW: '/admin/sessions/new',
     PARTICIPANTS: '/admin/participants',
-    PARTICIPANT_NEW: '/admin/participants/new',
+    PARTICIPANT_NEW: '/admin/participants/new', // kept for reference; route removed (no global create)
     REPORTS: '/admin/reports',
     MISSIONS: '/admin/missions',
     MISSION_NEW: '/admin/missions/new',
@@ -87,7 +87,9 @@ export const contentEditPath = (contentId: string, params?: { programId?: string
 }
 
 // API
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+// NOTE: API_BASE_URL was removed — all callers must use getApiBaseUrl() from
+// ./core/services/backendClient instead. (Previously duplicated the env read
+// in backendClient.ts:114 and was never imported anywhere.)
 
 // Custom DOM events (consumed by useHeaderNotifications)
 export const USERS_CHANGED_EVENT = 'kidversa:users-changed'
