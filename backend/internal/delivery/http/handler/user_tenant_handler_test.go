@@ -104,12 +104,13 @@ func (f *fakeUserRepoPhase3) Deactivate(_ context.Context, id string) (*entity.U
 }
 
 type fakeTenantRepoPhase3 struct {
-	byID   map[string]*entity.Tenant
-	bySlug map[string]*entity.Tenant
+	byID       map[string]*entity.Tenant
+	bySlug     map[string]*entity.Tenant
+	userCounts []repository.TenantUserCount
 }
 
 func newFakeTenantRepoP3() *fakeTenantRepoPhase3 {
-	return &fakeTenantRepoPhase3{byID: map[string]*entity.Tenant{}, bySlug: map[string]*entity.Tenant{}}
+	return &fakeTenantRepoPhase3{byID: map[string]*entity.Tenant{}, bySlug: map[string]*entity.Tenant{}, userCounts: []repository.TenantUserCount{}}
 }
 func (f *fakeTenantRepoPhase3) Create(_ context.Context, t *entity.Tenant) error {
 	f.byID[t.ID] = t
@@ -144,7 +145,7 @@ func (f *fakeTenantRepoPhase3) Delete(_ context.Context, id string) error {
 	return nil
 }
 func (f *fakeTenantRepoPhase3) CountUsers(_ context.Context) ([]repository.TenantUserCount, error) {
-	return []repository.TenantUserCount{}, nil
+	return f.userCounts, nil
 }
 
 func newTestUserHandler() (*UserHandler, *fakeUserRepoPhase3) {
@@ -295,5 +296,49 @@ func TestTenantHandlerCreateAndGet(t *testing.T) {
 	}
 	if rec2.Code != http.StatusOK {
 		t.Fatalf("expected 200 on get, got %d (body=%s)", rec2.Code, rec2.Body.String())
+	}
+}
+
+func TestTenantHandlerStatsReturnsUserCounts(t *testing.T) {
+	repo := newFakeTenantRepoP3()
+	repo.userCounts = []repository.TenantUserCount{
+		{TenantID: "t1", Count: 3},
+		{TenantID: "t2", Count: 7},
+	}
+	cfg := &config.Config{JWTSecret: "test-secret-at-least-32-bytes-long!!!"}
+	jm := auth.NewJWTManager(cfg)
+	uc := auth.NewTenantUsecase(repo)
+	h := NewTenantHandler(uc, jm)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/api/tenants/stats", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetPath("/api/tenants/stats")
+	setCtx(c, string(entity.RoleSuperAdmin), "t1")
+
+	if err := h.Stats(c); err != nil {
+		t.Fatalf("Stats returned error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d (body=%s)", rec.Code, rec.Body.String())
+	}
+
+	var env struct {
+		Data struct {
+			UserCounts []struct {
+				TenantID string `json:"tenant_id"`
+				Count    int    `json:"count"`
+			} `json:"user_counts"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+		t.Fatalf("invalid json: %v (body=%s)", err, rec.Body.String())
+	}
+	if len(env.Data.UserCounts) != 2 {
+		t.Fatalf("expected 2 user_counts entries, got %d (body=%s)", len(env.Data.UserCounts), rec.Body.String())
+	}
+	if env.Data.UserCounts[0].TenantID != "t1" || env.Data.UserCounts[0].Count != 3 {
+		t.Fatalf("unexpected first entry: %+v", env.Data.UserCounts[0])
 	}
 }
