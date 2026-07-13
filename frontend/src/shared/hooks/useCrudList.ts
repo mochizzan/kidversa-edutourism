@@ -2,12 +2,18 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { ListParams, PaginatedResponse } from '../../core/types'
 import { ApiError } from '../../core/services/backendClient'
 import { useGlobalToast } from '../../shared/components/feedback/Toast'
+import { useTenantScope } from '../../core/hooks/useTenantScope'
 
 interface UseCrudListOptions<T> {
   fetchFn: (params: ListParams) => Promise<PaginatedResponse<T>>
   pageSize?: number
   enableCache?: boolean
   additionalFilters?: Record<string, string | boolean | undefined>
+  // When true, the list is tenant-scoped: switching the active tenant (sidebar
+  // switcher) refetches the list. Used by admin data pages. When false, tenant
+  // changes are ignored (e.g. the global /admin/tenants page, and UsersPage
+  // which manages its own per-tenant filter via the URL, independent of sidebar).
+  scopeToTenant?: boolean
 }
 
 interface UseCrudListResult<T> {
@@ -24,16 +30,16 @@ interface UseCrudListResult<T> {
   setDeleteId: (id: string | null) => void
 }
 
-// Module-level cache per (fetchFn identity + filters + page) for instant paint
-// on revisit, and an in-flight dedupe map so React StrictMode's double mount
-// (dev) issues exactly ONE network call instead of two.
+// Module-level cache per (fetchFn identity + filters + page + tenant) for
+// instant paint on revisit, and an in-flight dedupe map so React StrictMode's
+// double mount (dev) issues exactly ONE network call instead of two.
 const _cache = new Map<string, { data: unknown[]; total: number }>()
 const _inflight = new Map<string, Promise<{ data: unknown[]; total: number }>>()
 
 export function useCrudList<T extends { id: string }>(
   options: UseCrudListOptions<T>,
 ): UseCrudListResult<T> {
-  const { fetchFn, pageSize = 10, enableCache = true, additionalFilters } = options
+  const { fetchFn, pageSize = 10, enableCache = true, additionalFilters, scopeToTenant = false } = options
 
   // Keep the latest fetchFn/additionalFilters/search without making them effect
   // deps. They are recreated every render at the call site; depending on their
@@ -48,14 +54,20 @@ export function useCrudList<T extends { id: string }>(
   const [search, setSearch] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const isSearchMounted = useRef(false)
 
-  // Stable string identity for the logical query INCLUDING the page. Changes
-  // only when the query or page changes, so it is safe to read at any time.
+  // React to active-tenant changes when the list is tenant-scoped. `tenantId`
+  // is '' when not scoped, so it never triggers a refetch on tenant switch.
+  const { tenantId } = useTenantScope()
+  const tenantDep = scopeToTenant ? tenantId ?? '' : ''
+
+  // Stable string identity for the logical query INCLUDING the page and tenant.
+  // Changes only when the query, page, or active tenant changes, so it is safe
+  // to read at any time.
   const buildKey = () =>
     fetchFnRef.current.toString() +
     JSON.stringify(additionalFiltersRef.current ?? {}) +
-    '|p' + page
+    '|p' + page +
+    '|t' + tenantDep
 
   const cached = enableCache ? _cache.get(buildKey()) : undefined
 
@@ -117,18 +129,22 @@ export function useCrudList<T extends { id: string }>(
     }
     // `search` is intentionally NOT a dep here: typing must NOT fire an
     // immediate fetch — only the debounced refreshKey below does (1 fetch/300ms).
-  }, [page, pageSize, refreshKey, addToast])
+    // `tenantDep` IS a dep: when the active tenant changes (scoped lists), the
+    // cache key changes and we refetch with the new tenant header.
+  }, [page, pageSize, refreshKey, addToast, tenantDep])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  // Debounced search: skip initial mount, reset page to 1 on new search.
+  // Debounced search. Guard against React StrictMode's double-invoked mount
+  // effect: compare to the previous value instead of a "first run" flag, so the
+  // debounce only fires on a REAL change (user typing) — never on mount. This
+  // prevents a spurious second fetch shortly after opening the page.
+  const prevSearchRef = useRef(search)
   useEffect(() => {
-    if (!isSearchMounted.current) {
-      isSearchMounted.current = true
-      return
-    }
+    if (prevSearchRef.current === search) return
+    prevSearchRef.current = search
     setPage(1)
     const timeout = setTimeout(() => {
       setRefreshKey((k) => k + 1)
