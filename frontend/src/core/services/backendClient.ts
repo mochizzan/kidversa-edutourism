@@ -319,7 +319,11 @@ export async function apiRequest<T>(
     }
 
     if (response.status === 401) {
-      if (!didRefresh) {
+      // Jangan coba refresh bila kita sama sekali tidak punya sesi
+      // (accessToken null = belum login / cookie kedaluwarsa). Percobaan
+      // refresh tanpa token berujung 400 (backend butuh refresh token).
+      // Kasus ini harus langsung throw agar authStore/redirectToLogin menangani.
+      if (accessToken !== null && !didRefresh) {
         didRefresh = true
         const ok = await refreshAccessToken().then(
           () => true,
@@ -327,7 +331,7 @@ export async function apiRequest<T>(
         )
         if (ok) continue
       }
-      // Refresh failed (or already attempted) — surface a typed error.
+      // Refresh gagal (atau memang belum login) — lempar error ter-typed.
       throw await toApiError(response)
     }
 
