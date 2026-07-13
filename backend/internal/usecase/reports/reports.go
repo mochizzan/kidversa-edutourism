@@ -3,6 +3,7 @@ package reports
 import (
 	"context"
 	"crypto/rand"
+	"log"
 	"encoding/hex"
 	"time"
 
@@ -106,9 +107,11 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID string) error {
 		return err
 	}
 	return u.gen.Generate(ctx, reportID, func(seq int, chunk string) {
-		_ = u.hub.Publish(ctx, sse.NarrativeChannel(reportID), sse.Event{
+		if err := u.hub.Publish(ctx, sse.NarrativeChannel(reportID), sse.Event{
 			Type: "narrative.chunk",
 			Data: map[string]any{"seq": seq, "text": chunk},
-		})
+		}); err != nil {
+			log.Printf("reports: narrative SSE publish failed for report %s: %v", reportID, err)
+		}
 	})
 }

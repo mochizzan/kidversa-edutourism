@@ -5,7 +5,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
-import { useAuthStore } from '../../../core/stores/authStore'
 import { ApiError } from '../../../core/services/backendClient'
 import { useRateLimit } from '../hooks/useRateLimit'
 import { ROUTES } from '../../../core/constants/app'
@@ -58,16 +57,6 @@ const LoginPage = () => {
     try {
       await login(data.email, data.password)
       clearRateLimit()
-
-      // Force a password change if the backend/account requires it.
-      // Baca state TERKINI dari store (bukan memanggil useAuth() di dalam
-      // handler, yang mengembalikan closure stale dari render awal).
-      const authState = useAuthStore.getState()
-      if (authState.mustChangePassword || authState.user?.must_change_password) {
-        submittedRef.current = false
-        navigate(ROUTES.AUTH.CHANGE_PASSWORD, { replace: true })
-        return
-      }
     } catch (err) {
       const isLockedNow = recordFailedAttempt()
       if (isLockedNow) {
@@ -81,9 +70,6 @@ const LoginPage = () => {
             case 'unauthorized':
               setGeneralError('Tidak memiliki akses.')
               break
-            case 'MUST_CHANGE_PASSWORD':
-              navigate(ROUTES.AUTH.CHANGE_PASSWORD, { replace: true })
-              return
             case 'validation_error':
               setGeneralError('Data tidak valid. Periksa kembali input Anda.')
               break

@@ -14,7 +14,6 @@ export interface User {
   rejected_at?: string
   rejected_by?: string
   rejection_reason?: string
-  must_change_password?: boolean
   created_at: string
 }
 
@@ -24,6 +23,16 @@ export interface Tenant {
   slug: string
   settings_json?: Record<string, unknown>
   created_at: string
+}
+
+// Per-tenant user count returned by GET /api/tenants/stats.
+export interface TenantUserCount {
+  tenant_id: string
+  count: number
+}
+
+export interface TenantStats {
+  user_counts: TenantUserCount[]
 }
 
 export interface Program {

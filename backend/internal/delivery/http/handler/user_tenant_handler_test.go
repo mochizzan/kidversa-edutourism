@@ -143,6 +143,9 @@ func (f *fakeTenantRepoPhase3) Delete(_ context.Context, id string) error {
 	delete(f.byID, id)
 	return nil
 }
+func (f *fakeTenantRepoPhase3) CountUsers(_ context.Context) ([]repository.TenantUserCount, error) {
+	return []repository.TenantUserCount{}, nil
+}
 
 func newTestUserHandler() (*UserHandler, *fakeUserRepoPhase3) {
 	cfg := &config.Config{JWTSecret: "test-secret-at-least-32-bytes-long!!!"}

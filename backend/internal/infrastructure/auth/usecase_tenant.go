@@ -11,6 +11,11 @@ import (
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
+// TenantStats aggregates per-tenant usage counts for the SUPER_ADMIN view.
+type TenantStats struct {
+	UserCounts []repository.TenantUserCount
+}
+
 // TenantUsecase implements tenant administration (SUPER_ADMIN only).
 type TenantUsecase struct {
 	tenants repository.TenantRepository
@@ -78,4 +83,15 @@ func (u *TenantUsecase) UpdateTenant(ctx context.Context, id, name, slug string,
 // DeleteTenant removes a tenant.
 func (u *TenantUsecase) DeleteTenant(ctx context.Context, id string) error {
 	return u.tenants.Delete(ctx, id)
+}
+
+// GetStats returns aggregate counts across all tenants (SUPER_ADMIN only).
+// User counts are computed server-side so the UI never needs a global /api/users
+// fetch (which is tenant-scoped and would 400 without a selected tenant).
+func (u *TenantUsecase) GetStats(ctx context.Context) (*TenantStats, error) {
+	counts, err := u.tenants.CountUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &TenantStats{UserCounts: counts}, nil
 }

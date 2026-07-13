@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/labstack/echo/v5"
@@ -84,7 +85,9 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 	}
 
 	// Single-use: consume the token now that we're responding successfully.
-	_ = h.authUC.ConsumeKioskToken((*c).Request().Context(), token)
+	if err := h.authUC.ConsumeKioskToken((*c).Request().Context(), token); err != nil {
+		log.Printf("kiosk: consume token failed: %v", err)
+	}
 
 	return appresp.OK(c, &kioskResponse{Session: s.Session, Stages: stages})
 }

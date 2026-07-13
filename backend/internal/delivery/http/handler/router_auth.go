@@ -15,6 +15,5 @@ func RegisterAuthRoutes(g *echo.Group, h *AuthHandler, jm *auth.JWTManager, sseC
 	g.POST("/refresh", h.Refresh)
 	g.GET("/me", h.Me, appmiddleware.JWTAuth(jm, sseCookieName, revoker))
 	g.POST("/logout", h.Logout, appmiddleware.JWTAuth(jm, sseCookieName, revoker))
-	g.POST("/change-password", h.ChangePassword, appmiddleware.JWTAuth(jm, sseCookieName, revoker))
 	g.POST("/kiosk", h.IssueKiosk, appmiddleware.JWTAuth(jm, sseCookieName, revoker))
 }

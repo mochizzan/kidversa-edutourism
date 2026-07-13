@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -15,7 +16,9 @@ import (
 func bindUUID(c *echo.Context, name string) (string, bool) {
 	v := (*c).Param(name)
 	if v == "" || uuid.Validate(v) != nil {
-		_ = appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+		if err := appresp.Fail(c, http.StatusBadRequest, "invalid_body"); err != nil {
+			log.Printf("handler: failed to write bindUUID error: %v", err)
+		}
 		return "", false
 	}
 	return v, true

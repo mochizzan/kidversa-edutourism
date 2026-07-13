@@ -97,7 +97,7 @@ func bootstrap(cfg *config.Config) error {
 		Role:               entity.RoleSuperAdmin,
 		IsActive:           true,
 		ApprovalStatus:     entity.ApprovalApproved,
-		MustChangePassword: true,
+		MustChangePassword: false,
 	}
 	var scnt int64
 	g.Model(&entity.User{}).Where("email = ?", super.Email).Count(&scnt)
@@ -121,7 +121,7 @@ func bootstrap(cfg *config.Config) error {
 		Role:               entity.RoleAdmin,
 		IsActive:           true,
 		ApprovalStatus:     entity.ApprovalApproved,
-		MustChangePassword: true,
+		MustChangePassword: false,
 	}
 	var acnt int64
 	g.Model(&entity.User{}).Where("email = ?", admin.Email).Count(&acnt)

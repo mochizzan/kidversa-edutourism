@@ -7,7 +7,6 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
@@ -124,6 +123,3 @@ func GetUserID(c *echo.Context) string {
 	u, _ := (*c).Get(CtxUserID).(string)
 	return u
 }
-
-// ensure apperrors import used (kept for future expansion / explicit error mapping).
-var _ = apperrors.Internal

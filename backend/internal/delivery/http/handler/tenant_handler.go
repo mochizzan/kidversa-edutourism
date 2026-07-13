@@ -96,6 +96,17 @@ func (h *TenantHandler) Delete(c *echo.Context) error {
 	return appresp.NoContent(c)
 }
 
+// Stats handles GET /api/tenants/stats. Returns per-tenant user counts for
+// the SUPER_ADMIN tenant overview. No tenant scope is required because the
+// caller is already gated to SUPER_ADMIN by the route middleware.
+func (h *TenantHandler) Stats(c *echo.Context) error {
+	stats, err := h.tenantUC.GetStats((*c).Request().Context())
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, stats)
+}
+
 // parseSettingsJSON converts a raw JSON string into entity.RawJSON, defaulting to {}.
 func parseSettingsJSON(s string) []byte {
 	if s == "" {

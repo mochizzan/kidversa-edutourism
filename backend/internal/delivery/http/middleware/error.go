@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/labstack/echo/v5"
@@ -44,7 +45,9 @@ func ErrorHandler(c *echo.Context, err error) {
 			msg = appresp.MessageForCode(code)
 		}
 	}
-	_ = appresp.FailMsg(c, status, code, msg)
+	if err := appresp.FailMsg(c, status, code, msg); err != nil {
+		log.Printf("middleware: failed to write error response: %v", err)
+	}
 }
 
 // CORS builds the CORS middleware with an explicit allowlist (never "*").

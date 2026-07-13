@@ -128,7 +128,9 @@ func (h *UserHandler) Reject(c *echo.Context) error {
 		return nil
 	}
 	var req dto.RejectUserRequest
-	_ = (*c).Bind(&req)
+	if err := (*c).Bind(&req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	}
 	uid := appmiddleware.GetUserID(c)
 	user, err := h.userUC.RejectUser((*c).Request().Context(), id, uid, req.Reason)
 	if err != nil {

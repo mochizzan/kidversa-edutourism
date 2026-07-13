@@ -11,8 +11,7 @@ import (
 )
 
 // RegisterLiveRoutes mounts /api/live/* on the given echo group.
-func RegisterLiveRoutes(g *echo.Group, h *LiveHandler, jm *auth.JWTManager, hub *sse.Hub, revoker auth.TokenRevoker) {
-	_ = hub // hub is held by the handler for SSE streaming.
+func RegisterLiveRoutes(g *echo.Group, h *LiveHandler, jm *auth.JWTManager, _ *sse.Hub, revoker auth.TokenRevoker) {
 	scope := appmiddleware.TenantScope()
 	g.GET("/:sessionId/groups", h.Groups, appmiddleware.JWTAuth(jm, "", revoker), scope)
 	g.GET("/:sessionId/timeline", h.Timeline, appmiddleware.JWTAuth(jm, "", revoker), scope)

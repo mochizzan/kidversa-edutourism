@@ -15,6 +15,7 @@ func RegisterTenantsRoutes(g *echo.Group, h *TenantHandler, jm *auth.JWTManager,
 
 	g.GET("", h.List, authMW, roleMW)
 	g.POST("", h.Create, authMW, roleMW)
+	g.GET("/stats", h.Stats, authMW, roleMW)
 	g.GET("/:id", h.Get, authMW, roleMW)
 	g.PUT("/:id", h.Update, authMW, roleMW)
 	g.DELETE("/:id", h.Delete, authMW, roleMW)

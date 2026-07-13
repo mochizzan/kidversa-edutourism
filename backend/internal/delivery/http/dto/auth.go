@@ -23,12 +23,6 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
-// ChangePasswordRequest is the payload for POST /api/auth/change-password.
-type ChangePasswordRequest struct {
-	OldPassword string `json:"old_password" validate:"required"`
-	NewPassword string `json:"new_password" validate:"required,min=6"`
-}
-
 // KioskTokenRequest requests a kiosk token for a session.
 type KioskTokenRequest struct {
 	SessionID string `json:"session_id" validate:"required"`

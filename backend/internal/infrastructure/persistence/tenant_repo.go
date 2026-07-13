@@ -97,3 +97,26 @@ func (r *GormTenantRepository) Delete(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+// CountUsers groups users by tenant_id and returns the count per tenant.
+// Tenants with zero users are omitted (the frontend defaults missing to 0),
+// and platform-level (tenant-less) users are excluded from the per-tenant view.
+func (r *GormTenantRepository) CountUsers(ctx context.Context) ([]repository.TenantUserCount, error) {
+	var rows []struct {
+		TenantID string `gorm:"column:tenant_id"`
+		Count     int    `gorm:"column:cnt"`
+	}
+	if err := r.db.WithContext(ctx).
+		Model(&UserModel{}).
+		Select("tenant_id, COUNT(*) AS cnt").
+		Where("tenant_id IS NOT NULL AND tenant_id <> ?", "").
+		Group("tenant_id").
+		Scan(&rows).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	out := make([]repository.TenantUserCount, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, repository.TenantUserCount{TenantID: row.TenantID, Count: row.Count})
+	}
+	return out, nil
+}

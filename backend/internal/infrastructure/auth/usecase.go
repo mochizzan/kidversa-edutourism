@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -89,7 +90,9 @@ func (u *Usecase) Refresh(ctx context.Context, oldRefresh string) (*LoginResult,
 	}
 	// Reuse detection: if the presented token was already revoked, the whole family is compromised.
 	if rec.RevokedAt != nil {
-		_ = u.refresh.RevokeAllForUser(ctx, rec.UserID)
+		if err := u.refresh.RevokeAllForUser(ctx, rec.UserID); err != nil {
+			log.Printf("auth: failed to revoke token family for user %s: %v", rec.UserID, err)
+		}
 		return nil, apperrors.Unauthorized("token_invalid", errors.New("reuse detected"))
 	}
 	// Revoke the old token (rotation) and issue a new pair.
@@ -113,7 +116,9 @@ func (u *Usecase) Refresh(ctx context.Context, oldRefresh string) (*LoginResult,
 // Logout revokes the current refresh token and denylists the access jti.
 func (u *Usecase) Logout(ctx context.Context, refreshTok, accessJTI string, accessTTL time.Duration) error {
 	if refreshTok != "" {
-		_ = u.refresh.Revoke(ctx, HashRefresh(refreshTok))
+		if err := u.refresh.Revoke(ctx, HashRefresh(refreshTok)); err != nil {
+			log.Printf("auth: logout revoke token failed: %v", err)
+		}
 	}
 	if accessJTI != "" {
 		u.revoker.Revoke(ctx, accessJTI, accessTTL)
@@ -121,30 +126,7 @@ func (u *Usecase) Logout(ctx context.Context, refreshTok, accessJTI string, acce
 	return nil
 }
 
-// ChangePassword verifies the old password, updates to a new hash, and revokes all sessions.
-func (u *Usecase) ChangePassword(ctx context.Context, userID, oldPwd, newPwd string) error {
-	user, err := u.users.GetByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-	if err := BcryptCompare(user.PasswordHash, oldPwd); err != nil {
-		return apperrors.Unauthorized("invalid_credentials", err)
-	}
-	hash, err := BcryptHash(newPwd, u.cost)
-	if err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	user.PasswordHash = hash
-	user.MustChangePassword = false
-	if err := u.users.Update(ctx, user); err != nil {
-		return err
-	}
-	// Revoke ALL refresh tokens + denylist all active jtis (force re-login everywhere).
-	_ = u.refresh.RevokeAllForUser(ctx, userID)
-	return nil
-}
-
-// IssueKioskToken issues a single-use kiosk token bound to a session+tenant.
+// Logout revokes the current refresh token and denylists the access jti.
 // ttl is clamped to [1h, 4h] (plan B11). The raw token is never logged.
 func (u *Usecase) IssueKioskToken(ctx context.Context, sessionID, tenantID string, ttl time.Duration) (string, error) {
 	const minTTL = time.Hour

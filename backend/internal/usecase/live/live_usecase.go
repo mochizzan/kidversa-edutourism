@@ -3,6 +3,7 @@ package live
 import (
 	"context"
 	"errors"
+	"log"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -165,7 +166,9 @@ func (s *Service) Notifications(ctx context.Context, userID, since string, limit
 }
 
 func (s *Service) publish(ctx context.Context, sessionID, typ string, data interface{}) {
-	_ = s.hub.Publish(ctx, sse.LiveChannel(sessionID), sse.Event{Type: typ, Data: data})
+	if err := s.hub.Publish(ctx, sse.LiveChannel(sessionID), sse.Event{Type: typ, Data: data}); err != nil {
+		log.Printf("live: SSE publish failed for session %s: %v", sessionID, err)
+	}
 }
 
 func findProgress(list []entity.GroupStageProgress, stageID string) *entity.GroupStageProgress {

@@ -55,7 +55,6 @@ interface AuthState {
   token: string | null
   isAuthenticated: boolean
   isLoading: boolean
-  mustChangePassword: boolean
 
   login: (email: string, password: string) => Promise<void>
   register: (data: CreateUserDTO) => Promise<User>
@@ -70,7 +69,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   isAuthenticated: false,
   isLoading: true, // start as loading until checkSession runs
-  mustChangePassword: false,
 
   login: async (email: string, password: string) => {
     const res = await apiRequest<{ data: LoginResponseData }>(
@@ -90,7 +88,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       token: access_token,
       isAuthenticated: true,
       isLoading: false,
-      mustChangePassword: Boolean(user.must_change_password),
     })
   },
 
@@ -131,7 +128,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
-      mustChangePassword: false,
     })
   },
 
@@ -145,7 +141,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: null,
           token: null,
           isAuthenticated: false,
-          mustChangePassword: false,
           isLoading: false,
         })
         return
@@ -157,7 +152,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: storedUser,
         token: getTokens().accessToken,
         isAuthenticated: true,
-        mustChangePassword: Boolean(storedUser.must_change_password),
       })
 
       // Validate the session against the backend. /me returns only a minimal
@@ -178,7 +172,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: null,
         token: null,
         isAuthenticated: false,
-        mustChangePassword: false,
         isLoading: false,
       })
     }
