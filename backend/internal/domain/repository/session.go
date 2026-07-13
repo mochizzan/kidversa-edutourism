@@ -69,6 +69,7 @@ type SessionRepository interface {
 	// Participants.
 	CreateParticipant(ctx context.Context, p *entity.Participant) error
 	GetParticipantByID(ctx context.Context, id string) (*entity.Participant, error)
+	GetParticipantGlobal(ctx context.Context, id, tenantID string) (*entity.Participant, error)
 	ListParticipants(ctx context.Context, sessionID, groupID string) ([]entity.Participant, error)
 	ListParticipantsPaginated(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*Paginated[entity.Participant], error)
 	UpdateParticipant(ctx context.Context, p *entity.Participant) error

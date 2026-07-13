@@ -223,6 +223,23 @@ func (r *GormSessionRepository) GetParticipantByID(ctx context.Context, id strin
 	return m.ToEntity(), nil
 }
 
+// GetParticipantGlobal returns a single participant by id, tenant-scoped (the
+// tenant filter is skipped for tenant-less SUPER_ADMIN calls when tenantID == "").
+func (r *GormSessionRepository) GetParticipantGlobal(ctx context.Context, id, tenantID string) (*entity.Participant, error) {
+	var m ParticipantModel
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
 func (r *GormSessionRepository) ListParticipants(ctx context.Context, sessionID, groupID string) ([]entity.Participant, error) {
 	q := r.db.WithContext(ctx).Model(&ParticipantModel{})
 	if sessionID != "" {

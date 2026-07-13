@@ -11,7 +11,8 @@ import (
 // Auth + role guard (FASILITATOR, ADMIN, KOORDINATOR, SUPER_ADMIN); tenant scope via JWT.
 func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecycleHandler,
 	sh *SessionStageHandler, gh *SessionGroupHandler,
-	ph *SessionParticipantHandler, bh *SessionParticipantBulkHandler, jm *auth.JWTManager, revoker auth.TokenRevoker, kioskH *KioskHandler) {
+	ph *SessionParticipantHandler, bh *SessionParticipantBulkHandler, jm *auth.JWTManager, revoker auth.TokenRevoker, kioskH *KioskHandler,
+	participantsGroup *echo.Group) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMW := appmiddleware.RequireRole("FASILITATOR", "ADMIN", "KOORDINATOR", "SUPER_ADMIN")
 
@@ -41,4 +42,7 @@ func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecyc
 	g.DELETE("/:id/participants/:participantId", ph.DeleteParticipant, authMW, roleMW)
 	g.POST("/:id/participants/import", bh.ImportParticipants, authMW, roleMW)
 	g.PUT("/:id/participants/:participantId", bh.UpdateParticipant, authMW, roleMW)
+
+	// Global participants group (/api/participants) — tenant-scoped single-get.
+	participantsGroup.GET("/:id", ph.GetParticipantGlobal, authMW, roleMW, appmiddleware.TenantScope())
 }

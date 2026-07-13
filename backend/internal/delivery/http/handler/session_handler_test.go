@@ -125,6 +125,12 @@ func (f *fakeSessionRepo) GetParticipantByID(_ context.Context, id string) (*ent
 	}
 	return nil, repoErrNotFound
 }
+func (f *fakeSessionRepo) GetParticipantGlobal(_ context.Context, id, _ string) (*entity.Participant, error) {
+	if p, ok := f.participants[id]; ok {
+		return p, nil
+	}
+	return nil, repoErrNotFound
+}
 func (f *fakeSessionRepo) ListParticipants(_ context.Context, _, _ string) ([]entity.Participant, error) {
 	out := make([]entity.Participant, 0, len(f.participants))
 	for _, p := range f.participants {

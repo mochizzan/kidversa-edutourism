@@ -70,6 +70,21 @@ func (h *SessionParticipantHandler) LinkParticipant(c *echo.Context) error {
 	return appresp.OK(c, p)
 }
 
+// GetParticipantGlobal handles the global GET /api/participants/:id (tenant-scoped
+// via TenantScope middleware; SUPER_ADMIN may pass X-Tenant-Id to scope to a tenant).
+func (h *SessionParticipantHandler) GetParticipantGlobal(c *echo.Context) error {
+	tenantID := appmiddleware.GetTenantID(c)
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	p, err := h.uc.GetParticipantGlobal((*c).Request().Context(), id, tenantID)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, p)
+}
+
 func (h *SessionParticipantHandler) GetParticipant(c *echo.Context) error {
 	pid, ok := bindUUID(c, "participantId")
 	if !ok {

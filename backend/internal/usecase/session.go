@@ -440,6 +440,11 @@ func (u *SessionUsecase) GetParticipant(ctx context.Context, participantID strin
 	return u.repo.GetParticipantByID(ctx, participantID)
 }
 
+// GetParticipantGlobal returns a single participant by id, tenant-scoped.
+func (u *SessionUsecase) GetParticipantGlobal(ctx context.Context, participantID, tenantID string) (*entity.Participant, error) {
+	return u.repo.GetParticipantGlobal(ctx, participantID, tenantID)
+}
+
 // DeleteParticipant removes a participant.
 func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID string) error {
 	return u.repo.DeleteParticipant(ctx, participantID)
