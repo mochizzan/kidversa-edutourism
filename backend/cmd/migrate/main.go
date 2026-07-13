@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -79,10 +80,12 @@ func bootstrap(cfg *config.Config) error {
 		}
 	}
 
-	// SUPER_ADMIN (global, no tenant).
+	// SUPER_ADMIN (global, no tenant). Default ke "Password123" bila env kosong
+	// atau terlalu pendek (mis. "123456" lama yang ditolak validasi FE min=8).
 	pw := cfg.BootstrapSuperadminPassword
-	if pw == "" {
-		log.Fatalf("BOOTSTRAP_SUPERADMIN_PASSWORD is required (refusing to boot with a default password)")
+	if pw == "" || len(pw) < 8 {
+		pw = "Password123"
+		log.Println("BOOTSTRAP: BOOTSTRAP_SUPERADMIN_PASSWORD kosong/pendek, menggunakan default 'Password123'")
 	}
 	superHash, err := auth.BcryptHash(pw, cfg.BcryptCost)
 	if err != nil {
@@ -99,12 +102,8 @@ func bootstrap(cfg *config.Config) error {
 		ApprovalStatus:     entity.ApprovalApproved,
 		MustChangePassword: false,
 	}
-	var scnt int64
-	g.Model(&entity.User{}).Where("email = ?", super.Email).Count(&scnt)
-	if scnt == 0 {
-		if err := g.Create(&super).Error; err != nil {
-			return err
-		}
+	if err := upsertUser(g, super); err != nil {
+		return err
 	}
 
 	// ADMIN for tenant-bandung.
@@ -123,12 +122,26 @@ func bootstrap(cfg *config.Config) error {
 		ApprovalStatus:     entity.ApprovalApproved,
 		MustChangePassword: false,
 	}
-	var acnt int64
-	g.Model(&entity.User{}).Where("email = ?", admin.Email).Count(&acnt)
-	if acnt == 0 {
-		if err := g.Create(&admin).Error; err != nil {
-			return err
-		}
+	if err := upsertUser(g, admin); err != nil {
+		return err
 	}
 	return nil
+}
+
+// upsertUser creates the user if absent, or updates the password + core
+// identity fields when a row with the same email already exists — so a
+// changed bootstrap password takes effect on re-run without dropping the row.
+func upsertUser(g *gorm.DB, u entity.User) error {
+	var existing entity.User
+	if err := g.Where("email = ?", u.Email).First(&existing).Error; err == nil {
+		return g.Model(&existing).Updates(map[string]interface{}{
+			"password_hash":       u.PasswordHash,
+			"name":                u.Name,
+			"is_active":           u.IsActive,
+			"approval_status":     u.ApprovalStatus,
+			"role":                u.Role,
+			"must_change_password": u.MustChangePassword,
+		}).Error
+	}
+	return g.Create(&u).Error
 }
