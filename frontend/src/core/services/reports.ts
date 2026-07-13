@@ -1,11 +1,8 @@
 import type { Report } from '../types'
 import type { ReportService } from './types'
 import { apiRequest, getApiBaseUrl } from './backendClient'
-
-interface ReportListEnvelope {
-  items: Report[]
-  meta?: { page: number; limit: number; total: number }
-}
+import { itemsRequest, itemRequest, nullableItemRequest, voidRequest } from './apiEnvelope'
+import { useAuthStore } from '../stores/authStore'
 
 interface ReportApproveRequest {
   approved_by: string
@@ -29,13 +26,11 @@ interface PublicReportResponse {
 }
 
 const getBySession = async (sessionId: string): Promise<Report[]> => {
-  const res = await apiRequest<ReportListEnvelope>('GET', `/api/reports?session_id=${encodeURIComponent(sessionId)}`)
-  return res.items ?? []
+  return itemsRequest<Report>('GET', `/api/reports?session_id=${encodeURIComponent(sessionId)}`)
 }
 
 const getById = async (id: string): Promise<Report | null> => {
-  const res = await apiRequest<Report>('GET', `/api/reports/${encodeURIComponent(id)}`)
-  return res ?? null
+  return nullableItemRequest<Report>('GET', `/api/reports/${encodeURIComponent(id)}`)
 }
 
 // generate triggers narrative generation on the backend. The backend generates
@@ -47,7 +42,7 @@ const generate = async (sessionId: string): Promise<Report[]> => {
   const reports = await getBySession(sessionId)
   await Promise.all(
     reports.map((r) =>
-      apiRequest<unknown>('POST', `/api/reports/${encodeURIComponent(r.id)}/generate`).catch(() => undefined),
+      voidRequest('POST', `/api/reports/${encodeURIComponent(r.id)}/generate`).catch(() => undefined),
     ),
   )
   return getBySession(sessionId)
@@ -57,14 +52,13 @@ const approve = async (
   reportId: string,
   _data?: { narrative_final?: string; mission_ids?: string[] },
 ): Promise<Report> => {
-  const res = await apiRequest<Report>('POST', `/api/reports/${encodeURIComponent(reportId)}/approve`, {
-    approved_by: 'approver',
+  return itemRequest<Report>('POST', `/api/reports/${encodeURIComponent(reportId)}/approve`, {
+    approved_by: useAuthStore.getState().user?.id ?? '',
   } as ReportApproveRequest)
-  return res
 }
 
 const send = async (reportId: string): Promise<Report> => {
-  const res = await apiRequest<ReportTokenResponse>('POST', `/api/reports/${encodeURIComponent(reportId)}/send`)
+  const res = await itemRequest<ReportTokenResponse>('POST', `/api/reports/${encodeURIComponent(reportId)}/send`)
   // The token response exposes the freshly minted parent token; map back to a Report.
   const existing = await getById(reportId).catch(() => null)
   return {
@@ -77,8 +71,8 @@ const send = async (reportId: string): Promise<Report> => {
 
 // getPublicReport fetches a report via its parent access token (public endpoint).
 const getPublicReport = async (token: string): Promise<PublicReportResponse | null> => {
-  const res = await apiRequest<PublicReportResponse>('GET', `/api/reports/access?token=${encodeURIComponent(token)}`)
-  return res ?? null
+  const res = await apiRequest<{ data: PublicReportResponse }>('GET', `/api/reports/access?token=${encodeURIComponent(token)}`)
+  return res.data ?? null
 }
 
 // streamNarrative opens the SSE narrative stream for a report and invokes

@@ -11,7 +11,7 @@
 //  - normalize `tenant_id` null/undefined → '' (C7),
 //  - attach the `X-Tenant-Id` header for SUPER_ADMIN (backend TenantScope requires it).
 
-import { apiRequest, getStoredUser } from './backendClient'
+import { ApiError, apiRequest, getStoredUser } from './backendClient'
 import type { ListParams, PaginatedResponse } from '../types'
 
 const ACTIVE_TENANT_KEY = 'kidversa_active_tenant_id'
@@ -23,6 +23,12 @@ interface ListEnvelope<T> {
 
 interface ItemEnvelope<T> {
   data: T
+}
+
+// Some list endpoints wrap the array one level deeper as `{ data: { items: [] } }`
+// (reports, consent, participant-missions). This envelope models that shape.
+interface ItemsEnvelope<T> {
+  data: { items: T[] }
 }
 
 // For SUPER_ADMIN the backend requires an explicit X-Tenant-Id header to scope
@@ -114,11 +120,21 @@ export async function listRequest<T>(
 }
 
 // GET an array (sub-resource list, e.g. stages/contents/groups/participants).
-export async function arrayRequest<T>(method: string, path: string): Promise<T[]> {
-  const res = await apiRequest<ItemEnvelope<T[]>>(method, path, undefined, {
+export async function arrayRequest<T>(method: string, path: string, body?: unknown): Promise<T[]> {
+  const res = await apiRequest<ItemEnvelope<T[]>>(method, path, body, {
     headers: withTenantHeader(),
   })
   return (res.data ?? []).map(normalizeTenantId)
+}
+
+// GET/POST a list wrapped as `{ data: { items: [] } }` (reports, consent,
+// participant-missions). Unwraps the nested `items` array and normalizes
+// tenant_id. Routes through withTenantHeader so tenant scoping is applied.
+export async function itemsRequest<T>(method: string, path: string, body?: unknown): Promise<T[]> {
+  const res = await apiRequest<ItemsEnvelope<T>>(method, path, body, {
+    headers: withTenantHeader(),
+  })
+  return (res.data?.items ?? []).map(normalizeTenantId)
 }
 
 // GET/POST/PUT a single item; returns the unwrapped `data` (tenant_id normalized).
@@ -127,6 +143,16 @@ export async function itemRequest<T>(method: string, path: string, body?: unknow
     headers: withTenantHeader(),
   })
   return normalizeTenantId(res.data)
+}
+
+// GET a single item that may not exist; returns the unwrapped `data` or null on 404.
+export async function nullableItemRequest<T>(method: string, path: string): Promise<T | null> {
+  try {
+    return await itemRequest<T>(method, path)
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null
+    throw err
+  }
 }
 
 // DELETE / mutation with no body of interest.
