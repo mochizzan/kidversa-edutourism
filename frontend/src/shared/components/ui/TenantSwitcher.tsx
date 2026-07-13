@@ -7,15 +7,18 @@ import { isSuperAdmin } from '../../../core/utils/permissions'
 import { cn } from '../../../core/utils'
 
 export function TenantSwitcher() {
-  const { user } = useAuth()
+  const { user, isAuthenticated } = useAuth()
   const { activeTenant, tenants, setActiveTenant, fetchTenants } = useTenantStore()
 
   useEffect(() => {
-    if (!isSuperAdmin(user)) return
+    // Jangan fetch sebelum sesi terautentikasi & token tersedia.
+    if (!isAuthenticated || !user || !isSuperAdmin(user)) return
     if (tenants.length === 0) {
-      void fetchTenants()
+      void fetchTenants().catch(() => {
+        // Kegagalan (mis. 401) ditangani oleh apiRequest + redirectToLogin.
+      })
     }
-  }, [user, tenants.length, fetchTenants])
+  }, [user, isAuthenticated, tenants.length, fetchTenants])
 
   if (!isSuperAdmin(user)) return null
 

@@ -66,6 +66,23 @@ export function clearStoredUser(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Centralized 401 handler registry
+// ---------------------------------------------------------------------------
+
+// Registry handler 401 terpusat. App mendaftarkan navigator SPA; kalau
+// kosong, fallback hard redirect. Tanpa import authStore (hindari circular).
+let unauthorizedHandler: (() => void) | null = null
+
+export function registerUnauthorizedHandler(fn: () => void): void {
+  unauthorizedHandler = fn
+}
+
+export function fireUnauthorized(): void {
+  if (unauthorizedHandler) unauthorizedHandler()
+  else window.location.assign('/auth/login')
+}
+
+// ---------------------------------------------------------------------------
 // Typed API error
 // ---------------------------------------------------------------------------
 
@@ -319,11 +336,13 @@ export async function apiRequest<T>(
     }
 
     if (response.status === 401) {
-      // Jangan coba refresh bila kita sama sekali tidak punya sesi
-      // (accessToken null = belum login / cookie kedaluwarsa). Percobaan
-      // refresh tanpa token berujung 400 (backend butuh refresh token).
-      // Kasus ini harus langsung throw agar authStore/redirectToLogin menangani.
-      if (accessToken !== null && !didRefresh) {
+      // Coba refresh bila kita yakin ada sesi aktif. Sinyal yang aman:
+      // user tersimpan di sessionStorage ⇒ refresh cookie (milik backend,
+      // HttpOnly) kemungkinan masih valid. Setelah reload accessToken memang
+      // null, tapi cookie refresh tetap ada, sehingga refresh HARUS dicoba
+      // (bukan langsung throw). Untuk request anonim (tidak ada storedUser)
+      // kita langsung throw — tidak ada sesi untuk di-refresh.
+      if (!didRefresh && getStoredUser()) {
         didRefresh = true
         const ok = await refreshAccessToken().then(
           () => true,
@@ -331,7 +350,8 @@ export async function apiRequest<T>(
         )
         if (ok) continue
       }
-      // Refresh gagal (atau memang belum login) — lempar error ter-typed.
+      // Refresh gagal (atau memang belum login) — arahkan ke login lalu lempar.
+      fireUnauthorized()
       throw await toApiError(response)
     }
 
