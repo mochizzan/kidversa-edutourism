@@ -6,7 +6,7 @@ Kidversa Edutourism — interactive digital storytelling platform for children (
 
 **Monorepo structure:**
 - `frontend/` — React 19 + TypeScript + Vite + Tailwind CSS v4 + PWA
-- `backend/` — Go + Echo **v5** + GORM + SQLite (scaffold only — `go.mod`/`go.sum` exist, no source files yet)
+- `backend/` — Go + Echo **v5** + GORM + **MariaDB 12** (full implementation; migrations in `backend/migrations/`, Docker `mariadb-12`)
 
 > `README.md` is stale. Trust this file and the source over README.
 
@@ -28,8 +28,9 @@ pnpm preview          # preview production build
 
 ### Backend (`backend/`)
 
-- No Go source files exist yet — backend is a stub with dependencies declared only.
-- Echo **v5** is declared in `go.mod` (not v4, despite README).
+- Full Go backend: Echo v5 handlers, GORM models, MariaDB 12 (`mariadb-12` container).
+- Build/verify: `cd backend && go build ./... && go vet ./...`. Migrations: `go run ./cmd/migrate` (needs `APP_ENV=dev` in `backend/.env` + running MariaDB). Tests: `TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3306 TEST_DB_USER=root TEST_DB_PASSWORD=admin TEST_DB_NAME=kidversa_test go test ./...`.
+- Echo **v5** is in `go.mod` (not v4, despite README).
 
 ## Architecture
 
@@ -57,28 +58,18 @@ pages/        # LandingPage, LearnerKioskPage, NotFoundPage
 
 Only `LoginPage` and `RegisterPage` are eager; every other page is lazy-loaded. Do NOT add a `React.lazy` import not consumed by a route — `noUnusedLocals` will fail the build.
 
-### Data Layer (IndexedDB, not localStorage, not API)
+### Data Layer (Backend API — IndexedDB removed)
 
-Persistence is **IndexedDB** (via `idb` package) in `core/services/storage/idb.ts` (DB: `kidversa_db`, v2). All CRUD hits IndexedDB stores.
+All domain data lives in the **backend** (Go + Echo v5 + GORM + MariaDB 12). The frontend talks to it exclusively through `core/services/backendClient.ts` (`apiRequest`, `getTokens`/`setTokens`, `ApiError`, `openSSE`, `startConnectionWatcher`). **IndexedDB was fully removed** (no `core/services/idb`, `local`, `seed`, `sync`, or `storage/idb.ts`).
 
-- **Auth/data bootstrap** runs at app start (`App.tsx` → `initDB()` then `runBootstrap()`). `core/services/local/bootstrap.ts` seeds two bootstrap **tenants** (`tenant-bandung`, `tenant-subang`) and the bootstrap **users** once, guarded by the **`kidversa_idb_bootstrapped_v2`** localStorage flag. This is the only seeding wired into the running app.
-- Bootstrap accounts (password `password123`):
-  | Email | Role | Tenant | Active |
-  |---|---|---|---|
-  | superadmin@kidversa.id | SUPER_ADMIN | none (global) | yes |
-  | admin.bandung@kidversa.id | ADMIN | tenant-bandung | yes |
-- `core/services/local/auth.ts` (`localAuthService`, `authSession`, `registerUser`, `approveUser`, `rejectUser`, `deactivateUser`). `authSession` stores token/user in **sessionStorage**.
-- **Seed system**: `core/services/seed/init.ts` (`initSeedDatabase`, `resetSeedDatabase`) + `seed/data.ts` seed programs/sessions/participants/etc., guarded by `kidversa_idb_seeded_v1`. NOTE: `initSeedDatabase` is **not called** by `App.tsx` — it exists but is not wired into startup; bootstrap only creates the tenants + 2 users. Don't assume seeded demo data is present in a fresh run.
+- **Auth** runs at app start (`App.tsx` → `backendClient.healthCheck()` then `authStore.checkSession()`). `authStore` (Zustand) persists the user in `sessionStorage` and the access token in memory; refresh is single-flight in `backendClient`. There is no local bootstrap/seed — tenants + users are created by the backend migration (`cmd/migrate` bootstrap: `superadmin@kidversa.id`, `admin.bandung@kidversa.id`, `tenant-bandung`, `tenant-subang`).
 - **Service pattern** (domain data, e.g. users/programs/sessions):
   1. Interface in `core/services/types.ts` (e.g. `UserService`, `ProgramService`).
-  2. IndexedDB-backed impl in `core/services/idb/<domain>.ts` (e.g. `idbUserService`) — namespaced by tenant via `requireTenantId()` from `tenantScope.ts`.
-  3. Barrel re-export in `core/services/<domain>.ts` (e.g. `users.ts` → `export const userService = idbUserService`). Swap this barrel to wire a real API.
-  - There is **no `core/services/mock/` directory** — older guidance pointing to `mock/db.ts`, `mock/auth.ts`, `mock-accounts.ts`, or `storage/mockDb.ts` is wrong; those files do not exist.
-- **`tenantScope.ts`** (`getTenantScope`, `requireTenantId`): `SUPER_ADMIN` operates across tenants and must have an active tenant selected (stored as `kidversa_active_tenant_id` in localStorage / `core/stores/tenantStore.ts`); other roles are scoped to their own `tenant_id`. Calls throw `'Tenant aktif belum dipilih'` if no tenant is set. Most idb services call `requireTenantId()` internally.
-- **Live service** (`core/services/live.ts` → `idb/live.ts`): group-stage progress, timeline events, and `simulateProgress` for the admin live dashboard. Progress status enum `GroupStageProgressStatus` (LOCKED/UNLOCKED/IN_PROGRESS/COMPLETED/SKIPPED).
-- **Sync manager**: `core/services/sync/syncManager.ts` (`syncManager`, `enqueueSyncItem`, `flushSyncQueue`, …). The top-level `core/services/syncManager.ts` is a **deprecated re-export adapter only** — import from `./sync/syncManager` instead. (The old flush that falsely marked items synced was removed; backend not yet present, so flushing is a no-op.)
-- **Custom DOM events**: `dispatchUsersChanged()` (`core/constants/app.ts`) fires `window` event `'kidversa:users-changed'` after user mutations; `useHeaderNotifications` listens via `USERS_CHANGED_EVENT`. Reuse this event for user list refreshes rather than re-fetching manually.
-- A real API client scaffold exists at `core/services/backendClient.ts` (`apiRequest`, `healthCheck`, `isBackendEnabled`), gated behind the localStorage flag `kidversa_backend_enabled` (**off by default**). Pages do not call it yet.
+  2. Real API impl in `core/services/<domain>.ts` (e.g. `users.ts`) — calls `apiRequest` against backend routes; no IndexedDB.
+  3. Shared helpers in `core/services/apiEnvelope.ts` (`listRequest`/`itemRequest`/`mutateRequest`) handle envelope unwrap, tenant-scoped pagination loops, and the C7 entity transform (e.g. `tenant_id` null→`''`).
+- **`tenantStore.ts`** (Zustand): `SUPER_ADMIN` selects an active tenant (`kidversa_active_tenant_id` in `localStorage`); other roles are scoped to their own `tenant_id`. Backend enforces scoping via `TenantScope()` middleware — the frontend only sends `X-Tenant-Id` for super-admin where needed.
+- **Live service** (`core/services/live.ts` → backend SSE): `useLiveSession` subscribes to `openSSE('/api/live/:sessionId/stream')`; facilitator overrides (unlock/complete/skip/jump/reset) POST to `/api/live/...`. No local `simulateProgress`.
+- **Custom DOM events**: `USERS_CHANGED_EVENT` (`'kidversa:users-changed'`) is listened to by `useHeaderNotifications`; the `dispatchUsersChanged()` emitter was removed (refresh lists via query/invalidation instead).
 
 ### State Management
 
@@ -96,7 +87,7 @@ Persistence is **IndexedDB** (via `idb` package) in `core/services/storage/idb.t
 ### App Entry Flow
 
 1. `main.tsx` → `<App />` in StrictMode.
-2. `App.tsx` → SplashScreen (~3.7s) → `initDB()` + `runBootstrap()` → `checkSession()`.
+2. `App.tsx` → SplashScreen (~3.7s) → `backendClient.healthCheck()` → `authStore.checkSession()`.
 3. Auth check: sessionStorage token → restore Zustand state; no token → `/auth/login`.
 4. After login: `getRedirectPath()` routes user to role dashboard.
 
@@ -125,19 +116,14 @@ Always check existing components before creating new ones.
 | `frontend/src/app/router.tsx` | Route assembler — imports `app/routes/*` |
 | `frontend/src/app/routes/helpers.tsx` | `guardedRoute`, `lazyRoute`, `SuspenseWrapper` |
 | `frontend/src/app/routes/<segment>.tsx` | Per-feature route definitions |
-| `frontend/src/App.tsx` | Root: splash screen + `initDB()` + `runBootstrap()` + session check |
+| `frontend/src/App.tsx` | Root: splash screen + `backendClient.healthCheck()` + `authStore.checkSession()` |
 | `frontend/src/core/stores/authStore.ts` | Zustand auth state |
 | `frontend/src/core/stores/tenantStore.ts` | Zustand active-tenant state (`kidversa_active_tenant_id`) |
-| `frontend/src/core/services/local/auth.ts` | Live auth (`localAuthService`, `authSession`) |
-| `frontend/src/core/services/local/bootstrap.ts` | Bootstrap tenants + users, flag `kidversa_idb_bootstrapped_v2` |
-| `frontend/src/core/services/seed/init.ts` | Seed system (`initSeedDatabase` — **not wired into startup**) |
+| `frontend/src/core/services/backendClient.ts` | API client: `apiRequest`, `getTokens`/`setTokens`, `ApiError`, `openSSE`, `startConnectionWatcher` |
+| `frontend/src/core/services/apiEnvelope.ts` | `listRequest`/`itemRequest`/`mutateRequest` envelope + pagination + C7 transform |
 | `frontend/src/core/services/types.ts` | Service interfaces (`UserService`, `ProgramService`, `AuthService`, …) |
-| `frontend/src/core/services/idb/<domain>.ts` | IndexedDB service impls |
-| `frontend/src/core/services/tenantScope.ts` | Tenant scoping (`getTenantScope`, `requireTenantId`) |
-| `frontend/src/core/services/live.ts` | Live progress/timeline service |
-| `frontend/src/core/services/sync/syncManager.ts` | Sync queue manager (use this, not the deprecated top-level re-export) |
-| `frontend/src/core/services/backendClient.ts` | Real API client scaffold (gated by `kidversa_backend_enabled`) |
-| `frontend/src/core/services/storage/idb.ts` | IndexedDB wrapper + store defs (`kidversa_db` v2) |
+| `frontend/src/core/services/<domain>.ts` | Real API service impls (users, programs, sessions, participants, missions, frames, photos, recordings, consent, assessments, reports, participantMissions, tenants) |
+| `frontend/src/core/services/live.ts` | Live SSE service (`useLiveSession` → `openSSE('/api/live/:sessionId/stream')`) |
 | `frontend/src/core/constants/app.ts` | `ROUTES`, `COLORS`, `USERS_CHANGED_EVENT`, path builders |
 | `frontend/src/core/types/entities.ts` | Entity/DTO types |
 | `frontend/src/core/types/enums.ts` | All enums incl. `UserRole` |
@@ -159,10 +145,3 @@ Always check existing components before creating new ones.
 - Gitignored: `docs/`, `img/`, `CLAUDE.md`, `.claude/`, `.codegraph/`, `.kilo/`, and the backend binary `kidversa-server`.
 - `noUnusedLocals`/`noUnusedParameters` are enabled — every unused import breaks the build.
 - TanStack React Query installed but no `QueryClientProvider` — don't use `useQuery` hooks yet.
-- Parent routes use `ParentTokenGuard` (`?token=`), not `ProtectedRoute` — they cannot access Zustand auth state.
-- Learner Kiosk (`/learner/*`) is fully public, no auth/guard.
-- Tailwind v4: no config file — all customization goes in `index.css` under `@theme`.
-- No test framework configured — `pnpm build` is the only automated verification.
-- `SUPER_ADMIN` must select an active tenant (`TenantSwitcher`) before domain data loads; `requireTenantId()` throws otherwise. Non-super-admin roles are auto-scoped to their own tenant.
-- `core/services/syncManager.ts` (top-level) is a deprecated re-export; import from `core/services/sync/syncManager.ts`.
-- The seed dataset in `seed/data.ts` is **not** loaded on app start — only bootstrap tenants + 2 users exist after `runBootstrap()`.
