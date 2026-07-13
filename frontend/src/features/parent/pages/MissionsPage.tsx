@@ -48,9 +48,9 @@ const missionCategories = [
 
 /* ── Inner component ── */
 function MissionsView() {
-  const { report, participant, reportId, loading: guardLoading, error: guardError } = useParentToken()
+  const { report, loading: guardLoading, error: guardError } = useParentToken()
   const [searchParams] = useSearchParams()
-  const reportIdParam = searchParams.get('reportId') || reportId || ''
+  const reportIdParam = searchParams.get('reportId') || report?.id || ''
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -141,7 +141,7 @@ function MissionsView() {
   }
 
   /* ── Invalid guard ── */
-  if (guardError || !participant) {
+  if (guardError || !report) {
     return (
       <EmptyState
         icon={<Target className="w-12 h-12" />}
@@ -157,7 +157,7 @@ function MissionsView() {
       <div className="space-y-4">
         <div className="text-center">
           <h1 className="text-xl font-bold text-on-surface">Misi Lanjutan</h1>
-          <p className="text-sm text-on-surface-variant mt-1">{participant.child_name}</p>
+          <p className="text-sm text-on-surface-variant mt-1">Ananda</p>
         </div>
         {[1, 2, 3].map((i) => (
           <div key={i} className="bg-surface rounded-2xl p-4 animate-pulse">
@@ -189,7 +189,7 @@ function MissionsView() {
       <div className="space-y-6">
         <div className="text-center">
           <h1 className="text-xl font-bold text-on-surface">Misi Lanjutan</h1>
-          <p className="text-sm text-on-surface-variant mt-1">{participant.child_name}</p>
+          <p className="text-sm text-on-surface-variant mt-1">Ananda</p>
         </div>
         <EmptyState
           icon={<Target className="w-12 h-12" />}
@@ -207,7 +207,7 @@ function MissionsView() {
       <div className="text-center">
         <h1 className="text-xl font-bold text-on-surface">Misi Lanjutan</h1>
         <p className="text-sm text-on-surface-variant mt-1">
-          Untuk: {participant.child_name}
+          Untuk: Ananda
         </p>
       </div>
 
@@ -312,7 +312,7 @@ function MissionsView() {
       {/* Back to report */}
       {report && (
         <Link
-          to={`/parent/report?token=${encodeURIComponent(report.parent_access_token)}`}
+          to={`/parent/report?${searchParams.toString()}`}
           className="flex items-center justify-center gap-2 text-sm text-primary font-medium hover:underline"
         >
           <ArrowLeft className="w-4 h-4" /> Kembali ke Laporan

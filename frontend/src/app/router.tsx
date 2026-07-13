@@ -4,7 +4,7 @@ import { authRoutes } from './routes/auth'
 import { adminRoutes } from './routes/admin'
 import { fasilitatorRoutes } from './routes/fasilitator'
 import { parentRoutes } from './routes/parent'
-import { learnerRoute } from './routes/learner'
+import { learnerRoute, kioskRoute } from './routes/learner'
 
 export const router = createBrowserRouter([
   rootRoute,
@@ -13,5 +13,6 @@ export const router = createBrowserRouter([
   ...fasilitatorRoutes,
   ...parentRoutes,
   learnerRoute,
+  kioskRoute,
   notFoundRoute,
 ])

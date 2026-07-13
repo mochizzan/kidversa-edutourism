@@ -6,22 +6,15 @@ import { Loader2 } from 'lucide-react'
 import {
   ParentTokenGuard,
   useParentToken,
+  type PublicReport,
 } from '../../../shared/components/auth/ParentTokenGuard'
-import { sessionService } from '../../../core/services/sessions'
-import { assessmentService } from '../../../core/services/assessments'
-import { photoService } from '../../../core/services/photos'
-import { programService } from '../../../core/services/programs'
-import { missionService } from '../../../core/services/missions'
-import { userService } from '../../../core/services/users'
-import type { ProgramStage, MissionBank } from '../../../core/types'
-import { formatDate } from '../../../core/utils'
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 import { DEFAULT_FACILITATOR_MESSAGE, DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
 
 /* ── Inner report component ── */
 function ReportView() {
-  const { report, participant, loading: guardLoading, error: guardError } = useParentToken()
+  const { report, loading: guardLoading, error: guardError } = useParentToken()
 
   const [raportHtml, setRaportHtml] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -44,99 +37,45 @@ function ReportView() {
   const scaledHeight = iframeHeight * scaleFactor
 
   useEffect(() => {
-    if (!report || !participant) return
+    if (!report) return
 
-    const loadDetails = async () => {
-      try {
-        const sess = await sessionService.getById(report.session_id)
-        if (!sess) {
-          setError('Sesi tidak ditemukan.')
-          setLoading(false)
-          return
-        }
+    const pub = report as PublicReport
 
-        const [sessAssessments, sessPhotos, sessStages, programStages, missionResult] =
-          await Promise.all([
-            assessmentService.getBySession(report.session_id),
-            photoService.getBySession(report.session_id),
-            sessionService.getStages(report.session_id),
-            programService.getStages(sess.program_id),
-            missionService.getAll({ limit: 50 }),
-          ])
+    const buildHtml = () => {
+      // The public report payload is an anti-IDOR view: it exposes the final
+      // narrative, the mission id list, and the (optional) PDF url — never PII.
+      const narrative = pub.ai_narrative_final || ''
+      const missions: string[] = pub.mission_ids_json
+        ? parseMissionIds(pub.mission_ids_json)
+        : []
 
-        const partAssessments = sessAssessments.filter(
-          (a) => a.participant_id === participant.id
-        )
-
-        const builtStageInfos: { programStage: ProgramStage; starRating: number }[] =
-          sessStages
-            .map((ss) => {
-              const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
-              if (!pgStage) return null
-              const assessment = partAssessments.find((a) => a.session_stage_id === ss.id)
-              return {
-                programStage: pgStage,
-                starRating: assessment?.star_rating ?? 0,
-              }
-            })
-            .filter((s): s is NonNullable<typeof s> => s !== null)
-
-        const reportPhoto =
-          sessPhotos.find(
-            (p) => p.participant_id === participant.id && p.is_report_photo
-          ) || sessPhotos.find((p) => p.participant_id === participant.id) || null
-
-        const programMissions: MissionBank[] = missionResult.data.filter(
-          (m) => m.program_id === sess.program_id
-        )
-        const selected = programMissions
-          .filter((m) => (report.mission_ids_json || []).includes(m.id))
-          .map((m) => m.title_child)
-
-        let facName = DEFAULT_FACILITATOR_NAME
-        let facPhoto: string | undefined = undefined
-        if (sess.created_by) {
-          const facilitator = await userService.getById(sess.created_by)
-          if (facilitator) {
-            facName = facilitator.name || DEFAULT_FACILITATOR_NAME
-            facPhoto = facilitator.avatar_url
-          }
-        }
-
-        const narrative = report.ai_narrative_final || report.ai_narrative_draft || ''
-        const quote = narrative
+      return generateMiniRaportHTML({
+        childName: 'Ananda',
+        childAge: 0,
+        sessionDate: '',
+        photoUrl: undefined,
+        quote: narrative
           ? (narrative.match(/^[^.!?\n]+[.!?]/)?.[0]?.trim() ||
             narrative.split('\n')[0].trim().slice(0, 120))
-          : undefined
-
-        const html = generateMiniRaportHTML({
-          childName: participant.child_name,
-          childAge: participant.child_age,
-          sessionDate: formatDate(sess.session_date),
-          photoUrl: reportPhoto?.framed_file_url || reportPhoto?.original_file_url,
-          quote,
-          stages: builtStageInfos.map((si, i) => ({
-            name: si.programStage.name,
-            sequenceOrder: i + 1,
-            starRating: si.starRating,
-          })),
-          narrative,
-          facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
-          missions: selected,
-          facilitatorName: facName,
-          facilitatorPhotoUrl: facPhoto,
-        })
-        setRaportHtml(html)
-        setLoading(false)
-      } catch (err) {
-        console.error('Failed to load parent report:', err)
-        setError('Gagal memuat detail laporan.')
-        setLoading(false)
-      }
+          : undefined,
+        stages: [],
+        narrative,
+        facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
+        missions,
+        facilitatorName: DEFAULT_FACILITATOR_NAME,
+        facilitatorPhotoUrl: undefined,
+      })
     }
 
-    loadDetails()
-  }, [report, participant])
+    try {
+      setRaportHtml(buildHtml())
+    } catch (err) {
+      console.error('Failed to build parent report:', err)
+      setError('Gagal memuat laporan.')
+    } finally {
+      setLoading(false)
+    }
+  }, [report])
 
   /* ── Cetak: print the existing rendered iframe directly ── */
   const handleCetak = () => {
@@ -145,10 +84,10 @@ function ReportView() {
 
   /* ── Unduh PDF: render a hidden iframe from the report HTML and capture it ── */
   const handleDownloadPdf = async () => {
-    if (!raportHtml || !participant) return
+    if (!raportHtml) return
     setActionLoading('pdf')
     try {
-      await captureRaportAsPdf(raportHtml, `raport-${participant.child_name}.pdf`)
+      await captureRaportAsPdf(raportHtml, 'raport.pdf')
     } catch (err) {
       console.error('Failed to generate PDF:', err)
       setDownloadError('Gagal menghasilkan file PDF.')
@@ -157,13 +96,13 @@ function ReportView() {
     }
   }
 
-  /* ── PNG download: render a hidden iframe from the report HTML and capture it ── */
+  /* ── PNG download ── */
   const handleDownloadPng = async () => {
-    if (!raportHtml || !participant) return
+    if (!raportHtml) return
     setActionLoading('png')
     try {
       const blob = await captureRaportAsBlob(raportHtml)
-      downloadBlob(blob, `raport-${participant.child_name}.png`)
+      downloadBlob(blob, 'raport.png')
     } catch (err) {
       console.error('Failed to generate PNG:', err)
       setDownloadError('Gagal menghasilkan gambar raport.')
@@ -201,7 +140,7 @@ function ReportView() {
   }
 
   /* ── Error ── */
-  if (guardError || error || !report || !participant || !raportHtml) {
+  if (guardError || error || !report || !raportHtml) {
     return (
       <div className="min-h-screen bg-gray-200 py-8">
         <EmptyState
@@ -222,28 +161,28 @@ function ReportView() {
   /* ── Render: mini raport fills viewport + floating toolbar ── */
   return (
     <div className="relative min-h-screen bg-gray-200 print-report">
+      <div
+        className="mx-auto overflow-hidden"
+        style={{ width: '100%', maxWidth: A4_SHEET_WIDTH }}
+      >
         <div
-          className="mx-auto overflow-hidden"
-          style={{ width: '100%', maxWidth: A4_SHEET_WIDTH }}
+          style={{
+            width: A4_SHEET_WIDTH,
+            transform: `scale(${scaleFactor})`,
+            transformOrigin: 'top center',
+            height: scaledHeight || 'auto',
+          }}
         >
-          <div
-            style={{
-              width: A4_SHEET_WIDTH,
-              transform: `scale(${scaleFactor})`,
-              transformOrigin: 'top center',
-              height: scaledHeight || 'auto',
-            }}
-          >
-            <iframe
-              ref={iframeRef}
-              srcDoc={raportHtml}
-              title="Mini Raport"
-              onLoad={handleIframeLoad}
-              className="border-0 block"
-              style={{ width: A4_SHEET_WIDTH, border: 'none' }}
-            />
-          </div>
+          <iframe
+            ref={iframeRef}
+            srcDoc={raportHtml}
+            title="Mini Raport"
+            onLoad={handleIframeLoad}
+            className="border-0 block"
+            style={{ width: A4_SHEET_WIDTH, border: 'none' }}
+          />
         </div>
+      </div>
 
       {downloadError && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-2 shadow-lg no-print">
@@ -274,10 +213,27 @@ function ReportView() {
   )
 }
 
+/* Parse the report's mission_ids_json field, which is a JSON array of ids as a
+   string (backend RawJSON). Returns trimmed ids, tolerating non-JSON input. */
+function parseMissionIds(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return parsed.map((m) => String(m).trim()).filter(Boolean)
+    }
+    if (typeof parsed === 'string') {
+      return parsed.split(',').map((s) => s.trim()).filter(Boolean)
+    }
+  } catch {
+    return raw.split(',').map((s) => s.trim()).filter(Boolean)
+  }
+  return []
+}
+
 /* ── Page wrapper ── */
 const ReportPage = () => {
   return (
-    <ParentTokenGuard>
+    <ParentTokenGuard kind="report">
       <ReportView />
     </ParentTokenGuard>
   )

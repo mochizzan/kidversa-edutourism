@@ -1,16 +1,29 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { reportService } from '../../../core/services/reports'
-import { sessionService } from '../../../core/services/sessions'
-import type { Report, Participant } from '../../../core/types'
+import { reportPublicService } from '../../../core/services/reports'
+import { ApiError } from '../../../core/services/backendClient'
+import type { Participant } from '../../../core/types'
+
+/* ── Public report shape (anti-IDOR DTO from GET /api/reports/access) ──
+   Mirrors backend PublicReportDTO. PII and the raw token are intentionally
+   absent — the parent flow only ever sees this stripped payload. */
+export interface PublicReport {
+  id: string
+  participant_id: string
+  session_id: string
+  status: string
+  ai_narrative_final?: string
+  mission_ids_json?: string
+  report_pdf_url?: string
+}
+
+export type ParentGuardKind = 'report' | 'consent'
 
 /* ── Context ── */
 interface ParentTokenContextValue {
   token: string
-  report: Report | null
+  report: PublicReport | null
   participant: Participant | null
-  participantId: string | null
-  reportId: string | null
   loading: boolean
   error: 'INVALID' | 'EXPIRED' | null
 }
@@ -19,8 +32,6 @@ const ParentTokenContext = createContext<ParentTokenContextValue>({
   token: '',
   report: null,
   participant: null,
-  participantId: null,
-  reportId: null,
   loading: true,
   error: null,
 })
@@ -30,9 +41,10 @@ export const useParentToken = () => useContext(ParentTokenContext)
 /* ── Guard ── */
 interface ParentTokenGuardProps {
   children: ReactNode
+  kind?: ParentGuardKind
 }
 
-export function ParentTokenGuard({ children }: ParentTokenGuardProps) {
+export function ParentTokenGuard({ children, kind = 'report' }: ParentTokenGuardProps) {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
 
@@ -40,84 +52,49 @@ export function ParentTokenGuard({ children }: ParentTokenGuardProps) {
     token,
     report: null,
     participant: null,
-    participantId: null,
-    reportId: null,
     loading: true,
     error: null,
   })
 
   useEffect(() => {
     if (!token) {
-      setState((prev) => ({ ...prev, loading: false, error: 'INVALID' }))
+      setState((prev) => ({ ...prev, token, loading: false, error: 'INVALID' }))
       return
     }
 
-    let cancelled = false
-
-    const validate = async () => {
-      try {
-        // Try to find a report by parent_access_token
-        const sessions = await sessionService.getAll({ limit: 50 })
-        let foundReport: Report | null = null
-        for (const session of sessions.data) {
-          const reports = await reportService.getBySession(session.id)
-          const match = reports.find((r) => r.parent_access_token === token)
-          if (match) {
-            foundReport = match
-            break
-          }
-        }
-
-        if (foundReport) {
-          let participant: Participant | null = null
-          try {
-            const participants = await sessionService.getParticipants(foundReport.session_id)
-            participant = participants.find((p) => p.id === foundReport!.participant_id) || null
-          } catch {
-            participant = null
-          }
-
-          const isExpired = foundReport.sent_at
-            ? Date.now() - new Date(foundReport.sent_at).getTime() > 30 * 24 * 60 * 60 * 1000
-            : false
-
-          if (!cancelled) {
-            setState({
-              token,
-              report: foundReport,
-              participant,
-              participantId: foundReport.participant_id,
-              reportId: foundReport.id,
-              loading: false,
-              error: isExpired ? 'EXPIRED' : null,
-            })
-          }
-          return
-        }
-
-        const participant = await sessionService.getParticipantById(token)
-
-        if (!cancelled) {
+    if (kind === 'report') {
+      // Public endpoint: GET /api/reports/access?token= (no auth needed).
+      reportPublicService
+        .getByToken(token)
+        .then((res) => {
+          setState({
+            token,
+            report: (res ?? null) as PublicReport | null,
+            participant: null,
+            loading: false,
+            error: null,
+          })
+        })
+        .catch((err) => {
+          const code = err instanceof ApiError ? err.code : ''
+          const status = err instanceof ApiError ? err.status : 0
+          // Backend returns 401/403/404 with token_invalid / token_expired.
+          const expired = code === 'token_expired' || status === 403
           setState({
             token,
             report: null,
-            participant,
-            participantId: participant?.id || null,
-            reportId: null,
+            participant: null,
             loading: false,
-            error: participant ? null : 'INVALID',
+            error: expired ? 'EXPIRED' : 'INVALID',
           })
-        }
-      } catch {
-        if (!cancelled) {
-          setState((prev) => ({ ...prev, loading: false, error: 'INVALID' }))
-        }
-      }
+        })
+      return
     }
 
-    validate()
-    return () => { cancelled = true }
-  }, [token])
+    // Consent / generic: the token is validated on submit (no public GET exists
+    // for a consent token), so we just pass it through to the form.
+    setState({ token, report: null, participant: null, loading: false, error: null })
+  }, [token, kind])
 
   /* ── Loading ── */
   if (state.loading) {
@@ -139,7 +116,7 @@ export function ParentTokenGuard({ children }: ParentTokenGuardProps) {
           <div className="w-16 h-16 rounded-full bg-surface-variant flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">🔗</span>
           </div>
-          <h1 className="text-xl font-bold text-on-surface mb-2">Link tidak dikenal</h1>
+          <h1 className="text-xl font-bold text-on-surface mb-2">Link tidak valid</h1>
           <p className="text-sm text-on-surface-variant mb-6">
             Tautan yang Anda akses tidak valid atau tidak ditemukan. Silakan hubungi koordinator untuk mendapatkan tautan baru.
           </p>
