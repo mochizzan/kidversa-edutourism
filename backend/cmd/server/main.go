@@ -60,7 +60,7 @@ func main() {
 	reportsUC := reportsuc.NewUsecase(reportRepo, hub, reportsuc.NewPlaceholderNarrative())
 
 	// Handlers.
-	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.CookieSecure, cfg.CookieSameSite)
+	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite)
 	registry := handler.NewRegistry(authHandler)
 	registry.User = handler.NewUserHandler(userUC, jwt)
 	registry.Tenant = handler.NewTenantHandler(tenantUC, jwt)

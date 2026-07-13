@@ -98,7 +98,7 @@ func newTestAuthHandler() (*AuthHandler, *fakeUserRepo) {
 	refresh := auth.NewInMemoryRefreshStore()
 	repo := newFakeUserRepo()
 	uc := auth.NewUsecase(repo, jm, revoker, refresh, nil, cfg.BcryptCost)
-	h := NewAuthHandler(uc, jm, "kidversa_session", false, "Lax")
+	h := NewAuthHandler(uc, jm, "kidversa_session", "kidversa_refresh", false, "Lax")
 	return h, repo
 }
 

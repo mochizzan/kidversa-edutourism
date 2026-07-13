@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -15,11 +16,12 @@ import (
 
 // AuthHandler serves /api/auth/*.
 type AuthHandler struct {
-	authUC         *auth.Usecase
-	jwt            *auth.JWTManager
-	cookieName     string
-	cookieSecure   bool
-	cookieSameSite string
+	authUC            *auth.Usecase
+	jwt               *auth.JWTManager
+	cookieName        string
+	refreshCookieName string
+	cookieSecure      bool
+	cookieSameSite    string
 }
 
 // kioskTokenTTL is the lifetime of an issued kiosk token. Kept as a named const
@@ -27,8 +29,8 @@ type AuthHandler struct {
 const kioskTokenTTL = 4 * time.Hour
 
 // NewAuthHandler builds the auth handler.
-func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, cookieSecure bool, cookieSameSite string) *AuthHandler {
-	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
+func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, refreshCookieName string, cookieSecure bool, cookieSameSite string) *AuthHandler {
+	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, refreshCookieName: refreshCookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
 }
 
 // Login handles POST /api/auth/login and sets the SSE session cookie.
@@ -42,6 +44,7 @@ func (h *AuthHandler) Login(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusUnauthorized, "invalid_credentials")
 	}
 	setSessionCookie(c, h.cookieName, res.AccessToken, h.cookieSecure, h.cookieSameSite, int(h.jwt.AccessTTL().Seconds()))
+	setRefreshCookie(c, h.refreshCookieName, res.RefreshToken, h.cookieSecure, h.cookieSameSite, int(h.jwt.RefreshTTL().Seconds()))
 	return appresp.OK(c, &dto.LoginResponse{AccessToken: res.AccessToken, RefreshToken: res.RefreshToken, User: res.User})
 }
 
@@ -63,16 +66,19 @@ func (h *AuthHandler) Register(c *echo.Context) error {
 	return appresp.Created(c, user)
 }
 
-// Refresh handles POST /api/auth/refresh (rotates tokens).
+// Refresh handles POST /api/auth/refresh (rotates tokens via HttpOnly refresh cookie).
 func (h *AuthHandler) Refresh(c *echo.Context) error {
-	var req dto.RefreshRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	res, err := h.authUC.Refresh((*c).Request().Context(), req.RefreshToken)
-	if err != nil {
+	ck, err := (*c).Cookie(h.refreshCookieName)
+	if err != nil || ck.Value == "" {
 		return appresp.Fail(c, http.StatusUnauthorized, "token_invalid")
 	}
+	res, err := h.authUC.Refresh((*c).Request().Context(), ck.Value)
+	if err != nil {
+		clearRefreshCookie(c, h.refreshCookieName)
+		return appresp.Fail(c, http.StatusUnauthorized, "token_invalid")
+	}
+	setSessionCookie(c, h.cookieName, res.AccessToken, h.cookieSecure, h.cookieSameSite, int(h.jwt.AccessTTL().Seconds()))
+	setRefreshCookie(c, h.refreshCookieName, res.RefreshToken, h.cookieSecure, h.cookieSameSite, int(h.jwt.RefreshTTL().Seconds()))
 	return appresp.OK(c, &dto.LoginResponse{AccessToken: res.AccessToken, RefreshToken: res.RefreshToken, User: res.User})
 }
 
@@ -105,10 +111,15 @@ func (h *AuthHandler) Me(c *echo.Context) error {
 // Logout handles POST /api/auth/logout.
 func (h *AuthHandler) Logout(c *echo.Context) error {
 	var req dto.RefreshRequest
-	_ = (*c).Bind(&req)
-	if claims, ok := (*c).Get(appmiddleware.CtxClaims).(*auth.Claims); ok && claims != nil {
-		_ = h.authUC.Logout((*c).Request().Context(), req.RefreshToken, claims.ID, h.jwt.AccessTTL())
+	if err := (*c).Bind(&req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
 	}
+	if claims, ok := (*c).Get(appmiddleware.CtxClaims).(*auth.Claims); ok && claims != nil {
+		if err := h.authUC.Logout((*c).Request().Context(), req.RefreshToken, claims.ID, h.jwt.AccessTTL()); err != nil {
+			log.Printf("auth: logout revoke failed: %v", err)
+		}
+	}
+	clearRefreshCookie(c, h.refreshCookieName)
 	clearSessionCookie(c, h.cookieName)
 	return appresp.NoContent(c)
 }
@@ -160,6 +171,28 @@ func setSessionCookie(c *echo.Context, name, token string, secure bool, sameSite
 }
 
 func clearSessionCookie(c *echo.Context, name string) {
+	http.SetCookie((*c).Response().(http.ResponseWriter), &http.Cookie{
+		Name:     name,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+	})
+}
+
+func setRefreshCookie(c *echo.Context, name, token string, secure bool, sameSite string, maxAge int) {
+	http.SetCookie((*c).Response().(http.ResponseWriter), &http.Cookie{
+		Name:     name,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: parseSameSite(sameSite),
+		MaxAge:   maxAge,
+	})
+}
+
+func clearRefreshCookie(c *echo.Context, name string) {
 	http.SetCookie((*c).Response().(http.ResponseWriter), &http.Cookie{
 		Name:     name,
 		Value:    "",
