@@ -42,7 +42,9 @@ export const userService: UserService = {
   create: (data: CreateUserDTO) =>
     itemRequest<User>('POST', '/api/users', {
       email: data.email,
-      password: data.password ?? 'password123',
+      // Do NOT default a password — let the backend validate it as required.
+      // If the caller omitted it, a plain `undefined` is sent (omitted from JSON).
+      password: data.password,
       name: data.name,
       phone: normalizePhone(data.phone),
       role: data.role,
