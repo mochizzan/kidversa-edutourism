@@ -88,7 +88,7 @@ export const sessionService: SessionService = {
 
   getParticipantById: async (participantId) => {
     try {
-      return await itemRequest<Participant>('GET', `/api/sessions/participants/${participantId}`)
+      return await itemRequest<Participant>('GET', `/api/participants/${participantId}`)
     } catch (err) {
       if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
         return null
