@@ -38,9 +38,15 @@ func (r *GormSessionRepository) CreateSession(ctx context.Context, s *entity.Ses
 	return nil
 }
 
-func (r *GormSessionRepository) GetSessionByID(ctx context.Context, id string) (*entity.Session, error) {
+func (r *GormSessionRepository) GetSessionByID(ctx context.Context, id, tenantID string) (*entity.Session, error) {
 	var m SessionModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	// Tenant scoping: restrict to the caller's tenant unless tenantID is empty
+	// (tenant-less SUPER_ADMIN scoped calls resolved by other means).
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}
@@ -140,9 +146,15 @@ func (r *GormSessionRepository) CreateSessionGroup(ctx context.Context, g *entit
 	return nil
 }
 
-func (r *GormSessionRepository) GetSessionGroupByID(ctx context.Context, id string) (*entity.SessionGroup, error) {
+func (r *GormSessionRepository) GetSessionGroupByID(ctx context.Context, id, tenantID string) (*entity.SessionGroup, error) {
 	var m SessionGroupModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	// Tenant scoping: restrict to the session's owning tenant (resolved via the
+	// group's session) unless tenantID is empty (tenant-less SUPER_ADMIN).
+	if tenantID != "" {
+		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}
@@ -212,9 +224,13 @@ func (r *GormSessionRepository) CreateParticipant(ctx context.Context, p *entity
 	return nil
 }
 
-func (r *GormSessionRepository) GetParticipantByID(ctx context.Context, id string) (*entity.Participant, error) {
+func (r *GormSessionRepository) GetParticipantByID(ctx context.Context, id, tenantID string) (*entity.Participant, error) {
 	var m ParticipantModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}
@@ -240,13 +256,16 @@ func (r *GormSessionRepository) GetParticipantGlobal(ctx context.Context, id, te
 	return m.ToEntity(), nil
 }
 
-func (r *GormSessionRepository) ListParticipants(ctx context.Context, sessionID, groupID string) ([]entity.Participant, error) {
+func (r *GormSessionRepository) ListParticipants(ctx context.Context, sessionID, groupID, tenantID string) ([]entity.Participant, error) {
 	q := r.db.WithContext(ctx).Model(&ParticipantModel{})
 	if sessionID != "" {
 		q = q.Where("session_id = ?", sessionID)
 	}
 	if groupID != "" {
 		q = q.Where("group_id = ?", groupID)
+	}
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
 	}
 	var models []ParticipantModel
 	if err := q.Order("created_at ASC").Find(&models).Error; err != nil {

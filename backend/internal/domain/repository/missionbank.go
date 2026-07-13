@@ -17,7 +17,7 @@ type MissionBankFilter struct {
 // MissionBankRepository is the persistence contract for mission templates.
 type MissionBankRepository interface {
 	Create(ctx context.Context, m *entity.MissionBank) error
-	GetByID(ctx context.Context, id string) (*entity.MissionBank, error)
+	GetByID(ctx context.Context, id, tenantID string) (*entity.MissionBank, error)
 	List(ctx context.Context, f MissionBankFilter, page, limit int) (*Paginated[entity.MissionBank], error)
 	Update(ctx context.Context, m *entity.MissionBank) error
 	// UpdateFields applies a partial (map) update. Use instead of Update(struct) so
@@ -36,7 +36,7 @@ type FrameFilter struct {
 // FrameRepository is the persistence contract for decorative photo frames.
 type FrameRepository interface {
 	Create(ctx context.Context, f *entity.PhotoFrame) error
-	GetByID(ctx context.Context, id string) (*entity.PhotoFrame, error)
+	GetByID(ctx context.Context, id, tenantID string) (*entity.PhotoFrame, error)
 	List(ctx context.Context, f FrameFilter, page, limit int) (*Paginated[entity.PhotoFrame], error)
 	Update(ctx context.Context, f *entity.PhotoFrame) error
 	// UpdateFields applies a partial (map) update. Use instead of Update(struct) so

@@ -19,11 +19,8 @@ func NewSessionHandler(uc *usecase.SessionUsecase) *SessionHandler { return &Ses
 
 func (h *SessionHandler) Create(c *echo.Context) error {
 	var req dto.CreateSessionRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	s, err := h.uc.CreateSession((*c).Request().Context(),
 		appmiddleware.GetTenantID(c), appmiddleware.GetUserID(c),
@@ -54,7 +51,7 @@ func (h *SessionHandler) Get(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	d, err := h.uc.GetSession((*c).Request().Context(), id)
+	d, err := h.uc.GetSession((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -70,7 +67,7 @@ func (h *SessionHandler) Update(c *echo.Context) error {
 	if err := (*c).Bind(&req); err != nil {
 		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
 	}
-	s, err := h.uc.UpdateSession((*c).Request().Context(), id,
+	s, err := h.uc.UpdateSession((*c).Request().Context(), id, appmiddleware.GetTenantID(c),
 		req.ProgramID, req.Name, req.SessionDate, req.Location, req.Notes, req.Status)
 	if err != nil {
 		return err
@@ -83,7 +80,7 @@ func (h *SessionHandler) Delete(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := h.uc.DeleteSession((*c).Request().Context(), id); err != nil {
+	if err := h.uc.DeleteSession((*c).Request().Context(), id, appmiddleware.GetTenantID(c)); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)

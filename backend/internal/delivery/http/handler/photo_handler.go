@@ -5,8 +5,8 @@ import (
 
 	"github.com/labstack/echo/v5"
 
-	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
@@ -28,7 +28,7 @@ func (h *PhotoHandler) GetByID(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	p, err := h.photos.GetByID((*c).Request().Context(), id)
+	p, err := h.photos.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (h *PhotoHandler) Update(c *echo.Context) error {
 	if err := h.photos.UpdateFields((*c).Request().Context(), id, fields); err != nil {
 		return err
 	}
-	p, err := h.photos.GetByID((*c).Request().Context(), id)
+	p, err := h.photos.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -101,19 +101,16 @@ func (h *PhotoHandler) SetReportPhoto(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	p, err := h.photos.GetByID((*c).Request().Context(), id)
+	p, err := h.photos.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
 	if err := h.photos.SetReportPhoto((*c).Request().Context(), p.ParticipantID, p.SessionID, id); err != nil {
 		return err
 	}
-	updated, err := h.photos.GetByID((*c).Request().Context(), id)
+	updated, err := h.photos.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
 	return appresp.OK(c, dto.NewPhotoResponse(updated))
 }
-
-// ensure import referenced.
-var _ = appmiddleware.GetUserID

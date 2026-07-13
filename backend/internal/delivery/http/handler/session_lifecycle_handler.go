@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/labstack/echo/v5"
 
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/usecase"
 )
@@ -19,7 +20,7 @@ func (h *SessionLifecycleHandler) Start(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	s, err := h.uc.StartSession((*c).Request().Context(), id)
+	s, err := h.uc.StartSession((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -31,7 +32,7 @@ func (h *SessionLifecycleHandler) Complete(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	s, err := h.uc.CompleteSession((*c).Request().Context(), id)
+	s, err := h.uc.CompleteSession((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func (h *SessionLifecycleHandler) Cancel(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	s, err := h.uc.CancelSession((*c).Request().Context(), id)
+	s, err := h.uc.CancelSession((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

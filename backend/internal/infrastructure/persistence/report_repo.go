@@ -34,9 +34,15 @@ func (r *GormReportRepository) Create(ctx context.Context, rep *entity.Report) e
 	return nil
 }
 
-func (r *GormReportRepository) GetByID(ctx context.Context, id string) (*entity.Report, error) {
+func (r *GormReportRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.Report, error) {
 	var m ReportModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	// Tenant scoping: restrict to the report's owning session's tenant (joined
+	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
+	if tenantID != "" {
+		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}
@@ -74,6 +80,9 @@ func (r *GormReportRepository) List(ctx context.Context, f repository.ReportFilt
 	}
 	if f.SessionID != "" {
 		q = q.Where("session_id = ?", f.SessionID)
+	}
+	if f.TenantID != "" {
+		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", f.TenantID)
 	}
 	if f.Status != "" {
 		q = q.Where("status = ?", f.Status)

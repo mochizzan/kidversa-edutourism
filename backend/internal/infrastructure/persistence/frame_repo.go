@@ -30,9 +30,14 @@ func (r *GormFrameRepository) Create(ctx context.Context, f *entity.PhotoFrame) 
 	return nil
 }
 
-func (r *GormFrameRepository) GetByID(ctx context.Context, id string) (*entity.PhotoFrame, error) {
+func (r *GormFrameRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.PhotoFrame, error) {
 	var m PhotoFrameModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	// Tenant scoping: photo_frames carry a stored tenant_id column.
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}

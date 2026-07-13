@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/usecase"
 )
@@ -39,11 +40,8 @@ func (h *SessionGroupHandler) CreateGroup(c *echo.Context) error {
 		return nil
 	}
 	var req dto.CreateGroupRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	g, err := h.uc.CreateGroup((*c).Request().Context(), id, req.Name)
 	if err != nil {
@@ -62,7 +60,7 @@ func (h *SessionGroupHandler) UpdateGroup(c *echo.Context) error {
 	if err := (*c).Bind(&req); err != nil {
 		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
 	}
-	g, err := h.uc.UpdateGroup((*c).Request().Context(), groupID, req.Name, req.Status)
+	g, err := h.uc.UpdateGroup((*c).Request().Context(), groupID, req.Name, req.Status, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -75,7 +73,7 @@ func (h *SessionGroupHandler) DeleteGroup(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := h.uc.DeleteGroup((*c).Request().Context(), groupID); err != nil {
+	if err := h.uc.DeleteGroup((*c).Request().Context(), groupID, appmiddleware.GetTenantID(c)); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)

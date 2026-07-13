@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"math"
 	"net/http"
 
 	"github.com/labstack/echo/v5"
 
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
@@ -15,12 +18,13 @@ import (
 // access endpoint. Parent access tokens are anti-IDOR: unguessable 64hex,
 // single-report scope, expiry, revocation.
 type ReportHandler struct {
-	uc *reportsuc.Usecase
+	uc  *reportsuc.Usecase
+	cfg *config.Config
 }
 
 // NewReportHandler builds the report handler.
-func NewReportHandler(uc *reportsuc.Usecase) *ReportHandler {
-	return &ReportHandler{uc: uc}
+func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config) *ReportHandler {
+	return &ReportHandler{uc: uc, cfg: cfg}
 }
 
 // GetByAccessToken handles GET /api/reports/access?token=... (PUBLIC).
@@ -57,11 +61,8 @@ func (h *ReportHandler) Approve(c *echo.Context) error {
 		return nil
 	}
 	var req dto.ReportApproveRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	r, err := h.uc.Approve((*c).Request().Context(), id, req.ApprovedBy)
 	if err != nil {
@@ -71,12 +72,15 @@ func (h *ReportHandler) Approve(c *echo.Context) error {
 }
 
 // Send handles POST /api/reports/:id/send (generates a fresh parent token).
+// The token TTL defaults to the configured ReportTokenTTL, overridable per
+// request via ReportSendRequest.TTLHours.
 func (h *ReportHandler) Send(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
 		return nil
 	}
-	ttl := 72
+	// Default to the configured report token TTL; allow a positive per-request override.
+	ttl := int(math.Round(h.cfg.ReportTokenTTL.Hours()))
 	var req dto.ReportSendRequest
 	if err := (*c).Bind(&req); err == nil && req.TTLHours > 0 {
 		ttl = req.TTLHours
@@ -122,7 +126,7 @@ func (h *ReportHandler) GetReport(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	r, err := h.uc.Repo().GetByID((*c).Request().Context(), id)
+	r, err := h.uc.Repo().GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

@@ -9,7 +9,7 @@ import (
 // PhotoRepository is the persistence contract for SmartPhoto records.
 type PhotoRepository interface {
 	Create(ctx context.Context, p *entity.SmartPhoto) error
-	GetByID(ctx context.Context, id string) (*entity.SmartPhoto, error)
+	GetByID(ctx context.Context, id, tenantID string) (*entity.SmartPhoto, error)
 	List(ctx context.Context, f PhotoFilter, page, limit int) (*Paginated[entity.SmartPhoto], error)
 	Update(ctx context.Context, p *entity.SmartPhoto) error
 	// UpdateFields applies a partial (map) update to a photo. Use this instead of
@@ -32,7 +32,7 @@ type PhotoFilter struct {
 // RecordingRepository is the persistence contract for Recording records.
 type RecordingRepository interface {
 	Create(ctx context.Context, r *entity.Recording) error
-	GetByID(ctx context.Context, id string) (*entity.Recording, error)
+	GetByID(ctx context.Context, id, tenantID string) (*entity.Recording, error)
 	List(ctx context.Context, f RecordingFilter, page, limit int) (*Paginated[entity.Recording], error)
 	Update(ctx context.Context, r *entity.Recording) error
 	// UpdateFields applies a partial (map) update to a recording. Use this instead

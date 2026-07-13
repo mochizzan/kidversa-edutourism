@@ -2,9 +2,11 @@ package live
 
 import (
 	"context"
+	"errors"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	apputil "kidversa-edutourism-backend/internal/pkg/util"
 )
@@ -28,8 +30,11 @@ type LiveSnapshot struct {
 	Timeline []entity.TimelineEvent      `json:"timeline"`
 }
 
-// Snapshot reads the current live state of a session from the DB.
-func (s *Service) Snapshot(ctx context.Context, sessionID string) (*LiveSnapshot, error) {
+// Snapshot reads the current live state of a session from the DB, tenant-scoped.
+func (s *Service) Snapshot(ctx context.Context, sessionID, callerTenant string) (*LiveSnapshot, error) {
+	if err := s.assertTenant(ctx, sessionID, callerTenant); err != nil {
+		return nil, err
+	}
 	groups, err := s.repo.ListGroups(ctx, sessionID)
 	if err != nil {
 		return nil, err
@@ -55,10 +60,14 @@ const (
 )
 
 // OverrideStage applies a facilitator override to a group-stage and broadcasts it.
-// The session is resolved from the group's owning session.
-func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, action OverrideAction, actorID string) (*entity.GroupStageProgress, error) {
+// The session is resolved from the group's owning session. callerTenant is the
+// resolved tenant from the JWT/scope; an owning-tenant mismatch is rejected.
+func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, action OverrideAction, actorID, callerTenant string) (*entity.GroupStageProgress, error) {
 	g, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
 		return nil, err
 	}
 	progress, _ := s.repo.GetProgressByGroup(ctx, groupID)
@@ -86,9 +95,12 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, ac
 }
 
 // Jump moves a group to a session stage (updates its current stage).
-func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID string) error {
+func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID, callerTenant string) error {
 	g, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil {
+		return err
+	}
+	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
 		return err
 	}
 	g.CurrentSessionStageID = &stageID
@@ -100,9 +112,12 @@ func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID string) er
 }
 
 // Reset clears a group's current stage (back to waiting).
-func (s *Service) Reset(ctx context.Context, groupID, actorID string) error {
+func (s *Service) Reset(ctx context.Context, groupID, actorID, callerTenant string) error {
 	g, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil {
+		return err
+	}
+	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
 		return err
 	}
 	g.CurrentSessionStageID = nil
@@ -158,6 +173,23 @@ func findProgress(list []entity.GroupStageProgress, stageID string) *entity.Grou
 		if list[i].SessionStageID == stageID {
 			return &list[i]
 		}
+	}
+	return nil
+}
+
+// assertTenant resolves the owning tenant of sessionID and compares it against the
+// caller's resolved tenant. tenant-less SUPER_ADMIN (callerTenant == "") is allowed
+// through (scoped by the X-Tenant-Id header via TenantScope middleware when present).
+func (s *Service) assertTenant(ctx context.Context, sessionID, callerTenant string) error {
+	if callerTenant == "" {
+		return nil
+	}
+	owner, err := s.repo.TenantIDForSession(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if owner != callerTenant {
+		return apperrors.Forbidden("forbidden", errors.New("tenant mismatch"))
 	}
 	return nil
 }

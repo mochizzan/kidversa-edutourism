@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
@@ -23,7 +21,7 @@ func (h *SessionParticipantHandler) ListParticipants(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	ps, err := h.uc.GetParticipants((*c).Request().Context(), id, (*c).QueryParam("group_id"))
+	ps, err := h.uc.GetParticipants((*c).Request().Context(), id, (*c).QueryParam("group_id"), appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -36,11 +34,8 @@ func (h *SessionParticipantHandler) CreateParticipant(c *echo.Context) error {
 		return nil
 	}
 	var req dto.CreateParticipantRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	p, err := h.uc.CreateParticipant((*c).Request().Context(),
 		appmiddleware.GetTenantID(c), id, req.GroupID, req.ChildName, req.ChildAge,
@@ -57,13 +52,10 @@ func (h *SessionParticipantHandler) LinkParticipant(c *echo.Context) error {
 		return nil
 	}
 	var req dto.LinkParticipantRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
-	}
-	p, err := h.uc.LinkParticipant((*c).Request().Context(), id, req.ParticipantID, req.GroupID)
+	p, err := h.uc.LinkParticipant((*c).Request().Context(), id, req.ParticipantID, req.GroupID, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -90,7 +82,7 @@ func (h *SessionParticipantHandler) GetParticipant(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	p, err := h.uc.GetParticipant((*c).Request().Context(), pid)
+	p, err := h.uc.GetParticipant((*c).Request().Context(), pid, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -118,7 +110,7 @@ func (h *SessionParticipantHandler) DeleteParticipant(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := h.uc.DeleteParticipant((*c).Request().Context(), pid); err != nil {
+	if err := h.uc.DeleteParticipant((*c).Request().Context(), pid, appmiddleware.GetTenantID(c)); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)

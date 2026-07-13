@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -27,7 +28,7 @@ func (h *RecordingHandler) GetByID(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	r, err := h.recordings.GetByID((*c).Request().Context(), id)
+	r, err := h.recordings.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -57,13 +58,10 @@ func (h *RecordingHandler) Review(c *echo.Context) error {
 		return nil
 	}
 	var req dto.RecordingReviewRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
-	}
-	r, err := h.recordings.GetByID((*c).Request().Context(), id)
+	r, err := h.recordings.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -121,7 +119,7 @@ func (h *RecordingHandler) Update(c *echo.Context) error {
 	if err := h.recordings.UpdateFields((*c).Request().Context(), id, fields); err != nil {
 		return err
 	}
-	r, err := h.recordings.GetByID((*c).Request().Context(), id)
+	r, err := h.recordings.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v5"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
@@ -43,11 +41,8 @@ func (h *SessionStageHandler) AssignFacilitator(c *echo.Context) error {
 		return nil
 	}
 	var req dto.AssignFacilitatorRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	st, err := h.uc.AssignFacilitator((*c).Request().Context(), id, stageID, req.FacilitatorID)
 	if err != nil {

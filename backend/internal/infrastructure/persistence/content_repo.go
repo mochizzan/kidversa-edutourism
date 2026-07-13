@@ -36,9 +36,15 @@ func (r *GormPhotoRepository) Create(ctx context.Context, p *entity.SmartPhoto) 
 	return nil
 }
 
-func (r *GormPhotoRepository) GetByID(ctx context.Context, id string) (*entity.SmartPhoto, error) {
+func (r *GormPhotoRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.SmartPhoto, error) {
 	var m SmartPhotoModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	// Tenant scoping: restrict to the photo's owning session's tenant (joined via
+	// sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
+	if tenantID != "" {
+		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}
@@ -145,9 +151,15 @@ func (r *GormRecordingRepository) Create(ctx context.Context, rec *entity.Record
 	return nil
 }
 
-func (r *GormRecordingRepository) GetByID(ctx context.Context, id string) (*entity.Recording, error) {
+func (r *GormRecordingRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.Recording, error) {
 	var m RecordingModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	// Tenant scoping: restrict to the recording's owning session's tenant (joined
+	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
+	if tenantID != "" {
+		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}

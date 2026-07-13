@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
@@ -25,11 +23,8 @@ func NewAssessmentHandler(uc *assessmentuc.Usecase) *AssessmentHandler {
 // Upsert handles POST /api/assessments/upsert.
 func (h *AssessmentHandler) Upsert(c *echo.Context) error {
 	var req dto.AssessmentUpsertRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	a, err := h.uc.Upsert((*c).Request().Context(),
 		repository.AssessmentFilter{ParticipantID: req.ParticipantID, SessionID: req.SessionID, SessionStageID: req.SessionStageID},
@@ -43,11 +38,8 @@ func (h *AssessmentHandler) Upsert(c *echo.Context) error {
 // BulkUpsert handles POST /api/assessments/bulk-upsert.
 func (h *AssessmentHandler) BulkUpsert(c *echo.Context) error {
 	var req dto.AssessmentBulkUpsertRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	items := make([]entity.Assessment, 0, len(req.Items))
 	for i := range req.Items {

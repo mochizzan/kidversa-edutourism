@@ -25,11 +25,8 @@ func (h *SessionParticipantBulkHandler) ImportParticipants(c *echo.Context) erro
 		return nil
 	}
 	var req dto.ImportParticipantsRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	rows := make([]repository.ParticipantInput, 0, len(req.Rows))
 	for i := range req.Rows {

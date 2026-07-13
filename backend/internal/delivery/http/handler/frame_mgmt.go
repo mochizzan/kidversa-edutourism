@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v5"
 
-	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
@@ -16,16 +14,13 @@ func (h *FrameHandler) Update(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	f, err := h.repo.GetByID((*c).Request().Context(), id)
+	f, err := h.repo.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
 	var req dto.FrameRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	f.ProgramID = req.ProgramID
 	f.Name = req.Name
@@ -61,12 +56,9 @@ func (h *FrameHandler) Deactivate(c *echo.Context) error {
 	if err := h.repo.UpdateFields((*c).Request().Context(), id, fields); err != nil {
 		return err
 	}
-	updated, err := h.repo.GetByID((*c).Request().Context(), id)
+	updated, err := h.repo.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
 	return appresp.OK(c, dto.NewFrameResponse(updated))
 }
-
-// ensure import referenced.
-var _ = appmiddleware.GetUserID

@@ -2,10 +2,10 @@ package usecase
 
 import (
 	"context"
-	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	"kidversa-edutourism-backend/internal/pkg/util"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
@@ -45,9 +45,10 @@ func (u *SessionUsecase) CreateSession(ctx context.Context, tenantID, createdBy 
 	return s, nil
 }
 
-// GetSession returns the expanded session detail (stages + groups + participants).
-func (u *SessionUsecase) GetSession(ctx context.Context, id string) (*repository.SessionDetail, error) {
-	s, err := u.repo.GetSessionByID(ctx, id)
+// GetSession returns the expanded session detail (stages + groups + participants),
+// tenant-scoped.
+func (u *SessionUsecase) GetSession(ctx context.Context, id, tenantID string) (*repository.SessionDetail, error) {
+	s, err := u.repo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func (u *SessionUsecase) GetSession(ctx context.Context, id string) (*repository
 	}
 	gwp := make([]repository.GroupWithParticipants, 0, len(groups))
 	for i := range groups {
-		ps, err := u.repo.ListParticipants(ctx, id, groups[i].ID)
+		ps, err := u.repo.ListParticipants(ctx, id, groups[i].ID, tenantID)
 		if err != nil {
 			return nil, err
 		}
@@ -76,8 +77,8 @@ func (u *SessionUsecase) ListSessions(ctx context.Context, f repository.SessionF
 }
 
 // UpdateSession patches mutable session fields (and status when provided).
-func (u *SessionUsecase) UpdateSession(ctx context.Context, id, programID, name, sessionDate, location, notes, status string) (*entity.Session, error) {
-	s, err := u.repo.GetSessionByID(ctx, id)
+func (u *SessionUsecase) UpdateSession(ctx context.Context, id, tenantID, programID, name, sessionDate, location, notes, status string) (*entity.Session, error) {
+	s, err := u.repo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +110,8 @@ func (u *SessionUsecase) UpdateSession(ctx context.Context, id, programID, name,
 }
 
 // StartSession transitions a session DRAFT -> ACTIVE (cascades stages to ACTIVE).
-func (u *SessionUsecase) StartSession(ctx context.Context, id string) (*entity.Session, error) {
-	s, err := u.repo.GetSessionByID(ctx, id)
+func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	s, err := u.repo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +130,7 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id string) (*entity.S
 	for i := range stages {
 		if stages[i].Status == entity.SessionStageWaiting {
 			stages[i].Status = entity.SessionStageActive
-			now := nowStr()
+			now := util.NowISO()
 			stages[i].StartedAt = &now
 			if err := u.repo.UpdateSessionStage(ctx, &stages[i]); err != nil {
 				return nil, err
@@ -140,8 +141,8 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id string) (*entity.S
 }
 
 // CompleteSession transitions ACTIVE -> COMPLETED (cascades stages/groups to COMPLETED).
-func (u *SessionUsecase) CompleteSession(ctx context.Context, id string) (*entity.Session, error) {
-	s, err := u.repo.GetSessionByID(ctx, id)
+func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	s, err := u.repo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +159,7 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id string) (*entit
 	}
 	for i := range stages {
 		stages[i].Status = entity.SessionStageCompleted
-		now := nowStr()
+		now := util.NowISO()
 		stages[i].CompletedAt = &now
 		if err := u.repo.UpdateSessionStage(ctx, &stages[i]); err != nil {
 			return nil, err
@@ -178,8 +179,8 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id string) (*entit
 }
 
 // CancelSession transitions a session to CANCELLED and cancels its stages.
-func (u *SessionUsecase) CancelSession(ctx context.Context, id string) (*entity.Session, error) {
-	s, err := u.repo.GetSessionByID(ctx, id)
+func (u *SessionUsecase) CancelSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	s, err := u.repo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +198,7 @@ func (u *SessionUsecase) CancelSession(ctx context.Context, id string) (*entity.
 	for i := range stages {
 		if stages[i].Status == entity.SessionStageActive {
 			stages[i].Status = entity.SessionStageCompleted
-			now := nowStr()
+			now := util.NowISO()
 			stages[i].CompletedAt = &now
 			if err := u.repo.UpdateSessionStage(ctx, &stages[i]); err != nil {
 				return nil, err
@@ -211,8 +212,8 @@ func (u *SessionUsecase) CancelSession(ctx context.Context, id string) (*entity.
 // protected (their data is operationally live or archived) and cannot be deleted;
 // callers must cancel an ACTIVE session first. The underlying delete is a hard
 // delete so FK cascades to stages/groups/participants fire.
-func (u *SessionUsecase) DeleteSession(ctx context.Context, id string) error {
-	s, err := u.repo.GetSessionByID(ctx, id)
+func (u *SessionUsecase) DeleteSession(ctx context.Context, id, tenantID string) error {
+	s, err := u.repo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return err
 	}
@@ -260,8 +261,8 @@ func (u *SessionUsecase) CreateGroup(ctx context.Context, sessionID, name string
 }
 
 // UpdateGroup patches a session group's name/status.
-func (u *SessionUsecase) UpdateGroup(ctx context.Context, groupID, name, status string) (*entity.SessionGroup, error) {
-	g, err := u.repo.GetSessionGroupByID(ctx, groupID)
+func (u *SessionUsecase) UpdateGroup(ctx context.Context, groupID, name, status, tenantID string) (*entity.SessionGroup, error) {
+	g, err := u.repo.GetSessionGroupByID(ctx, groupID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +282,7 @@ func (u *SessionUsecase) UpdateGroup(ctx context.Context, groupID, name, status 
 }
 
 // DeleteGroup removes a session group.
-func (u *SessionUsecase) DeleteGroup(ctx context.Context, groupID string) error {
+func (u *SessionUsecase) DeleteGroup(ctx context.Context, groupID, tenantID string) error {
 	return u.repo.DeleteSessionGroup(ctx, groupID)
 }
 
@@ -365,8 +366,8 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 }
 
 // LinkParticipant attaches an existing participant to a session (and optional group).
-func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, participantID, groupID string) (*entity.Participant, error) {
-	p, err := u.repo.GetParticipantByID(ctx, participantID)
+func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, participantID, groupID, tenantID string) (*entity.Participant, error) {
+	p, err := u.repo.GetParticipantByID(ctx, participantID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +385,7 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 
 // UpdateParticipant patches a participant's fields.
 func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, childName string, childAge int, schoolName, parentName, parentPhone, parentEmail, groupID string, consentRecording, consentPhoto bool, hasAge bool) (*entity.Participant, error) {
-	p, err := u.repo.GetParticipantByID(ctx, participantID)
+	p, err := u.repo.GetParticipantByID(ctx, participantID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -422,9 +423,10 @@ func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, c
 	return p, nil
 }
 
-// GetParticipants lists participants for a session (optionally filtered by group).
-func (u *SessionUsecase) GetParticipants(ctx context.Context, sessionID, groupID string) ([]entity.Participant, error) {
-	return u.repo.ListParticipants(ctx, sessionID, groupID)
+// GetParticipants lists participants for a session (optionally filtered by group),
+// tenant-scoped.
+func (u *SessionUsecase) GetParticipants(ctx context.Context, sessionID, groupID, tenantID string) ([]entity.Participant, error) {
+	return u.repo.ListParticipants(ctx, sessionID, groupID, tenantID)
 }
 
 // ListParticipantsGlobal lists participants across the caller's tenant scope with
@@ -435,9 +437,9 @@ func (u *SessionUsecase) ListParticipantsGlobal(ctx context.Context, tenantID, s
 	return u.repo.ListParticipantsPaginated(ctx, tenantID, sessionID, groupID, search, page, limit)
 }
 
-// GetParticipant returns a single participant.
-func (u *SessionUsecase) GetParticipant(ctx context.Context, participantID string) (*entity.Participant, error) {
-	return u.repo.GetParticipantByID(ctx, participantID)
+// GetParticipant returns a single participant, tenant-scoped.
+func (u *SessionUsecase) GetParticipant(ctx context.Context, participantID, tenantID string) (*entity.Participant, error) {
+	return u.repo.GetParticipantByID(ctx, participantID, tenantID)
 }
 
 // GetParticipantGlobal returns a single participant by id, tenant-scoped.
@@ -446,12 +448,8 @@ func (u *SessionUsecase) GetParticipantGlobal(ctx context.Context, participantID
 }
 
 // DeleteParticipant removes a participant.
-func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID string) error {
+func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID, _ string) error {
 	return u.repo.DeleteParticipant(ctx, participantID)
-}
-
-func nowStr() string {
-	return time.Now().Format("2006-01-02 15:04:05")
 }
 
 func isValidSessionStatus(s string) bool {

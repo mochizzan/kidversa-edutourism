@@ -1,10 +1,6 @@
 package handler
 
 import (
-	"fmt"
-	"net/http"
-	"time"
-
 	"github.com/labstack/echo/v5"
 
 	"github.com/google/uuid"
@@ -30,7 +26,7 @@ func NewLiveHandler(svc *live.Service, hub *sse.Hub) *LiveHandler {
 // Groups handles GET /:sessionId/groups (dashboard snapshot of groups).
 func (h *LiveHandler) Groups(c *echo.Context) error {
 	sessionID := (*c).Param("sessionId")
-	snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID)
+	snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -40,7 +36,7 @@ func (h *LiveHandler) Groups(c *echo.Context) error {
 // Timeline handles GET /:sessionId/timeline (recent timeline events).
 func (h *LiveHandler) Timeline(c *echo.Context) error {
 	sessionID := (*c).Param("sessionId")
-	snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID)
+	snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -52,7 +48,7 @@ func (h *LiveHandler) Override(c *echo.Context, action live.OverrideAction) erro
 	groupID := (*c).Param("groupId")
 	stageID := (*c).Param("stageId")
 	actorID := appmiddleware.GetUserID(c)
-	p, err := h.svc.OverrideStage((*c).Request().Context(), groupID, stageID, action, actorID)
+	p, err := h.svc.OverrideStage((*c).Request().Context(), groupID, stageID, action, actorID, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -62,15 +58,12 @@ func (h *LiveHandler) Override(c *echo.Context, action live.OverrideAction) erro
 // Jump handles POST /groups/:groupId/jump.
 func (h *LiveHandler) Jump(c *echo.Context) error {
 	var req dto.LiveJumpRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	groupID := (*c).Param("groupId")
 	actorID := appmiddleware.GetUserID(c)
-	if err := h.svc.Jump((*c).Request().Context(), groupID, req.StageID, actorID); err != nil {
+	if err := h.svc.Jump((*c).Request().Context(), groupID, req.StageID, actorID, appmiddleware.GetTenantID(c)); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
@@ -80,7 +73,7 @@ func (h *LiveHandler) Jump(c *echo.Context) error {
 func (h *LiveHandler) Reset(c *echo.Context) error {
 	groupID := (*c).Param("groupId")
 	actorID := appmiddleware.GetUserID(c)
-	if err := h.svc.Reset((*c).Request().Context(), groupID, actorID); err != nil {
+	if err := h.svc.Reset((*c).Request().Context(), groupID, actorID, appmiddleware.GetTenantID(c)); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
@@ -89,11 +82,8 @@ func (h *LiveHandler) Reset(c *echo.Context) error {
 // PublishEvent handles POST /events (create + broadcast a timeline event).
 func (h *LiveHandler) PublishEvent(c *echo.Context) error {
 	var req dto.LiveEventRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	sessionID := (*c).Param("sessionId")
 	e := &entity.TimelineEvent{
@@ -110,37 +100,12 @@ func (h *LiveHandler) PublishEvent(c *echo.Context) error {
 func (h *LiveHandler) Stream(c *echo.Context) error {
 	sessionID := (*c).Param("sessionId")
 	ch := sse.LiveChannel(sessionID)
-	ec, unsub, err := h.hub.Subscribe((*c).Request().Context(), ch)
-	if err != nil {
-		return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
-	}
-	defer unsub()
 
-	w := (*c).Response()
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
-	flusher := getFlusher(w)
-	flusher.Flush()
-
-	// Initial snapshot.
-	snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID)
-	if err == nil {
-		writeSSE(w, flusher, sse.Event{Type: "snapshot", Data: snap})
+	// Initial snapshot is sent as the first event before streaming live deltas.
+	var initial *sse.Event
+	if snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID, appmiddleware.GetTenantID(c)); err == nil {
+		initial = &sse.Event{Type: "snapshot", Data: snap}
 	}
 
-	keep := time.NewTicker(15 * time.Second)
-	defer keep.Stop()
-	for {
-		select {
-		case <-(*c).Request().Context().Done():
-			return nil
-		case ev := <-ec:
-			writeSSE(w, flusher, ev)
-		case <-keep.C:
-			fmt.Fprintf(w, ": keepalive\n\n")
-			flusher.Flush()
-		}
-	}
+	return streamSSE(c, h.hub, ch, initial, sseKeepaliveSec)
 }

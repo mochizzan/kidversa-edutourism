@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v5"
 
-	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
@@ -17,16 +15,13 @@ func (h *MissionBankHandler) Update(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	m, err := h.repo.GetByID((*c).Request().Context(), id)
+	m, err := h.repo.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
 	var req dto.MissionBankRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	m.ProgramID = req.ProgramID
 	m.Category = entity.MissionCategory(req.Category)
@@ -59,7 +54,7 @@ func (h *MissionBankHandler) ToggleActive(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	m, err := h.repo.GetByID((*c).Request().Context(), id)
+	m, err := h.repo.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -67,12 +62,9 @@ func (h *MissionBankHandler) ToggleActive(c *echo.Context) error {
 	if err := h.repo.UpdateFields((*c).Request().Context(), id, fields); err != nil {
 		return err
 	}
-	updated, err := h.repo.GetByID((*c).Request().Context(), id)
+	updated, err := h.repo.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
 	return appresp.OK(c, dto.NewMissionBankResponse(updated))
 }
-
-// ensure import referenced.
-var _ = appmiddleware.GetUserID

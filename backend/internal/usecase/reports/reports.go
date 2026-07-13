@@ -47,7 +47,7 @@ func generateToken() (string, error) {
 
 // Approve marks a report approved and persists the approver.
 func (u *Usecase) Approve(ctx context.Context, reportID, approvedBy string) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID)
+	r, err := u.repo.GetByID(ctx, reportID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (u *Usecase) Approve(ctx context.Context, reportID, approvedBy string) (*en
 // the report sent. The token is unguessable (32 random bytes → 64 hex chars),
 // scoped to exactly one report, and expires after ttlHours.
 func (u *Usecase) Send(ctx context.Context, reportID string, ttlHours int) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID)
+	r, err := u.repo.GetByID(ctx, reportID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (u *Usecase) Send(ctx context.Context, reportID string, ttlHours int) (*ent
 
 // RevokeToken invalidates a report's parent access token.
 func (u *Usecase) RevokeToken(ctx context.Context, reportID string) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID)
+	r, err := u.repo.GetByID(ctx, reportID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (u *Usecase) RevokeToken(ctx context.Context, reportID string) (*entity.Rep
 // StreamNarrative runs the narrative generator and publishes each chunk to the
 // report's SSE channel so connected parents receive progressive text.
 func (u *Usecase) StreamNarrative(ctx context.Context, reportID string) error {
-	if _, err := u.repo.GetByID(ctx, reportID); err != nil {
+	if _, err := u.repo.GetByID(ctx, reportID, ""); err != nil {
 		return err
 	}
 	return u.gen.Generate(ctx, reportID, func(seq int, chunk string) {

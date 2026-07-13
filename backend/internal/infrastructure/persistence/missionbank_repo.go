@@ -30,9 +30,14 @@ func (r *GormMissionBankRepository) Create(ctx context.Context, m *entity.Missio
 	return nil
 }
 
-func (r *GormMissionBankRepository) GetByID(ctx context.Context, id string) (*entity.MissionBank, error) {
+func (r *GormMissionBankRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.MissionBank, error) {
 	var m MissionBankModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	// Tenant scoping: mission_banks carry a stored tenant_id column.
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}

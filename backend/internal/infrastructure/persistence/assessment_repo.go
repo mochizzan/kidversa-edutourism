@@ -33,9 +33,15 @@ func (r *GormAssessmentRepository) Create(ctx context.Context, a *entity.Assessm
 	return nil
 }
 
-func (r *GormAssessmentRepository) GetByID(ctx context.Context, id string) (*entity.Assessment, error) {
+func (r *GormAssessmentRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.Assessment, error) {
 	var m AssessmentModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).Where("id = ?", id)
+	// Tenant scoping: restrict to the assessment's owning session's tenant (joined
+	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
+	if tenantID != "" {
+		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}
