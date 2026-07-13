@@ -13,7 +13,7 @@ import (
 
 // TenantStats aggregates per-tenant usage counts for the SUPER_ADMIN view.
 type TenantStats struct {
-	UserCounts []repository.TenantUserCount
+	UserCounts []repository.TenantUserCount `json:"user_counts"`
 }
 
 // TenantUsecase implements tenant administration (SUPER_ADMIN only).
