@@ -8,11 +8,10 @@ export const participantService: ParticipantService = {
   // callers (e.g. limit:1000) receive every row.
   getAll: (params) => listRequest<Participant>('/api/participants', params),
 
-  // There is no global GET /api/participants/:id; the per-session single-get
-  // endpoint is global (scoped only by participant id), so reuse it.
+  // Global GET /api/participants/:id (tenant-scoped); matches the backend route.
   getById: async (id) => {
     try {
-      return await itemRequest<Participant>('GET', `/api/sessions/participants/${id}`)
+      return await itemRequest<Participant>('GET', `/api/participants/${id}`)
     } catch (err) {
       if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
         return null

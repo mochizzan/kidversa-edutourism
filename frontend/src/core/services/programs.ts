@@ -93,10 +93,10 @@ export const programService: ProgramService = {
     voidRequest('POST', `/api/programs/${programId}/stages/reorder`, { ordered_ids: stageIds }),
 
   getContents: (stageId) =>
-    arrayRequest<StageContent>('GET', `/api/program-stages/${stageId}/contents`),
+    arrayRequest<StageContent>('GET', `/api/programs/program-stages/${stageId}/contents`),
 
   createContent: (stageId, data) =>
-    itemRequest<StageContent>('POST', `/api/program-stages/${stageId}/contents`, {
+    itemRequest<StageContent>('POST', `/api/programs/program-stages/${stageId}/contents`, {
       title: data.title,
       file_url: data.file_url,
       file_type: data.file_type,
@@ -106,7 +106,7 @@ export const programService: ProgramService = {
     }),
 
   updateContent: (stageId, contentId, data) =>
-    itemRequest<StageContent>('PUT', `/api/program-stages/${stageId}/contents/${contentId}`, {
+    itemRequest<StageContent>('PUT', `/api/programs/program-stages/${stageId}/contents/${contentId}`, {
       title: data.title,
       file_url: data.file_url,
       file_type: data.file_type,
@@ -116,10 +116,10 @@ export const programService: ProgramService = {
     }),
 
   deleteContent: (stageId, contentId) =>
-    voidRequest('DELETE', `/api/program-stages/${stageId}/contents/${contentId}`),
+    voidRequest('DELETE', `/api/programs/program-stages/${stageId}/contents/${contentId}`),
 
   reorderContents: (stageId, contentIds) =>
-    voidRequest('POST', `/api/program-stages/${stageId}/contents/reorder`, {
+    voidRequest('POST', `/api/programs/program-stages/${stageId}/contents/reorder`, {
       ordered_ids: contentIds,
     }),
 }
