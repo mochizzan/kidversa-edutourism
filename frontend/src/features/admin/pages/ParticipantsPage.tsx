@@ -7,6 +7,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { DataTable, type Column } from '../../../shared/components/data/DataTable'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { participantService } from '../../../core/services/participants'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
@@ -31,8 +32,10 @@ const getSessionStatusLabel = (session?: Session | null) => {
 
 const ParticipantsPage = () => {
   const { addToast } = useGlobalToast()
+  const { tenantId } = useTenantScope()
   const { data: participants, loading, page, total, setPage, setSearch, refresh } = useCrudList<Participant>({
     fetchFn: (params) => participantService.getAll({ ...params, limit: 10 }),
+    scopeToTenant: true,
   })
   const [sessionsById, setSessionsById] = useState<Record<string, Session>>({})
   const [assessmentsByParticipant, setAssessmentsByParticipant] = useState<Record<string, Assessment[]>>({})
@@ -64,7 +67,7 @@ const ParticipantsPage = () => {
     return () => {
       cancelled = true
     }
-  }, [addToast])
+  }, [addToast, tenantId])
 
   useEffect(() => {
     let cancelled = false
@@ -89,7 +92,7 @@ const ParticipantsPage = () => {
     return () => {
       cancelled = true
     }
-  }, [participants])
+  }, [participants, tenantId])
 
   const rows = useMemo<ParticipantRow[]>(() => {
     return participants.map((participant) => {

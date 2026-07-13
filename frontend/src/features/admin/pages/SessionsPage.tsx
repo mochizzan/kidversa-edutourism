@@ -20,6 +20,7 @@ const SessionsPage = () => {
   const navigate = useNavigate()
   const { data: sessions, loading, error, page, total, setPage, setSearch, refresh } = useCrudList<Session>({
     fetchFn: (params) => sessionService.getAll({ ...params, limit: 10 }),
+    scopeToTenant: true,
   })
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)

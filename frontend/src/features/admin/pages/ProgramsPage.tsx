@@ -19,6 +19,7 @@ const ProgramsPage = () => {
   const navigate = useNavigate()
   const { data: programs, loading, page, total, setPage, setSearch, refresh } = useCrudList<Program>({
     fetchFn: (params) => programService.getAll({ ...params, limit: 10 }),
+    scopeToTenant: true,
   })
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const { getHighlightClass } = useHighlight()
