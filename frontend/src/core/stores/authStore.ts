@@ -5,12 +5,13 @@ import { UserRole } from '../types'
 import { ROUTES } from '../constants/app'
 import {
   apiRequest,
-  getTokens,
   setTokens,
   clearTokens,
   getStoredUser,
   setStoredUser,
   clearStoredUser,
+  refreshAccessToken,
+  fireUnauthorized,
 } from '../services/backendClient'
 
 // Role-based redirect map
@@ -21,26 +22,13 @@ const ROLE_REDIRECTS: Record<string, string> = {
   [UserRole.FASILITATOR]: ROUTES.FASILITATOR.DASHBOARD,
 }
 
-// Module-level unauthorized handler. App registers a SPA navigator here so
-// that any caught 401 (refresh already failed in backendClient) routes to
-// login without a full page reload. Defaults to a hard redirect.
-let onUnauthorized: (() => void) | null = null
-
-export function registerUnauthorizedHandler(handler: () => void): void {
-  onUnauthorized = handler
-}
-
 // Called when an ApiError with status 401 surfaces outside the initial
 // checkSession flow (the refresh-retry already failed in backendClient).
 // Clears tokens and routes to the login screen.
 export function redirectToLogin(): void {
   clearTokens()
   clearStoredUser()
-  if (onUnauthorized) {
-    onUnauthorized()
-  } else {
-    window.location.assign(ROUTES.AUTH.LOGIN)
-  }
+  fireUnauthorized()
 }
 
 // Backend envelope: every response is `{ data: ... }`.
@@ -146,13 +134,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return
       }
 
-      // Optimistically restore the session; the in-memory token may be null
-      // after a reload, but the backend authenticates via the session cookie.
+      // Optimistically restore the session; the in-memory token is null after
+      // a reload, but we will re-establish it via refresh below before any
+      // Bearer-protected call (e.g. /api/tenants) is made.
       set({
         user: storedUser,
-        token: getTokens().accessToken,
+        token: null,
         isAuthenticated: true,
       })
+
+      // PULIHKAN bearer token dari refresh cookie SEBELUM deklarasi final.
+      // Tanpa ini, /api/tenants (wajib Bearer) akan 401 setelah reload karena
+      // accessToken null. Refresh memakai cookie HttpOnly (credentials:include),
+      // dan backend mengembalikan access_token baru.
+      try {
+        const token = await refreshAccessToken()
+        set({ token, isAuthenticated: true })
+      } catch {
+        // Refresh gagal (cookie tidak valid/kadaluarsa) ⇒ sesi mati.
+        await get().logout()
+        return
+      }
 
       // Validate the session against the backend. /me returns only a minimal
       // user — we do NOT replace our full stored user with it.
