@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +65,9 @@ type Config struct {
 
 // Load reads configuration from the environment (optionally via .env) and validates the critical fields.
 func Load() *Config {
-	_ = godotenv.Load() // ignore if .env absent (prod/compose injects env)
+	if err := findAndLoadDotEnv(); err != nil {
+		log.Printf("config: .env load skipped: %v", err)
+	}
 
 	c := &Config{
 		DBHost:     getEnv("DB_HOST", "127.0.0.1"),
@@ -135,10 +138,38 @@ func (c *Config) SSECookieName() string {
 	return c.CookieName
 }
 
+// RefreshCookieName returns the configured refresh-token cookie name.
+func (c *Config) RefreshCookieName() string {
+	return getEnv("REFRESH_COOKIE_NAME", "kidversa_refresh")
+}
+
 // TestDSN returns the DSN for the isolated test database.
 func (c *Config) TestDSN() string {
 	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&multiStatements=true",
 		c.TestDBUser, c.TestDBPassword, c.TestDBHost, c.TestDBPort, c.TestDBName)
+}
+
+// findAndLoadDotEnv locates the Go module root by walking upward for go.mod,
+// then loads .env from that directory. Falls back to CWD if no module root is found.
+func findAndLoadDotEnv() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	for {
+		envPath := filepath.Join(dir, ".env")
+		if _, statErr := os.Stat(envPath); statErr == nil {
+			log.Printf("config: loaded .env from %s", envPath)
+			return godotenv.Load(envPath)
+		}
+		// Stop at filesystem root.
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return godotenv.Load() // fallback: try CWD (prod/compose with env injection)
 }
 
 func getEnv(key, def string) string {
