@@ -4,6 +4,7 @@ import type {
   ProgramStage,
   CreateProgramDTO,
   UpdateProgramDTO,
+  ToggleActiveResult,
   CreateStageDTO,
   UpdateStageDTO,
   StageContent,
@@ -36,7 +37,7 @@ export interface ProgramService {
   getById(id: string): Promise<Program | null>
   create(data: CreateProgramDTO): Promise<Program>
   update(id: string, data: UpdateProgramDTO): Promise<Program>
-  toggleActive(id: string): Promise<Program>
+  toggleActive(id: string): Promise<ToggleActiveResult>
   delete(id: string): Promise<void>
 
   getStages(programId: string): Promise<ProgramStage[]>
@@ -84,9 +85,6 @@ export interface SessionService {
 export interface ParticipantService {
   getAll(params?: ListParams): Promise<PaginatedResponse<Participant>>
   getById(id: string): Promise<Participant | null>
-  create(data: CreateParticipantDTO): Promise<Participant>
-  update(id: string, data: Partial<CreateParticipantDTO>): Promise<Participant>
-  delete(id: string): Promise<void>
 }
 
 // Users
@@ -115,7 +113,6 @@ export interface PhotoService {
   getBySession(sessionId: string): Promise<SmartPhoto[]>
   getByParticipant(participantId: string): Promise<SmartPhoto[]>
   upload(participantId: string, sessionId: string, file: File): Promise<SmartPhoto>
-  setReportPhoto(photoId: string, isReportPhoto: boolean): Promise<SmartPhoto>
   update(photoId: string, data: Partial<SmartPhoto>): Promise<SmartPhoto>
   delete(id: string): Promise<void>
 }

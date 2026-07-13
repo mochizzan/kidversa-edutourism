@@ -7,6 +7,7 @@ import type {
   UpdateProgramDTO,
   CreateStageDTO,
   UpdateStageDTO,
+  ToggleActiveResult,
 } from '../types'
 import { listRequest, itemRequest, voidRequest, arrayRequest } from './apiEnvelope'
 
@@ -57,7 +58,7 @@ export const programService: ProgramService = {
     }),
 
   toggleActive: (id) =>
-    itemRequest<Program>('POST', `/api/programs/${id}/toggle-active`),
+    itemRequest<ToggleActiveResult>('POST', `/api/programs/${id}/toggle-active`),
 
   delete: (id) => voidRequest('DELETE', `/api/programs/${id}`),
 
