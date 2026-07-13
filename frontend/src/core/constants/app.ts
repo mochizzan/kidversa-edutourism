@@ -89,9 +89,5 @@ export const contentEditPath = (contentId: string, params?: { programId?: string
 // API
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
-// Custom DOM events
+// Custom DOM events (consumed by useHeaderNotifications)
 export const USERS_CHANGED_EVENT = 'kidversa:users-changed'
-
-export function dispatchUsersChanged(): void {
-  window.dispatchEvent(new CustomEvent(USERS_CHANGED_EVENT))
-}
