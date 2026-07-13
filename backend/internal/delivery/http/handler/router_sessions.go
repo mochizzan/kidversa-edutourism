@@ -43,6 +43,7 @@ func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecyc
 	g.POST("/:id/participants/import", bh.ImportParticipants, authMW, roleMW)
 	g.PUT("/:id/participants/:participantId", bh.UpdateParticipant, authMW, roleMW)
 
-	// Global participants group (/api/participants) — tenant-scoped single-get.
+	// Global participants group (/api/participants) — tenant-scoped list + single-get.
+	participantsGroup.GET("", ph.ListParticipantsGlobal, authMW, roleMW, appmiddleware.TenantScope())
 	participantsGroup.GET("/:id", ph.GetParticipantGlobal, authMW, roleMW, appmiddleware.TenantScope())
 }
