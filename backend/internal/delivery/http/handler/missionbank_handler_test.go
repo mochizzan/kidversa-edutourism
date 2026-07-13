@@ -32,7 +32,7 @@ func (f *fakeMissionBankRepo) Create(_ context.Context, m *entity.MissionBank) e
 	f.byID[m.ID] = m
 	return nil
 }
-func (f *fakeMissionBankRepo) GetByID(_ context.Context, id string) (*entity.MissionBank, error) {
+func (f *fakeMissionBankRepo) GetByID(_ context.Context, id, _ string) (*entity.MissionBank, error) {
 	if m, ok := f.byID[id]; ok {
 		return m, nil
 	}

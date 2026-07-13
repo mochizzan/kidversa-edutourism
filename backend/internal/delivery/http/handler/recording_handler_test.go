@@ -29,7 +29,7 @@ func (f *fakeRecordingRepo) Create(_ context.Context, r *entity.Recording) error
 	f.byID[r.ID] = r
 	return nil
 }
-func (f *fakeRecordingRepo) GetByID(_ context.Context, id string) (*entity.Recording, error) {
+func (f *fakeRecordingRepo) GetByID(_ context.Context, id, _ string) (*entity.Recording, error) {
 	if r, ok := f.byID[id]; ok {
 		return r, nil
 	}

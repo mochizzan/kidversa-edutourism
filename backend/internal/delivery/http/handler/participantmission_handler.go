@@ -2,15 +2,14 @@ package handler
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	apputil "kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // ParticipantMissionHandler serves /api/participant-missions/* (CRUD).
@@ -26,11 +25,8 @@ func NewParticipantMissionHandler(repo repository.ParticipantMissionRepository) 
 // Create handles POST /api/participant-missions.
 func (h *ParticipantMissionHandler) Create(c *echo.Context) error {
 	var req dto.ParticipantMissionRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	m := &entity.ParticipantMission{
 		ParticipantID: req.ParticipantID,
@@ -39,7 +35,7 @@ func (h *ParticipantMissionHandler) Create(c *echo.Context) error {
 		IsCompleted:   req.IsCompleted,
 	}
 	if m.IsCompleted {
-		now := time.Now().Format(time.RFC3339)
+		now := apputil.NowISO()
 		m.CompletedAt = &now
 	}
 	if err := h.repo.Create((*c).Request().Context(), m); err != nil {
@@ -91,11 +87,8 @@ func (h *ParticipantMissionHandler) ListByParticipant(c *echo.Context) error {
 // It atomically replaces all participant missions for a report with the given items.
 func (h *ParticipantMissionHandler) Replace(c *echo.Context) error {
 	var req dto.ParticipantMissionBulkRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	items := make([]entity.ParticipantMission, 0, len(req.Items))
 	for i := range req.Items {
@@ -107,7 +100,7 @@ func (h *ParticipantMissionHandler) Replace(c *echo.Context) error {
 			IsCompleted:   it.IsCompleted,
 		}
 		if m.IsCompleted {
-			now := time.Now().Format(time.RFC3339)
+			now := apputil.NowISO()
 			m.CompletedAt = &now
 		}
 		items = append(items, m)
@@ -147,7 +140,7 @@ func (h *ParticipantMissionHandler) Toggle(c *echo.Context) error {
 	}
 	m.IsCompleted = !m.IsCompleted
 	if m.IsCompleted {
-		now := time.Now().Format(time.RFC3339)
+		now := apputil.NowISO()
 		m.CompletedAt = &now
 	} else {
 		m.CompletedAt = nil
@@ -169,7 +162,3 @@ func (h *ParticipantMissionHandler) Delete(c *echo.Context) error {
 	}
 	return appresp.NoContent(c)
 }
-
-// ensure imports referenced.
-var _ = appmiddleware.GetUserID
-var _ = repository.ParticipantMissionFilter{}

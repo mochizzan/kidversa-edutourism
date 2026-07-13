@@ -44,11 +44,8 @@ func (h *ProgramHandler) List(c *echo.Context) error {
 // Create handles POST /api/programs.
 func (h *ProgramHandler) Create(c *echo.Context) error {
 	var req dto.ProgramRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	active := true
 	if req.IsActive != nil {

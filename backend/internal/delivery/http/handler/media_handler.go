@@ -74,7 +74,7 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 
 	switch kind {
 	case kindPhoto:
-		rec, err := h.photos.GetByID(ctx, id)
+		rec, err := h.photos.GetByID(ctx, id, "")
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 			return appresp.Fail(c, http.StatusForbidden, "consent_required")
 		}
 	case kindRecording:
-		rec, err := h.recordings.GetByID(ctx, id)
+		rec, err := h.recordings.GetByID(ctx, id, "")
 		if err != nil {
 			return err
 		}

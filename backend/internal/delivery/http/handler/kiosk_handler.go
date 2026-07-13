@@ -63,7 +63,7 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_invalid")
 	}
 
-	s, err := h.sessionUC.GetSession((*c).Request().Context(), id)
+	s, err := h.sessionUC.GetSession((*c).Request().Context(), id, "")
 	if err != nil {
 		return err
 	}

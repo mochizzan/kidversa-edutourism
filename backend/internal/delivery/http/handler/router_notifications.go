@@ -9,6 +9,10 @@ import (
 )
 
 // RegisterNotificationsRoutes mounts /api/notifications/* on the given echo group.
+// Notifications are intentionally user-scoped (keyed by userID from the JWT), NOT
+// tenant-scoped: a notification targets exactly one recipient, so TenantScope
+// filtering is unnecessary and would add no protection. Every handler resolves
+// the caller's userID from the JWT and never exposes another user's rows.
 func RegisterNotificationsRoutes(g *echo.Group, h *NotificationHandler, jm *auth.JWTManager, hub *sse.Hub, revoker auth.TokenRevoker) {
 	_ = hub // hub is held by the handler for SSE streaming.
 	authM := appmiddleware.JWTAuth(jm, "", revoker)

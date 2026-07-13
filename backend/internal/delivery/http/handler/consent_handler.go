@@ -7,7 +7,6 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
@@ -27,11 +26,8 @@ func NewConsentHandler(consent repository.ConsentRepository, sessionRepo reposit
 // Respond handles POST /api/consent/respond (parent decision + audit row).
 func (h *ConsentHandler) Respond(c *echo.Context) error {
 	var req dto.ConsentRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	ip := (*c).RealIP()
 	ua := (*c).Request().UserAgent()
@@ -117,7 +113,7 @@ func (h *ConsentHandler) participantPIIByToken(ctx context.Context, token string
 	if err != nil {
 		return nil, nil
 	}
-	p, perr := h.sessionRepo.GetParticipantByID(ctx, log.ParticipantID)
+	p, perr := h.sessionRepo.GetParticipantByID(ctx, log.ParticipantID, "")
 	if perr != nil {
 		return nil, nil
 	}
@@ -127,6 +123,3 @@ func (h *ConsentHandler) participantPIIByToken(ctx context.Context, token string
 		"status":      "recorded",
 	}, nil
 }
-
-// ensure imports referenced.
-var _ = appmiddleware.GetUserID

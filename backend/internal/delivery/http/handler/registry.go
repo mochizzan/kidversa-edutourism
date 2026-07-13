@@ -1,9 +1,5 @@
 package handler
 
-import (
-	"kidversa-edutourism-backend/internal/infrastructure/auth"
-)
-
 // Registry holds all constructed HTTP handlers, wired in cmd/server after
 // dependencies are resolved.
 type Registry struct {
@@ -36,6 +32,3 @@ type Registry struct {
 func NewRegistry(auth *AuthHandler) *Registry {
 	return &Registry{Auth: auth}
 }
-
-// ensure auth import referenced (token revoker type used by handlers).
-var _ = auth.NewInMemoryRevoker

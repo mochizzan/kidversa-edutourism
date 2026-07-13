@@ -84,6 +84,22 @@ func MessageForCode(code string) string {
 		return "Token tidak valid"
 	case "tenant_required":
 		return "Tenant aktif belum dipilih"
+	case "session_not_deletable":
+		return "Sesi tidak dapat dihapus"
+	case "participant_not_deletable":
+		return "Peserta tidak dapat dihapus"
+	case "file_type_blocked":
+		return "Tipe berkas diblokir"
+	case "consent_required":
+		return "Persetujuan orang tua diperlukan"
+	case "invalid_file":
+		return "Berkas tidak valid"
+	case "token_revoked":
+		return "Token telah dicabut"
+	case "token_required":
+		return "Token diperlukan"
+	case "kiosk_invalid":
+		return "Token kiosk tidak valid"
 	case "bad_request":
 		return "Permintaan tidak dapat diproses"
 	case "internal_error":

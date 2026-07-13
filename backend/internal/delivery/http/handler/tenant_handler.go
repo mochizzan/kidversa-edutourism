@@ -4,11 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
@@ -26,12 +24,7 @@ func NewTenantHandler(tenantUC *auth.TenantUsecase, jwt *auth.JWTManager) *Tenan
 }
 
 func validateTenantID(c *echo.Context) (string, bool) {
-	id := (*c).Param("id")
-	if _, err := uuid.Parse(id); err != nil {
-		_ = appresp.Fail(c, http.StatusBadRequest, "bad_request")
-		return "", false
-	}
-	return id, true
+	return bindUUID(c, "id")
 }
 
 // List handles GET /api/tenants.
@@ -49,11 +42,8 @@ func (h *TenantHandler) List(c *echo.Context) error {
 // Create handles POST /api/tenants.
 func (h *TenantHandler) Create(c *echo.Context) error {
 	var req dto.CreateTenantRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	settings := parseSettingsJSON(req.SettingsJSON)
 	t, err := h.tenantUC.CreateTenant((*c).Request().Context(), req.Name, req.Slug, settings)
@@ -113,6 +103,3 @@ func parseSettingsJSON(s string) []byte {
 	}
 	return []byte(s)
 }
-
-// ensure middleware import used.
-var _ = appmiddleware.CtxClaims

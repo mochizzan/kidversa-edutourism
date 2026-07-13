@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -43,7 +45,7 @@ func (f *fakeReportRepo) Create(_ context.Context, r *entity.Report) error {
 	f.byID[r.ID] = r
 	return nil
 }
-func (f *fakeReportRepo) GetByID(_ context.Context, id string) (*entity.Report, error) {
+func (f *fakeReportRepo) GetByID(_ context.Context, id, _ string) (*entity.Report, error) {
 	r, ok := f.byID[id]
 	if !ok {
 		return nil, repoErrNotFound
@@ -78,7 +80,8 @@ func (f *fakeReportRepo) Delete(_ context.Context, id string) error {
 func newTestReportHandler() (*ReportHandler, *fakeReportRepo) {
 	repo := newFakeReportRepo()
 	uc := reportsuc.NewUsecase(repo, mustHub(), reportsuc.NewPlaceholderNarrative())
-	return NewReportHandler(uc), repo
+	cfg := &config.Config{ReportTokenTTL: 72 * time.Hour}
+	return NewReportHandler(uc, cfg), repo
 }
 
 func TestReportPublicAccessRejectsBadToken(t *testing.T) {

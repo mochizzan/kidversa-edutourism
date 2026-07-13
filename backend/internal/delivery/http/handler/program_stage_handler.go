@@ -30,11 +30,8 @@ func (h *ProgramHandler) CreateStage(c *echo.Context) error {
 		return nil
 	}
 	var req dto.ProgramStageRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	s := &entity.ProgramStage{
 		ProgramID: programID, SequenceOrder: req.SequenceOrder, Name: req.Name,
@@ -99,11 +96,8 @@ func (h *ProgramHandler) ReorderStages(c *echo.Context) error {
 		return nil
 	}
 	var req dto.ReorderRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	if err := h.repo.ReorderStages((*c).Request().Context(), programID, req.OrderedIDs); err != nil {
 		return err

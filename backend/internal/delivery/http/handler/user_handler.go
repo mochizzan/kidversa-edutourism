@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
@@ -35,12 +34,7 @@ func actor(c *echo.Context) (string, string) {
 
 // validateID parses the :id path param; returns error via response if invalid.
 func validateID(c *echo.Context) (string, bool) {
-	id := (*c).Param("id")
-	if _, err := uuid.Parse(id); err != nil {
-		_ = appresp.Fail(c, http.StatusBadRequest, "bad_request")
-		return "", false
-	}
-	return id, true
+	return bindUUID(c, "id")
 }
 
 // List handles GET /api/users (paginated + filtered).
@@ -70,11 +64,8 @@ func (h *UserHandler) List(c *echo.Context) error {
 // Create handles POST /api/users.
 func (h *UserHandler) Create(c *echo.Context) error {
 	var req dto.CreateUserRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	role, tid := actor(c)
 	user, err := h.userUC.CreateUser((*c).Request().Context(), req.Email, req.Password, req.Name, req.Phone, req.TenantID, req.Role, role, tid)

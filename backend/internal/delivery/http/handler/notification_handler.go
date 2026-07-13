@@ -1,10 +1,6 @@
 package handler
 
 import (
-	"fmt"
-	"net/http"
-	"time"
-
 	"github.com/labstack/echo/v5"
 
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
@@ -59,31 +55,5 @@ func (h *NotificationHandler) MarkAllRead(c *echo.Context) error {
 func (h *NotificationHandler) Stream(c *echo.Context) error {
 	uid := appmiddleware.GetUserID(c)
 	ch := sse.NotifChannel(uid)
-	ec, unsub, err := h.hub.Subscribe((*c).Request().Context(), ch)
-	if err != nil {
-		return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
-	}
-	defer unsub()
-
-	w := (*c).Response()
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
-	f := getFlusher(w)
-	f.Flush()
-
-	keep := time.NewTicker(15 * time.Second)
-	defer keep.Stop()
-	for {
-		select {
-		case <-(*c).Request().Context().Done():
-			return nil
-		case ev := <-ec:
-			writeSSE(w, f, ev)
-		case <-keep.C:
-			fmt.Fprintf(w, ": keepalive\n\n")
-			f.Flush()
-		}
-	}
+	return streamSSE(c, h.hub, ch, nil, sseKeepaliveSec)
 }

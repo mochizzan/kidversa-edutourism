@@ -36,7 +36,7 @@ func (f *fakeAssessmentRepo) Create(_ context.Context, a *entity.Assessment) err
 	f.byID[a.ID] = a
 	return nil
 }
-func (f *fakeAssessmentRepo) GetByID(_ context.Context, id string) (*entity.Assessment, error) {
+func (f *fakeAssessmentRepo) GetByID(_ context.Context, id, _ string) (*entity.Assessment, error) {
 	if a, ok := f.byID[id]; ok {
 		return a, nil
 	}

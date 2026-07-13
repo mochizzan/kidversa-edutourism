@@ -22,6 +22,10 @@ type AuthHandler struct {
 	cookieSameSite string
 }
 
+// kioskTokenTTL is the lifetime of an issued kiosk token. Kept as a named const
+// (not yet configurable) so the value has a single source of truth.
+const kioskTokenTTL = 4 * time.Hour
+
 // NewAuthHandler builds the auth handler.
 func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, cookieSecure bool, cookieSameSite string) *AuthHandler {
 	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
@@ -30,11 +34,8 @@ func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, c
 // Login handles POST /api/auth/login and sets the SSE session cookie.
 func (h *AuthHandler) Login(c *echo.Context) error {
 	var req dto.LoginRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	res, err := h.authUC.Login((*c).Request().Context(), req.Email, req.Password)
 	if err != nil {
@@ -47,11 +48,8 @@ func (h *AuthHandler) Login(c *echo.Context) error {
 // Register handles POST /api/auth/register (self-service, pending).
 func (h *AuthHandler) Register(c *echo.Context) error {
 	var req dto.RegisterRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	tenantID := req.TenantID
 	var tenantPtr *string
@@ -68,11 +66,8 @@ func (h *AuthHandler) Register(c *echo.Context) error {
 // Refresh handles POST /api/auth/refresh (rotates tokens).
 func (h *AuthHandler) Refresh(c *echo.Context) error {
 	var req dto.RefreshRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	res, err := h.authUC.Refresh((*c).Request().Context(), req.RefreshToken)
 	if err != nil {
@@ -93,7 +88,11 @@ func (h *AuthHandler) Me(c *echo.Context) error {
 		if claims.TenantID != "" {
 			tptr = &claims.TenantID
 		}
-		// Return minimal public user from claims (full record fetched by callers needing it).
+		// Return minimal public user from claims. The frontend (/auth/me in
+		// authStore) uses this endpoint only to validate the session cookie — it
+		// does NOT read email/name from this response (they come from the stored
+		// user record), so exposing only ID/TenantID/Role keeps the payload small
+		// and avoids leaking PII. Extend here if the FE starts consuming more fields.
 		return appresp.OK(c, &dto.MeResponse{User: &entity.User{
 			BaseModel: entity.BaseModel{ID: claims.UserID},
 			TenantID:  tptr,
@@ -117,11 +116,8 @@ func (h *AuthHandler) Logout(c *echo.Context) error {
 // ChangePassword handles POST /api/auth/change-password.
 func (h *AuthHandler) ChangePassword(c *echo.Context) error {
 	var req dto.ChangePasswordRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	uid := appmiddleware.GetUserID(c)
 	if uid == "" {
@@ -137,17 +133,14 @@ func (h *AuthHandler) ChangePassword(c *echo.Context) error {
 // kiosk token bound to the requested session (within the caller's tenant scope).
 func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
 	var req dto.KioskTokenRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	tenantID := appmiddleware.GetTenantID(c)
 	if tenantID == "" {
 		return appresp.Fail(c, http.StatusBadRequest, "tenant_required")
 	}
-	token, err := h.authUC.IssueKioskToken((*c).Request().Context(), req.SessionID, tenantID, 4*time.Hour)
+	token, err := h.authUC.IssueKioskToken((*c).Request().Context(), req.SessionID, tenantID, kioskTokenTTL)
 	if err != nil {
 		return err
 	}

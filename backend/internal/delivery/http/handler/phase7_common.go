@@ -21,6 +21,19 @@ func bindUUID(c *echo.Context, name string) (string, bool) {
 	return v, true
 }
 
+// bindAndValidate binds the request body into req and validates it, writing the
+// standard error envelope on failure. It returns a non-nil error to short-circuit
+// the handler (e.g. `if err := bindAndValidate(c, &req); err != nil { return err }`).
+func bindAndValidate(c *echo.Context, req interface{}) error {
+	if err := (*c).Bind(req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	}
+	if err := (*c).Validate(req); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
+	return nil
+}
+
 // queryInt reads a query param as int with a default.
 func queryInt(c *echo.Context, name string, def int) int {
 	v := (*c).QueryParam(name)

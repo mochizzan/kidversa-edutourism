@@ -39,7 +39,7 @@ func (f *fakeSessionRepo) CreateSession(_ context.Context, s *entity.Session) er
 	f.sessions[s.ID] = s
 	return nil
 }
-func (f *fakeSessionRepo) GetSessionByID(_ context.Context, id string) (*entity.Session, error) {
+func (f *fakeSessionRepo) GetSessionByID(_ context.Context, id, _ string) (*entity.Session, error) {
 	if s, ok := f.sessions[id]; ok {
 		return s, nil
 	}
@@ -85,7 +85,7 @@ func (f *fakeSessionRepo) CreateSessionGroup(_ context.Context, g *entity.Sessio
 	f.groups[g.ID] = g
 	return nil
 }
-func (f *fakeSessionRepo) GetSessionGroupByID(_ context.Context, id string) (*entity.SessionGroup, error) {
+func (f *fakeSessionRepo) GetSessionGroupByID(_ context.Context, id, _ string) (*entity.SessionGroup, error) {
 	if g, ok := f.groups[id]; ok {
 		return g, nil
 	}
@@ -119,7 +119,7 @@ func (f *fakeSessionRepo) CreateParticipant(_ context.Context, p *entity.Partici
 	f.participants[p.ID] = p
 	return nil
 }
-func (f *fakeSessionRepo) GetParticipantByID(_ context.Context, id string) (*entity.Participant, error) {
+func (f *fakeSessionRepo) GetParticipantByID(_ context.Context, id, _ string) (*entity.Participant, error) {
 	if p, ok := f.participants[id]; ok {
 		return p, nil
 	}
@@ -131,7 +131,7 @@ func (f *fakeSessionRepo) GetParticipantGlobal(_ context.Context, id, _ string) 
 	}
 	return nil, repoErrNotFound
 }
-func (f *fakeSessionRepo) ListParticipants(_ context.Context, _, _ string) ([]entity.Participant, error) {
+func (f *fakeSessionRepo) ListParticipants(_ context.Context, _, _, _ string) ([]entity.Participant, error) {
 	out := make([]entity.Participant, 0, len(f.participants))
 	for _, p := range f.participants {
 		out = append(out, *p)

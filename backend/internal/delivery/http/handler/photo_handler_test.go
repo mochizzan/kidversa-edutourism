@@ -25,7 +25,7 @@ func (f *fakePhotoRepo) Create(_ context.Context, p *entity.SmartPhoto) error {
 	f.byID[p.ID] = p
 	return nil
 }
-func (f *fakePhotoRepo) GetByID(_ context.Context, id string) (*entity.SmartPhoto, error) {
+func (f *fakePhotoRepo) GetByID(_ context.Context, id, _ string) (*entity.SmartPhoto, error) {
 	if p, ok := f.byID[id]; ok {
 		return p, nil
 	}

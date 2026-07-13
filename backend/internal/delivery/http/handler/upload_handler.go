@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
@@ -19,6 +18,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	apputil "kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // UploadHandler serves the multipart file-upload endpoints that persist media
@@ -56,7 +56,7 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 	}
 	takenAt := (*c).FormValue("taken_at")
 	if takenAt == "" {
-		takenAt = time.Now().Format(time.RFC3339)
+		takenAt = apputil.NowISO()
 	}
 	isReport := (*c).FormValue("is_report_photo") == "true" || (*c).FormValue("is_report_photo") == "1"
 
@@ -82,7 +82,7 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 // UploadRecording handles POST /api/recordings/upload (same contract as photos,
 // for audio/video). Creates a Recording row referencing the stored file.
 func (h *UploadHandler) UploadRecording(c *echo.Context) error {
-	fh, storedRel, err := h.persistFile(c, "recordings")
+	fileSize, storedRel, err := h.persistFile(c, "recordings")
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (h *UploadHandler) UploadRecording(c *echo.Context) error {
 
 	duration := 0
 	if v := (*c).FormValue("duration_seconds"); v != "" {
-		if n, e := parsePositiveInt(v); e == nil {
+		if n, e := strconv.Atoi(strings.TrimSpace(v)); e == nil {
 			duration = n
 		}
 	}
@@ -107,7 +107,7 @@ func (h *UploadHandler) UploadRecording(c *echo.Context) error {
 		SessionStageID:  (*c).FormValue("session_stage_id"),
 		FileURL:         storedRel,
 		DurationSeconds: duration,
-		FileSizeBytes:   fh.Size,
+		FileSizeBytes:   fileSize,
 		TranscriptText:  (*c).FormValue("transcript_text"),
 		ReviewStatus:    entity.RecordingPending,
 		ReviewedBy:      reviewedByPtr,
@@ -121,17 +121,17 @@ func (h *UploadHandler) UploadRecording(c *echo.Context) error {
 }
 
 // persistFile validates, sniffs, and stores the uploaded file into a subdir of
-// cfg.UploadDir using a random filename. It returns the multipart header (for
-// size) and the stored path RELATIVE to cfg.UploadDir. The client-supplied
-// filename is ignored entirely (path-traversal hardening).
-func (h *UploadHandler) persistFile(c *echo.Context, subdir string) (*multipartHeader, string, error) {
+// cfg.UploadDir using a random filename. It returns the file size (from the
+// multipart header) and the stored path RELATIVE to cfg.UploadDir. The
+// client-supplied filename is ignored entirely (path-traversal hardening).
+func (h *UploadHandler) persistFile(c *echo.Context, subdir string) (int64, string, error) {
 	fh, err := (*c).FormFile(uploadFieldName)
 	if err != nil {
-		return nil, "", appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+		return 0, "", appresp.Fail(c, http.StatusBadRequest, "invalid_body")
 	}
 	src, err := fh.Open()
 	if err != nil {
-		return nil, "", apperrors.Internal("internal_error", err)
+		return 0, "", apperrors.Internal("internal_error", err)
 	}
 	defer src.Close()
 
@@ -140,15 +140,15 @@ func (h *UploadHandler) persistFile(c *echo.Context, subdir string) (*multipartH
 	n, err := io.ReadFull(src, head)
 	if err != nil && err != io.ErrUnexpectedEOF {
 		if err == io.EOF {
-			return nil, "", appresp.FailMsg(c, http.StatusBadRequest, "invalid_file", "file kosong")
+			return 0, "", appresp.FailMsg(c, http.StatusBadRequest, "invalid_file", "file kosong")
 		}
-		return nil, "", apperrors.Internal("internal_error", err)
+		return 0, "", apperrors.Internal("internal_error", err)
 	}
 	head = head[:n]
 
 	detected, ok := detectAllowedMedia(head)
 	if !ok {
-		return nil, "", appresp.FailMsg(c, http.StatusUnsupportedMediaType, "file_type_unsupported", "Tipe berkas tidak diizinkan")
+		return 0, "", appresp.FailMsg(c, http.StatusUnsupportedMediaType, "file_type_unsupported", "Tipe berkas tidak diizinkan")
 	}
 
 	// Compose the random destination name (uuid + detected extension).
@@ -158,27 +158,27 @@ func (h *UploadHandler) persistFile(c *echo.Context, subdir string) (*multipartH
 
 	// Double-check the resolved destination stays inside UploadDir.
 	if !withinDir(h.cfg.UploadDir, dest) {
-		return nil, "", apperrors.Internal("internal_error", nil)
+		return 0, "", apperrors.Internal("internal_error", nil)
 	}
 	if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil {
-		return nil, "", apperrors.Internal("internal_error", err)
+		return 0, "", apperrors.Internal("internal_error", err)
 	}
 
 	out, err := os.Create(dest)
 	if err != nil {
-		return nil, "", apperrors.Internal("internal_error", err)
+		return 0, "", apperrors.Internal("internal_error", err)
 	}
 	defer out.Close()
 
 	if _, err := out.Write(head); err != nil {
 		_ = os.Remove(dest)
-		return nil, "", apperrors.Internal("internal_error", err)
+		return 0, "", apperrors.Internal("internal_error", err)
 	}
 	if _, err := io.Copy(out, src); err != nil {
 		_ = os.Remove(dest)
-		return nil, "", apperrors.Internal("internal_error", err)
+		return 0, "", apperrors.Internal("internal_error", err)
 	}
-	return &multipartHeader{Size: fh.Size}, rel, nil
+	return fh.Size, rel, nil
 }
 
 // removeStored deletes a previously stored upload (rollback helper).
@@ -188,11 +188,6 @@ func (h *UploadHandler) removeStored(uploadDir, rel string) error {
 		return nil
 	}
 	return os.Remove(dest)
-}
-
-// multipartHeader is a thin alias so we don't import multipart in the signature.
-type multipartHeader struct {
-	Size int64
 }
 
 // --- media type detection (extension + magic bytes) ---
@@ -243,11 +238,6 @@ func detectAllowedMedia(head []byte) (detectedMedia, bool) {
 	default:
 		return detectedMedia{}, false
 	}
-}
-
-// parsePositiveInt parses a non-negative integer from a form value.
-func parsePositiveInt(s string) (int, error) {
-	return strconv.Atoi(strings.TrimSpace(s))
 }
 
 // withinDir reports whether path p resolves to a location inside dir.

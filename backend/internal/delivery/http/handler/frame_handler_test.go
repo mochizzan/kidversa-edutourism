@@ -30,7 +30,7 @@ func (f *fakeFrameRepo) Create(_ context.Context, fr *entity.PhotoFrame) error {
 	f.byID[fr.ID] = fr
 	return nil
 }
-func (f *fakeFrameRepo) GetByID(_ context.Context, id string) (*entity.PhotoFrame, error) {
+func (f *fakeFrameRepo) GetByID(_ context.Context, id, _ string) (*entity.PhotoFrame, error) {
 	if fr, ok := f.byID[id]; ok {
 		return fr, nil
 	}

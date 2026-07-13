@@ -11,12 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
-	"kidversa-edutourism-backend/internal/domain/repository"
 )
 
-// fakeParticipantMissionRepo is an in-memory ParticipantMissionRepository.
 type fakeParticipantMissionRepo struct {
 	byID     map[string]*entity.ParticipantMission
 	byReport map[string][]*entity.ParticipantMission
@@ -103,6 +100,4 @@ func TestParticipantMissionToggleFlipsCompletion(t *testing.T) {
 	if !env.Data.IsCompleted {
 		t.Fatalf("expected IsCompleted true after toggle")
 	}
-	_ = appmiddleware.GetUserID
-	_ = repository.ParticipantMissionFilter{}
 }

@@ -30,11 +30,8 @@ func (h *ProgramHandler) CreateContent(c *echo.Context) error {
 		return nil
 	}
 	var req dto.StageContentRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	active := true
 	if req.IsActive != nil {
@@ -103,11 +100,8 @@ func (h *ProgramHandler) ReorderContents(c *echo.Context) error {
 		return nil
 	}
 	var req dto.ReorderRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	if err := (*c).Validate(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	if err := h.repo.ReorderContents((*c).Request().Context(), stageID, req.OrderedIDs); err != nil {
 		return err
