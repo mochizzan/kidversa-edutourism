@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom'
 import { router } from './app/router'
 import { useAuthStore, registerUnauthorizedHandler } from './core/stores/authStore'
 import { ROUTES } from './core/constants/app'
+import { UserRole } from './core/types/enums'
 import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
 import { ToastProvider } from './shared/components/feedback/Toast'
 import { healthCheck } from './core/services/backendClient'
@@ -109,14 +110,17 @@ function App() {
     }
     setBackendDown(false)
     await checkSession()
-    // Inisialisasi daftar tenant + auto-select tenant pertama untuk SUPER_ADMIN
-    // agar request tenant-scoped (/api/users, dll) mengirim X-Tenant-Id dan
-    // tidak memicu 400 tenant_required. Dilakukan di sini (composition root),
-    // bukan di authStore, untuk menghindari coupling antar-store.
-    try {
-      await useTenantStore.getState().fetchTenants()
-    } catch {
-      // Kegagalan fetch tenant bersifat opsional untuk non-SA; abaikan.
+    // Hanya fetch tenant + auto-select bila user SUDAH terautentikasi DAN
+    // SUPER_ADMIN. Untuk user belum login, pemanggilan ini memicu 401 lalu
+    // percobaan refresh yang berujung 400 (lihat backendClient.refreshAccessToken).
+    // Untuk non-SA, endpoint ini 403 (Forbidden) — juga tidak perlu dipanggil.
+    const authState = useAuthStore.getState()
+    if (authState.isAuthenticated && authState.user?.role === UserRole.SUPER_ADMIN) {
+      try {
+        await useTenantStore.getState().fetchTenants()
+      } catch {
+        // Kegagalan fetch tenant bersifat opsional; abaikan.
+      }
     }
   }
 
