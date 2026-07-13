@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
+import { useAuthStore } from '../../../core/stores/authStore'
 import { ApiError } from '../../../core/services/backendClient'
 import { useRateLimit } from '../hooks/useRateLimit'
 import { ROUTES } from '../../../core/constants/app'
@@ -38,6 +39,10 @@ const LoginPage = () => {
     defaultValues: { email: '', password: '', honeypot: '' },
   })
 
+  // Guard against double-submit (e.g. button clicked twice / repeated submit
+  // events): ensure login() runs at most once per submit attempt.
+  const submittedRef = useRef(false)
+
   // ── Redirect if authed ──
   useEffect(() => {
     if (isAuthenticated) navigate(returnUrl, { replace: true })
@@ -47,14 +52,19 @@ const LoginPage = () => {
   const onSubmit = async (data: LoginFormData) => {
     setGeneralError(null)
     if (data.honeypot?.length) return
+    if (submittedRef.current) return
+    submittedRef.current = true
 
     try {
       await login(data.email, data.password)
       clearRateLimit()
 
       // Force a password change if the backend/account requires it.
-      const { mustChangePassword, user } = useAuth()
-      if (mustChangePassword || user?.must_change_password) {
+      // Baca state TERKINI dari store (bukan memanggil useAuth() di dalam
+      // handler, yang mengembalikan closure stale dari render awal).
+      const authState = useAuthStore.getState()
+      if (authState.mustChangePassword || authState.user?.must_change_password) {
+        submittedRef.current = false
         navigate(ROUTES.AUTH.CHANGE_PASSWORD, { replace: true })
         return
       }
