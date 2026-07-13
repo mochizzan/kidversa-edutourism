@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Radio,
   Calendar,
   Clock,
   RefreshCw,
-  Play,
   SkipForward,
   RotateCcw,
   CheckCircle2,
@@ -17,6 +16,7 @@ import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
 import { liveService } from '../../../core/services/live'
 import { programService } from '../../../core/services/programs'
+import { useLiveSession } from '../../../core/hooks/useLiveSession'
 import { SessionStatus, GroupStageProgressStatus, UserRole } from '../../../core/types/enums'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -27,7 +27,7 @@ import { cn } from '../../../core/utils'
 import { ApiError } from '../../../core/services/backendClient'
 import { redirectToLogin } from '../../../core/stores/authStore'
 import type { Session, SessionStage, ProgramStage } from '../../../core/types'
-import type { TimelineEventRow, LiveGroupWithProgress } from '../../../core/services/live'
+import type { LiveGroupWithProgress } from '../../../core/services/live'
 import { StageProgressBar } from '../components/StageProgressBar'
 import { TimelineFeed } from '../components/TimelineFeed'
 import { ConfirmOverrideModal } from '../components/ConfirmOverrideModal'
@@ -40,28 +40,48 @@ const LiveMonitorPage = () => {
   const navigate = useNavigate()
 
   const [activeSession, setActiveSession] = useState<Session | null>(null)
-  const [groups, setGroups] = useState<LiveGroupWithProgress[]>([])
-  const [timeline, setTimeline] = useState<TimelineEventRow[]>([])
   const [stages, setStages] = useState<SessionStage[]>([])
   const [programStages, setProgramStages] = useState<ProgramStage[]>([])
   const [allActiveSessions, setAllActiveSessions] = useState<Session[]>([])
   const [stageNames, setStageNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [simulationOn, setSimulationOn] = useState(false)
   const [overrideModal, setOverrideModal] = useState<{
     groupId: string
     action: 'skip' | 'jump' | 'reset'
   } | null>(null)
-  const simulationRef = useRef<number | null>(null)
 
+  // Live state comes from the backend SSE stream via useLiveSession — no
+  // polling, no local simulation. Override actions POST to the backend and
+  // their effects arrive back through the SSE stream.
+  const {
+    groups: liveGroups,
+    progress,
+    participantsByGroup,
+    timeline,
+    connectionStatus,
+    loading: liveLoading,
+  } = useLiveSession(activeSession?.id ?? null)
+
+  const groups: LiveGroupWithProgress[] = useMemo(
+    () =>
+      liveGroups.map((g) => ({
+        group: g,
+        progress: progress.filter((p) => p.group_id === g.id),
+        participants: participantsByGroup[g.id] ?? [],
+      })),
+    [liveGroups, progress, participantsByGroup],
+  )
+
+  // Loads session metadata (active sessions + selected session's stages). The
+  // live groups/progress/timeline are supplied by the SSE hook, not here.
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const result = await sessionService.getAll({ limit: 20 })
       const activeSessions = result.data.filter(
-        (s: Session) => s.status === SessionStatus.ACTIVE
+        (s: Session) => s.status === SessionStatus.ACTIVE,
       )
       setAllActiveSessions(activeSessions)
 
@@ -77,14 +97,10 @@ const LiveMonitorPage = () => {
       if (session) {
         setActiveSession(session)
 
-        const [groupsData, timelineData, sessionStages, programStagesData] = await Promise.all([
-          liveService.getGroupsWithProgress(session.id),
-          liveService.getTimeline(session.id),
+        const [sessionStages, programStagesData] = await Promise.all([
           sessionService.getStages(session.id),
           programService.getStages(session.program_id),
         ])
-        setGroups(groupsData)
-        setTimeline(timelineData)
         setStages(sessionStages)
         setProgramStages(programStagesData)
 
@@ -97,8 +113,6 @@ const LiveMonitorPage = () => {
         setStageNames(nameMap)
       } else {
         setActiveSession(null)
-        setGroups([])
-        setTimeline([])
         setStages([])
         setProgramStages([])
         setStageNames({})
@@ -114,53 +128,6 @@ const LiveMonitorPage = () => {
     fetchData()
   }, [fetchData, urlSessionId])
 
-  // Polling every 5 seconds
-  useEffect(() => {
-    if (!activeSession) return
-    const interval = setInterval(async () => {
-      try {
-        const [groupsData, timelineData] = await Promise.all([
-          liveService.getGroupsWithProgress(activeSession.id),
-          liveService.getTimeline(activeSession.id),
-        ])
-        setGroups(groupsData)
-        setTimeline(timelineData)
-      } catch {
-        // silent fail on poll
-      }
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [activeSession])
-
-  // Simulation
-  useEffect(() => {
-    if (simulationOn && activeSession) {
-      const runTick = async () => {
-        try {
-          await liveService.simulateProgress(activeSession.id)
-          const [groupsData, timelineData] = await Promise.all([
-            liveService.getGroupsWithProgress(activeSession.id),
-            liveService.getTimeline(activeSession.id),
-          ])
-          setGroups(groupsData)
-          setTimeline(timelineData)
-        } catch {
-          // silent
-        }
-      }
-      runTick()
-      simulationRef.current = window.setInterval(runTick, 12000)
-    } else {
-      if (simulationRef.current) {
-        clearInterval(simulationRef.current)
-        simulationRef.current = null
-      }
-    }
-    return () => {
-      if (simulationRef.current) clearInterval(simulationRef.current)
-    }
-  }, [simulationOn, activeSession])
-
   const handleSessionChange = (newId: string) => {
     navigate(`/admin/live/${newId}`)
   }
@@ -169,9 +136,9 @@ const LiveMonitorPage = () => {
     if (!activeSession || !user) return
     try {
       if (action === 'skip') {
-        const progress = groups.find((g) => g.group.id === groupId)?.progress
-        const active = progress?.find(
-          (p) => p.status === GroupStageProgressStatus.IN_PROGRESS || p.status === GroupStageProgressStatus.UNLOCKED
+        const progressList = groups.find((g) => g.group.id === groupId)?.progress
+        const active = progressList?.find(
+          (p) => p.status === GroupStageProgressStatus.IN_PROGRESS || p.status === GroupStageProgressStatus.UNLOCKED,
         )
         if (active) await liveService.skipStage(groupId, active.session_stage_id, reason, user.id)
       } else if (action === 'jump' && targetStageId) {
@@ -179,14 +146,15 @@ const LiveMonitorPage = () => {
       } else if (action === 'reset') {
         await liveService.resetProgress(groupId, reason, user.id)
       }
+      // The override + its timeline note arrive back via the SSE stream; no
+      // local mutation or re-fetch.
       await liveService.addTimelineEvent(
         activeSession.id,
         groupId,
         'override',
         `Override: ${action} — ${reason}`,
-        user.id
+        user.id,
       )
-      await fetchData()
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         redirectToLogin()
@@ -208,9 +176,8 @@ const LiveMonitorPage = () => {
         groupId,
         'stage:unlock',
         `${group?.group.name || 'Kelompok'} di-unlock ke "${ps?.name || 'Stage'}"`,
-        user.id
+        user.id,
       )
-      await fetchData()
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) redirectToLogin()
     }
@@ -228,9 +195,8 @@ const LiveMonitorPage = () => {
         groupId,
         'group:completed',
         `${group?.group.name || 'Kelompok'} menyelesaikan "${ps?.name || 'Stage'}"`,
-        user.id
+        user.id,
       )
-      await fetchData()
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) redirectToLogin()
     }
@@ -242,22 +208,22 @@ const LiveMonitorPage = () => {
     }
 
     const active = g.progress.find(
-      (p) => p.status === GroupStageProgressStatus.IN_PROGRESS
+      (p) => p.status === GroupStageProgressStatus.IN_PROGRESS,
     )
     if (active) return { status: 'IN_PROGRESS' as const, stageId: active.session_stage_id }
 
     const unlocked = g.progress.find(
-      (p) => p.status === GroupStageProgressStatus.UNLOCKED
+      (p) => p.status === GroupStageProgressStatus.UNLOCKED,
     )
     if (unlocked) return { status: 'UNLOCKED' as const, stageId: unlocked.session_stage_id }
 
     const allDone = g.progress.every(
-      (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED
+      (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED,
     )
     if (allDone) return { status: 'COMPLETED' as const, stageId: undefined }
 
     const hasDone = g.progress.some(
-      (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED
+      (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED,
     )
     if (hasDone) return { status: 'COMPLETED' as const, stageId: undefined }
 
@@ -266,7 +232,7 @@ const LiveMonitorPage = () => {
 
   const getActiveStageIndex = (g: LiveGroupWithProgress) => {
     const activeProgress = g.progress.find(
-      (p) => p.status === GroupStageProgressStatus.IN_PROGRESS || p.status === GroupStageProgressStatus.UNLOCKED
+      (p) => p.status === GroupStageProgressStatus.IN_PROGRESS || p.status === GroupStageProgressStatus.UNLOCKED,
     )
     if (!activeProgress) return { current: 0, total: programStages.length }
 
@@ -291,7 +257,7 @@ const LiveMonitorPage = () => {
   }
 
   // ── Loading ──
-  if (loading) {
+  if (loading || liveLoading) {
     return (
       <div className="space-y-6">
         <PageHeader title="Live Monitor" />
@@ -333,9 +299,17 @@ const LiveMonitorPage = () => {
   // `allCompleted` = semua stage COMPLETED/SKIPPED (cek record langsung, bukan derived status)
   const allCompleted = groups.length > 0 && groups.every(
     (g) => g.progress.length > 0 && g.progress.every(
-      (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED
-    )
+      (p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED,
+    ),
   )
+
+  const connectionBadge = connectionStatus === 'online'
+    ? null
+    : (
+      <Badge variant={connectionStatus === 'reconnecting' ? 'warning' : 'neutral'}>
+        {connectionStatus === 'reconnecting' ? 'Menyambung ulang…' : 'Koneksi lemah'}
+      </Badge>
+    )
 
   return (
     <div className="space-y-6">
@@ -366,6 +340,7 @@ const LiveMonitorPage = () => {
                 </span>
               </Badge>
             )}
+            {connectionBadge}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -406,14 +381,6 @@ const LiveMonitorPage = () => {
             <Monitor className="w-4 h-4 mr-1" />
             Buka Kiosk
           </Button>
-          <Button
-            variant={simulationOn ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => setSimulationOn(!simulationOn)}
-          >
-            <Play className="w-4 h-4 mr-1" />
-            {simulationOn ? 'Hentikan Simulasi' : 'Mulai Simulasi'}
-          </Button>
           <Button variant="ghost" size="sm" onClick={fetchData}>
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -434,7 +401,7 @@ const LiveMonitorPage = () => {
           {[
             { label: 'Total', value: groups.length, icon: Users, color: 'text-on-surface' },
             { label: 'Selesai', value: groups.filter((g) => g.progress.length > 0 && g.progress.every((p) => p.status === GroupStageProgressStatus.COMPLETED || p.status === GroupStageProgressStatus.SKIPPED)).length, icon: CheckCircle2, color: 'text-green-600' },
-            { label: 'Berlangsung', value: groups.filter((g) => { const s = getGroupStatus(g).status; return s === 'IN_PROGRESS' || s === 'UNLOCKED' }).length, icon: Play, color: 'text-amber-600' },
+            { label: 'Berlangsung', value: groups.filter((g) => { const s = getGroupStatus(g).status; return s === 'IN_PROGRESS' || s === 'UNLOCKED' }).length, icon: AlertTriangle, color: 'text-amber-600' },
             { label: 'Menunggu', value: groups.filter((g) => getGroupStatus(g).status === 'LOCKED').length, icon: Monitor, color: 'text-gray-500' },
           ].map((stat) => (
             <div key={stat.label} className="bg-surface rounded-xl p-4 border border-outline-variant/40">
@@ -475,7 +442,7 @@ const LiveMonitorPage = () => {
                 'bg-surface rounded-xl p-5 border transition-all',
                 status === 'IN_PROGRESS' ? 'border-amber-300 shadow-md' :
                 status === 'COMPLETED' ? 'border-green-200' :
-                'border-outline-variant'
+                'border-outline-variant',
               )}
             >
               {/* Header */}
@@ -570,7 +537,7 @@ const LiveMonitorPage = () => {
               {/* Duration warning */}
               {status === 'IN_PROGRESS' && (() => {
                 const activeProgress = g.progress.find(
-                  (p) => p.status === GroupStageProgressStatus.IN_PROGRESS
+                  (p) => p.status === GroupStageProgressStatus.IN_PROGRESS,
                 )
                 if (activeProgress?.entered_at) {
                   const elapsed = Date.now() - new Date(activeProgress.entered_at).getTime()
