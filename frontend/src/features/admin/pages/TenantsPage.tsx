@@ -9,7 +9,6 @@ import { Input } from '../../../shared/components/ui/Input'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { tenantService } from '../../../core/services/tenants'
-import { userService } from '../../../core/services/users'
 import { useTenantStore } from '../../../core/stores/tenantStore'
 import type { Tenant } from '../../../core/types'
 
@@ -39,28 +38,28 @@ const TenantsPage = () => {
 
   const loadTenants = useCallback(async () => {
     try {
-      const [tenantList, usersPage] = await Promise.all([
+      const [tenantList, stats] = await Promise.all([
         tenantService.getAll(),
-        userService.getAll({ page: 1, limit: 1000 }),
+        tenantService.getStats(),
       ])
-      const users = usersPage.data
 
+      const userCounts = stats?.user_counts ?? []
       const counts: Record<string, number> = {}
-      for (const user of users) {
-        if (user.tenant_id) {
-          counts[user.tenant_id] = (counts[user.tenant_id] || 0) + 1
-        }
+      for (const row of userCounts) {
+        counts[row.tenant_id] = row.count
       }
 
       setTenants(tenantList)
       setTenantUserCounts(counts)
       setStoreTenants(tenantList)
     } catch (error) {
+      // Surface the error instead of silently rendering empty counts.
+      addToast({ type: 'error', message: 'Gagal memuat data tenant.' })
       console.error('Failed to load tenants:', error)
     } finally {
       setLoading(false)
     }
-  }, [setStoreTenants])
+  }, [setStoreTenants, addToast])
 
   useEffect(() => {
     loadTenants()

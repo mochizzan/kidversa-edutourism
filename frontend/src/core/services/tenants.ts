@@ -1,5 +1,6 @@
-import type { Tenant } from '../types'
+import type { Tenant, TenantStats } from '../types'
 import { apiRequest } from './backendClient'
+import { itemRequest } from './apiEnvelope'
 
 interface TenantsEnvelope {
   data: Tenant[]
@@ -8,6 +9,7 @@ interface TenantsEnvelope {
 
 export interface TenantService {
   getAll(): Promise<Tenant[]>
+  getStats(): Promise<TenantStats>
 }
 
 // getAll returns every tenant the caller is allowed to see. SUPER_ADMIN sees
@@ -19,6 +21,16 @@ const getAll = async (): Promise<Tenant[]> => {
   return res.data ?? []
 }
 
+// getStats returns per-tenant user counts computed server-side. This avoids a
+// global /api/users fetch (which is tenant-scoped and would 400 without a
+// selected tenant) and is accurate for SUPER_ADMIN across all tenants.
+// Backend membungkus stats dalam envelope { data: { user_counts: [...] } };
+// itemRequest mengembalikan res.data (TenantStats) secara konsisten.
+const getStats = async (): Promise<TenantStats> => {
+  return itemRequest<TenantStats>('GET', '/api/tenants/stats')
+}
+
 export const tenantService: TenantService = {
   getAll,
+  getStats,
 }

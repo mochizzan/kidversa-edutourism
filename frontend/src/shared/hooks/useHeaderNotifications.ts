@@ -7,6 +7,7 @@ import type { User } from '../../core/types'
 import { UserRole, ApprovalStatus } from '../../core/types/enums'
 import { isSuperAdmin, isAdmin } from '../../core/utils/permissions'
 import { USERS_CHANGED_EVENT, ROUTES } from '../../core/constants/app'
+import { useTenantStore } from '../../core/stores/tenantStore'
 
 export interface HeaderNotification {
   id: string
@@ -53,6 +54,14 @@ export function useHeaderNotifications() {
 
     const approvalRoles: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN]
     if (approvalRoles.includes(user.role)) {
+      // SUPER_ADMIN wajib punya active tenant agar /api/users (tenant-scoped)
+      // tidak 400. Jika belum ter-select (mis. fetchTenants gagal), jangan
+      // fetch user global — cukup tampilkan notifikasi koneksi yang sudah ada.
+      const activeTenantId = useTenantStore.getState().activeTenant?.id ?? null
+      if (user.role === UserRole.SUPER_ADMIN && !activeTenantId) {
+        setNotifications(notifs)
+        return
+      }
       try {
         const [usersPage, tenantList] = await Promise.all([
           userService.getAll({ page: 1, limit: 1000 }),

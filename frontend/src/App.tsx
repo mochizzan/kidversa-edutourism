@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { RouterProvider, useNavigate } from 'react-router-dom'
+import { RouterProvider } from 'react-router-dom'
 import { router } from './app/router'
 import { useAuthStore, registerUnauthorizedHandler } from './core/stores/authStore'
 import { ROUTES } from './core/constants/app'
 import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
 import { ToastProvider } from './shared/components/feedback/Toast'
 import { healthCheck } from './core/services/backendClient'
+import { useTenantStore } from './core/stores/tenantStore'
 
 /* ── Splash Screen ── */
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -84,12 +85,16 @@ function App() {
   const { checkSession, isLoading } = useAuthStore()
   const [splashDone, setSplashDone] = useState(false)
   const [backendDown, setBackendDown] = useState(false)
-  const navigate = useNavigate()
 
   // Route any caught 401 (refresh already failed in backendClient) to login.
+  // `App` renders <RouterProvider> below, so it lives *outside* the router
+  // context and cannot use useNavigate(). The router instance itself exposes
+  // an imperative navigate() that works from anywhere.
   useEffect(() => {
-    registerUnauthorizedHandler(() => navigate(ROUTES.AUTH.LOGIN, { replace: true }))
-  }, [navigate])
+    registerUnauthorizedHandler(() =>
+      router.navigate(ROUTES.AUTH.LOGIN, { replace: true }),
+    )
+  }, [])
 
   const runStartup = async () => {
     try {
@@ -104,6 +109,15 @@ function App() {
     }
     setBackendDown(false)
     await checkSession()
+    // Inisialisasi daftar tenant + auto-select tenant pertama untuk SUPER_ADMIN
+    // agar request tenant-scoped (/api/users, dll) mengirim X-Tenant-Id dan
+    // tidak memicu 400 tenant_required. Dilakukan di sini (composition root),
+    // bukan di authStore, untuk menghindari coupling antar-store.
+    try {
+      await useTenantStore.getState().fetchTenants()
+    } catch {
+      // Kegagalan fetch tenant bersifat opsional untuk non-SA; abaikan.
+    }
   }
 
   useEffect(() => {
