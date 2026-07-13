@@ -186,6 +186,7 @@ const ChildAssessmentPage = () => {
     try {
       const data: CreateAssessmentDTO = {
         participant_id: childId,
+        session_id: childDetail.sessionStage.session_id,
         session_stage_id: childDetail.sessionStage.id,
         star_rating: starRating,
         comment: comment.trim() || undefined,

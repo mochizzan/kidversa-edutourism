@@ -80,9 +80,17 @@ export interface UpdateUserDTO extends Partial<CreateUserDTO> {
 
 export interface CreateAssessmentDTO {
   participant_id: string
+  session_id: string
   session_stage_id: string
   star_rating: number
   comment?: string
+}
+
+// ToggleActiveResult is the minimal response returned by the program/mission
+// toggle-active endpoints (backend returns only the id + new active state).
+export interface ToggleActiveResult {
+  id: string
+  is_active: boolean
 }
 
 export interface LoginDTO {
