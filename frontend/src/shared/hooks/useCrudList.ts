@@ -32,7 +32,17 @@ export function useCrudList<T extends { id: string }>(
 ): UseCrudListResult<T> {
   const { fetchFn, pageSize = 10, enableCache = true, additionalFilters } = options
 
-  const cacheKey = fetchFn.toString() + JSON.stringify(additionalFilters)
+  // Keep the latest fetchFn/additionalFilters without making them effect deps.
+  // They are recreated every render at the call site; depending on their identity
+  // would retrigger the load effect on every render (infinite loop).
+  const fetchFnRef = useRef(fetchFn)
+  fetchFnRef.current = fetchFn
+  const additionalFiltersRef = useRef(additionalFilters)
+  additionalFiltersRef.current = additionalFilters
+
+  // Stable string identity: fetchFn source + serialized filters. Stable across
+  // renders for the same logical query, changes only when the query changes.
+  const cacheKey = fetchFnRef.current.toString() + JSON.stringify(additionalFiltersRef.current ?? {})
   const cached = enableCache ? _cache.get(cacheKey) : undefined
 
   const [data, setData] = useState<T[]>(cached?.data as T[] ?? [])
@@ -51,7 +61,7 @@ export function useCrudList<T extends { id: string }>(
     setLoading(true)
     setError(null)
     try {
-      const res = await fetchFn({ page, limit: pageSize, search, ...additionalFilters })
+      const res = await fetchFnRef.current({ page, limit: pageSize, search, ...additionalFiltersRef.current })
       setData(res.data)
       setTotal(res.total)
       if (enableCache) {
@@ -71,7 +81,7 @@ export function useCrudList<T extends { id: string }>(
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, fetchFn, enableCache, cacheKey, additionalFilters, refreshKey, addToast])
+  }, [page, pageSize, search, cacheKey, refreshKey, addToast])
 
   useEffect(() => {
     void load()
