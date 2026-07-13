@@ -47,13 +47,15 @@ interface TimelineEnvelope {
   timeline: TimelineEventRow[]
 }
 
-// Snapshot of a session: groups (each with progress + participants), the flat
-// progress list, and the timeline events. Drives the monitor/list pages.
-async function loadSnapshot(sessionId: string): Promise<{
+interface LiveSnapshot {
   groupsWithProgress: LiveGroupWithProgress[]
   progress: GroupStageProgressRow[]
   timeline: TimelineEventRow[]
-}> {
+}
+
+// Snapshot of a session: groups (each with progress + participants), the flat
+// progress list, and the timeline events. Drives the monitor/list pages.
+async function fetchSnapshot(sessionId: string): Promise<LiveSnapshot> {
   const [groupsRes, timelineRes] = await Promise.all([
     apiRequest<GroupsEnvelope>('GET', `/api/live/${sessionId}/groups`),
     apiRequest<TimelineEnvelope>('GET', `/api/live/${sessionId}/timeline`),
@@ -75,6 +77,31 @@ async function loadSnapshot(sessionId: string): Promise<{
   }
 }
 
+// R1: getProgress/getGroupsWithProgress/getTimeline previously each triggered a
+// full snapshot load (6 API calls when a page reads all three in one render).
+// Cache the in-flight snapshot per sessionId within a short TTL so those calls
+// collapse into a single load while staying fresh across renders. Mutations
+// invalidate the cache so the next read re-fetches.
+const SNAPSHOT_TTL_MS = 2000
+const snapshotCache = new Map<string, { at: number; promise: Promise<LiveSnapshot> }>()
+
+function loadSnapshot(sessionId: string): Promise<LiveSnapshot> {
+  const cached = snapshotCache.get(sessionId)
+  if (cached && Date.now() - cached.at < SNAPSHOT_TTL_MS) {
+    return cached.promise
+  }
+  const promise = fetchSnapshot(sessionId)
+  snapshotCache.set(sessionId, { at: Date.now(), promise })
+  // On failure, drop the cache entry so the next call retries.
+  promise.catch(() => snapshotCache.delete(sessionId))
+  return promise
+}
+
+function invalidateSnapshot(sessionId?: string): void {
+  if (sessionId) snapshotCache.delete(sessionId)
+  else snapshotCache.clear()
+}
+
 export const liveService = {
   getProgress: async (sessionId: string): Promise<GroupStageProgressRow[]> => {
     const { progress } = await loadSnapshot(sessionId)
@@ -94,22 +121,27 @@ export const liveService = {
   // Facilitator overrides — POST /api/live/groups/:groupId/stages/:stageId/{unlock,complete,skip}
   unlockStage: async (groupId: string, sessionStageId: string, userId: string): Promise<void> => {
     await apiRequest('POST', `/api/live/groups/${groupId}/stages/${sessionStageId}/unlock`, { userId })
+    invalidateSnapshot()
   },
 
   completeStage: async (groupId: string, sessionStageId: string): Promise<void> => {
     await apiRequest('POST', `/api/live/groups/${groupId}/stages/${sessionStageId}/complete`)
+    invalidateSnapshot()
   },
 
   skipStage: async (groupId: string, sessionStageId: string, reason: string, userId: string): Promise<void> => {
     await apiRequest('POST', `/api/live/groups/${groupId}/stages/${sessionStageId}/skip`, { reason, userId })
+    invalidateSnapshot()
   },
 
   jumpToStage: async (groupId: string, targetStageId: string, reason: string, userId: string): Promise<void> => {
     await apiRequest('POST', `/api/live/groups/${groupId}/jump`, { stage_id: targetStageId, reason, userId })
+    invalidateSnapshot()
   },
 
   resetProgress: async (groupId: string, reason: string, userId: string): Promise<void> => {
     await apiRequest('POST', `/api/live/groups/${groupId}/reset`, { reason, userId })
+    invalidateSnapshot()
   },
 
   addTimelineEvent: async (
@@ -120,6 +152,7 @@ export const liveService = {
     userId?: string,
   ): Promise<void> => {
     await apiRequest('POST', `/api/live/events`, { session_id: sessionId, group_id: groupId, type, message, user_id: userId })
+    invalidateSnapshot(sessionId)
   },
 
   // Live progress is driven by the backend + SSE; the frontend no longer
