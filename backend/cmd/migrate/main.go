@@ -13,6 +13,17 @@ import (
 	"kidversa-edutourism-backend/internal/infrastructure/persistence"
 )
 
+// Bootstrap defaults used when seeding the database on first run. These are
+// bootstrap-only values (not secrets); the super-admin password is overridable
+// via BOOTSTRAP_SUPERADMIN_PASSWORD. Tenant slugs are stable identifiers used by
+// the seed logic and by operations tooling.
+const (
+	bootstrapSuperadminEmail = "superadmin@kidversa.id"
+	bootstrapAdminBandungEmail = "admin.bandung@kidversa.id"
+	bootstrapTenantBandungSlug = "tenant-bandung"
+	bootstrapTenantSubangSlug  = "tenant-subang"
+)
+
 func main() {
 	cfg := config.Load()
 
@@ -45,8 +56,8 @@ func bootstrap(cfg *config.Config) error {
 	// Tenants (idempotent by slug).
 	bandungID := ""
 	tenants := []entity.Tenant{
-		{BaseModel: entity.BaseModel{ID: uuid.NewString()}, Name: "Tenant Bandung", Slug: "tenant-bandung"},
-		{BaseModel: entity.BaseModel{ID: uuid.NewString()}, Name: "Tenant Subang", Slug: "tenant-subang"},
+		{BaseModel: entity.BaseModel{ID: uuid.NewString()}, Name: "Tenant Bandung", Slug: bootstrapTenantBandungSlug},
+		{BaseModel: entity.BaseModel{ID: uuid.NewString()}, Name: "Tenant Subang", Slug: bootstrapTenantSubangSlug},
 	}
 	for _, t := range tenants {
 		var cnt int64
@@ -58,12 +69,12 @@ func bootstrap(cfg *config.Config) error {
 		} else {
 			var existing entity.Tenant
 			g.Where("slug = ?", t.Slug).First(&existing)
-			if t.Slug == "tenant-bandung" {
+			if t.Slug == bootstrapTenantBandungSlug {
 				bandungID = existing.ID
 			}
 			continue
 		}
-		if t.Slug == "tenant-bandung" {
+		if t.Slug == bootstrapTenantBandungSlug {
 			bandungID = t.ID
 		}
 	}
@@ -71,8 +82,7 @@ func bootstrap(cfg *config.Config) error {
 	// SUPER_ADMIN (global, no tenant).
 	pw := cfg.BootstrapSuperadminPassword
 	if pw == "" {
-		pw = "password123" // fallback; must_change_password=1 forces reset on first login
-		log.Println("WARNING: using default bootstrap password; set BOOTSTRAP_SUPERADMIN_PASSWORD in production")
+		log.Fatalf("BOOTSTRAP_SUPERADMIN_PASSWORD is required (refusing to boot with a default password)")
 	}
 	superHash, err := auth.BcryptHash(pw, cfg.BcryptCost)
 	if err != nil {
@@ -81,7 +91,7 @@ func bootstrap(cfg *config.Config) error {
 	super := entity.User{
 		BaseModel:          entity.BaseModel{ID: uuid.NewString()},
 		TenantID:           nil,
-		Email:              "superadmin@kidversa.id",
+		Email:              bootstrapSuperadminEmail,
 		PasswordHash:       superHash,
 		Name:               "Super Admin",
 		Role:               entity.RoleSuperAdmin,
@@ -105,7 +115,7 @@ func bootstrap(cfg *config.Config) error {
 	admin := entity.User{
 		BaseModel:          entity.BaseModel{ID: uuid.NewString()},
 		TenantID:           &bandungID,
-		Email:              "admin.bandung@kidversa.id",
+		Email:              bootstrapAdminBandungEmail,
 		PasswordHash:       adminHash,
 		Name:               "Admin Bandung",
 		Role:               entity.RoleAdmin,
