@@ -31,7 +31,7 @@ func main() {
 
 	jwt := auth.NewJWTManager(cfg)
 	revoker := auth.NewInMemoryRevoker()
-	refreshStore := auth.NewInMemoryRefreshStore()
+	refreshStore := persistence.NewGormRefreshRepository(db.DB)
 	hub := sse.NewHub()
 
 	// Repositories.

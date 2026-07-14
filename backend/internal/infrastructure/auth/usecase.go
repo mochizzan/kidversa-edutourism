@@ -95,6 +95,9 @@ func (u *Usecase) Refresh(ctx context.Context, oldRefresh string) (*LoginResult,
 		}
 		return nil, apperrors.Unauthorized("token_invalid", errors.New("reuse detected"))
 	}
+	if time.Now().After(rec.ExpiresAt) {
+		return nil, apperrors.Unauthorized("token_invalid", errors.New("refresh expired"))
+	}
 	// Revoke the old token (rotation) and issue a new pair.
 	if err := u.refresh.Revoke(ctx, hash); err != nil {
 		return nil, apperrors.Internal("internal_error", err)
