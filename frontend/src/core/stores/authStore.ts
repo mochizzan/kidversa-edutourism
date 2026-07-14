@@ -7,12 +7,17 @@ import {
   apiRequest,
   setTokens,
   clearTokens,
+  getTokens,
   getStoredUser,
   setStoredUser,
   clearStoredUser,
   refreshAccessToken,
   fireUnauthorized,
 } from '../services/backendClient'
+
+// Single in-flight guard: concurrent checkSession calls (React StrictMode
+// double-invoke in dev) share one resolution instead of racing two refreshes.
+let sessionInFlight: Promise<void> | null = null
 
 // Role-based redirect map
 const ROLE_REDIRECTS: Record<string, string> = {
@@ -28,6 +33,7 @@ const ROLE_REDIRECTS: Record<string, string> = {
 export function redirectToLogin(): void {
   clearTokens()
   clearStoredUser()
+  useAuthStore.setState({ isLoading: false, isAuthenticated: false, user: null, token: null })
   fireUnauthorized()
 }
 
@@ -104,11 +110,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    // Best-effort backend logout (clears the session cookie server-side).
-    try {
-      await apiRequest('POST', '/api/auth/logout')
-    } catch {
-      // Ignore network/401 — local cleanup still happens.
+    // Best-effort backend logout — only when we actually hold a session, so
+    // we avoid a spurious 401 against /api/auth/logout when the session is
+    // already dead (e.g. refresh failed on reload).
+    if (getTokens().accessToken || get().isAuthenticated) {
+      try {
+        await apiRequest('POST', '/api/auth/logout')
+      } catch {
+        // Ignore network/401 — local cleanup still happens.
+      }
     }
     clearTokens()
     clearStoredUser()
@@ -116,66 +126,75 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       token: null,
       isAuthenticated: false,
+      isLoading: false, // CRITICAL: unblock <App> so login route renders (no infinite spinner)
     })
   },
 
   checkSession: async () => {
-    set({ isLoading: true })
-    try {
-      // Restore the user captured at login (full record) from sessionStorage.
-      const storedUser = getStoredUser<User>()
-      if (!storedUser) {
+    if (sessionInFlight) return sessionInFlight
+    sessionInFlight = (async () => {
+      set({ isLoading: true })
+      try {
+        // Restore the user captured at login (full record) from sessionStorage.
+        const storedUser = getStoredUser<User>()
+        if (!storedUser) {
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false,
+          })
+          return
+        }
+
+        // Optimistically restore the session; the in-memory token is null after
+        // a reload, but we will re-establish it via refresh below before any
+        // Bearer-protected call (e.g. /api/tenants) is made.
+        set({
+          user: storedUser,
+          token: null,
+          isAuthenticated: true,
+        })
+
+        // PULIHKAN bearer token dari refresh cookie SEBELUM deklarasi final.
+        // Tanpa ini, /api/tenants (wajib Bearer) akan 401 setelah reload karena
+        // accessToken null. Refresh memakai cookie HttpOnly (credentials:include),
+        // dan backend mengembalikan access_token baru.
+        try {
+          const token = await refreshAccessToken()
+          set({ token, isAuthenticated: true })
+        } catch {
+          // Refresh gagal (cookie tidak valid/kadaluarsa) ⇒ sesi mati.
+          await get().logout()
+          return
+        }
+
+        // Validate the session against the backend. /me returns only a minimal
+        // user — we do NOT replace our full stored user with it.
+        try {
+          await apiRequest('GET', '/api/auth/me')
+          set({ isLoading: false })
+        } catch (err) {
+          // A 401 means the session is no longer valid → clear it.
+          if (err instanceof Error && 'status' in err && (err as { status: number }).status === 401) {
+            await get().logout()
+          } else {
+            set({ isLoading: false })
+          }
+        }
+      } catch {
         set({
           user: null,
           token: null,
           isAuthenticated: false,
           isLoading: false,
         })
-        return
       }
-
-      // Optimistically restore the session; the in-memory token is null after
-      // a reload, but we will re-establish it via refresh below before any
-      // Bearer-protected call (e.g. /api/tenants) is made.
-      set({
-        user: storedUser,
-        token: null,
-        isAuthenticated: true,
-      })
-
-      // PULIHKAN bearer token dari refresh cookie SEBELUM deklarasi final.
-      // Tanpa ini, /api/tenants (wajib Bearer) akan 401 setelah reload karena
-      // accessToken null. Refresh memakai cookie HttpOnly (credentials:include),
-      // dan backend mengembalikan access_token baru.
-      try {
-        const token = await refreshAccessToken()
-        set({ token, isAuthenticated: true })
-      } catch {
-        // Refresh gagal (cookie tidak valid/kadaluarsa) ⇒ sesi mati.
-        await get().logout()
-        return
-      }
-
-      // Validate the session against the backend. /me returns only a minimal
-      // user — we do NOT replace our full stored user with it.
-      try {
-        await apiRequest('GET', '/api/auth/me')
-        set({ isLoading: false })
-      } catch (err) {
-        // A 401 means the session is no longer valid → clear it.
-        if (err instanceof Error && 'status' in err && (err as { status: number }).status === 401) {
-          await get().logout()
-        } else {
-          set({ isLoading: false })
-        }
-      }
-    } catch {
-      set({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-      })
+    })()
+    try {
+      await sessionInFlight
+    } finally {
+      sessionInFlight = null
     }
   },
 
