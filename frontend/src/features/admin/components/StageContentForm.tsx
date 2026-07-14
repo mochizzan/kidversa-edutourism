@@ -26,7 +26,7 @@ export interface StageContentFormValues {
 
 interface StageContentFormProps {
   initial?: StageContent | null
-  onSubmit: (data: StageContentFormValues) => void
+  onSubmit: (data: StageContentFormValues, file: File | null) => void
   onCancel: () => void
 }
 
@@ -56,9 +56,19 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
   const [compressing, setCompressing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const dragCounter = useRef(0)
+  // The actual File to upload (separate from the local blob preview URL).
+  const uploadFileRef = useRef<File | null>(null)
+  const previewUrlRef = useRef<string | null>(null)
 
   const set = <K extends keyof StageContentFormValues>(key: K, value: StageContentFormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
+
+  const revokePreview = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current)
+      previewUrlRef.current = null
+    }
+  }, [])
 
   const handleFileSelect = useCallback(async (file: File) => {
     setFileError(null)
@@ -107,7 +117,11 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
         })
       }
 
+      // Keep the processed file for upload; only use a blob URL locally for preview.
+      uploadFileRef.current = processedFile
+      revokePreview()
       const url = URL.createObjectURL(processedFile)
+      previewUrlRef.current = url
       set('file_url', url)
       set('file_type', detectedType)
 
@@ -120,7 +134,7 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
     } finally {
       setCompressing(false)
     }
-  }, [])
+  }, [revokePreview])
 
   const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -160,6 +174,8 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
   const clearFile = () => {
     set('file_url', '')
     setFileError(null)
+    uploadFileRef.current = null
+    revokePreview()
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -168,7 +184,7 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
       setFileError('File atau URL wajib diisi')
       return
     }
-    onSubmit(form)
+    onSubmit(form, uploadFileRef.current)
   }
 
   const isGameBundle = form.file_type === StageContentFileTypeEnum.GAME_BUNDLE

@@ -11,9 +11,10 @@ import (
 // MissionBankModel is the GORM persistence model for mission-bank templates.
 type MissionBankModel struct {
 	entity.MissionBank
-	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
+	RelatedStageIDsJSON entity.RawJSON `gorm:"column:related_stage_ids" json:"related_stage_ids_json,omitempty"`
+	CreatedAt           time.Time      `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt           time.Time      `gorm:"column:updated_at" json:"updated_at"`
+	DeletedAt           gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
 }
 
 // TableName pins the table name.

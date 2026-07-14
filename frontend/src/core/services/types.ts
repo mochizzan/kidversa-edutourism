@@ -8,6 +8,7 @@ import type {
   CreateStageDTO,
   UpdateStageDTO,
   StageContent,
+  StageContentFileType,
   Session,
   SessionStage,
   CreateSessionDTO,
@@ -48,6 +49,7 @@ export interface ProgramService {
 
   getContents(stageId: string): Promise<StageContent[]>
   createContent(stageId: string, data: Omit<StageContent, 'id' | 'program_stage_id' | 'created_at'>): Promise<StageContent>
+  uploadContent(stageId: string, data: { file: File; title: string; file_type: StageContentFileType; duration_seconds?: number }): Promise<StageContent>
   updateContent(stageId: string, contentId: string, data: Partial<Omit<StageContent, 'id' | 'program_stage_id' | 'created_at'>>): Promise<StageContent>
   deleteContent(stageId: string, contentId: string): Promise<void>
   reorderContents(stageId: string, contentIds: string[]): Promise<void>
@@ -97,6 +99,7 @@ export interface UserService {
   approve(userId: string, approverId: string): Promise<User>
   reject(userId: string, approverId: string, reason?: string): Promise<User>
   remove(userId: string): Promise<void>
+  uploadAvatar(id: string, file: File): Promise<User>
 }
 
 // Frames
@@ -106,6 +109,7 @@ export interface FrameService {
   create(data: Omit<PhotoFrame, 'id' | 'created_at'>): Promise<PhotoFrame>
   update(id: string, data: Partial<Omit<PhotoFrame, 'id' | 'created_at'>>): Promise<PhotoFrame>
   deactivate(id: string): Promise<PhotoFrame>
+  upload(data: { name: string; programId?: string; file: File }): Promise<PhotoFrame>
 }
 
 // Photos

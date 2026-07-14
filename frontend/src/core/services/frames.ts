@@ -2,6 +2,7 @@ import type { PaginatedResponse, ListParams, PhotoFrame } from '../types'
 import type { FrameService } from './types'
 import { apiRequest } from './backendClient'
 import { withTenantHeader, normalizeTenantId, itemRequest } from './apiEnvelope'
+import { uploadMultipart } from './uploadMultipart'
 
 // Frame service — backed by /api/frames (NOT /api/photo-frames) (C3).
 // Replaces the IndexedDB barrel. Preserves the `frameService` export name and
@@ -108,10 +109,23 @@ const deactivate = async (id: string): Promise<PhotoFrame> => {
   return itemRequest<PhotoFrame>('POST', `/api/frames/${id}/deactivate`)
 }
 
+const upload = async (data: {
+  name: string
+  programId?: string
+  file: File
+}): Promise<PhotoFrame> => {
+  const form = new FormData()
+  form.append('file', data.file)
+  form.append('name', data.name)
+  if (data.programId) form.append('program_id', data.programId)
+  return uploadMultipart<PhotoFrame>('/api/frames/upload', form)
+}
+
 export const frameService: FrameService = {
   getAll,
   getById,
   create,
   update,
   deactivate,
+  upload,
 }

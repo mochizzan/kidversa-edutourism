@@ -61,10 +61,10 @@ func seedFrame(db *gorm.DB, tenantID, programID string) string {
 	return fid
 }
 
-func seedMissionBank(db *gorm.DB, programID string) string {
+func seedMissionBank(db *gorm.DB, tenantID, programID string) string {
 	mid := newUUID()
-	if err := db.Exec("INSERT INTO mission_banks (id, program_id, category, title_child, title_parent, is_active, created_at, updated_at) VALUES (?, ?, 'HOME', 'Child', 'Parent', 1, NOW(3), NOW(3))",
-		mid, programID).Error; err != nil {
+	if err := db.Exec("INSERT INTO mission_banks (id, tenant_id, program_id, category, title_child, title_parent, is_active, sort_order, created_at, updated_at) VALUES (?, ?, ?, 'HOME', 'Child', 'Parent', 1, 0, NOW(3), NOW(3))",
+		mid, tenantID, programID).Error; err != nil {
 		return ""
 	}
 	return mid

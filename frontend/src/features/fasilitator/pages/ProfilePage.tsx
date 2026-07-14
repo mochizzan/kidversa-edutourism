@@ -18,7 +18,6 @@ import { useAuth } from '../../../core/hooks/useAuth'
 import { Card } from '../../../shared/components/ui/Card'
 import { ROUTES } from '../../../core/constants/app'
 import { Button } from '../../../shared/components/ui/Button'
-import { resizeImage } from '../../../core/utils/image'
 import { userService } from '../../../core/services/users'
 import { useAuthStore } from '../../../core/stores/authStore'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
@@ -29,6 +28,7 @@ import type { User as UserType } from '../../../core/types'
 import { AvatarUploadModal } from '../../../shared/components/ui/AvatarUploadModal'
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
 import { cn } from '../../../core/utils'
+import { resolveStoredUpload } from '../../../core/utils/media'
 
 const roleLabel: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
@@ -56,8 +56,7 @@ const ProfilePage = () => {
   const handleAvatarUpload = async (file: File) => {
     if (!user) return
     try {
-      const base64 = await resizeImage(file)
-      const updated = await userService.update(user.id, { avatar_url: base64 })
+      const updated = await userService.uploadAvatar(user.id, file)
       const { password_hash: _, ...cleanUser } = updated
       setUser(cleanUser as UserType)
       addToast({ type: 'success', message: 'Foto profil berhasil diperbarui' })
@@ -145,7 +144,7 @@ const ProfilePage = () => {
               avatarDragOver && 'ring-2 ring-primary'
             )}>
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt={user.name} className='w-full h-full object-cover rounded-full' />
+                <img src={resolveStoredUpload(user.avatar_url, 'avatar') ?? user.avatar_url} alt={user.name} className='w-full h-full object-cover rounded-full' />
               ) : (
                 <span className='text-[36px] md:text-[42px] lg:text-[48px] font-bold text-[#6D28D9]'>
                   {user.name?.charAt(0)?.toUpperCase() || '?'}
@@ -311,7 +310,7 @@ const ProfilePage = () => {
       <AvatarUploadModal
         open={showAvatarModal}
         onClose={() => { setShowAvatarModal(false); setPendingDragFile(null) }}
-        currentAvatarUrl={user.avatar_url}
+        currentAvatarUrl={resolveStoredUpload(user.avatar_url, 'avatar') ?? user.avatar_url}
         initialFile={pendingDragFile}
         onUpload={handleAvatarUpload}
       />

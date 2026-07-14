@@ -157,16 +157,18 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
       return
     }
 
-    const tenantIdToUse = tenantId
     setIsSaving(true)
     setErrorMessage(null)
     try {
+      // Upload each frame's real file to the server (NOT the local blob URL).
+      // The blob URL (item.preview) is only used for local preview display.
+      // Tenant scoping + ordering are derived on the server from the JWT/scope.
       await Promise.all(
-        items.map((item, index) =>
-          frameService.create({
-            tenant_id: tenantIdToUse, name: item.name.trim(),
-            program_id: item.programId || undefined,
-            file_url: item.preview, is_active: true, sort_order: index,
+        items.map((item) =>
+          frameService.upload({
+            name: item.name.trim(),
+            programId: item.programId || undefined,
+            file: item.file,
           }),
         ),
       )

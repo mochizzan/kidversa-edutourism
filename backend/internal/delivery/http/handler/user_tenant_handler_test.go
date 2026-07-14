@@ -69,6 +69,10 @@ func (f *fakeUserRepoPhase3) Delete(_ context.Context, id string) error {
 	delete(f.byID, id)
 	return nil
 }
+func (f *fakeUserRepoPhase3) HardDelete(_ context.Context, id string) error {
+	delete(f.byID, id)
+	return nil
+}
 func (f *fakeUserRepoPhase3) Approve(_ context.Context, id, approverID string) (*entity.User, error) {
 	u, ok := f.byID[id]
 	if !ok {

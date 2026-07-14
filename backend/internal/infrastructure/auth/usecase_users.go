@@ -129,7 +129,7 @@ func (u *UserUsecase) DeleteUser(ctx context.Context, id, actorRole, actorTenant
 			return apperrors.Forbidden("forbidden", errors.New("cross-tenant access"))
 		}
 	}
-	return u.users.Delete(ctx, id)
+	return u.users.HardDelete(ctx, id)
 }
 
 // ApproveUser approves + activates a user (SUPER_ADMIN only at the handler layer).

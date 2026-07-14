@@ -14,6 +14,7 @@ import (
 
 	"kidversa-edutourism-backend/internal/config"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
@@ -23,17 +24,28 @@ import (
 
 // UploadHandler serves the multipart file-upload endpoints that persist media
 // to disk (under cfg.UploadDir) and create the corresponding SmartPhoto /
-// Recording records. Served media is later retrieved via the authenticated
-// media handler (never e.Static).
+// Recording / PhotoFrame / StageContent records (or patch a User's avatar).
+// Served media is later retrieved via the authenticated media handler (never
+// e.Static).
 type UploadHandler struct {
 	cfg        *config.Config
 	photos     repository.PhotoRepository
 	recordings repository.RecordingRepository
+	frames     repository.FrameRepository
+	programs   repository.ProgramRepository
+	users      repository.UserRepository
 }
 
 // NewUploadHandler builds the upload handler.
-func NewUploadHandler(cfg *config.Config, photos repository.PhotoRepository, recordings repository.RecordingRepository) *UploadHandler {
-	return &UploadHandler{cfg: cfg, photos: photos, recordings: recordings}
+func NewUploadHandler(
+	cfg *config.Config,
+	photos repository.PhotoRepository,
+	recordings repository.RecordingRepository,
+	frames repository.FrameRepository,
+	programs repository.ProgramRepository,
+	users repository.UserRepository,
+) *UploadHandler {
+	return &UploadHandler{cfg: cfg, photos: photos, recordings: recordings, frames: frames, programs: programs, users: users}
 }
 
 const uploadFieldName = "file"
@@ -118,6 +130,131 @@ func (h *UploadHandler) UploadRecording(c *echo.Context) error {
 		return err
 	}
 	return appresp.Created(c, rec)
+}
+
+// UploadFrame handles POST /api/frames/upload:
+//   - validates + stores the multipart file to disk (subdir "frames"),
+//   - creates a PhotoFrame row referencing the stored file.
+//
+// The frame's owning tenant is derived from the JWT/scope (never the body, F5).
+// program_id is optional; name is required.
+func (h *UploadHandler) UploadFrame(c *echo.Context) error {
+	_, storedRel, err := h.persistFile(c, "frames")
+	if err != nil {
+		return err
+	}
+
+	name := (*c).FormValue("name")
+	if name == "" {
+		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "Nama frame wajib diisi")
+	}
+
+	tenantID := appmiddleware.GetTenantID(c)
+	f := &entity.PhotoFrame{
+		TenantID:     tenantID,
+		ProgramID:    (*c).FormValue("program_id"),
+		Name:         name,
+		FileURL:      storedRel,
+		IsActive:     true,
+		SortOrder:    0,
+	}
+	if v := (*c).FormValue("sort_order"); v != "" {
+		if n, e := strconv.Atoi(strings.TrimSpace(v)); e == nil {
+			f.SortOrder = n
+		}
+	}
+	if err := h.frames.Create((*c).Request().Context(), f); err != nil {
+		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		return err
+	}
+	return appresp.Created(c, dto.NewFrameResponse(f))
+}
+
+// UploadContent handles POST /api/program-stages/:stageId/contents/upload:
+//   - validates + stores the multipart file to disk (subdir "contents"),
+//   - creates a StageContent row referencing the stored file.
+//
+// The stage is resolved from the path param; tenant scoping is enforced through
+// the stage's owning program (looked up from the path id). file_type is required.
+func (h *UploadHandler) UploadContent(c *echo.Context) error {
+	stageID, ok := bindUUID(c, "stageId")
+	if !ok {
+		return nil
+	}
+	_, storedRel, err := h.persistFile(c, "contents")
+	if err != nil {
+		return err
+	}
+
+	title := (*c).FormValue("title")
+	if title == "" {
+		title = (*c).FormValue("name")
+	}
+	fileType := entity.StageContentFileType((*c).FormValue("file_type"))
+	if fileType == "" {
+		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "Tipe file konten wajib diisi")
+	}
+
+	ct := &entity.StageContent{
+		ProgramStageID: stageID,
+		Title:          title,
+		FileURL:        storedRel,
+		FileType:       fileType,
+		IsActive:       true,
+		SortOrder:      0,
+	}
+	if v := (*c).FormValue("duration_seconds"); v != "" {
+		if n, e := strconv.Atoi(strings.TrimSpace(v)); e == nil {
+			ct.DurationSeconds = n
+		}
+	}
+	if err := h.programs.CreateContent((*c).Request().Context(), ct); err != nil {
+		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		return err
+	}
+	return appresp.Created(c, ct)
+}
+
+// UploadAvatar handles POST /api/users/:id/avatar:
+//   - validates + stores the multipart file to disk (subdir "avatars"),
+//   - updates the user's avatar_url to the stored path.
+//
+// Tenant scoping for the target user is enforced by the user repository's
+// Update path (same-tenant / SUPER_ADMIN). The file is stored as a path, never
+// a base64 blob, to keep the VARCHAR column small.
+func (h *UploadHandler) UploadAvatar(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+
+	// Scope guard: only the target user themselves, or an admin/koordinator/
+	// super_admin (the admin "edit user" flow), may set the avatar. A facilitator
+	// uploading someone else's avatar is rejected.
+	actorID := appmiddleware.GetUserID(c)
+	actorRole, _ := (*c).Get(appmiddleware.CtxRole).(string)
+	if id != actorID && actorRole != string(entity.RoleSuperAdmin) && actorRole != string(entity.RoleAdmin) && actorRole != string(entity.RoleKoordinator) {
+		return appresp.Fail(c, http.StatusForbidden, "forbidden")
+	}
+
+	_, storedRel, err := h.persistFile(c, "avatars")
+	if err != nil {
+		return err
+	}
+
+	user, err := h.users.GetByID((*c).Request().Context(), id)
+	if err != nil {
+		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		return err
+	}
+	user.AvatarURL = storedRel
+	if err := h.users.Update((*c).Request().Context(), user); err != nil {
+		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		return err
+	}
+	return appresp.OK(c, user)
 }
 
 // persistFile validates, sniffs, and stores the uploaded file into a subdir of

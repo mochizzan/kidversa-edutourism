@@ -30,6 +30,10 @@ type UserRepository interface {
 	Update(ctx context.Context, u *entity.User) error
 	Delete(ctx context.Context, id string) error
 
+	// HardDelete permanently removes a user row (ignores soft-delete scope).
+	// Used for irreversible SUPER_ADMIN user removal.
+	HardDelete(ctx context.Context, id string) error
+
 	// Approve marks a user approved and active.
 	Approve(ctx context.Context, id, approverID string) (*entity.User, error)
 	// Reject marks a user rejected (inactive).

@@ -9,6 +9,7 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
 import type { Program, ProgramStage, StageContent } from '../../../core/types'
+import { StageContentFileType as StageContentFileTypeEnum } from '../../../core/types/enums'
 import { syncStageMeta } from '../../../core/utils/content'
 import { StageContentForm, type StageContentFormValues } from '../components/StageContentForm'
 
@@ -92,18 +93,44 @@ const ContentFormPage = () => {
     loadStages(programId)
   }
 
-  const handleContentSubmit = async (data: StageContentFormValues) => {
+  const handleContentSubmit = async (data: StageContentFormValues, file: File | null) => {
     if (!stageId) {
       addToast({ type: 'error', message: 'Pilih stage terlebih dahulu' })
       return
     }
     try {
+      const isGameBundle = data.file_type === StageContentFileTypeEnum.GAME_BUNDLE
       if (isEdit && contentId) {
-        await programService.updateContent(stageId, contentId, data)
+        // Edits keep the existing file unless a file was selected.
+        if (file && !isGameBundle) {
+          await programService.uploadContent(stageId, {
+            file,
+            title: data.title,
+            file_type: data.file_type,
+            duration_seconds: data.duration_seconds,
+          })
+          await programService.deleteContent(stageId, contentId)
+        } else {
+          await programService.updateContent(stageId, contentId, data)
+        }
         addToast({ type: 'success', message: 'Konten berhasil diperbarui' })
       } else {
         const existing = await programService.getContents(stageId)
-        await programService.createContent(stageId, { ...data, sort_order: existing.length })
+        const sortOrder = existing.length
+        if (data.file_url && isGameBundle) {
+          // Game bundles use a URL, not a file upload.
+          await programService.createContent(stageId, { ...data, sort_order: sortOrder })
+        } else if (file) {
+          await programService.uploadContent(stageId, {
+            file,
+            title: data.title,
+            file_type: data.file_type,
+            duration_seconds: data.duration_seconds,
+          })
+        } else {
+          addToast({ type: 'error', message: 'Pilih file terlebih dahulu' })
+          return
+        }
         addToast({ type: 'success', message: 'Konten baru berhasil ditambahkan' })
       }
 

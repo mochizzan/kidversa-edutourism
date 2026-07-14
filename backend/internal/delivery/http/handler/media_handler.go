@@ -16,16 +16,20 @@ import (
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
-// MediaHandler serves uploaded media (photos / recordings of children) through
-// an authenticated, tenant-scoped route. Media is NEVER served via e.Static;
-// every request is gated by JWT auth, tenant scope, and (for photos) a consent
-// log check. HTML / SVG content is refused to prevent stored-XSS.
+// MediaHandler serves uploaded media (photos / recordings of children, plus
+// decorative frames, stage content, and user avatars) through an authenticated,
+// tenant-scoped route. Media is NEVER served via e.Static; every request is
+// gated by JWT auth, tenant scope, and (for photos/recordings) a consent log
+// check. HTML / SVG content is refused to prevent stored-XSS.
 type MediaHandler struct {
 	cfg        *config.Config
 	photos     repository.PhotoRepository
 	recordings repository.RecordingRepository
 	consent    repository.ConsentRepository
 	sessions   repository.SessionRepository
+	frames     repository.FrameRepository
+	programs   repository.ProgramRepository
+	users      repository.UserRepository
 }
 
 // NewMediaHandler builds the media handler.
@@ -35,8 +39,11 @@ func NewMediaHandler(
 	recordings repository.RecordingRepository,
 	consent repository.ConsentRepository,
 	sessions repository.SessionRepository,
+	frames repository.FrameRepository,
+	programs repository.ProgramRepository,
+	users repository.UserRepository,
 ) *MediaHandler {
-	return &MediaHandler{cfg: cfg, photos: photos, recordings: recordings, consent: consent, sessions: sessions}
+	return &MediaHandler{cfg: cfg, photos: photos, recordings: recordings, consent: consent, sessions: sessions, frames: frames, programs: programs, users: users}
 }
 
 // mediaKind enumerates the served asset kinds.
@@ -45,20 +52,24 @@ type mediaKind string
 const (
 	kindPhoto     mediaKind = "photo"
 	kindRecording mediaKind = "recording"
+	kindFrame     mediaKind = "frame"
+	kindContent   mediaKind = "content"
+	kindAvatar    mediaKind = "avatar"
 )
 
 // Get handles GET /api/media/:kind/:id.
-//   - :kind is "photo" or "recording"; any other value is 400.
+//   - :kind is "photo", "recording", "frame", "content", or "avatar"; any other
+//     value is 400.
 //   - :id must be a UUID; otherwise 400.
 //   - Requires a valid JWT (enforced by JWTAuth middleware upstream).
 //   - Enforces tenant scope: the asset's owning tenant must equal the caller's
 //     resolved tenant (from TenantScope middleware).
-//   - For photos, requires a positive ConsentLog value for PHOTO consent.
+//   - For photos/recordings, requires a positive ConsentLog value.
 //   - Reads the file from disk and streams it with a SAFE content type; refuses
 //     to serve .html (or any disallowed type).
 func (h *MediaHandler) Get(c *echo.Context) error {
 	kind := mediaKind((*c).Param("kind"))
-	if kind != kindPhoto && kind != kindRecording {
+	if kind != kindPhoto && kind != kindRecording && kind != kindFrame && kind != kindContent && kind != kindAvatar {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
 	id := (*c).Param("id")
@@ -115,6 +126,40 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		if !granted {
 			return appresp.Fail(c, http.StatusForbidden, "consent_required")
 		}
+	case kindFrame:
+		// Frames are decorative overlays; no consent gate. Tenant scope is
+		// enforced via the frame's stored tenant_id.
+		rec, err := h.frames.GetByID(ctx, id, "")
+		if err != nil {
+			return err
+		}
+		relPath = rec.FileURL
+		owningTenant = rec.TenantID
+	case kindContent:
+		// Stage content is curriculum media; no consent gate. Tenant scope is
+		// resolved through the content's program.
+		ct, err := h.programs.GetContentByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		relPath = ct.FileURL
+		stage, serr := h.programs.GetStageByID(ctx, ct.ProgramStageID)
+		if serr != nil {
+			return serr
+		}
+		program, perr := h.programs.GetProgramByID(ctx, stage.ProgramID)
+		if perr != nil {
+			return perr
+		}
+		owningTenant = derefTenant(program.TenantID)
+	case kindAvatar:
+		// Avatars are user profile images; tenant scope via the user's tenant.
+		u, err := h.users.GetByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		relPath = u.AvatarURL
+		owningTenant = derefTenant(u.TenantID)
 	}
 
 	// Tenant scope check.
@@ -147,6 +192,14 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusForbidden, "file_type_blocked")
 	}
 	return (*c).Blob(http.StatusOK, ct, data)
+}
+
+// derefTenant normalizes a nullable tenant pointer into an empty-or-value string.
+func derefTenant(tid *string) string {
+	if tid == nil {
+		return ""
+	}
+	return *tid
 }
 
 // safeContentType maps a file extension to a safe content type, returning ""

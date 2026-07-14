@@ -54,6 +54,7 @@ CLAUDE.md
 
 # Docs & plans (not for version control)
 docs/
+.plans/
 
 # Images & assets
 img/

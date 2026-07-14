@@ -9,6 +9,7 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { frameService } from '../../../core/services/frames'
 import { programService } from '../../../core/services/programs'
+import { resolveStoredUpload } from '../../../core/utils/media'
 import type { Program } from '../../../core/types'
 
 const FrameFormPage = () => {
@@ -124,7 +125,11 @@ const FrameFormPage = () => {
             <label className="block text-sm font-medium text-on-surface mb-1">Preview</label>
             <div className="w-full aspect-[4/3] rounded-xl bg-surface-container-high flex items-center justify-center overflow-hidden border border-outline-variant">
               {form.thumbnail_url || form.file_url ? (
-                <img src={form.thumbnail_url || form.file_url} alt={form.name} className="w-full h-full object-cover" />
+                <img
+                  src={resolveStoredUpload(form.thumbnail_url || form.file_url, 'frame') ?? form.file_url}
+                  alt={form.name}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <Image className="w-8 h-8 text-on-surface-variant/50" />
               )}

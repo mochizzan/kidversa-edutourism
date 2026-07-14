@@ -19,6 +19,7 @@ import {
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { cn } from '../../../core/utils'
+import { resolveStoredUpload } from '../../../core/utils/media'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { photoService } from '../../../core/services/photos'
@@ -332,7 +333,7 @@ const SmartPhotoPage = () => {
         const frame = frames.find((f) => f.id === selectedFrameId)
         if (frame?.file_url) {
           try {
-            const frameImg = await loadImage(frame.file_url)
+            const frameImg = await loadImage(resolveStoredUpload(frame.file_url, 'frame') ?? frame.file_url)
             if (!cancelled) {
               ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height)
             }
@@ -537,7 +538,7 @@ const SmartPhotoPage = () => {
         >
           {(frame.thumbnail_url || frame.file_url) ? (
             <img
-              src={frame.thumbnail_url || frame.file_url}
+              src={resolveStoredUpload(frame.thumbnail_url || frame.file_url, 'frame') ?? frame.file_url}
               alt={frame.name}
               className="w-full h-full object-cover"
               onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect fill="%23e0e0e0" width="200" height="200"/><text x="50%" y="50%" fill="%23999" text-anchor="middle" dy=".3em" font-size="14" font-family="sans-serif">Gagal Muat</text></svg>' }}
@@ -796,7 +797,7 @@ const SmartPhotoPage = () => {
                     className="aspect-[3/4] overflow-hidden rounded-2xl bg-[#F7F2FA] relative group border border-[#E6E0E9] shadow-sm"
                   >
                     <img
-                      src={photo.framed_file_url || photo.original_file_url}
+                      src={(resolveStoredUpload(photo.framed_file_url || photo.original_file_url, 'photo')) ?? (photo.framed_file_url || photo.original_file_url)}
                       alt=""
                       className="w-full h-full object-cover"
                     />
@@ -901,7 +902,7 @@ const SmartPhotoPage = () => {
 
       {fullscreenPhoto && (
         <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4" onClick={() => setFullscreenPhoto(null)}>
-          <img src={fullscreenPhoto.framed_file_url || fullscreenPhoto.original_file_url} alt="" className="max-w-full max-h-[85vh] object-contain rounded-lg" />
+          <img src={(resolveStoredUpload(fullscreenPhoto.framed_file_url || fullscreenPhoto.original_file_url, 'photo')) ?? (fullscreenPhoto.framed_file_url || fullscreenPhoto.original_file_url)} alt="" className="max-w-full max-h-[85vh] object-contain rounded-lg" />
           <button onClick={() => setFullscreenPhoto(null)} className="absolute top-4 right-4 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-all">
             <X className="w-6 h-6" />
           </button>

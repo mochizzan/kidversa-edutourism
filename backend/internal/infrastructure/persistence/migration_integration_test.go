@@ -136,8 +136,8 @@ func TestB9ParticipantMissionTxReplace(t *testing.T) {
 		t.Fatalf("create report: %v", err)
 	}
 
-	mb1 := seedMissionBank(db, program)
-	mb2 := seedMissionBank(db, program)
+	mb1 := seedMissionBank(db, tenant, program)
+	mb2 := seedMissionBank(db, tenant, program)
 	repo := NewParticipantMissionRepository(db)
 	items := []entity.ParticipantMission{
 		{ParticipantID: pid, ReportID: report.ID, MissionBankID: mb1, IsCompleted: true},

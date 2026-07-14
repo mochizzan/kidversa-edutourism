@@ -82,8 +82,8 @@ func main() {
 	registry.ParticipantMission = handler.NewParticipantMissionHandler(participantMissionRepo)
 	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo)
 	registry.Frame = handler.NewFrameHandler(frameRepo)
-	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, recordingRepo)
-	registry.Media = handler.NewMediaHandler(cfg, photoRepo, recordingRepo, consentRepo, sessionRepo)
+	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, recordingRepo, frameRepo, programRepo, userRepo)
+	registry.Media = handler.NewMediaHandler(cfg, photoRepo, recordingRepo, consentRepo, sessionRepo, frameRepo, programRepo, userRepo)
 
 	deps := httppkg.Deps{
 		Config:   cfg,

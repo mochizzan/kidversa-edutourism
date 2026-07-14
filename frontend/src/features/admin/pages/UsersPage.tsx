@@ -63,6 +63,7 @@ const UsersPage = () => {
   const [rejectReason, setRejectReason] = useState('')
   const [deactivateId, setDeactivateId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const { getHighlightClass } = useHighlight()
 
   useEffect(() => {
@@ -160,6 +161,7 @@ const UsersPage = () => {
     if (!deleteId) return
     await userService.remove(deleteId)
     setDeleteId(null)
+    setDeleteConfirmText('')
     refresh()
   }
 
@@ -357,13 +359,21 @@ const UsersPage = () => {
         <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menonaktifkan user ini?</p>
       </Modal>
 
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Hapus User" footer={
+      <Modal open={!!deleteId} onClose={() => { setDeleteId(null); setDeleteConfirmText('') }} title="Hapus User Secara Permanen" footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDeleteId(null)}>Batal</Button>
-          <Button variant="danger" onClick={handleDelete}>Hapus</Button>
+          <Button variant="secondary" onClick={() => { setDeleteId(null); setDeleteConfirmText('') }}>Batal</Button>
+          <Button variant="danger" disabled={deleteConfirmText !== 'HAPUS'} onClick={handleDelete}>Hapus Permanen</Button>
         </div>
       }>
-        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menghapus user ini? Tindakan ini tidak dapat dibatalkan.</p>
+        <div className="space-y-3">
+          <p className="text-sm text-on-surface-variant">Tindakan ini <b>tidak dapat dibatalkan</b> dan akan menghapus data user dari database. Ketik <b>HAPUS</b> untuk konfirmasi.</p>
+          <input
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            placeholder="Ketik HAPUS"
+            className="w-full px-3 py-2 rounded-xl border text-sm outline-none bg-surface-container-low border-outline-variant/60 text-on-surface"
+          />
+        </div>
       </Modal>
     </div>
   )

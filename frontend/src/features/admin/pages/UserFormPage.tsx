@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,8 +16,8 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { redirectToLogin } from '../../../core/stores/authStore'
+import { resolveStoredUpload } from '../../../core/utils/media'
 import { ApiError } from '../../../core/services/backendClient'
-import { resizeImage } from '../../../core/utils/image'
 import type { UpdateUserDTO } from '../../../core/types'
 import { UserRole } from '../../../core/types'
 import { PasswordStrengthBar } from '../../auth/components/PasswordStrengthBar'
@@ -67,6 +67,7 @@ const UserFormPage = () => {
   
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const avatarFileRef = useRef<File | null>(null)
 
   const form = useForm<CreateFormData>({
     resolver: zodResolver(isEdit ? updateUserSchema : createUserSchema) as unknown as Resolver<CreateFormData>,
@@ -92,7 +93,7 @@ const UserFormPage = () => {
             phone: foundUser.phone || '',
             role: foundUser.role,
           } as UpdateFormData)
-          setAvatarPreview(foundUser.avatar_url || null)
+          setAvatarPreview(foundUser.avatar_url ? resolveStoredUpload(foundUser.avatar_url, 'avatar') ?? foundUser.avatar_url : null)
         } else {
           addToast({ type: 'error', message: 'User tidak ditemukan' })
           navigate(ROUTES.ADMIN.USERS)
@@ -104,8 +105,8 @@ const UserFormPage = () => {
 
   const handleAvatarUpload = async (file: File) => {
     try {
-      const base64 = await resizeImage(file)
-      setAvatarPreview(base64)
+      avatarFileRef.current = file
+      setAvatarPreview(URL.createObjectURL(file))
       setShowAvatarModal(false)
     } catch {
       addToast({ type: 'error', message: 'Gagal memproses gambar' })
@@ -122,10 +123,14 @@ const UserFormPage = () => {
           role: data.role,
           phone: data.phone || undefined,
         }
-        if (avatarPreview) payload.avatar_url = avatarPreview
-        
-        await userService.update(userId, payload)
+        const updated = await userService.update(userId, payload)
+        // Upload the avatar file separately (if changed) so it's stored as a
+        // server path rather than a base64 blob in the avatar_url column.
+        if (avatarFileRef.current) {
+          await userService.uploadAvatar(userId, avatarFileRef.current)
+        }
         addToast({ type: 'success', message: 'User berhasil diperbarui' })
+        void updated
       } else {
         if (!tenantId) {
           addToast({ type: 'error', message: requiresSelection ? 'Pilih tenant aktif terlebih dahulu.' : 'Tenant belum tersedia.' })
@@ -133,15 +138,17 @@ const UserFormPage = () => {
           return
         }
         const createData = data as CreateFormData
-        await userService.create({
+        const created = await userService.create({
           tenant_id: tenantId,
           name: createData.name,
           email: createData.email,
           password: createData.password,
           role: createData.role,
           phone: createData.phone || undefined,
-          avatar_url: avatarPreview || undefined,
         })
+        if (avatarFileRef.current) {
+          await userService.uploadAvatar(created.id, avatarFileRef.current)
+        }
         addToast({ type: 'success', message: 'User baru berhasil ditambahkan' })
       }
       navigate(ROUTES.ADMIN.USERS)

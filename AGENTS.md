@@ -18,11 +18,12 @@ Kidversa Edutourism — interactive digital storytelling platform for children (
 cd frontend
 pnpm install          # install deps
 pnpm dev              # dev server → http://localhost:5173
-pnpm build            # tsc -b && vite build  ← primary verification (no lint/test scripts)
+pnpm build            # build:raport-css → tsc -b → vite build  ← primary verification (no lint/test scripts)
 pnpm preview          # preview production build
 ```
 
 - `pnpm build` is the only CI-equivalent check. Run it after any change.
+- `build` first runs `build:raport-css` (`@tailwindcss/cli` compiles `shared/templates/miniRaport.tailwind.css` → `miniRaport.styles.css`, an inlined stylesheet for the printable mini-raport). Edit the `.tailwind.css` source, not the generated `.styles.css`.
 - `tsconfig.json` enables `strict`, `noUnusedLocals`, `noUnusedParameters`, `noUncheckedSideEffectImports` — every unused import/var is a build error.
 - Vite proxies `/api` → `http://localhost:8080`.
 
@@ -39,7 +40,7 @@ pnpm preview          # preview production build
 ```
 app/          # router.tsx (thin assembler) + routes/ (per-feature route defs), providers/
 core/         # config/, constants/, hooks/, services/, stores/, theme/, types/, utils/
-features/     # admin/, auth/, fasilitator/, parent/
+features/     # admin/, auth/, fasilitator/, parent/, learner/
 shared/       # components/{ui,data,charts,feedback,layout,auth}, hooks/, layouts/, types/, utils/
 pages/        # LandingPage, LearnerKioskPage, NotFoundPage
 ```
@@ -141,7 +142,7 @@ Always check existing components before creating new ones.
 
 ## Gotchas
 
-- No `.env` files — `VITE_API_BASE_URL` defaults to `http://localhost:8080` (hardcoded in `core/constants/app.ts` and `backendClient.ts`).
-- Gitignored: `docs/`, `img/`, `CLAUDE.md`, `.claude/`, `.codegraph/`, `.kilo/`, and the backend binary `kidversa-server`.
+- Frontend has **no `.env`** — `VITE_API_BASE_URL` is hardcoded to `http://localhost:8080` in `core/constants/app.ts` and `backendClient.ts`. The backend **does** use `backend/.env` (gitignored) — backend/.env.example documents every var.
+- Gitignored (root `.gitignore`): `node_modules/`, `vendor/`, `dist/`, `*.exe`, `*.db/*.sqlite*`, `.env`, `CLAUDE.md`, `.claude/`, `.codegraph/`, `.kilo/`, `.serena/`. (`docs/` and `img/` are tracked, not ignored.)
 - `noUnusedLocals`/`noUnusedParameters` are enabled — every unused import breaks the build.
 - TanStack React Query installed but no `QueryClientProvider` — don't use `useQuery` hooks yet.

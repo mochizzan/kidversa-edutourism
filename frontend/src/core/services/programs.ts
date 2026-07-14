@@ -10,6 +10,7 @@ import type {
   ToggleActiveResult,
 } from '../types'
 import { listRequest, itemRequest, voidRequest, arrayRequest } from './apiEnvelope'
+import { uploadMultipart } from './uploadMultipart'
 
 // Program stages are ordered by sequence_order. The list endpoint returns them
 // unsorted; sort defensively so hydration matches the idb behaviour.
@@ -105,6 +106,20 @@ export const programService: ProgramService = {
       sort_order: data.sort_order,
       is_active: data.is_active,
     }),
+
+  uploadContent: (stageId, data) => {
+    const form = new FormData()
+    form.append('file', data.file)
+    form.append('title', data.title)
+    form.append('file_type', data.file_type)
+    if (data.duration_seconds !== undefined) {
+      form.append('duration_seconds', String(data.duration_seconds))
+    }
+    return uploadMultipart<StageContent>(
+      `/api/programs/program-stages/${stageId}/contents/upload`,
+      form,
+    )
+  },
 
   updateContent: (stageId, contentId, data) =>
     itemRequest<StageContent>('PUT', `/api/programs/program-stages/${stageId}/contents/${contentId}`, {

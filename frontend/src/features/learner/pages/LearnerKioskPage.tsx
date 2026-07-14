@@ -5,6 +5,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { apiRequest, ApiError } from '../../../core/services/backendClient'
 import type { Session, SessionStage, StageContent } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
+import { resolveStoredUpload } from '../../../core/utils/media'
 
 /* ── Public kiosk payload (GET /api/sessions/:id/kiosk?token=) ──
    Mirrors the backend kioskResponse DTO: the session, its stages, and each
@@ -162,7 +163,7 @@ const LearnerKioskPage = () => {
         {currentContent?.file_type === StageContentFileType.VIDEO && (
           <video
             key={currentContent.id}
-            src={currentContent.file_url}
+            src={resolveStoredUpload(currentContent.file_url, 'content') ?? currentContent.file_url}
             className="max-w-full max-h-full"
             autoPlay={isPlaying}
             muted={isMuted}
@@ -173,7 +174,7 @@ const LearnerKioskPage = () => {
         {currentContent?.file_type === StageContentFileType.IMAGE && (
           <img
             key={currentContent.id}
-            src={currentContent.file_url}
+            src={resolveStoredUpload(currentContent.file_url, 'content') ?? currentContent.file_url}
             alt={currentContent.title}
             className="max-w-full max-h-full object-contain"
           />
@@ -185,7 +186,7 @@ const LearnerKioskPage = () => {
             </div>
             <audio
               key={currentContent.id}
-              src={currentContent.file_url}
+              src={resolveStoredUpload(currentContent.file_url, 'content') ?? currentContent.file_url}
               autoPlay={isPlaying}
               muted={isMuted}
               controls

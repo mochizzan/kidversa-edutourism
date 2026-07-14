@@ -50,6 +50,7 @@ import {
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 import { extractFirstSentence } from '../../../core/utils/reportNarrative'
+import { resolveStoredUpload } from '../../../core/utils/media'
 
 /* ── Combined stage info for rendering ── */
 interface StageInfo {
@@ -445,7 +446,7 @@ const ReportReviewPage = () => {
                   Foto
                 </p>
                 <img
-                  src={photo.framed_file_url || photo.original_file_url}
+                  src={(resolveStoredUpload(photo.framed_file_url || photo.original_file_url, 'photo')) ?? (photo.framed_file_url || photo.original_file_url)}
                   alt={participant.child_name}
                   className="w-24 h-24 object-cover rounded-xl"
                 />
@@ -467,7 +468,7 @@ const ReportReviewPage = () => {
             <div className="w-20 h-20 rounded-2xl bg-surface-variant flex items-center justify-center shrink-0 overflow-hidden">
               {photo ? (
                 <img
-                  src={photo.framed_file_url || photo.original_file_url}
+                  src={(resolveStoredUpload(photo.framed_file_url || photo.original_file_url, 'photo')) ?? (photo.framed_file_url || photo.original_file_url)}
                   alt={participant.child_name}
                   className="w-full h-full object-cover"
                   onError={(e) => {

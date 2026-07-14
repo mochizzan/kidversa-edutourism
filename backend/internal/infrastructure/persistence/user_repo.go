@@ -111,6 +111,27 @@ func (r *GormUserRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// HardDelete permanently removes a user row, bypassing GORM's soft-delete scope.
+// It first clears the FK RESTRICT reference (sessions.created_by) so the hard
+// delete does not fail, then runs a real DELETE. MariaDB then applies the
+// ON DELETE CASCADE (refresh_tokens, notifications) and ON DELETE SET NULL
+// (users.approved_by / users.rejected_by) constraints automatically.
+func (r *GormUserRepository) HardDelete(ctx context.Context, id string) error {
+	// Release FK RESTRICT: sessions.created_by -> NULL. A rejected/pending user
+	// normally owns no sessions, but handle it so the hard delete never fails.
+	if err := r.db.WithContext(ctx).
+		Model(&SessionModel{}).Where("created_by = ?", id).
+		Update("created_by", nil).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	// Real deletion (skip GORM soft-delete scope).
+	if err := r.db.WithContext(ctx).
+		Unscoped().Delete(&UserModel{}, "id = ?", id).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
 func (r *GormUserRepository) Approve(ctx context.Context, id, approverID string) (*entity.User, error) {
 	var m UserModel
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
@@ -119,7 +140,7 @@ func (r *GormUserRepository) Approve(ctx context.Context, id, approverID string)
 		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	now := time.Now().Format("2006-01-02T15:04:05Z07:00")
+	now := time.Now().Format("2006-01-02 15:04:05.000")
 	m.IsActive = true
 	m.ApprovalStatus = entity.ApprovalApproved
 	m.ApprovedAt = &now
@@ -141,7 +162,7 @@ func (r *GormUserRepository) Reject(ctx context.Context, id, approverID, reason 
 		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	now := time.Now().Format("2006-01-02T15:04:05Z07:00")
+	now := time.Now().Format("2006-01-02 15:04:05.000")
 	m.IsActive = false
 	m.ApprovalStatus = entity.ApprovalRejected
 	m.RejectedAt = &now

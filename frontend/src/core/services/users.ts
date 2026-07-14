@@ -2,6 +2,7 @@ import type { UserService } from './types'
 import type { User, CreateUserDTO, UpdateUserDTO } from '../types'
 import { listRequest, itemRequest, voidRequest } from './apiEnvelope'
 import { normalizePhone } from '../utils/phone'
+import { uploadMultipart } from './uploadMultipart'
 
 export const userService: UserService = {
   getAll: (params) => listRequest<User>('/api/users', params),
@@ -47,4 +48,10 @@ export const userService: UserService = {
     itemRequest<User>('POST', `/api/users/${userId}/reject`, reason ? { reason } : {}),
 
   remove: (userId) => voidRequest('DELETE', `/api/users/${userId}`),
+
+  uploadAvatar: (id, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return uploadMultipart<User>(`/api/users/${id}/avatar`, form)
+  },
 }
