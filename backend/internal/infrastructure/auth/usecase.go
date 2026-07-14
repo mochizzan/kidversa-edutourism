@@ -35,6 +35,10 @@ type RefreshRecord struct {
 	RevokedAt *time.Time
 }
 
+// KioskTokenTTL is the default lifetime of an issued kiosk token. It is also the
+// upper bound enforced by IssueKioskToken (ttl is clamped to [1h, KioskTokenTTL]).
+const KioskTokenTTL = 4 * time.Hour
+
 // Usecase implements authentication business logic.
 type Usecase struct {
 	users   repository.UserRepository
@@ -129,11 +133,11 @@ func (u *Usecase) Logout(ctx context.Context, refreshTok, accessJTI string, acce
 	return nil
 }
 
-// Logout revokes the current refresh token and denylists the access jti.
-// ttl is clamped to [1h, 4h] (plan B11). The raw token is never logged.
+	// Logout revokes the current refresh token and denylists the access jti.
+	// ttl is clamped to [1h, KioskTokenTTL] (plan B11). The raw token is never logged.
 func (u *Usecase) IssueKioskToken(ctx context.Context, sessionID, tenantID string, ttl time.Duration) (string, error) {
 	const minTTL = time.Hour
-	const maxTTL = 4 * time.Hour
+	const maxTTL = KioskTokenTTL
 	if ttl < minTTL {
 		ttl = minTTL
 	}

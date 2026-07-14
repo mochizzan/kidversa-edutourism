@@ -10,6 +10,7 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { sessionService } from '../../../core/services/sessions'
+import { UserRole } from '../../../core/types/enums'
 import { programService } from '../../../core/services/programs'
 import { userService } from '../../../core/services/users'
 import { ApiError } from '../../../core/services/backendClient'
@@ -49,7 +50,7 @@ const SessionDetailPage = () => {
     try {
       const s = await sessionService.getById(sessionId)
       setSession(s)
-      const users = await userService.getAll({ filters: { role: 'FASILITATOR' } })
+      const users = await userService.getAll({ filters: { role: UserRole.FASILITATOR } })
       setFacilitators(users.data)
     } finally {
       setLoading(false)

@@ -10,6 +10,7 @@ import { DataTable } from '../../../shared/components/data/DataTable'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { useCrudList } from '../../../shared/hooks/useCrudList'
+import { UserRole } from '../../../core/types/enums'
 import { userService } from '../../../core/services/users'
 import { tenantService } from '../../../core/services/tenants'
 import { useAuth } from '../../../core/hooks/useAuth'
@@ -52,7 +53,7 @@ const UsersPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const { user: currentUser } = useAuth()
   const { tenantId } = useTenantScope()
-  const isSuperAdminView = currentUser?.role === 'SUPER_ADMIN'
+  const isSuperAdminView = currentUser?.role === UserRole.SUPER_ADMIN
 
   const [activeTab, setActiveTab] = useState<FilterTab>(parseFilter(searchParams.get('filter')))
   const [tenantFilter, setTenantFilter] = useState(searchParams.get('tenant') || '')

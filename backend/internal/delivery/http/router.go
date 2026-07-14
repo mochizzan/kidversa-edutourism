@@ -75,7 +75,7 @@ func NewRouter(d Deps) *echo.Echo {
 	handler.RegisterFramesRoutes(api.Group("/frames"), h.Frame, d.JWT, d.Revoker)
 
 	// File upload + authenticated media.
-	handler.RegisterUploadRoutes(api.Group("/api"), h.Upload, d.JWT, d.Config, d.Revoker)
+	handler.RegisterUploadRoutes(api.Group(""), h.Upload, d.JWT, d.Config, d.Revoker)
 	handler.RegisterMediaRoutes(api.Group("/media"), h.Media, d.JWT, d.Config, d.Revoker)
 
 	return e

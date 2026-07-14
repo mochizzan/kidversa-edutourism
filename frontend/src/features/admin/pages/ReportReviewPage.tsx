@@ -49,6 +49,7 @@ import {
 } from '../../../core/constants/report'
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
+import { extractFirstSentence } from '../../../core/utils/reportNarrative'
 
 /* ── Combined stage info for rendering ── */
 interface StageInfo {
@@ -209,10 +210,7 @@ const ReportReviewPage = () => {
   /* ── Build mini raport HTML (shared by print + PNG) ── */
   const buildRaportHtml = (): string | null => {
     if (!participant || !session) return null
-    const quote = narrativeText
-      ? (narrativeText.match(/^[^.!?\n]+[.!?]/)?.[0]?.trim() ||
-        narrativeText.split('\n')[0].trim().slice(0, 120))
-      : undefined
+    const quote = extractFirstSentence(narrativeText)
 
     return generateMiniRaportHTML({
       childName: participant.child_name,

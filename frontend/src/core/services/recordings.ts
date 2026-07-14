@@ -1,8 +1,9 @@
 import type { Recording } from '../types'
 import type { RecordingService } from './types'
 import { apiRequest } from './backendClient'
-import { withTenantHeader } from './apiEnvelope'
+import { withTenantHeader, normalizeTenantId, itemRequest, voidRequest } from './apiEnvelope'
 import { uploadMultipart } from './uploadMultipart'
+import { parseRawJSON } from '../utils/rawJson'
 
 // Recording service — backed by /api/recordings (+ /api/recordings/upload
 // multipart) (B6). Replaces the IndexedDB barrel. Preserves the
@@ -16,25 +17,6 @@ interface RecordingListEnvelope {
 // C7: the backend RawJSON column `emotion_tags_json` arrives as a JSON string
 // (or a base64 of the JSON bytes). Normalize it back into the typed
 // Record<string, unknown> the frontend expects.
-function parseRawJSON<T>(value: unknown, fallback: T): T {
-  if (value === null || value === undefined) return fallback
-  if (typeof value !== 'string') return value as T
-  const trimmed = value.trim()
-  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-    try {
-      return JSON.parse(trimmed) as T
-    } catch {
-      return fallback
-    }
-  }
-  try {
-    const decoded = atob(trimmed)
-    return JSON.parse(decoded) as T
-  } catch {
-    return fallback
-  }
-}
-
 function normalizeRecording(raw: Recording): Recording {
   return {
     ...raw,
@@ -55,7 +37,7 @@ const getBySession = async (sessionId: string): Promise<Recording[]> => {
     undefined,
     { headers: withTenantHeader() },
   )
-  return (res.data?.items ?? []).map(normalizeRecording)
+  return (res.data?.items ?? []).map((r) => normalizeTenantId(normalizeRecording(r)))
 }
 
 const getByParticipant = async (
@@ -70,7 +52,7 @@ const getByParticipant = async (
     undefined,
     { headers: withTenantHeader() },
   )
-  return (res.data?.items ?? []).map(normalizeRecording)
+  return (res.data?.items ?? []).map((r) => normalizeTenantId(normalizeRecording(r)))
 }
 
 const getById = async (id: string): Promise<Recording | null> => {
@@ -98,13 +80,7 @@ const update = async (
   if (data.review_status !== undefined) body.review_status = data.review_status
   if (data.reviewed_by !== undefined) body.reviewed_by = data.reviewed_by
   if (data.reviewed_at !== undefined) body.reviewed_at = data.reviewed_at
-  const res = await apiRequest<{ data: Recording }>(
-    'PUT',
-    `/api/recordings/${id}`,
-    body,
-    { headers: withTenantHeader() },
-  )
-  return res.data
+  return itemRequest<Recording>('PUT', `/api/recordings/${id}`, body)
 }
 
 const upload = async (
@@ -120,9 +96,7 @@ const upload = async (
 }
 
 const remove = async (id: string): Promise<void> => {
-  await apiRequest<void>('DELETE', `/api/recordings/${id}`, undefined, {
-    headers: withTenantHeader(),
-  })
+  await voidRequest('DELETE', `/api/recordings/${id}`)
 }
 
 export const recordingService: RecordingService = {

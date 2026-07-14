@@ -14,6 +14,7 @@ import {
   refreshAccessToken,
   fireUnauthorized,
 } from '../services/backendClient'
+import { normalizePhone } from '../utils/phone'
 
 // Single in-flight guard: concurrent checkSession calls (React StrictMode
 // double-invoke in dev) share one resolution instead of racing two refreshes.
@@ -87,17 +88,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   register: async (data: CreateUserDTO) => {
     // Transform Indonesian phone numbers to E.164 (+62...) at the service boundary.
-    const phone = data.phone
-      ? (() => {
-          const digits = data.phone.replace(/[^\d]/g, '')
-          const national = digits.startsWith('62')
-            ? digits.slice(2)
-            : digits.startsWith('0')
-              ? digits.slice(1)
-              : digits
-          return national.length >= 7 && national.length <= 13 ? `+62${national}` : data.phone
-        })()
-      : undefined
+    const phone = normalizePhone(data.phone)
     const res = await apiRequest<{ data: User }>('POST', '/api/auth/register', {
       name: data.name,
       email: data.email,

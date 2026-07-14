@@ -152,7 +152,7 @@ func newTestUserHandler() (*UserHandler, *fakeUserRepoPhase3) {
 	cfg := &config.Config{JWTSecret: "test-secret-at-least-32-bytes-long!!!"}
 	jm := auth.NewJWTManager(cfg)
 	repo := newFakeUserRepoP3()
-	uc := auth.NewUserUsecase(repo)
+	uc := auth.NewUserUsecase(repo, 12)
 	h := NewUserHandler(uc, jm)
 	return h, repo
 }

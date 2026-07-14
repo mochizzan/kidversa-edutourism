@@ -227,12 +227,14 @@ func (r *GormRecordingRepository) List(ctx context.Context, f repository.Recordi
 
 // GormConsentRepository implements repository.ConsentRepository.
 type GormConsentRepository struct {
-	db *gorm.DB
+	db            *gorm.DB
+	consentTokenTTL time.Duration
 }
 
-// NewConsentRepository builds a GORM-backed consent repository.
-func NewConsentRepository(db *gorm.DB) repository.ConsentRepository {
-	return &GormConsentRepository{db: db}
+// NewConsentRepository builds a GORM-backed consent repository. consentTokenTTL
+// is the lifetime of a single-use consent token (from config).
+func NewConsentRepository(db *gorm.DB, consentTokenTTL time.Duration) repository.ConsentRepository {
+	return &GormConsentRepository{db: db, consentTokenTTL: consentTokenTTL}
 }
 
 // Create persists a new consent log row (initial send).
@@ -341,7 +343,7 @@ func (r *GormConsentRepository) SendRequest(ctx context.Context, participantID, 
 		return "", apperrors.Internal("internal_error", err)
 	}
 	now := time.Now()
-	expiresAt := now.Add(24 * time.Hour).Format(time.RFC3339)
+	expiresAt := now.Add(r.consentTokenTTL).Format(time.RFC3339)
 	log := &entity.ConsentLog{
 		ParticipantID: participantID,
 		SessionID:     sessionID,

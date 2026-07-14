@@ -10,6 +10,7 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { participantService } from '../../../core/services/participants'
 import { sessionService } from '../../../core/services/sessions'
 import { ApiError } from '../../../core/services/backendClient'
+import { isValidEmail } from '../../../core/utils/validation'
 import { redirectToLogin } from '../../../core/stores/authStore'
 
 type ParticipantFormState = {
@@ -109,8 +110,7 @@ const ParticipantFormPage = () => {
 
     const trimmedEmail = form.parent_email.trim()
     if (trimmedEmail) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(trimmedEmail)) {
+      if (!isValidEmail(trimmedEmail)) {
         addToast({ type: 'error', message: 'Format email tidak valid' })
         return null
       }

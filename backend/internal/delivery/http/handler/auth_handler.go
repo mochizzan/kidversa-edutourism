@@ -3,7 +3,6 @@ package handler
 import (
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -24,11 +23,12 @@ type AuthHandler struct {
 	cookieSameSite    string
 }
 
-// kioskTokenTTL is the lifetime of an issued kiosk token. Kept as a named const
-// (not yet configurable) so the value has a single source of truth.
-const kioskTokenTTL = 4 * time.Hour
+	// kioskTokenTTL is the lifetime of an issued kiosk token, shared with the
+	// auth usecase (auth.KioskTokenTTL) so the requested and max-allowed values
+	// stay in sync.
+	const kioskTokenTTL = auth.KioskTokenTTL
 
-// NewAuthHandler builds the auth handler.
+	// NewAuthHandler builds the auth handler.
 func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, refreshCookieName string, cookieSecure bool, cookieSameSite string) *AuthHandler {
 	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, refreshCookieName: refreshCookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
 }

@@ -9,18 +9,21 @@ import (
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
-// defaultBcryptCost is used when hashing passwords created via the admin user usecase.
-const defaultBcryptCost = 10
-
 // UserUsecase implements user administration business logic (CRUD + approvals).
 // Role gating: SUPER_ADMIN operates globally; ADMIN is scoped to its own tenant.
 type UserUsecase struct {
-	users repository.UserRepository
+	users     repository.UserRepository
+	bcryptCost int
 }
 
-// NewUserUsecase builds the user administration usecase.
-func NewUserUsecase(users repository.UserRepository) *UserUsecase {
-	return &UserUsecase{users: users}
+// NewUserUsecase builds the user administration usecase. bcryptCost is the
+// hashing cost for admin-created user passwords (from config, shared with the
+// register/login usecase so all passwords use the same cost).
+func NewUserUsecase(users repository.UserRepository, bcryptCost int) *UserUsecase {
+	if bcryptCost < 10 || bcryptCost > 14 {
+		bcryptCost = 12
+	}
+	return &UserUsecase{users: users, bcryptCost: bcryptCost}
 }
 
 // CreateUser creates a new (pending, inactive) user. ADMIN is forced to its own tenant.
@@ -35,7 +38,7 @@ func (u *UserUsecase) CreateUser(ctx context.Context, email, password, name, pho
 	if !role.Valid() {
 		return nil, apperrors.BadRequest("validation_error", errors.New("invalid role"))
 	}
-	hash, err := BcryptHash(password, defaultBcryptCost)
+	hash, err := BcryptHash(password, u.bcryptCost)
 	if err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}

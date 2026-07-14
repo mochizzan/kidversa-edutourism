@@ -1,8 +1,10 @@
 import type { MissionBank, CreateMissionBankDTO } from '../types'
 import type { MissionBankService } from './types'
 import { apiRequest } from './backendClient'
-import { withTenantHeader } from './apiEnvelope'
+import { withTenantHeader, normalizeTenantId } from './apiEnvelope'
 import { useTenantStore } from '../stores/tenantStore'
+import { STORAGE_KEYS } from '../constants/storage'
+import { parseRawJSON } from '../utils/rawJson'
 
 // MissionBank service — backed by /api/mission-banks (B7 for toggle-active).
 // Replaces the IndexedDB barrel. Preserves the `missionService` export name and
@@ -15,31 +17,9 @@ function getActiveTenantId(): string | undefined {
   if (activeTenant?.id) return activeTenant.id
   const tid =
     typeof localStorage !== 'undefined'
-      ? localStorage.getItem('kidversa_active_tenant_id')
+      ? localStorage.getItem(STORAGE_KEYS.ACTIVE_TENANT_ID)
       : null
   return tid ?? undefined
-}
-
-// C7: RawJSON columns arrive from the backend as a JSON string (or base64 of
-// the JSON bytes, depending on GORM/MySQL driver). Normalize both forms back
-// into the native typed value the frontend expects.
-function parseRawJSON<T>(value: unknown, fallback: T): T {
-  if (value === null || value === undefined) return fallback
-  if (typeof value !== 'string') return value as T
-  const trimmed = value.trim()
-  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-    try {
-      return JSON.parse(trimmed) as T
-    } catch {
-      return fallback
-    }
-  }
-  try {
-    const decoded = atob(trimmed)
-    return JSON.parse(decoded) as T
-  } catch {
-    return fallback
-  }
 }
 
 function normalizeMission(raw: MissionBank): MissionBank {
@@ -98,7 +78,7 @@ const getAll = async (
     undefined,
     { headers: withTenantHeader() },
   )
-  const items = (res.data?.items ?? []).map(normalizeMission)
+  const items = (res.data?.items ?? []).map((m) => normalizeTenantId(normalizeMission(m)))
   const total = res.meta?.total ?? items.length
   return {
     data: items,

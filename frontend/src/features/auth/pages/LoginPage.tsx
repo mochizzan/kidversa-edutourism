@@ -10,6 +10,7 @@ import { useRateLimit } from '../hooks/useRateLimit'
 import { ROUTES } from '../../../core/constants/app'
 import { LoginForm } from '../components/LoginForm'
 import { DemoHint } from '../components/DemoHint'
+import { Logo } from '../../../shared/components/ui/Logo'
 
 const loginSchema = z.object({
   email: z.string().email('Format email tidak valid'),
@@ -88,7 +89,7 @@ const LoginPage = () => {
       {/* ── Header ── */}
       <div className="flex flex-col items-center mb-7">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark shadow-lg shadow-primary/25 flex items-center justify-center mb-3">
-          <img src="/logo.png" alt="Kidversa" className="w-8 h-8 object-contain" />
+          <Logo alt="Kidversa" className="w-8 h-8 object-contain" />
         </div>
         <h2 className="text-xl font-bold text-on-surface tracking-tight text-center">
           Selamat datang kembali

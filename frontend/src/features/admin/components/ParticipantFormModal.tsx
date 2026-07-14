@@ -7,6 +7,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { cn } from '../../../core/utils'
 import type { Participant } from '../../../core/types'
+import { isValidEmail } from '../../../core/utils/validation'
 
 type ParticipantFormData = {
   child_name: string
@@ -127,8 +128,7 @@ export function ParticipantFormModal({
 
     // Email validation - optional but must be valid if filled
     if (formData.parent_email && formData.parent_email.trim()) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(formData.parent_email.trim())) {
+      if (!isValidEmail(formData.parent_email.trim())) {
         newErrors.parent_email = 'Format email tidak valid'
       }
     }

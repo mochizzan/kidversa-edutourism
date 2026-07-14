@@ -3,6 +3,7 @@ import { cn } from '../../core/utils'
 import { useAuth } from '../../core/hooks/useAuth'
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary'
 import { ROUTES } from '../../core/constants/app'
+import { Logo } from '../components/ui/Logo'
 import {
   LayoutDashboard,
   Users,
@@ -47,7 +48,7 @@ const FasilitatorLayout = () => {
       <header className="sticky top-0 z-40 bg-white border-b border-[#ECECEC] px-4 md:px-6 lg:px-8 h-16 md:h-[72px] lg:h-[75px] flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           {/* Brand Logo — image from assets */}
-          <img src="/logo.png" alt="Kidversa Logo" className="w-9 h-9 md:w-10 md:h-10 rounded-lg object-contain shrink-0 shadow-sm" />
+          <Logo className="w-9 h-9 md:w-10 md:h-10 rounded-lg object-contain shrink-0 shadow-sm" />
           <div className="min-w-0">
             <h1 className="text-sm md:text-base font-bold text-[#1C1B1F] leading-tight truncate">
               Hai, {userName}

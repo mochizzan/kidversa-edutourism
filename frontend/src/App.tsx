@@ -8,6 +8,7 @@ import { UserRole } from './core/types/enums'
 import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
 import { ToastProvider } from './shared/components/feedback/Toast'
 import { useTenantStore } from './core/stores/tenantStore'
+import { Logo } from './shared/components/ui/Logo'
 
 /* ── Splash Screen ── */
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
@@ -39,8 +40,7 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
       {phase !== 'pop' && (
         <div className="animate-splash-pop">
           <div className="w-28 h-28 md:w-32 md:h-32 rounded-2xl bg-white shadow-2xl flex items-center justify-center">
-            <img
-              src="/logo.png"
+            <Logo
               alt="Kidversa"
               className="w-20 h-20 md:w-24 md:h-24 object-contain"
             />
@@ -150,7 +150,7 @@ function App() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-surface p-8 text-center">
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary-dark shadow-lg flex items-center justify-center mb-4">
-          <img src="/logo.png" alt="Kidversa" className="w-10 h-10 object-contain" />
+          <Logo alt="Kidversa" className="w-10 h-10 object-contain" />
         </div>
         <h1 className="text-xl font-bold text-on-surface">Backend tidak tersedia</h1>
         <p className="text-sm text-on-surface-variant/60 mt-2 max-w-[280px] leading-relaxed">

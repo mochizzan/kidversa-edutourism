@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { cn } from '../../../core/utils'
 import { Tooltip } from './Tooltip'
 
-interface ButtonProps {
+export interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   size?: 'sm' | 'md' | 'lg'
   loading?: boolean

@@ -1,6 +1,7 @@
 import { MapPin, BookOpen, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../core/constants/app'
+import { Logo } from '../shared/components/ui/Logo'
 
 const LandingPage = () => {
   return (
@@ -8,7 +9,7 @@ const LandingPage = () => {
       <div className="text-center text-white">
         {/* Hero */}
         <div className="flex justify-center items-center gap-3 mb-6">
-          <img src="/logo.png" alt="Kidversa Logo" className="w-14 h-14 rounded-xl object-contain" />
+          <Logo className="w-14 h-14 rounded-xl object-contain" />
           <h1 className="text-5xl font-bold">Kidversa</h1>
         </div>
         <p className="text-xl text-primary-200 mb-8 max-w-2xl mx-auto">

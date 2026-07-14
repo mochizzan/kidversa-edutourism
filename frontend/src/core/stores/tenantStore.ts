@@ -3,8 +3,9 @@ import type { Tenant } from '../types'
 import { UserRole } from '../types'
 import { apiRequest } from '../services/backendClient'
 import { useAuthStore } from './authStore'
+import { STORAGE_KEYS } from '../constants/storage'
 
-const ACTIVE_TENANT_KEY = 'kidversa_active_tenant_id'
+const ACTIVE_TENANT_KEY = STORAGE_KEYS.ACTIVE_TENANT_ID
 
 interface TenantsResponse {
   data: Tenant[]

@@ -11,13 +11,15 @@ import (
 
 // NotificationHandler serves /api/notifications/* (SSE + list/mark-read).
 type NotificationHandler struct {
-	svc *live.Service
-	hub *sse.Hub
+	svc         *live.Service
+	hub         *sse.Hub
+	keepaliveSec int
 }
 
-// NewNotificationHandler builds the notification handler.
-func NewNotificationHandler(svc *live.Service, hub *sse.Hub) *NotificationHandler {
-	return &NotificationHandler{svc: svc, hub: hub}
+// NewNotificationHandler builds the notification handler. keepaliveSec is the idle
+// interval at which the SSE stream emits keepalive comment frames (from config).
+func NewNotificationHandler(svc *live.Service, hub *sse.Hub, keepaliveSec int) *NotificationHandler {
+	return &NotificationHandler{svc: svc, hub: hub, keepaliveSec: keepaliveSec}
 }
 
 // List handles GET /api/notifications (fetch + unread count, ?since= optional).
@@ -55,5 +57,5 @@ func (h *NotificationHandler) MarkAllRead(c *echo.Context) error {
 func (h *NotificationHandler) Stream(c *echo.Context) error {
 	uid := appmiddleware.GetUserID(c)
 	ch := sse.NotifChannel(uid)
-	return streamSSE(c, h.hub, ch, nil, sseKeepaliveSec)
+	return streamSSE(c, h.hub, ch, nil, h.keepaliveSec)
 }

@@ -1,29 +1,17 @@
 import type { SmartPhoto } from '../types'
 import type { PhotoService } from './types'
-import { apiRequest } from './backendClient'
-import { withTenantHeader } from './apiEnvelope'
+import { itemsRequest, itemRequest, voidRequest } from './apiEnvelope'
 import { uploadMultipart } from './uploadMultipart'
 
 // Photo service — backed by /api/photos (+ /api/photos/upload multipart) (B5).
 // Replaces the IndexedDB barrel. Preserves the `photoService` export name and
 // the PhotoService signature.
 
-interface PhotoListEnvelope {
-  data: { items: SmartPhoto[] }
-  meta?: { page: number; limit: number; total: number }
-}
-
 const getBySession = async (sessionId: string): Promise<SmartPhoto[]> => {
   const qs = new URLSearchParams()
   qs.set('session_id', sessionId)
   qs.set('limit', '100')
-  const res = await apiRequest<PhotoListEnvelope>(
-    'GET',
-    `/api/photos?${qs.toString()}`,
-    undefined,
-    { headers: withTenantHeader() },
-  )
-  return res.data?.items ?? []
+  return itemsRequest<SmartPhoto>('GET', `/api/photos?${qs.toString()}`)
 }
 
 const getByParticipant = async (
@@ -32,13 +20,7 @@ const getByParticipant = async (
   const qs = new URLSearchParams()
   qs.set('participant_id', participantId)
   qs.set('limit', '100')
-  const res = await apiRequest<PhotoListEnvelope>(
-    'GET',
-    `/api/photos?${qs.toString()}`,
-    undefined,
-    { headers: withTenantHeader() },
-  )
-  return res.data?.items ?? []
+  return itemsRequest<SmartPhoto>('GET', `/api/photos?${qs.toString()}`)
 }
 
 const upload = async (
@@ -66,19 +48,11 @@ const update = async (
   if (data.taken_by !== undefined) body.taken_by = data.taken_by
   if (data.taken_at !== undefined) body.taken_at = data.taken_at
   if (data.frame_id !== undefined) body.frame_id = data.frame_id
-  const res = await apiRequest<{ data: SmartPhoto }>(
-    'PUT',
-    `/api/photos/${photoId}`,
-    body,
-    { headers: withTenantHeader() },
-  )
-  return res.data
+  return itemRequest<SmartPhoto>('PUT', `/api/photos/${photoId}`, body)
 }
 
 const remove = async (id: string): Promise<void> => {
-  await apiRequest<void>('DELETE', `/api/photos/${id}`, undefined, {
-    headers: withTenantHeader(),
-  })
+  await voidRequest('DELETE', `/api/photos/${id}`)
 }
 
 export const photoService: PhotoService = {

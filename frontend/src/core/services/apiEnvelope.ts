@@ -13,8 +13,10 @@
 
 import { ApiError, apiRequest, getStoredUser } from './backendClient'
 import type { ListParams, PaginatedResponse } from '../types'
+import { STORAGE_KEYS } from '../constants/storage'
+import { UserRole } from '../types/enums'
 
-const ACTIVE_TENANT_KEY = 'kidversa_active_tenant_id'
+const ACTIVE_TENANT_KEY = STORAGE_KEYS.ACTIVE_TENANT_ID
 
 interface ListEnvelope<T> {
   data: T[]
@@ -37,7 +39,7 @@ interface ItemsEnvelope<T> {
 // tenantStore); the current role comes from the persisted auth user.
 export function withTenantHeader(headers: Record<string, string> = {}): Record<string, string> {
   const user = getStoredUser<{ role?: string }>()
-  if (user?.role === 'SUPER_ADMIN') {
+  if (user?.role === UserRole.SUPER_ADMIN) {
     const tid =
       typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_TENANT_KEY) : null
     if (tid) return { ...headers, 'X-Tenant-Id': tid }

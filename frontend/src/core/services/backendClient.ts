@@ -144,19 +144,6 @@ export async function healthCheck(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Backend enablement (backend is now the only data path)
-// ---------------------------------------------------------------------------
-
-export function isBackendEnabled(): boolean {
-  // Backend is now the only data path; the localStorage gate is removed.
-  return true
-}
-
-export function setBackendEnabled(_enabled: boolean): void {
-  // Kept for API compatibility with existing callers; backend is always on.
-}
-
-// ---------------------------------------------------------------------------
 // Request options + low-level fetch
 // ---------------------------------------------------------------------------
 
@@ -261,8 +248,9 @@ export async function refreshAccessToken(): Promise<string> {
         let message = 'Session expired. Please log in again.'
         try {
           const data = await res.json()
-          if (typeof data?.error === 'string') message = data.error
-          if (typeof data?.code === 'string') code = data.code
+          const errPayload = data?.error ?? data
+          if (typeof errPayload?.message === 'string') message = errPayload.message
+          if (typeof errPayload?.code === 'string') code = errPayload.code
         } catch {
           // Ignore non-JSON body.
         }
@@ -270,7 +258,8 @@ export async function refreshAccessToken(): Promise<string> {
       }
       // Backend sets the HttpOnly refresh cookie and returns a fresh access token.
       const data = await res.json()
-      const newToken: string = data.access_token ?? data.accessToken ?? ''
+      const payload = data.data ?? data
+      const newToken: string = payload.access_token ?? payload.accessToken ?? ''
       if (!newToken) {
         throw new ApiError('No access token returned', 'refresh_failed', res.status)
       }
@@ -423,8 +412,6 @@ export function startConnectionWatcher(intervalMs = 15000): () => void {
 // ---------------------------------------------------------------------------
 
 export const backendClient = {
-  isBackendEnabled,
-  setBackendEnabled,
   getApiBaseUrl,
   healthCheck,
   request: apiRequest,

@@ -20,6 +20,7 @@ import {
   Building2,
 } from 'lucide-react'
 import { useState, useCallback } from 'react'
+import { Logo } from '../components/ui/Logo'
 import { ROUTES } from '../../core/constants/app'
 import { cn } from '../../core/utils'
 import { useAuth } from '../../core/hooks/useAuth'
@@ -122,7 +123,7 @@ const AdminLayout = () => {
         {/* Logo + Close button */}
         <div className="flex items-center h-16 lg:h-20 px-6 border-b border-outline-variant shrink-0">
           <Link to={ROUTES.HOME} className="flex items-center gap-3 min-w-0 flex-1">
-            <img src="/logo.png" alt="Kidversa Logo" className="w-8 h-8 rounded-lg object-contain shrink-0" />
+            <Logo className="w-8 h-8 rounded-lg object-contain shrink-0" />
             <span className={cn(
               'text-xl font-bold text-on-surface truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
               isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'

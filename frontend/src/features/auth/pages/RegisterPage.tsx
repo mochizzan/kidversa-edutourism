@@ -15,6 +15,7 @@ import { RegisterStepName } from '../components/RegisterStepName'
 import { RegisterStepEmail } from '../components/RegisterStepEmail'
 import { RegisterStepPassword } from '../components/RegisterStepPassword'
 import { RegisterStepTerms } from '../components/RegisterStepTerms'
+import { Logo } from '../../../shared/components/ui/Logo'
 
 const registerSchema = z
   .object({
@@ -132,7 +133,7 @@ const RegisterPage = () => {
       {/* ── Header ── */}
       <div className="flex flex-col items-center mb-6">
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark shadow-lg shadow-primary/25 flex items-center justify-center mb-3">
-          <img src="/logo.png" alt="Kidversa" className="w-8 h-8 object-contain" />
+          <Logo alt="Kidversa" className="w-8 h-8 object-contain" />
         </div>
         <h2 className="text-xl font-bold text-on-surface tracking-tight text-center">Buat Akun Baru</h2>
         <p className="text-sm text-on-surface-variant/60 mt-1.5 text-center max-w-[240px] leading-relaxed">{STEPS[step].desc}</p>

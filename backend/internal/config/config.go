@@ -31,6 +31,7 @@ type Config struct {
 	JWTRefreshTTL  time.Duration
 	BcryptCost     int
 	ReportTokenTTL time.Duration
+	ConsentTokenTTL time.Duration
 	CookieSecure   bool
 	CookieSameSite string
 
@@ -38,6 +39,7 @@ type Config struct {
 	ServerPort  string
 	CORSOrigins []string
 	UploadDir   string
+	UploadMaxMB int
 
 	// SSE / cookie
 	CookieName string
@@ -84,6 +86,7 @@ func Load() *Config {
 		JWTRefreshTTL:  getEnvDuration("JWT_REFRESH_TTL", 168*time.Hour),
 		BcryptCost:     getEnvInt("BCRYPT_COST", 12),
 		ReportTokenTTL: getEnvDuration("REPORT_TOKEN_TTL_HOURS", 168*time.Hour),
+		ConsentTokenTTL: getEnvDuration("CONSENT_TOKEN_TTL_HOURS", 24*time.Hour),
 		CookieSecure:   getEnvBool("COOKIE_SECURE", false),
 		CookieSameSite: getEnv("COOKIE_SAMESITE", "Lax"),
 
@@ -95,6 +98,7 @@ func Load() *Config {
 
 		RateLimitPerMin: getEnvInt("RATE_LIMIT_PER_MIN", 60),
 		SSEKeepaliveSec: getEnvInt("SSE_KEEPALIVE_SEC", 15),
+		UploadMaxMB:     getEnvInt("UPLOAD_MAX_MB", 25),
 
 		RealtimeBackend: getEnv("REALTIME_BACKEND", "memory"),
 		RevokerBackend:  getEnv("REVOKER_BACKEND", "memory"),

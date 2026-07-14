@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"testing"
+	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 )
@@ -20,7 +21,7 @@ func TestB2B13ConsentScoping(t *testing.T) {
 	sidB := seedSession(db, tenant, program, user)
 	ctx := context.Background()
 
-	repo := NewConsentRepository(db)
+	repo := NewConsentRepository(db, 24*time.Hour)
 	mk := func(sid string) {
 		log := &entity.ConsentLog{
 			ParticipantID: pid,
@@ -70,7 +71,7 @@ func TestB10ConsentTokenRoundTrip(t *testing.T) {
 	sid := seedSession(db, tenant, program, user)
 	ctx := context.Background()
 
-	repo := NewConsentRepository(db)
+	repo := NewConsentRepository(db, 24*time.Hour)
 	token, err := repo.SendRequest(ctx, pid, sid, entity.ConsentPhoto)
 	if err != nil {
 		t.Fatalf("SendRequest: %v", err)

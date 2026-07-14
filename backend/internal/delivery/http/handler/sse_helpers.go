@@ -12,11 +12,6 @@ import (
 	"kidversa-edutourism-backend/internal/pkg/sse"
 )
 
-// sseKeepaliveSec is the idle interval at which SSE streams emit a comment frame
-// so proxies don't close an idle connection. Centralized here so every SSE
-// endpoint uses the same cadence.
-const sseKeepaliveSec = 15
-
 // getFlusher returns the http.Flusher for an SSE response writer.
 func getFlusher(w http.ResponseWriter) http.Flusher {
 	return w.(http.Flusher)

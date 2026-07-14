@@ -1,6 +1,7 @@
 import { Outlet, Link } from 'react-router-dom'
 import { ROUTES } from '../../core/constants/app'
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary'
+import { Logo } from '../components/ui/Logo'
 
 const MainLayout = () => {
   return (
@@ -9,7 +10,7 @@ const MainLayout = () => {
       <nav className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link to={ROUTES.HOME} className="flex items-center gap-2 text-white">
-            <img src="/logo.png" alt="Kidversa Logo" className="w-10 h-10 rounded-lg object-contain" />
+            <Logo className="w-10 h-10 rounded-lg object-contain" />
             <span className="text-2xl font-bold">Kidversa</span>
           </Link>
           <div className="flex items-center gap-4">

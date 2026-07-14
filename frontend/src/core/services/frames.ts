@@ -1,7 +1,7 @@
 import type { PaginatedResponse, ListParams, PhotoFrame } from '../types'
 import type { FrameService } from './types'
 import { apiRequest } from './backendClient'
-import { withTenantHeader } from './apiEnvelope'
+import { withTenantHeader, normalizeTenantId, itemRequest } from './apiEnvelope'
 
 // Frame service — backed by /api/frames (NOT /api/photo-frames) (C3).
 // Replaces the IndexedDB barrel. Preserves the `frameService` export name and
@@ -35,7 +35,7 @@ const fetchAllPages = async (
       undefined,
       { headers: withTenantHeader() },
     )
-    const items = res.data?.items ?? []
+    const items = (res.data?.items ?? []).map((f) => normalizeTenantId(f))
     all.push(...items)
     const meta = res.meta
     if (!meta || items.length === 0 || all.length >= meta.total) break
@@ -72,33 +72,21 @@ const getAll = async (
 }
 
 const getById = async (id: string): Promise<PhotoFrame | null> => {
-  const res = await apiRequest<{ data: PhotoFrame }>(
-    'GET',
-    `/api/frames/${id}`,
-    undefined,
-    { headers: withTenantHeader() },
-  )
-  return res.data ?? null
+  return itemRequest<PhotoFrame>('GET', `/api/frames/${id}`)
 }
 
 const create = async (
   data: Omit<PhotoFrame, 'id' | 'created_at'>,
 ): Promise<PhotoFrame> => {
-  const res = await apiRequest<{ data: PhotoFrame }>(
-    'POST',
-    '/api/frames',
-    {
-      tenant_id: data.tenant_id,
-      program_id: data.program_id ?? '',
-      name: data.name,
-      file_url: data.file_url,
-      thumbnail_url: data.thumbnail_url ?? '',
-      is_active: data.is_active,
-      sort_order: data.sort_order ?? 0,
-    },
-    { headers: withTenantHeader() },
-  )
-  return res.data
+  return itemRequest<PhotoFrame>('POST', '/api/frames', {
+    tenant_id: data.tenant_id,
+    program_id: data.program_id ?? '',
+    name: data.name,
+    file_url: data.file_url,
+    thumbnail_url: data.thumbnail_url ?? '',
+    is_active: data.is_active,
+    sort_order: data.sort_order ?? 0,
+  })
 }
 
 const update = async (
@@ -113,23 +101,11 @@ const update = async (
   if (data.thumbnail_url !== undefined) body.thumbnail_url = data.thumbnail_url
   if (data.is_active !== undefined) body.is_active = data.is_active
   if (data.sort_order !== undefined) body.sort_order = data.sort_order
-  const res = await apiRequest<{ data: PhotoFrame }>(
-    'PUT',
-    `/api/frames/${id}`,
-    body,
-    { headers: withTenantHeader() },
-  )
-  return res.data
+  return itemRequest<PhotoFrame>('PUT', `/api/frames/${id}`, body)
 }
 
 const deactivate = async (id: string): Promise<PhotoFrame> => {
-  const res = await apiRequest<{ data: PhotoFrame }>(
-    'POST',
-    `/api/frames/${id}/deactivate`,
-    undefined,
-    { headers: withTenantHeader() },
-  )
-  return res.data
+  return itemRequest<PhotoFrame>('POST', `/api/frames/${id}/deactivate`)
 }
 
 export const frameService: FrameService = {

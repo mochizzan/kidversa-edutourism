@@ -14,13 +14,15 @@ import (
 
 // LiveHandler serves /api/live/* (dashboard state + SSE).
 type LiveHandler struct {
-	svc *live.Service
-	hub *sse.Hub
+	svc     *live.Service
+	hub     *sse.Hub
+	keepaliveSec int
 }
 
-// NewLiveHandler builds the live handler.
-func NewLiveHandler(svc *live.Service, hub *sse.Hub) *LiveHandler {
-	return &LiveHandler{svc: svc, hub: hub}
+// NewLiveHandler builds the live handler. keepaliveSec is the idle interval at
+// which the SSE stream emits keepalive comment frames (from config).
+func NewLiveHandler(svc *live.Service, hub *sse.Hub, keepaliveSec int) *LiveHandler {
+	return &LiveHandler{svc: svc, hub: hub, keepaliveSec: keepaliveSec}
 }
 
 // Groups handles GET /:sessionId/groups (dashboard snapshot of groups).
@@ -107,5 +109,5 @@ func (h *LiveHandler) Stream(c *echo.Context) error {
 		initial = &sse.Event{Type: "snapshot", Data: snap}
 	}
 
-	return streamSSE(c, h.hub, ch, initial, sseKeepaliveSec)
+	return streamSSE(c, h.hub, ch, initial, h.keepaliveSec)
 }

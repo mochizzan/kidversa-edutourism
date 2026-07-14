@@ -1,0 +1,25 @@
+// timing.ts — shared frontend timing constants (ms).
+export const TIMING = {
+  // App splash screen phases.
+  SPLASH_POP_MS: 700,
+  SPLASH_TEXT_MS: 3200,
+  SPLASH_EXIT_MS: 500,
+
+  // API client.
+  API_TIMEOUT_MS: 10000,
+  API_TIMEOUT_LONG_MS: 15000,
+  API_HEALTH_CHECK_MS: 5000,
+  API_REFRESH_TIMEOUT_MS: 10000,
+  API_MAX_RETRIES: 3,
+  API_BACKOFF_BASE_MS: 1000,
+  API_BACKOFF_MAX_MS: 8000,
+  CONNECTION_POLL_MS: 15000,
+
+  // UI.
+  SEARCH_DEBOUNCE_MS: 250,
+
+  // Raport rendering.
+  RAPORT_RENDER_DELAY_MS: 100,
+  RAPORT_CAPTURE_DELAY_MS: 500,
+  RAPORT_CAPTURE_TIMEOUT_MS: 3000,
+} as const

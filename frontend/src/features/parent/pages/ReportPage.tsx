@@ -11,6 +11,7 @@ import {
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 import { DEFAULT_FACILITATOR_MESSAGE, DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
+import { extractFirstSentence } from '../../../core/utils/reportNarrative'
 
 /* ── Inner report component ── */
 function ReportView() {
@@ -54,10 +55,7 @@ function ReportView() {
         childAge: 0,
         sessionDate: '',
         photoUrl: undefined,
-        quote: narrative
-          ? (narrative.match(/^[^.!?\n]+[.!?]/)?.[0]?.trim() ||
-            narrative.split('\n')[0].trim().slice(0, 120))
-          : undefined,
+        quote: extractFirstSentence(narrative),
         stages: [],
         narrative,
         facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
