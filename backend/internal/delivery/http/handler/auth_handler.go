@@ -142,14 +142,23 @@ func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
 	return appresp.OK(c, map[string]string{"token": token})
 }
 
-func setSessionCookie(c *echo.Context, name, token string, secure bool, sameSite string, maxAge int) {
+// setSessionCookie / setRefreshCookie issue the auth cookies. These MUST be
+// sent on cross-origin credentialed requests (the SPA origin differs from the
+// API origin, e.g. :5173 → :8080), so they require SameSite=None. The None
+// mode mandates the Secure attribute; browsers treat http://localhost as a
+// secure context, so Secure cookies are stored and sent there too (and HTTPS
+// in production requires it anyway). We therefore ignore the configurable
+// secure/sameSite values for these auth cookies — Lax/Strict would silently
+// break the refresh-on-reload flow because the cookie would not be attached
+// to the cross-origin fetch to /api/auth/refresh.
+func setSessionCookie(c *echo.Context, name, token string, _ bool, _ string, maxAge int) {
 	http.SetCookie((*c).Response().(http.ResponseWriter), &http.Cookie{
 		Name:     name,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
-		SameSite: parseSameSite(sameSite),
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   maxAge,
 	})
 }
@@ -160,18 +169,20 @@ func clearSessionCookie(c *echo.Context, name string) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   -1,
 	})
 }
 
-func setRefreshCookie(c *echo.Context, name, token string, secure bool, sameSite string, maxAge int) {
+func setRefreshCookie(c *echo.Context, name, token string, _ bool, _ string, maxAge int) {
 	http.SetCookie((*c).Response().(http.ResponseWriter), &http.Cookie{
 		Name:     name,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   secure,
-		SameSite: parseSameSite(sameSite),
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   maxAge,
 	})
 }
@@ -182,6 +193,8 @@ func clearRefreshCookie(c *echo.Context, name string) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   -1,
 	})
 }
