@@ -18,8 +18,9 @@ import {
   contentNewPath,
   contentEditPath,
 } from '../../../core/constants/app'
-import { STAGE_CONTENT_FILE_TYPE_LABELS, STAGE_CONTENT_FILE_TYPE_ICONS } from '../../../core/constants/labels'
+import { STAGE_CONTENT_FILE_TYPE_LABELS, STAGE_CONTENT_FILE_TYPE_ICONS, YOUTUBE_LABEL } from '../../../core/constants/labels'
 import { computeDurationMinutes, syncStageMeta } from '../../../core/utils/content'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import { StageForm } from '../components/StageForm'
 import { Plus, FileText } from 'lucide-react'
 
@@ -97,7 +98,7 @@ const ProgramStagePage = () => {
       }
       navigate(programDetailPath(programId))
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menyimpan stage' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setSaving(false)
     }
@@ -110,7 +111,7 @@ const ProgramStagePage = () => {
       await programService.deleteStage(programId, stageId)
       navigate(programDetailPath(programId))
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus stage' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setDeleting(false)
       setDeleteTarget(null)
@@ -127,7 +128,7 @@ const ProgramStagePage = () => {
       setContents(updatedContents)
       await syncStageMeta(programService, programId, stageId)
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus konten' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setContentDeleting(false)
     }
@@ -203,7 +204,9 @@ const ProgramStagePage = () => {
                     <div>
                       <p className="text-sm font-medium text-on-surface">{content.title}</p>
                       <p className="text-xs text-on-surface-variant">
-                        {STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type]} · {content.duration_seconds ?? 0}s
+                        {content.youtube_url
+                          ? YOUTUBE_LABEL
+                          : `${STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type]} · ${content.duration_seconds ?? 0}s`}
                       </p>
                     </div>
                   </div>

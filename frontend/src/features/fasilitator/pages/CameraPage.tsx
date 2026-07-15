@@ -11,6 +11,7 @@ import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Card } from '../../../shared/components/ui/Card'
 import { Badge } from '../../../shared/components/ui/Badge'
 import type { Participant } from '../../../core/types'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 interface GroupWithParticipants {
   groupId: string
@@ -63,7 +64,7 @@ const CameraPage = () => {
 
       setGroups(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat data')
+      setError(friendlyError(err))
     } finally {
       setLoading(false)
     }

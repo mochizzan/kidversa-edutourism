@@ -93,6 +93,26 @@ func (r *GormUserRepository) List(ctx context.Context, f repository.UserFilter, 
 	return &repository.Paginated[entity.User]{Items: items, Total: int(total)}, nil
 }
 
+func (r *GormUserRepository) ListApproversForTenant(ctx context.Context, tenantID string) ([]entity.User, error) {
+	q := r.db.WithContext(ctx).Model(&UserModel{}).
+		Where("approval_status = ?", entity.ApprovalApproved).
+		Where("is_active = ?", true)
+	if tenantID != "" {
+		q = q.Where("(role = ?) OR (role = ? AND tenant_id = ?)", entity.RoleSuperAdmin, entity.RoleAdmin, tenantID)
+	} else {
+		q = q.Where("role = ?", entity.RoleSuperAdmin)
+	}
+	var models []UserModel
+	if err := q.Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	out := make([]entity.User, 0, len(models))
+	for i := range models {
+		out = append(out, *models[i].ToEntity())
+	}
+	return out, nil
+}
+
 func (r *GormUserRepository) Update(ctx context.Context, u *entity.User) error {
 	m := userModelFromEntity(u)
 	if err := r.db.WithContext(ctx).Model(&UserModel{}).Where("id = ?", u.ID).Updates(m).Error; err != nil {

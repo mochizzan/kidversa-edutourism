@@ -210,6 +210,14 @@ func (h *UploadHandler) UploadContent(c *echo.Context) error {
 			ct.DurationSeconds = n
 		}
 	}
+	// For uploaded VIDEO, recompute the duration authoritatively from the stored
+	// file with ffprobe (the client value above is only a fallback). Non-positive
+	// results are ignored so a missing ffprobe binary never wipes a good estimate.
+	if fileType == entity.StageContentVideo {
+		if probed := apputil.ProbeVideoDuration(filepath.Join(h.cfg.UploadDir, filepath.FromSlash(storedRel))); probed > 0 {
+			ct.DurationSeconds = probed
+		}
+	}
 	if err := h.programs.CreateContent((*c).Request().Context(), ct); err != nil {
 		_ = h.removeStored(h.cfg.UploadDir, storedRel)
 		return err

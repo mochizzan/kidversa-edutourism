@@ -40,4 +40,7 @@ type NotificationRepository interface {
 	CountUnread(ctx context.Context, userID string) (int64, error)
 	MarkRead(ctx context.Context, id, userID string) error
 	MarkAllRead(ctx context.Context, userID string) error
+	// DeleteByRefAndType removes notifications matching refID + type and returns
+	// the distinct recipient_user_id list (for SSE fan-out).
+	DeleteByRefAndType(ctx context.Context, refID, typ string) ([]string, error)
 }

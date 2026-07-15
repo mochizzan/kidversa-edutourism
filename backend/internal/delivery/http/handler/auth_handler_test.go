@@ -89,6 +89,10 @@ func (f *fakeUserRepo) Deactivate(_ context.Context, id string) (*entity.User, e
 	return u, nil
 }
 
+func (f *fakeUserRepo) ListApproversForTenant(_ context.Context, _ string) ([]entity.User, error) {
+	return nil, nil
+}
+
 var repoErrNotFound = errorString("not found")
 
 type errorString string

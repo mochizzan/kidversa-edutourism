@@ -18,6 +18,7 @@ import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { redirectToLogin } from '../../../core/stores/authStore'
 import { resolveStoredUpload } from '../../../core/utils/media'
 import { ApiError } from '../../../core/services/backendClient'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import type { UpdateUserDTO } from '../../../core/types'
 import { UserRole } from '../../../core/types'
 import { PasswordStrengthBar } from '../../auth/components/PasswordStrengthBar'
@@ -158,17 +159,7 @@ const UserFormPage = () => {
           redirectToLogin()
           return
         }
-        // Map common backend error codes to friendly messages.
-        switch (err.code) {
-          case 'validation_error':
-            addToast({ type: 'error', message: 'Data tidak valid. Periksa kembali input Anda.' })
-            break
-          case 'conflict':
-            addToast({ type: 'error', message: 'Email sudah terdaftar.' })
-            break
-          default:
-            addToast({ type: 'error', message: err.message || 'Gagal menyimpan user' })
-        }
+        addToast({ type: 'error', message: friendlyError(err) })
       } else {
         addToast({ type: 'error', message: 'Gagal menyimpan user' })
       }

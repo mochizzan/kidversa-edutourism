@@ -22,9 +22,14 @@ type ProgramStageRequest struct {
 }
 
 // StageContentRequest is the create/update payload for stage contents.
+//
+// FileURL is NOT required: VIDEO content may instead carry a YouTubeURL (no upload),
+// and GAME_BUNDLE content always uses a URL. Validation of the source is enforced
+// in the handlers (file upload vs. URL payload), not here.
 type StageContentRequest struct {
 	Title           string                      `json:"title" validate:"required"`
-	FileURL         string                      `json:"file_url" validate:"required"`
+	FileURL         string                      `json:"file_url"`
+	YouTubeURL      string                      `json:"youtube_url,omitempty"`
 	FileType        entity.StageContentFileType `json:"file_type" validate:"required"`
 	DurationSeconds int                         `json:"duration_seconds,omitempty"`
 	SortOrder       int                         `json:"sort_order,omitempty"`

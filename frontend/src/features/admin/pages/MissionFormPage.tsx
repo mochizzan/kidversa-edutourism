@@ -12,6 +12,7 @@ import { programService } from '../../../core/services/programs'
 import type { Program, ProgramStage } from '../../../core/types'
 import { MissionCategory } from '../../../core/types'
 import { cn } from '../../../core/utils'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 const MissionFormPage = () => {
   const navigate = useNavigate()
@@ -109,7 +110,7 @@ const MissionFormPage = () => {
       }
       navigate(ROUTES.ADMIN.MISSIONS)
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menyimpan misi' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setSaving(false)
     }

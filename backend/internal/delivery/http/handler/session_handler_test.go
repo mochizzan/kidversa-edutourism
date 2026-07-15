@@ -160,9 +160,16 @@ func (f *fakeSessionRepo) TenantIDForSession(_ context.Context, _ string) (strin
 	return "", nil
 }
 
+// fakeProgramStageReader is a no-op ProgramStageReader for tests.
+type fakeProgramStageReader struct{}
+
+func (f *fakeProgramStageReader) ListStages(_ context.Context, _ string) ([]entity.ProgramStage, error) {
+	return nil, nil
+}
+
 func TestSessionCreateAndList(t *testing.T) {
 	repo := newFakeSessionRepo()
-	uc := usecase.NewSessionUsecase(repo)
+	uc := usecase.NewSessionUsecase(repo, &fakeProgramStageReader{})
 	h := NewSessionHandler(uc)
 	e := echo.New()
 	e.Validator = appmiddleware.NewValidator()

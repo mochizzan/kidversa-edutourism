@@ -44,6 +44,15 @@ const ContentFormPage = () => {
       if (cancelled) return
       setPrograms(res.data)
 
+      // Load stages when navigated with pre-selected program (contextual, non-edit).
+      if (!isEdit && isContextual && queryProgramId) {
+        const stgs = await programService.getStages(queryProgramId)
+        if (!cancelled) {
+          setStages(stgs)
+          setStageId(queryStageId || '')
+        }
+      }
+
       if (isEdit && contentId) {
         let foundContent: StageContent | null = null
         let foundStage: ProgramStage | null = null
@@ -79,7 +88,7 @@ const ContentFormPage = () => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [isEdit, contentId])
+  }, [isEdit, contentId, isContextual, queryProgramId, queryStageId])
 
   const loadStages = useCallback(async (programId: string) => {
     if (!programId) { setStages([]); return }
@@ -100,9 +109,21 @@ const ContentFormPage = () => {
     }
     try {
       const isGameBundle = data.file_type === StageContentFileTypeEnum.GAME_BUNDLE
+      // VIDEO sourced from YouTube: no file upload, sent as a URL payload.
+      const isYouTubeVideo =
+        data.file_type === StageContentFileTypeEnum.VIDEO && data.source_mode === 'youtube'
+
       if (isEdit && contentId) {
-        // Edits keep the existing file unless a file was selected.
-        if (file && !isGameBundle) {
+        if (isYouTubeVideo) {
+          // Switch (or keep) the content as a YouTube video — pure update, no upload.
+          await programService.updateContent(stageId, contentId, {
+            ...data,
+            file_url: '',
+            youtube_url: data.youtube_url,
+            duration_seconds: 0,
+          })
+        } else if (file && !isGameBundle) {
+          // Re-upload replaces the existing content (upload then delete old).
           await programService.uploadContent(stageId, {
             file,
             title: data.title,
@@ -117,7 +138,16 @@ const ContentFormPage = () => {
       } else {
         const existing = await programService.getContents(stageId)
         const sortOrder = existing.length
-        if (data.file_url && isGameBundle) {
+        if (isYouTubeVideo) {
+          // YouTube video: create via the JSON endpoint with youtube_url.
+          await programService.createContent(stageId, {
+            ...data,
+            file_url: '',
+            youtube_url: data.youtube_url,
+            duration_seconds: 0,
+            sort_order: sortOrder,
+          })
+        } else if (data.file_url && isGameBundle) {
           // Game bundles use a URL, not a file upload.
           await programService.createContent(stageId, { ...data, sort_order: sortOrder })
         } else if (file) {

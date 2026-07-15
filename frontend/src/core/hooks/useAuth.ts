@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore'
 export const useAuth = () => {
   const {
     user,
+    token,
     isAuthenticated,
     isLoading,
     login,
@@ -13,6 +14,7 @@ export const useAuth = () => {
 
   return {
     user,
+    token,
     isAuthenticated,
     isLoading,
     login,

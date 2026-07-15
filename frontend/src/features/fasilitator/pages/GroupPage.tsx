@@ -16,6 +16,7 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { ChildListItem } from '../components/ChildListItem'
 import { GroupCompleteButton } from '../components/GroupCompleteButton'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import type {
   Session,
   SessionStage,
@@ -145,7 +146,7 @@ const GroupPage = () => {
         isRecordingStage: programStage?.is_recording_stage ?? false,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat data kelompok')
+      setError(friendlyError(err))
     } finally {
       setLoading(false)
     }

@@ -55,7 +55,24 @@ func (h *SessionHandler) Get(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return appresp.OK(c, d)
+	return appresp.OK(c, toSessionDetailResponse(d))
+}
+
+// toSessionDetailResponse maps the domain SessionDetail (no json tags) to the
+// delivery-layer dto with camelCase json tags the frontend expects.
+func toSessionDetailResponse(d *repository.SessionDetail) dto.SessionDetail {
+	groups := make([]dto.GroupWithParticipants, len(d.Groups))
+	for i, g := range d.Groups {
+		groups[i] = dto.GroupWithParticipants{
+			SessionGroup: g.SessionGroup,
+			Participants: g.Participants,
+		}
+	}
+	return dto.SessionDetail{
+		Session: d.Session,
+		Stages:  d.Stages,
+		Groups:  groups,
+	}
 }
 
 func (h *SessionHandler) Update(c *echo.Context) error {

@@ -63,6 +63,11 @@ export interface StageContent {
   program_stage_id: string
   title: string
   file_url: string
+  /**
+   * Present only when the VIDEO content is sourced from YouTube instead of an
+   * uploaded file. Exactly one of `file_url` / `youtube_url` is populated for VIDEO.
+   */
+  youtube_url?: string
   file_type: import('./enums').StageContentFileType
   duration_seconds?: number
   sort_order: number
@@ -259,4 +264,18 @@ export interface SyncQueue {
   created_at: string
   updated_at: string
   synced_at?: string
+}
+
+// Backend notification entity returned by GET /api/notifications.
+// unreadCount on the list is derived from the badge (`meta.total`).
+export interface Notification {
+  id: string
+  tenant_id: string
+  recipient_user_id: string
+  type: string
+  title?: string
+  message?: string
+  ref_id?: string
+  is_read: boolean
+  created_at?: string
 }

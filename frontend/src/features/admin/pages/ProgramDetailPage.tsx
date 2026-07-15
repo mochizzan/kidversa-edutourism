@@ -9,6 +9,7 @@ import { programService } from '../../../core/services/programs'
 import type { Program } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 import { programListPath, programDetailPath, programStagePath } from '../../../core/constants/app'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import { ProgramCreateForm } from '../components/ProgramCreateForm'
 import { ProgramInfoTab } from '../components/ProgramInfoTab'
 import { ProgramStagesTab } from '../components/ProgramStagesTab'
@@ -44,7 +45,7 @@ const ProgramDetailPage = () => {
       const created = await programService.create({ name: newName, description: newDesc })
       navigate(programDetailPath(created.id), { replace: true })
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal membuat program' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally { setCreating(false) }
   }
 

@@ -6,6 +6,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { cn } from '../../../core/utils'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Participant } from '../../../core/types'
 import { isValidEmail } from '../../../core/utils/validation'
 
@@ -101,7 +102,7 @@ export function ParticipantFormModal({
       await onLinkExisting(selectedParticipantId)
       onClose()
     } catch (err) {
-      setSelectError(err instanceof Error ? err.message : 'Gagal menambahkan peserta')
+      setSelectError(friendlyError(err))
     } finally {
       setSubmitting(false)
     }
@@ -158,7 +159,7 @@ export function ParticipantFormModal({
       await onSubmit(validatedData)
       onClose()
     } catch (err) {
-      setErrors({ child_name: err instanceof Error ? err.message : 'Gagal menyimpan peserta' })
+      setErrors({ child_name: friendlyError(err) })
     } finally {
       setSubmitting(false)
     }

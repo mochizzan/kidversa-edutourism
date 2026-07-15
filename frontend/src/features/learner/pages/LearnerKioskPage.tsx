@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Play, Pause, Volume2, VolumeX, SkipForward, AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
-import { apiRequest, ApiError } from '../../../core/services/backendClient'
+import { apiRequest } from '../../../core/services/backendClient'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Session, SessionStage, StageContent } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
 import { resolveStoredUpload } from '../../../core/utils/media'
+import { extractYouTubeEmbedUrl } from '../../../core/utils/youtube'
 
 /* ── Public kiosk payload (GET /api/sessions/:id/kiosk?token=) ──
    Mirrors the backend kioskResponse DTO: the session, its stages, and each
@@ -78,13 +80,7 @@ const LearnerKioskPage = () => {
           .sort((a, b) => a.sort_order - b.sort_order)
         setContents(active)
       } catch (err) {
-        // Backend returns 401/404 for invalid/expired/consumed tokens.
-        const code = err instanceof ApiError ? err.code : ''
-        setError(
-          code === 'kiosk_invalid'
-            ? 'Sesi berakhir atau tautan tidak valid.'
-            : 'Gagal memuat konten.',
-        )
+        setError(friendlyError(err))
       } finally {
         setLoading(false)
       }
@@ -161,15 +157,28 @@ const LearnerKioskPage = () => {
       {/* Content Area */}
       <div className="flex-1 flex items-center justify-center bg-black">
         {currentContent?.file_type === StageContentFileType.VIDEO && (
-          <video
-            key={currentContent.id}
-            src={resolveStoredUpload(currentContent.file_url, 'content') ?? currentContent.file_url}
-            className="max-w-full max-h-full"
-            autoPlay={isPlaying}
-            muted={isMuted}
-            controls
-            onEnded={handleNext}
-          />
+          currentContent.youtube_url ? (
+            // YouTube-sourced video: render an embed iframe (autoplay via query).
+            <iframe
+              key={currentContent.id}
+              src={`${extractYouTubeEmbedUrl(currentContent.youtube_url) ?? currentContent.youtube_url}?autoplay=1&mute=${isMuted ? 1 : 0}`}
+              className="w-full h-full border-0"
+              title={currentContent.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            // Uploaded video: native player.
+            <video
+              key={currentContent.id}
+              src={resolveStoredUpload(currentContent.file_url, 'content') ?? currentContent.file_url}
+              className="max-w-full max-h-full"
+              autoPlay={isPlaying}
+              muted={isMuted}
+              controls
+              onEnded={handleNext}
+            />
+          )
         )}
         {currentContent?.file_type === StageContentFileType.IMAGE && (
           <img

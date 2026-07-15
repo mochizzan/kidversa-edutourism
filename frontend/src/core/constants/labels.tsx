@@ -16,6 +16,9 @@ export const STAGE_CONTENT_FILE_TYPE_LABELS: Record<StageContentFileType, string
   [StageContentFileType.GAME_BUNDLE]: 'Game',
 }
 
+/** Label for a VIDEO content sourced from YouTube instead of an uploaded file. */
+export const YOUTUBE_LABEL = 'YouTube'
+
 export const STAGE_CONTENT_FILE_TYPE_ICONS: Record<StageContentFileType, ReactNode> = {
   [StageContentFileType.VIDEO]: <Video className="w-4 h-4" />,
   [StageContentFileType.IMAGE]: <Image className="w-4 h-4" />,

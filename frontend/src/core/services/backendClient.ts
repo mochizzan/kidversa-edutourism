@@ -158,13 +158,20 @@ function backoff(attempt: number): Promise<void> {
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
-  let message = `Request failed with status ${response.status}`
+  let message = 'Terjadi kesalahan. Silakan coba lagi.'
   let code = 'unknown'
   try {
     const data = await response.json()
     if (data && typeof data === 'object') {
-      if (typeof data.error === 'string') message = data.error
-      if (typeof data.code === 'string') code = data.code
+      // Backend envelope: { error: { code: string, message: string } }
+      const errObj = (data as Record<string, unknown>).error
+      if (errObj && typeof errObj === 'object') {
+        const e = errObj as Record<string, unknown>
+        if (typeof e.code === 'string') code = e.code
+        if (typeof e.message === 'string') message = e.message
+      } else if (typeof errObj === 'string') {
+        message = errObj
+      }
     }
   } catch {
     // Non-JSON error body; keep the defaults.
@@ -369,9 +376,16 @@ export function openSSE(
   onEvent: (event: MessageEvent) => void,
   opts?: SSEOptions,
 ): EventSource {
-  const url = `${getApiBaseUrl()}${path}`
+  const base = `${getApiBaseUrl()}${path}`
   // EventSource cannot send an Authorization header; it relies on the
-  // `kidversa_session` cookie being sent via withCredentials.
+  // `kidversa_session` cookie being sent via withCredentials. As a fallback
+  // for cross-origin environments where that cookie may be dropped, append
+  // the access token as a query parameter — the backend's JWTAuth middleware
+  // checks the cookie first, then falls back to ?token=.
+  const separator = path.includes('?') ? '&' : '?'
+  const url = accessToken
+    ? `${base}${separator}token=${encodeURIComponent(accessToken)}`
+    : base
   const source = new EventSource(url, { withCredentials: true })
   source.onmessage = onEvent
   source.onerror = (ev) => {

@@ -52,9 +52,9 @@ func main() {
 
 	// Usecases.
 	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, auth.NewKioskStore(db.DB), cfg.BcryptCost)
-	userUC := auth.NewUserUsecase(userRepo, cfg.BcryptCost)
+	userUC := auth.NewUserUsecase(userRepo, notifRepo, hub, cfg.BcryptCost)
 	tenantUC := auth.NewTenantUsecase(tenantRepo)
-	sessionUC := usecase.NewSessionUsecase(sessionRepo)
+	sessionUC := usecase.NewSessionUsecase(sessionRepo, programRepo)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo)
 	reportsUC := reportsuc.NewUsecase(reportRepo, hub, reportsuc.NewPlaceholderNarrative())
@@ -62,7 +62,7 @@ func main() {
 	// Handlers.
 	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite)
 	registry := handler.NewRegistry(authHandler)
-	registry.User = handler.NewUserHandler(userUC, jwt)
+	registry.User = handler.NewUserHandler(userUC, jwt, liveSvc)
 	registry.Tenant = handler.NewTenantHandler(tenantUC, jwt)
 	registry.Program = handler.NewProgramHandler(programRepo)
 	registry.Session = handler.NewSessionHandler(sessionUC)

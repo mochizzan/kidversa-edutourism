@@ -13,6 +13,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import type { Participant, Assessment, SessionStage, ProgramStage, CreateAssessmentDTO } from '../../../core/types'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 interface ChildDetail {
   participant: Participant
@@ -155,7 +156,7 @@ const ChildAssessmentPage = () => {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat data anak')
+      setError(friendlyError(err))
     } finally {
       setLoading(false)
     }

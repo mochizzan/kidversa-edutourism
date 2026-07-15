@@ -38,7 +38,7 @@ func (h *ProgramHandler) CreateContent(c *echo.Context) error {
 		active = *req.IsActive
 	}
 	ct := &entity.StageContent{
-		ProgramStageID: stageID, Title: req.Title, FileURL: req.FileURL,
+		ProgramStageID: stageID, Title: req.Title, FileURL: req.FileURL, YouTubeURL: req.YouTubeURL,
 		FileType: req.FileType, DurationSeconds: req.DurationSeconds, SortOrder: req.SortOrder, IsActive: active,
 	}
 	if err := h.repo.CreateContent((*c).Request().Context(), ct); err != nil {
@@ -70,6 +70,9 @@ func (h *ProgramHandler) UpdateContent(c *echo.Context) error {
 	if req.FileType != "" {
 		ct.FileType = req.FileType
 	}
+	// YouTubeURL is set unconditionally from the payload: an empty string clears
+	// it (e.g. when switching a YouTube video back to a manual upload).
+	ct.YouTubeURL = req.YouTubeURL
 	ct.DurationSeconds = req.DurationSeconds
 	ct.SortOrder = req.SortOrder
 	if req.IsActive != nil {

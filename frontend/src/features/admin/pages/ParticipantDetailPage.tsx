@@ -14,6 +14,7 @@ import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog
 import { participantService } from '../../../core/services/participants'
 import { sessionService } from '../../../core/services/sessions'
 import type { Participant } from '../../../core/types'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 const ParticipantDetailPage = () => {
   const { participantId } = useParams<{ participantId: string }>()
@@ -61,7 +62,7 @@ const ParticipantDetailPage = () => {
       addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
       navigate(ROUTES.ADMIN.PARTICIPANTS)
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus peserta' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setConfirmOpen(false)
     }
@@ -92,7 +93,7 @@ const ParticipantDetailPage = () => {
         subtitle={`${participant.child_age} tahun${participant.school_name ? ` · ${participant.school_name}` : ''} · ${participant.parent_name}`}
         actions={
           <div className="flex items-center gap-2">
-            <Link to={`/admin/participants/${participant.id}/edit`}>
+            <Link to={`${ROUTES.ADMIN.PARTICIPANTS}/${participant.id}/edit`}>
               <Button variant="secondary" icon={<Pencil className="w-4 h-4" />}>Edit</Button>
             </Link>
             <Button variant="danger" icon={<Trash2 className="w-4 h-4" />} onClick={() => setConfirmOpen(true)}>Hapus</Button>

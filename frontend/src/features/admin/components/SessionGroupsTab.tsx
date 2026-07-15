@@ -14,6 +14,7 @@ import { CsvImportModal } from './CsvImportModal'
 import { ROUTES } from '../../../core/constants/app'
 import type { SessionGroup, Participant, CreateParticipantDTO } from '../../../core/types'
 import type { ImportRow } from '../utils/csvParser'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 interface SessionGroupsTabProps {
   sessionId: string
@@ -67,7 +68,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       onRefresh()
       setRefreshKey(k => k + 1)
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Gagal membuat kelompok')
+      throw new Error(friendlyError(err))
     }
   }
 
@@ -79,7 +80,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       onRefresh()
       setRefreshKey(k => k + 1)
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Gagal memperbarui kelompok')
+      throw new Error(friendlyError(err))
     }
   }
 
@@ -99,7 +100,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       onRefresh()
       setRefreshKey(k => k + 1)
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus kelompok' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setConfirmGroup(null)
     }
@@ -125,7 +126,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, onRefresh }
       onRefresh()
       setRefreshKey(k => k + 1)
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus peserta' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setConfirmParticipant(null)
     }

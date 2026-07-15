@@ -46,6 +46,23 @@ func (h *SessionParticipantHandler) CreateParticipant(c *echo.Context) error {
 	return appresp.Created(c, p)
 }
 
+// CreateParticipantGlobal handles the global POST /api/participants (tenant-scoped
+// via TenantScope middleware; SUPER_ADMIN may pass X-Tenant-Id to scope to a tenant).
+// Creates a standalone participant not yet attached to a session.
+func (h *SessionParticipantHandler) CreateParticipantGlobal(c *echo.Context) error {
+	var req dto.CreateParticipantRequest
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	p, err := h.uc.CreateParticipant((*c).Request().Context(),
+		appmiddleware.GetTenantID(c), "", req.GroupID, req.ChildName, req.ChildAge,
+		req.SchoolName, req.ParentName, req.ParentPhone, req.ParentEmail, req.ConsentRecording, req.ConsentPhoto)
+	if err != nil {
+		return err
+	}
+	return appresp.Created(c, p)
+}
+
 func (h *SessionParticipantHandler) LinkParticipant(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {

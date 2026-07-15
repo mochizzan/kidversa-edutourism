@@ -146,7 +146,30 @@ func (s *Service) MarkRead(ctx context.Context, id, userID string) error {
 
 // MarkAllRead marks every notification for a recipient read.
 func (s *Service) MarkAllRead(ctx context.Context, userID string) error {
-	return s.notif.MarkAllRead(ctx, userID)
+	if err := s.notif.MarkAllRead(ctx, userID); err != nil {
+		return err
+	}
+	s.publishNotif(ctx, userID, sse.Event{
+		Type: entity.EventNotifUpdate,
+		Data: map[string]string{"action": "read-all"},
+	})
+	return nil
+}
+
+// DismissApproval removes pending-approval notifications for targetUserID and
+// notifies each affected approver to refetch. Best-effort (returns repo errors).
+func (s *Service) DismissApproval(ctx context.Context, targetUserID string) error {
+	recipients, err := s.notif.DeleteByRefAndType(ctx, targetUserID, entity.NotifTypeUserPendingApproval)
+	if err != nil {
+		return err
+	}
+	for _, rid := range recipients {
+		s.publishNotif(ctx, rid, sse.Event{
+			Type: entity.EventNotifUpdate,
+			Data: map[string]string{"type": entity.NotifTypeUserPendingApproval, "ref_id": targetUserID},
+		})
+	}
+	return nil
 }
 
 // Notifications fetches a recipient's notifications and unread count.
@@ -168,6 +191,13 @@ func (s *Service) Notifications(ctx context.Context, userID, since string, limit
 func (s *Service) publish(ctx context.Context, sessionID, typ string, data interface{}) {
 	if err := s.hub.Publish(ctx, sse.LiveChannel(sessionID), sse.Event{Type: typ, Data: data}); err != nil {
 		log.Printf("live: SSE publish failed for session %s: %v", sessionID, err)
+	}
+}
+
+// publishNotif publishes an event on a single user's notification channel.
+func (s *Service) publishNotif(ctx context.Context, userID string, ev sse.Event) {
+	if err := s.hub.Publish(ctx, sse.NotifChannel(userID), ev); err != nil {
+		log.Printf("live: SSE notif publish failed for user %s: %v", userID, err)
 	}
 }
 

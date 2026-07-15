@@ -27,7 +27,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
   const { query, setQuery, loading, results, searched, reset } = useGlobalSearch()
-  const { notifications, unreadCount } = useHeaderNotifications()
+  const { notifications, unreadCount, acknowledge } = useHeaderNotifications()
   const { setActiveTenant, tenants } = useTenantStore()
   const [focused, setFocused] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -236,7 +236,13 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
           <div ref={notificationRef} className="relative">
             <Tooltip content="Notifikasi">
               <button
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={() => {
+                const next = !showNotifications
+                setShowNotifications(next)
+                // Optimistic clear: open the panel and fire-and-forget markAllRead.
+                // SSE notif:update confirms via refetch (badge already 0 locally).
+                if (next) acknowledge()
+              }}
                 className="relative w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
               >
                 <Bell className="w-5 h-5" />

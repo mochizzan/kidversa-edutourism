@@ -14,6 +14,7 @@ import { SessionCard } from '../components/SessionCard'
 import { GroupCard } from '../components/GroupCard'
 import type { Session, SessionStage, ProgramStage } from '../../../core/types'
 import type { LiveGroupWithProgress, GroupStageProgressRow } from '../../../core/services/live'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 function deriveGroupStatus(progress: GroupStageProgressRow[]): 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' {
   if (progress.length === 0) return 'WAITING'
@@ -89,7 +90,7 @@ const DashboardPage = () => {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat data')
+      setError(friendlyError(err))
     } finally {
       setLoading(false)
     }

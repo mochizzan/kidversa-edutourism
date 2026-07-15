@@ -10,6 +10,7 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { participantService } from '../../../core/services/participants'
 import { sessionService } from '../../../core/services/sessions'
 import { ApiError } from '../../../core/services/backendClient'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import { isValidEmail } from '../../../core/utils/validation'
 import { redirectToLogin } from '../../../core/stores/authStore'
 
@@ -152,8 +153,8 @@ const ParticipantFormPage = () => {
         await sessionService.updateParticipant(existing.session_id, participantId, payload)
         addToast({ type: 'success', message: 'Peserta berhasil diperbarui' })
       } else {
-        addToast({ type: 'error', message: 'Tambah peserta harus melalui halaman sesi' })
-        return
+        await participantService.create(payload)
+        addToast({ type: 'success', message: 'Peserta berhasil ditambahkan' })
       }
 
       navigate(ROUTES.ADMIN.PARTICIPANTS)
@@ -163,7 +164,7 @@ const ParticipantFormPage = () => {
           redirectToLogin()
           return
         }
-        addToast({ type: 'error', message: err.message || 'Gagal menyimpan peserta' })
+        addToast({ type: 'error', message: friendlyError(err) })
       } else {
         addToast({ type: 'error', message: 'Gagal menyimpan peserta' })
       }

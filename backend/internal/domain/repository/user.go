@@ -40,4 +40,9 @@ type UserRepository interface {
 	Reject(ctx context.Context, id, approverID, reason string) (*entity.User, error)
 	// Deactivate flips a user's is_active to false (no approval change).
 	Deactivate(ctx context.Context, id string) (*entity.User, error)
+
+	// ListApproversForTenant returns active, approved users who can approve
+	// registrations for tenantID. Super-admins always qualify globally; when
+	// tenantID is non-empty the tenant's ADMINs also qualify.
+	ListApproversForTenant(ctx context.Context, tenantID string) ([]entity.User, error)
 }

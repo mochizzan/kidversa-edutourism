@@ -14,6 +14,7 @@ import { programService } from '../../../core/services/programs'
 import { cn } from '../../../core/utils'
 import type { StageContent, Program, ProgramStage } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
+import { YOUTUBE_LABEL } from '../../../core/constants/labels'
 import { contentEditPath } from '../../../core/constants/app'
 
 // ── File type helpers ──
@@ -191,12 +192,13 @@ const ContentPage = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {contents.map((item) => {
             const meta = FILE_TYPE_META[item.file_type] || FILE_TYPE_META.VIDEO
+            const isYouTube = item.file_type === StageContentFileType.VIDEO && !!item.youtube_url
             return (
               <Card key={item.id} padding="sm" className="hover:shadow-md transition-shadow flex flex-col">
                 <div className="flex items-center justify-between mb-3">
                   <div className={cn('flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ring-1', meta.bg, meta.fg, meta.ring)}>
                     {meta.icon}
-                    {meta.label}
+                    {isYouTube ? YOUTUBE_LABEL : meta.label}
                   </div>
                   <Badge variant={item.is_active ? 'success' : 'neutral'} size="sm">
                     {item.is_active ? 'Aktif' : 'Nonaktif'}
@@ -209,7 +211,7 @@ const ContentPage = () => {
                     Stage: {item.stageName}
                   </p>
                   <p className="text-xs text-on-surface-variant/60 mt-0.5">
-                    {formatDuration(item.duration_seconds)}
+                    {isYouTube ? YOUTUBE_LABEL : formatDuration(item.duration_seconds)}
                   </p>
                 </div>
 

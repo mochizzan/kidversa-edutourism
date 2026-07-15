@@ -101,6 +101,7 @@ export const programService: ProgramService = {
     itemRequest<StageContent>('POST', `/api/programs/program-stages/${stageId}/contents`, {
       title: data.title,
       file_url: data.file_url,
+      youtube_url: data.youtube_url,
       file_type: data.file_type,
       duration_seconds: data.duration_seconds,
       sort_order: data.sort_order,
@@ -115,8 +116,11 @@ export const programService: ProgramService = {
     if (data.duration_seconds !== undefined) {
       form.append('duration_seconds', String(data.duration_seconds))
     }
+    if (data.youtube_url !== undefined && data.youtube_url !== '') {
+      form.append('youtube_url', data.youtube_url)
+    }
     return uploadMultipart<StageContent>(
-      `/api/programs/program-stages/${stageId}/contents/upload`,
+      `/api/program-stages/${stageId}/contents/upload`,
       form,
     )
   },
@@ -125,6 +129,7 @@ export const programService: ProgramService = {
     itemRequest<StageContent>('PUT', `/api/programs/program-stages/${stageId}/contents/${contentId}`, {
       title: data.title,
       file_url: data.file_url,
+      youtube_url: data.youtube_url,
       file_type: data.file_type,
       duration_seconds: data.duration_seconds,
       sort_order: data.sort_order,

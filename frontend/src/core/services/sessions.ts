@@ -8,7 +8,7 @@ import type {
   CreateSessionDTO,
   UpdateSessionDTO,
 } from '../types'
-import { listRequest, itemRequest, voidRequest, arrayRequest } from './apiEnvelope'
+import { listRequest, itemRequest, voidRequest, arrayRequest, normalizeTenantId } from './apiEnvelope'
 
 export const sessionService: SessionService = {
   getAll: (params) => listRequest<Session>('/api/sessions', params),
@@ -21,10 +21,14 @@ export const sessionService: SessionService = {
         groups: (SessionGroup & { participants: Participant[] })[]
       }>('GET', `/api/sessions/${id}`)
       // EC3: default stages to [] if the backend omits them.
+      const session = normalizeTenantId(detail.session)
       return {
-        ...detail.session,
-        stages: detail.stages ?? [],
-        groups: detail.groups ?? [],
+        ...session,
+        stages: (detail.stages ?? []).map(normalizeTenantId),
+        groups: (detail.groups ?? []).map((g) => ({
+          ...normalizeTenantId(g),
+          participants: (g.participants ?? []).map(normalizeTenantId),
+        })),
       }
     } catch (err) {
       if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {

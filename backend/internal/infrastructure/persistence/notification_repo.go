@@ -105,3 +105,26 @@ func (r *GormNotificationRepository) MarkAllRead(ctx context.Context, userID str
 	}
 	return nil
 }
+
+// DeleteByRefAndType removes notifications matching refID + type and returns the
+// distinct recipient_user_id list so callers can fan out SSE events.
+func (r *GormNotificationRepository) DeleteByRefAndType(ctx context.Context, refID, typ string) ([]string, error) {
+	var rows []NotificationModel
+	if err := r.db.WithContext(ctx).Where("ref_id = ? AND type = ?", refID, typ).Find(&rows).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	seen := make(map[string]struct{}, len(rows))
+	recipients := make([]string, 0, len(rows))
+	for i := range rows {
+		rid := rows[i].RecipientUserID
+		if _, ok := seen[rid]; ok {
+			continue
+		}
+		seen[rid] = struct{}{}
+		recipients = append(recipients, rid)
+	}
+	if err := r.db.WithContext(ctx).Where("ref_id = ? AND type = ?", refID, typ).Delete(&NotificationModel{}).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return recipients, nil
+}

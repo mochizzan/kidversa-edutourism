@@ -16,10 +16,16 @@ const fileTypes = Object.values(StageContentFileTypeEnum).map((value) => ({
   label: STAGE_CONTENT_FILE_TYPE_LABELS[value as StageContentFileType],
 }))
 
+export type StageContentSourceMode = 'upload' | 'youtube'
+
 export interface StageContentFormValues {
   title: string
   file_url: string
   file_type: StageContentFileType
+  /** YouTube watch/embed URL; only used when file_type === VIDEO && source_mode === 'youtube'. */
+  youtube_url: string
+  /** Client-only toggle: how a VIDEO is sourced. Never sent to the backend. */
+  source_mode: StageContentSourceMode
   duration_seconds: number
   is_active: boolean
 }
@@ -34,6 +40,8 @@ const EMPTY: StageContentFormValues = {
   title: '',
   file_url: '',
   file_type: StageContentFileTypeEnum.VIDEO,
+  youtube_url: '',
+  source_mode: 'upload',
   duration_seconds: 0,
   is_active: true,
 }
@@ -44,7 +52,13 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
       ? {
           title: initial.title,
           file_url: initial.file_url,
+          youtube_url: initial.youtube_url ?? '',
           file_type: initial.file_type,
+          // A VIDEO carrying a youtube_url is a YouTube source; otherwise it's an upload.
+          source_mode:
+            initial.file_type === StageContentFileTypeEnum.VIDEO && initial.youtube_url
+              ? 'youtube'
+              : 'upload',
           duration_seconds: initial.duration_seconds ?? 0,
           is_active: initial.is_active,
         }
@@ -124,8 +138,13 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
       previewUrlRef.current = url
       set('file_url', url)
       set('file_type', detectedType)
+      // Selecting a file means manual upload (not YouTube). Clear any stale YouTube state.
+      set('source_mode', 'upload')
+      set('youtube_url', '')
 
-      if (detectedType === StageContentFileTypeEnum.VIDEO || detectedType === StageContentFileTypeEnum.AUDIO) {
+      // Duration is computed automatically for uploaded VIDEO only (backend also
+      // probes it authoritatively on upload). AUDIO has no duration field of its own.
+      if (detectedType === StageContentFileTypeEnum.VIDEO) {
         const duration = await getMediaDuration(file)
         set('duration_seconds', duration)
       }
@@ -180,8 +199,20 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    // VIDEO + YouTube: send the URL, no file.
+    if (form.file_type === StageContentFileTypeEnum.VIDEO && form.source_mode === 'youtube') {
+      if (!form.youtube_url.trim()) {
+        setFileError('URL YouTube wajib diisi')
+        return
+      }
+      onSubmit({ ...form, file_url: '' }, null)
+      return
+    }
+
+    // Everything else requires a file (or a Game Bundle URL).
     if (!form.file_url.trim()) {
-      setFileError('File atau URL wajib diisi')
+      setFileError(form.file_type === StageContentFileTypeEnum.GAME_BUNDLE ? 'URL wajib diisi' : 'File wajib diisi')
       return
     }
     onSubmit(form, uploadFileRef.current)
@@ -203,13 +234,53 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
         label="Tipe File"
         value={form.file_type}
         onChange={(e) => {
-          set('file_type', e.target.value as StageContentFileType)
+          const nextType = e.target.value as StageContentFileType
+          set('file_type', nextType)
           set('file_url', '')
+          set('youtube_url', '')
+          // YouTube source only applies to VIDEO; fall back to upload for other types.
+          set('source_mode', nextType === StageContentFileTypeEnum.VIDEO ? form.source_mode : 'upload')
           setFileError(null)
         }}
         options={fileTypes}
         hint="Format media dari satu konten; boleh berbeda dari Tipe Aktivitas stage."
       />
+
+      {form.file_type === StageContentFileTypeEnum.VIDEO && (
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-surface rounded-lg border border-outline-variant">
+          <span className="text-sm text-on-surface-variant">Sumber Video:</span>
+          <button
+            type="button"
+            onClick={() => set('source_mode', 'upload')}
+            className={cn(
+              'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+              form.source_mode === 'upload'
+                ? 'bg-primary text-on-primary'
+                : 'bg-surface-variant text-on-surface-variant hover:bg-outline-variant'
+            )}
+          >
+            Upload Manual
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              set('source_mode', 'youtube')
+              set('file_url', '')
+              set('duration_seconds', 0)
+              uploadFileRef.current = null
+              revokePreview()
+            }}
+            className={cn(
+              'px-3 py-1 rounded-full text-sm font-medium transition-colors',
+              form.source_mode === 'youtube'
+                ? 'bg-primary text-on-primary'
+                : 'bg-surface-variant text-on-surface-variant hover:bg-outline-variant'
+            )}
+          >
+            YouTube
+          </button>
+        </div>
+      )}
 
       {isGameBundle ? (
         <Input
@@ -218,6 +289,15 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
           onChange={(e) => set('file_url', e.target.value)}
           placeholder="https://..."
           required
+        />
+      ) : form.file_type === StageContentFileTypeEnum.VIDEO && form.source_mode === 'youtube' ? (
+        <Input
+          label="URL YouTube"
+          value={form.youtube_url}
+          onChange={(e) => set('youtube_url', e.target.value)}
+          placeholder="https://youtube.com/watch?v=..."
+          required
+          hint="Tempel tautan YouTube (watch / youtu.be / embed). Kiosk akan menampilkan via embed."
         />
       ) : (
         <div className="space-y-2">
@@ -271,19 +351,14 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
             className="hidden"
           />
           {fileError && <p className="text-sm text-error">{fileError}</p>}
+
+          {form.file_type === StageContentFileTypeEnum.VIDEO && form.duration_seconds > 0 && (
+            <p className="text-sm text-on-surface-variant">
+              Total Durasi Video: {form.duration_seconds}(detik)
+            </p>
+          )}
         </div>
       )}
-
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          label="Durasi File (detik)"
-          type="number"
-          min={0}
-          value={form.duration_seconds.toString()}
-          onChange={(e) => set('duration_seconds', parseInt(e.target.value) || 0)}
-          hint="Panjang pemutaran file ini (detik). Otomatis terisi untuk Video/Audio."
-        />
-      </div>
 
       <label className="flex items-center gap-2 text-sm">
         <input

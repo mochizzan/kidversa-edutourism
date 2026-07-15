@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Pencil, Trash2, Eye } from 'lucide-react'
+import { Pencil, Trash2, Eye, Plus } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -15,6 +15,8 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { useCrudList } from '../../../shared/hooks/useCrudList'
 import type { Assessment, Participant, Session } from '../../../core/types'
 import { SessionStatus } from '../../../core/types'
+import { friendlyError } from '../../../core/utils/errorMessages'
+import { ROUTES } from '../../../core/constants/app'
 
 interface ParticipantRow extends Participant {
   sessionName: string
@@ -57,7 +59,7 @@ const ParticipantsPage = () => {
         setSessionsById(sessionMap)
       } catch (err) {
         if (!cancelled) {
-          addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal memuat sesi' })
+          addToast({ type: 'error', message: friendlyError(err) })
         }
       }
     }
@@ -134,7 +136,7 @@ const ParticipantsPage = () => {
         refresh()
       }
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus peserta' })
+      addToast({ type: 'error', message: friendlyError(err) })
     }
   }
 
@@ -188,10 +190,10 @@ const ParticipantsPage = () => {
       align: 'right',
       render: (item) => (
         <div className="flex items-center justify-end gap-2">
-          <Link to={`/admin/participants/${item.id}`}>
+          <Link to={`${ROUTES.ADMIN.PARTICIPANTS}/${item.id}`}>
             <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip="Lihat detail" />
           </Link>
-          <Link to={`/admin/participants/${item.id}/edit`}>
+          <Link to={`${ROUTES.ADMIN.PARTICIPANTS}/${item.id}/edit`}>
             <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit peserta" />
           </Link>
           <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Hapus peserta" onClick={() => setDeleteId(item.id)} />
@@ -205,6 +207,11 @@ const ParticipantsPage = () => {
       <PageHeader
         title="Peserta"
         subtitle="Kelola data peserta dan pantau progres sesi mereka."
+        actions={
+          <Link to={`${ROUTES.ADMIN.PARTICIPANTS}/new`}>
+            <Button icon={<Plus className="w-4 h-4" />}>Tambah Peserta</Button>
+          </Link>
+        }
       />
 
       <DataTable

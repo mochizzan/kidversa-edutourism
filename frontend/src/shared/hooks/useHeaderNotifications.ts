@@ -1,13 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../core/hooks/useAuth'
 import { useConnectionStatus } from './useConnectionStatus'
-import { userService } from '../../core/services/users'
-import { tenantService } from '../../core/services/tenants'
-import type { User } from '../../core/types'
-import { UserRole, ApprovalStatus } from '../../core/types/enums'
-import { isSuperAdmin, isAdmin } from '../../core/utils/permissions'
-import { USERS_CHANGED_EVENT, ROUTES } from '../../core/constants/app'
-import { useTenantStore } from '../../core/stores/tenantStore'
+import { openSSE, refreshAccessToken } from '../../core/services/backendClient'
+import { notifications } from '../../core/services/notifications'
+import { ROUTES } from '../../core/constants/app'
+import type { Notification } from '../../core/types'
 
 export interface HeaderNotification {
   id: string
@@ -22,18 +19,15 @@ export interface HeaderNotification {
 }
 
 export function useHeaderNotifications() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { status: connectionStatus } = useConnectionStatus()
-  const [notifications, setNotifications] = useState<HeaderNotification[]>([])
+  const [notificationsState, setNotificationsState] = useState<HeaderNotification[]>([])
+  const [realUnread, setRealUnread] = useState(0)
+  const [acknowledged, setAcknowledged] = useState(false)
 
-  const loadNotifications = useCallback(async () => {
-    if (!user) {
-      setNotifications([])
-      return
-    }
-
+  // Connection-status notices are always shown, independent of SSE.
+  const connectionNotifs = useCallback((): HeaderNotification[] => {
     const notifs: HeaderNotification[] = []
-
     if (connectionStatus === 'reconnecting') {
       notifs.push({
         id: 'offline',
@@ -43,92 +37,135 @@ export function useHeaderNotifications() {
         color: 'text-orange-600 bg-orange-100',
       })
     }
-
     notifs.push({
       id: 'connection-status',
       type: 'connection',
-      title: connectionStatus === 'online' ? 'Terhubung ke Server' : connectionStatus === 'degraded' ? 'Koneksi Terbatas' : 'Menghubungkan…',
+      title:
+        connectionStatus === 'online'
+          ? 'Terhubung ke Server'
+          : connectionStatus === 'degraded'
+            ? 'Koneksi Terbatas'
+            : 'Menghubungkan…',
       description: connectionStatus === 'online' ? 'Semua data tersinkronisasi' : 'Coba lagi nanti',
-      color: connectionStatus === 'online' ? 'text-green-600 bg-green-100' : connectionStatus === 'degraded' ? 'text-blue-600 bg-blue-100' : 'text-orange-600 bg-orange-100',
+      color:
+        connectionStatus === 'online'
+          ? 'text-green-600 bg-green-100'
+          : connectionStatus === 'degraded'
+            ? 'text-blue-600 bg-blue-100'
+            : 'text-orange-600 bg-orange-100',
     })
+    return notifs
+  }, [connectionStatus])
 
-    const approvalRoles: UserRole[] = [UserRole.SUPER_ADMIN, UserRole.ADMIN]
-    if (approvalRoles.includes(user.role)) {
-      // SUPER_ADMIN wajib punya active tenant agar /api/users (tenant-scoped)
-      // tidak 400. Jika belum ter-select (mis. fetchTenants gagal), jangan
-      // fetch user global — cukup tampilkan notifikasi koneksi yang sudah ada.
-      const activeTenantId = useTenantStore.getState().activeTenant?.id ?? null
-      if (user.role === UserRole.SUPER_ADMIN && !activeTenantId) {
-        setNotifications(notifs)
-        return
-      }
-      try {
-        const [usersPage, tenantList] = await Promise.all([
-          userService.getAll({ page: 1, limit: 1000 }),
-          tenantService.getAll(),
-        ])
-        const users = usersPage.data
-        const tenants = tenantList
-        const tenantMap = new Map(tenants.map((t) => [t.id, t]))
-        const pendingUsers = users.filter((u) => u.approval_status === ApprovalStatus.PENDING)
-
-        const relevantPending = pendingUsers.filter((pending) => {
-          if (isSuperAdmin(user)) return true
-          if (isAdmin(user)) return pending.tenant_id === user.tenant_id
-          return false
-        })
-
-        const grouped = new Map<string, User[]>()
-        for (const pending of relevantPending) {
-          const tid = pending.tenant_id || '__global__'
-          if (!grouped.has(tid)) grouped.set(tid, [])
-          grouped.get(tid)!.push(pending)
-        }
-
-        for (const [tenantId, pendingList] of grouped) {
-          const tenantName = tenantId === '__global__' ? 'Platform' : (tenantMap.get(tenantId)?.name || 'Unknown')
-          const count = pendingList.length
-
-          const route = isSuperAdmin(user)
-            ? `${ROUTES.ADMIN.USERS}?filter=pending&tenant=${tenantId}`
-            : `${ROUTES.ADMIN.USERS}?filter=pending`
-
-          notifs.push({
-            id: `approval-${tenantId}`,
-            tenant_id: tenantId === '__global__' ? null : tenantId,
-            tenant_name: tenantName,
-            type: 'user_approval',
-            title: isSuperAdmin(user)
-              ? `${count} Pendaftaran Menunggu - ${tenantName}`
-              : `${count} Pendaftaran Menunggu`,
-            description: `${count} pengguna baru menunggu persetujuan`,
-            route,
-            color: 'text-purple-600 bg-purple-100',
-            count,
-          })
-        }
-      } catch {
-        // ignore notification load errors
-      }
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setNotificationsState(connectionNotifs())
+      setRealUnread(0)
+      return
     }
+    try {
+      const { items, unread } = await notifications.list()
+      const mapped: HeaderNotification[] = items.map((n: Notification) => {
+        const tenantId = n.tenant_id || undefined
+        const route = tenantId
+          ? `${ROUTES.ADMIN.USERS}?filter=pending&tenant=${tenantId}`
+          : `${ROUTES.ADMIN.USERS}?filter=pending`
+        return {
+          id: n.id,
+          tenant_id: tenantId,
+          tenant_name: n.title,
+          type: 'user_approval',
+          title: n.title || 'Pendaftaran Menunggu',
+          description: n.message || 'Pengguna baru menunggu persetujuan',
+          route,
+          color: 'text-purple-600 bg-purple-100',
+          count: 1,
+        }
+      })
+      setNotificationsState([...mapped, ...connectionNotifs()])
+      setRealUnread(unread)
+    } catch {
+      // Offline / transient failure — keep connection notices only.
+      setNotificationsState(connectionNotifs())
+    }
+  }, [user, connectionNotifs])
 
-    setNotifications(notifs)
-  }, [user, connectionStatus])
-
+  // Full-SSE subscription: a wake-up signal (notif:new / notif:update)
+  // triggers a refetch of GET /api/notifications. No delta merge.
+  //
+  // Guard: only open the stream once the in-memory access token is ready.
+  // On a cold reload the user is restored from sessionStorage BEFORE the token
+  // is re-established via refresh, and EventSource cannot send a Bearer header
+  // (only the session cookie). Opening prematurely would 401 (and auto-reconnect
+  // would storm 401s). Waiting for `token` avoids that.
   useEffect(() => {
-    loadNotifications()
-    const interval = setInterval(loadNotifications, 30000)
-    const handleUsersChanged = () => loadNotifications()
-    window.addEventListener(USERS_CHANGED_EVENT, handleUsersChanged)
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener(USERS_CHANGED_EVENT, handleUsersChanged)
+    if (!user || !token) {
+      setNotificationsState(connectionNotifs())
+      return
     }
-  }, [loadNotifications])
+    let closed = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let attempts = 0
+    const MAX_ATTEMPTS = 5
 
-  const unreadCount = notifications.filter(
-    (n) => n.type === 'user_approval'
-  ).length
+    const open = () => {
+      if (closed) return
+      let source: EventSource
+      const onEvent = () => {
+        void refresh()
+      }
+      source = openSSE('/api/notifications/stream', onEvent, {
+        onError: () => {
+          // EventSource auto-reconnects, but on a 401 it would loop forever.
+          // Close it and retry after refreshing the token (backoff), with a cap.
+          source.close()
+          if (closed || attempts >= MAX_ATTEMPTS) return
+          attempts++
+          const delay = Math.min(1000 * 2 ** (attempts - 1), 8000)
+          retryTimer = setTimeout(async () => {
+            try {
+              await refreshAccessToken()
+            } catch {
+              // token refresh failed; give up, connection watcher will retry.
+              return
+            }
+            if (!closed) open()
+          }, delay)
+        },
+      })
+      source.onopen = () => {
+        attempts = 0
+        void refresh()
+      }
+      source.addEventListener('notif:new', onEvent)
+      source.addEventListener('notif:update', onEvent)
+    }
 
-  return { notifications, unreadCount, refresh: loadNotifications }
+    void refresh()
+    open()
+    return () => {
+      closed = true
+      if (retryTimer) clearTimeout(retryTimer)
+    }
+  }, [user, token, connectionNotifs, refresh])
+
+  // Re-render connection notices when status changes.
+  useEffect(() => {
+    if (!user) return
+    setNotificationsState((prev) => {
+      const approvals = prev.filter((n) => n.type === 'user_approval')
+      return [...approvals, ...connectionNotifs()]
+    })
+  }, [user, connectionNotifs])
+
+  const acknowledge = useCallback(() => {
+    setAcknowledged(true)
+    void notifications.markAllRead().catch(() => {
+      // Best-effort: SSE notif:update will confirm via refetch.
+    })
+  }, [])
+
+  const unreadCount = acknowledged ? 0 : realUnread
+
+  return { notifications: notificationsState, unreadCount, refresh, acknowledge }
 }

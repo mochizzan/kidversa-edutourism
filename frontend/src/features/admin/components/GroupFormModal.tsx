@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 interface GroupFormModalProps {
   open: boolean
@@ -59,7 +60,7 @@ export function GroupFormModal({
       await onSubmit(trimmedName)
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal menyimpan kelompok')
+      setError(friendlyError(err))
     } finally {
       setSubmitting(false)
     }

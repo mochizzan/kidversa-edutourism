@@ -107,6 +107,10 @@ func (f *fakeUserRepoPhase3) Deactivate(_ context.Context, id string) (*entity.U
 	return u, nil
 }
 
+func (f *fakeUserRepoPhase3) ListApproversForTenant(_ context.Context, _ string) ([]entity.User, error) {
+	return nil, nil
+}
+
 type fakeTenantRepoPhase3 struct {
 	byID       map[string]*entity.Tenant
 	bySlug     map[string]*entity.Tenant
@@ -156,8 +160,8 @@ func newTestUserHandler() (*UserHandler, *fakeUserRepoPhase3) {
 	cfg := &config.Config{JWTSecret: "test-secret-at-least-32-bytes-long!!!"}
 	jm := auth.NewJWTManager(cfg)
 	repo := newFakeUserRepoP3()
-	uc := auth.NewUserUsecase(repo, 12)
-	h := NewUserHandler(uc, jm)
+	uc := auth.NewUserUsecase(repo, nil, nil, 12)
+	h := NewUserHandler(uc, jm, nil)
 	return h, repo
 }
 

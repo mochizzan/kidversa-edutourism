@@ -61,8 +61,8 @@ func NewRouter(d Deps) *echo.Echo {
 	)
 
 	// Live + SSE.
-	handler.RegisterLiveRoutes(api.Group("/live"), h.Live, d.JWT, d.Hub, d.Revoker)
-	handler.RegisterNotificationsRoutes(api.Group("/notifications"), h.Notification, d.JWT, d.Hub, d.Revoker)
+	handler.RegisterLiveRoutes(api.Group("/live"), h.Live, d.JWT, d.Hub, d.Config, d.Revoker)
+	handler.RegisterNotificationsRoutes(api.Group("/notifications"), h.Notification, d.JWT, d.Hub, d.Config, d.Revoker)
 
 	// Resources.
 	handler.RegisterAssessmentRoutes(api.Group("/assessments"), h.Assessment, d.JWT, d.Revoker)

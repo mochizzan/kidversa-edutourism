@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -10,6 +11,7 @@ import (
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
+	"kidversa-edutourism-backend/internal/usecase/live"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
@@ -18,11 +20,13 @@ type UserHandler struct {
 	userUC   *auth.UserUsecase
 	tenantUC *auth.TenantUsecase
 	jwt      *auth.JWTManager
+	svc      *live.Service
 }
 
-// NewUserHandler builds the user handler.
-func NewUserHandler(userUC *auth.UserUsecase, jwt *auth.JWTManager) *UserHandler {
-	return &UserHandler{userUC: userUC, jwt: jwt}
+// NewUserHandler builds the user handler. svc is the live service used to fan out
+// approval-dismiss notifications (best-effort) on approve/reject.
+func NewUserHandler(userUC *auth.UserUsecase, jwt *auth.JWTManager, svc *live.Service) *UserHandler {
+	return &UserHandler{userUC: userUC, jwt: jwt, svc: svc}
 }
 
 // actorRoleTenant extracts the caller's role + tenant from the JWT context.
@@ -35,6 +39,17 @@ func actor(c *echo.Context) (string, string) {
 // validateID parses the :id path param; returns error via response if invalid.
 func validateID(c *echo.Context) (string, bool) {
 	return bindUUID(c, "id")
+}
+
+// dismissApproval best-effort fans out the approval-dismiss notification so
+// approvers' badge counts refresh. It never fails the 200 response.
+func (h *UserHandler) dismissApproval(c *echo.Context, targetUserID string) {
+	if h.svc == nil {
+		return
+	}
+	if err := h.svc.DismissApproval((*c).Request().Context(), targetUserID); err != nil {
+		log.Printf("user: dismiss approval notif for %s failed: %v", targetUserID, err)
+	}
 }
 
 // List handles GET /api/users (paginated + filtered).
@@ -118,6 +133,7 @@ func (h *UserHandler) Approve(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	h.dismissApproval(c, id)
 	return appresp.OK(c, user)
 }
 
@@ -136,6 +152,7 @@ func (h *UserHandler) Reject(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	h.dismissApproval(c, id)
 	return appresp.OK(c, user)
 }
 

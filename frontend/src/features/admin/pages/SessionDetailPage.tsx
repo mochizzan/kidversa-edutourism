@@ -14,6 +14,7 @@ import { UserRole } from '../../../core/types/enums'
 import { programService } from '../../../core/services/programs'
 import { userService } from '../../../core/services/users'
 import { ApiError } from '../../../core/services/backendClient'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import { redirectToLogin } from '../../../core/stores/authStore'
 import type { Session, SessionStage, SessionGroup, Participant, User, Program } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
@@ -103,7 +104,7 @@ const SessionDetailPage = () => {
         redirectToLogin()
         return
       }
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal membuat sesi' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally { setCreating(false) }
   }
 

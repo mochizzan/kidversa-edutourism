@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
-import { ApiError } from '../../../core/services/backendClient'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import { useRateLimit } from '../hooks/useRateLimit'
 import { ROUTES } from '../../../core/constants/app'
 import { LoginForm } from '../components/LoginForm'
@@ -63,24 +63,10 @@ const LoginPage = () => {
       if (isLockedNow) {
         setGeneralError('Terlalu banyak percobaan. Coba lagi dalam 5 menit.')
       } else {
-        if (err instanceof ApiError) {
-          switch (err.code) {
-            case 'invalid_credentials':
-              setGeneralError('Email atau password salah.')
-              break
-            case 'unauthorized':
-              setGeneralError('Tidak memiliki akses.')
-              break
-            case 'validation_error':
-              setGeneralError('Data tidak valid. Periksa kembali input Anda.')
-              break
-            default:
-              setGeneralError(err.message || 'Terjadi kesalahan. Silakan coba lagi.')
-          }
-        } else {
-          setGeneralError('Terjadi kesalahan. Silakan coba lagi.')
-        }
+        setGeneralError(friendlyError(err))
       }
+    } finally {
+      submittedRef.current = false
     }
   }
 

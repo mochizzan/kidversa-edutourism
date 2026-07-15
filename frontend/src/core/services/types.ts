@@ -49,7 +49,7 @@ export interface ProgramService {
 
   getContents(stageId: string): Promise<StageContent[]>
   createContent(stageId: string, data: Omit<StageContent, 'id' | 'program_stage_id' | 'created_at'>): Promise<StageContent>
-  uploadContent(stageId: string, data: { file: File; title: string; file_type: StageContentFileType; duration_seconds?: number }): Promise<StageContent>
+  uploadContent(stageId: string, data: { file: File; title: string; file_type: StageContentFileType; duration_seconds?: number; youtube_url?: string }): Promise<StageContent>
   updateContent(stageId: string, contentId: string, data: Partial<Omit<StageContent, 'id' | 'program_stage_id' | 'created_at'>>): Promise<StageContent>
   deleteContent(stageId: string, contentId: string): Promise<void>
   reorderContents(stageId: string, contentIds: string[]): Promise<void>
@@ -87,6 +87,7 @@ export interface SessionService {
 export interface ParticipantService {
   getAll(params?: ListParams): Promise<PaginatedResponse<Participant>>
   getById(id: string): Promise<Participant | null>
+  create(data: CreateParticipantDTO): Promise<Participant>
 }
 
 // Users

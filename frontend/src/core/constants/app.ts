@@ -32,7 +32,7 @@ export const ROUTES = {
     SESSIONS: '/admin/sessions',
     SESSION_NEW: '/admin/sessions/new',
     PARTICIPANTS: '/admin/participants',
-    PARTICIPANT_NEW: '/admin/participants/new', // kept for reference; route removed (no global create)
+    PARTICIPANT_NEW: '/admin/participants/new',
     REPORTS: '/admin/reports',
     MISSIONS: '/admin/missions',
     MISSION_NEW: '/admin/missions/new',

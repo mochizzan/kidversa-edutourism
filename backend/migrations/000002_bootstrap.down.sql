@@ -1,2 +1,0 @@
--- 000002_bootstrap.down.sql
--- No-op: bootstrap is applied in Go (idempotent); dropping tenants would destroy all data.

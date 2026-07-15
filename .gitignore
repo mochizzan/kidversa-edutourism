@@ -63,3 +63,4 @@ img/
 kidversa-server
 backend/.env
 backend/uploads/
+backend/cmd/server/uploads/

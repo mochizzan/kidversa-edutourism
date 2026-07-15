@@ -54,9 +54,14 @@ func extractToken(c *echo.Context, sseCookieName string) string {
 		return strings.TrimPrefix(authz, "Bearer ")
 	}
 	if sseCookieName != "" {
-		if ck, err := (*c).Cookie(sseCookieName); err == nil {
+		if ck, err := (*c).Cookie(sseCookieName); err == nil && ck.Value != "" {
 			return ck.Value
 		}
+	}
+	// Fallback: query parameter (for environments where the cookie is blocked,
+	// e.g. cross-origin EventSource where the Set-Cookie was dropped).
+	if tok := (*c).QueryParam("token"); tok != "" {
+		return tok
 	}
 	return ""
 }

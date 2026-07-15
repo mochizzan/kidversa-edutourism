@@ -15,6 +15,7 @@ import { sessionService } from '../../../core/services/sessions'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Session } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 const SessionsPage = () => {
   const navigate = useNavigate()
@@ -54,7 +55,7 @@ const SessionsPage = () => {
       setDeletingId(null)
       refresh()
     } catch (err) {
-      addToast({ type: 'error', message: err instanceof Error ? err.message : 'Gagal menghapus sesi' })
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setDeleting(false)
     }

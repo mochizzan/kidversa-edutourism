@@ -11,6 +11,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { formatDate } from '../../../shared/utils'
 import { SessionStatus } from '../../../core/types/enums'
 import type { Session } from '../../../core/types'
+import { friendlyError } from '../../../core/utils/errorMessages'
 
 interface ActivityItem {
   id: string
@@ -85,7 +86,7 @@ const ActivitiesPage = () => {
 
       setActivities(items)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal memuat aktivitas')
+      setError(friendlyError(err))
     } finally {
       setLoading(false)
     }
