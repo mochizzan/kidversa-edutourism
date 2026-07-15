@@ -1,5 +1,7 @@
 package entity
 
+import "time"
+
 // Assessment is a star-rating + comment given to a participant at a session stage.
 type Assessment struct {
 	BaseModel
@@ -9,7 +11,7 @@ type Assessment struct {
 	StarRating     int        `json:"star_rating"`
 	Comment        string     `json:"comment,omitempty"`
 	AssessedBy     string     `json:"assessed_by"`
-	AssessedAt     string     `json:"assessed_at"`
+	AssessedAt     time.Time  `json:"assessed_at"`
 	SyncStatus     SyncStatus `json:"sync_status"`
 }
 
@@ -23,7 +25,7 @@ type SmartPhoto struct {
 	FramedFileURL   string     `json:"framed_file_url,omitempty"`
 	IsReportPhoto   bool       `json:"is_report_photo"`
 	TakenBy         string     `json:"taken_by"`
-	TakenAt         string     `json:"taken_at"`
+	TakenAt         time.Time  `json:"taken_at"`
 	SyncStatus      SyncStatus `json:"sync_status"`
 }
 
@@ -37,10 +39,10 @@ type Recording struct {
 	DurationSeconds int                    `json:"duration_seconds"`
 	FileSizeBytes   int64                  `json:"file_size_bytes,omitempty"`
 	TranscriptText  string                 `json:"transcript_text,omitempty"`
-	EmotionTagsJSON RawJSON                `json:"emotion_tags_json,omitempty"`
+	EmotionTags     []string               `json:"emotion_tags,omitempty"`
 	ReviewStatus    RecordingsReviewStatus `json:"review_status"`
 	ReviewedBy      *string                `json:"reviewed_by,omitempty"`
-	ReviewedAt      *string                `json:"reviewed_at,omitempty"`
+	ReviewedAt      *time.Time             `json:"reviewed_at,omitempty"`
 	SyncStatus      SyncStatus             `json:"sync_status"`
 }
 
@@ -51,25 +53,29 @@ type Report struct {
 	SessionID            string       `json:"session_id"`
 	AINarrativeDraft     string       `json:"ai_narrative_draft,omitempty"`
 	AINarrativeFinal     string       `json:"ai_narrative_final,omitempty"`
-	MissionIDsJSON       RawJSON      `json:"mission_ids_json,omitempty"`
 	ReportPDFURL         string       `json:"report_pdf_url,omitempty"`
 	ParentAccessToken    string       `json:"-"`
-	ParentTokenExpiresAt *string      `json:"-"`
+	ParentTokenExpiresAt *time.Time   `json:"-"`
 	ParentTokenRevoked   bool         `json:"-"`
 	Status               ReportStatus `json:"status"`
-	GeneratedAt          *string      `json:"generated_at,omitempty"`
-	SentAt               *string      `json:"sent_at,omitempty"`
+	GeneratedAt          *time.Time   `json:"generated_at,omitempty"`
+	SentAt               *time.Time   `json:"sent_at,omitempty"`
 	ApprovedBy           *string      `json:"approved_by,omitempty"`
+	// MissionIDs is the derived list of mission-bank ids assigned to this report
+	// (1NF: sourced from the participant_missions junction, never a JSON column).
+	// It is computed by the repository and excluded from persistence.
+	MissionIDs []string `json:"mission_ids,omitempty" gorm:"-"`
 }
 
 // ParticipantMission links a report to a completed mission from the mission bank.
+// ParticipantID is intentionally omitted: it is derivable from
+// report_id -> reports.participant_id (3NF).
 type ParticipantMission struct {
 	BaseModel
-	ParticipantID string  `json:"participant_id"`
-	ReportID      string  `json:"report_id"`
-	MissionBankID string  `json:"mission_bank_id"`
-	IsCompleted   bool    `json:"is_completed"`
-	CompletedAt   *string `json:"completed_at,omitempty"`
+	ReportID      string     `json:"report_id"`
+	MissionBankID string     `json:"mission_bank_id"`
+	IsCompleted   bool       `json:"is_completed"`
+	CompletedAt   *time.Time `json:"completed_at,omitempty"`
 }
 
 // ConsentLog records a parent's consent response for recording/photo.
@@ -79,40 +85,42 @@ type ConsentLog struct {
 	SessionID     string      `json:"session_id"`
 	ConsentType   ConsentType `json:"consent_type"`
 	Value         bool        `json:"value"`
-	SentAt        string      `json:"sent_at"`
-	RespondedAt   *string     `json:"responded_at,omitempty"`
+	SentAt        time.Time   `json:"sent_at"`
+	RespondedAt   *time.Time  `json:"responded_at,omitempty"`
 	IPAddress     string      `json:"ip_address,omitempty"`
 	UserAgent     string      `json:"user_agent,omitempty"`
 	// ConsentToken is the single-use, unguessable token used by the public
 	// respond-public flow (plan B10). Empty for rows created via the JWT flow.
 	ConsentToken string `json:"consent_token,omitempty"`
 	// ConsumedAt is set when the token-based response is recorded (replay protection).
-	ConsumedAt *string `json:"consumed_at,omitempty"`
+	ConsumedAt *time.Time `json:"consumed_at,omitempty"`
 	// ExpiresAt is the RFC3339 expiry of the consent token.
-	ExpiresAt *string `json:"expires_at,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
 // TimelineEvent is a realtime log entry for the live dashboard (replaces frontend simulation).
 type TimelineEvent struct {
 	BaseModel
-	SessionID string `json:"session_id"`
-	GroupID   string `json:"group_id"`
-	Type      string `json:"type"` // group:progress|group:completed|stage:unlock|override
-	Message   string `json:"message"`
-	UserID    string `json:"user_id,omitempty"`
+	SessionID string           `json:"session_id"`
+	GroupID   string           `json:"group_id"`
+	Type      TimelineEventType `json:"type"` // enum: group:progress|group:completed|stage:unlock|override
+	Message   string           `json:"message"`
+	UserID    string           `json:"user_id,omitempty"`
 }
 
 // MissionBank is a reusable mission template (Home/Parent/School) tied to a program + tenant.
 type MissionBank struct {
 	BaseModel
-	TenantID            string          `json:"tenant_id"`
-	ProgramID           string          `json:"program_id"`
-	Category            MissionCategory `json:"category"`
-	TitleChild          string          `json:"title_child"`
-	TitleParent         string          `json:"title_parent"`
-	DescriptionParent   string          `json:"description_parent,omitempty"`
-	RelatedStageIDsJSON RawJSON         `json:"related_stage_ids_json,omitempty"`
-	IsActive            bool            `json:"is_active"`
+	TenantID          string          `json:"tenant_id"`
+	ProgramID         string          `json:"program_id"`
+	Category          MissionCategory `json:"category"`
+	TitleChild        string          `json:"title_child"`
+	TitleParent       string          `json:"title_parent"`
+	DescriptionParent string          `json:"description_parent,omitempty"`
+	// RelatedStageIDs is the ordered list of program-stage ids the mission targets.
+	// It is persisted via the mission_bank_stages junction table (1NF).
+	RelatedStageIDs []string `json:"related_stage_ids,omitempty"`
+	IsActive        bool     `json:"is_active"`
 }
 
 // PhotoFrame is a decorative frame overlay (per tenant + optional program) applied to photos.

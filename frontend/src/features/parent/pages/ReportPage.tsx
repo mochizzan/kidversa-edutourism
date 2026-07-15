@@ -46,9 +46,7 @@ function ReportView() {
       // The public report payload is an anti-IDOR view: it exposes the final
       // narrative, the mission id list, and the (optional) PDF url — never PII.
       const narrative = pub.ai_narrative_final || ''
-      const missions: string[] = pub.mission_ids_json
-        ? parseMissionIds(pub.mission_ids_json)
-        : []
+      const missions: string[] = pub.mission_ids ?? []
 
       return generateMiniRaportHTML({
         childName: 'Ananda',
@@ -209,23 +207,6 @@ function ReportView() {
       </div>
     </div>
   )
-}
-
-/* Parse the report's mission_ids_json field, which is a JSON array of ids as a
-   string (backend RawJSON). Returns trimmed ids, tolerating non-JSON input. */
-function parseMissionIds(raw: string): string[] {
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) {
-      return parsed.map((m) => String(m).trim()).filter(Boolean)
-    }
-    if (typeof parsed === 'string') {
-      return parsed.split(',').map((s) => s.trim()).filter(Boolean)
-    }
-  } catch {
-    return raw.split(',').map((s) => s.trim()).filter(Boolean)
-  }
-  return []
 }
 
 /* ── Page wrapper ── */

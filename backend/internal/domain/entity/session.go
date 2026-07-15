@@ -1,5 +1,7 @@
 package entity
 
+import "time"
+
 // Session is a single running instance of a program for a group of participants.
 type Session struct {
 	BaseModel
@@ -20,8 +22,8 @@ type SessionStage struct {
 	ProgramStageID string             `json:"program_stage_id"`
 	FacilitatorID  *string            `json:"facilitator_id,omitempty"`
 	Status         SessionStageStatus `json:"status"`
-	StartedAt      *string            `json:"started_at,omitempty"`
-	CompletedAt    *string            `json:"completed_at,omitempty"`
+	StartedAt      *time.Time          `json:"started_at,omitempty"`
+	CompletedAt    *time.Time          `json:"completed_at,omitempty"`
 }
 
 // SessionGroup is a cohort of participants within a session.
@@ -39,8 +41,8 @@ type GroupStageProgress struct {
 	GroupID        string                   `json:"group_id"`
 	SessionStageID string                   `json:"session_stage_id"`
 	Status         GroupStageProgressStatus `json:"status"`
-	EnteredAt      *string                  `json:"entered_at,omitempty"`
-	CompletedAt    *string                  `json:"completed_at,omitempty"`
+	EnteredAt      *time.Time               `json:"entered_at,omitempty"`
+	CompletedAt    *time.Time               `json:"completed_at,omitempty"`
 	UnlockedBy     *string                  `json:"unlocked_by,omitempty"`
 	UnlockReason   string                   `json:"unlock_reason,omitempty"`
 }
@@ -58,6 +60,6 @@ type Participant struct {
 	ParentPhone      string  `json:"parent_phone"`
 	ParentEmail      string  `json:"parent_email,omitempty"`
 	ConsentRecording bool    `json:"consent_recording"`
-	ConsentPhoto     bool    `json:"consent_photo"`
-	ConsentAt        *string `json:"consent_at,omitempty"`
+	ConsentPhoto     bool      `json:"consent_photo"`
+	ConsentAt        *time.Time `json:"consent_at,omitempty"`
 }

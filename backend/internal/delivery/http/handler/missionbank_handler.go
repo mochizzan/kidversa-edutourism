@@ -41,7 +41,7 @@ func (h *MissionBankHandler) Create(c *echo.Context) error {
 		TitleChild:          req.TitleChild,
 		TitleParent:         req.TitleParent,
 		DescriptionParent:   req.DescriptionParent,
-		RelatedStageIDsJSON: entity.RawJSON(req.RelatedStageIDsJSON),
+		RelatedStageIDs:     req.RelatedStageIDs,
 		IsActive:            req.IsActive,
 	}
 	if err := h.repo.Create((*c).Request().Context(), m); err != nil {

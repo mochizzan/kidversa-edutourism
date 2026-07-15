@@ -28,7 +28,7 @@ func (h *MissionBankHandler) Update(c *echo.Context) error {
 	m.TitleChild = req.TitleChild
 	m.TitleParent = req.TitleParent
 	m.DescriptionParent = req.DescriptionParent
-	m.RelatedStageIDsJSON = entity.RawJSON(req.RelatedStageIDsJSON)
+	m.RelatedStageIDs = req.RelatedStageIDs
 	m.IsActive = req.IsActive
 	if err := h.repo.Update((*c).Request().Context(), m); err != nil {
 		return err

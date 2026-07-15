@@ -10,6 +10,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	apputil "kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // RecordingHandler serves /api/recordings/* (CRUD + review over Recording rows).
@@ -114,7 +115,11 @@ func (h *RecordingHandler) Update(c *echo.Context) error {
 		fields["reviewed_by"] = req.ReviewedBy
 	}
 	if req.ReviewedAt != "" {
-		fields["reviewed_at"] = req.ReviewedAt
+		if t, ok := apputil.ParseISO(req.ReviewedAt); ok {
+			fields["reviewed_at"] = t
+		} else {
+			fields["reviewed_at"] = req.ReviewedAt
+		}
 	}
 	if err := h.recordings.UpdateFields((*c).Request().Context(), id, fields); err != nil {
 		return err

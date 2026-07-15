@@ -96,9 +96,15 @@ func (r *GormParticipantMissionRepository) ReplaceByReport(ctx context.Context, 
 }
 
 // ListByParticipant returns all participant missions for the given participant.
+// participant_id is no longer stored on participant_missions (3NF); it is derived
+// via the parent report (report_id -> reports.participant_id).
 func (r *GormParticipantMissionRepository) ListByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantMission, error) {
 	var models []ParticipantMissionModel
-	if err := r.db.WithContext(ctx).Where("participant_id = ?", participantID).Order("created_at DESC").Find(&models).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Joins("JOIN reports r ON r.id = participant_missions.report_id").
+		Where("r.participant_id = ?", participantID).
+		Order("participant_missions.created_at DESC").
+		Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	out := make([]entity.ParticipantMission, 0, len(models))

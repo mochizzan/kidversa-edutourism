@@ -1,6 +1,9 @@
 package dto
 
-import "kidversa-edutourism-backend/internal/domain/entity"
+import (
+	"kidversa-edutourism-backend/internal/domain/entity"
+	apputil "kidversa-edutourism-backend/internal/pkg/util"
+)
 
 // ReportResponse is the authenticated read representation of a report.
 type ReportResponse struct {
@@ -30,13 +33,13 @@ func NewReportListResponse(items []entity.Report) *ReportListResponse {
 // PublicReportDTO is the anti-IDOR safe view returned to a parent presenting a
 // valid access token. It intentionally omits PII and the raw token.
 type PublicReportDTO struct {
-	ID               string `json:"id"`
-	ParticipantID    string `json:"participant_id"`
-	SessionID        string `json:"session_id"`
-	Status           string `json:"status"`
-	AINarrativeFinal string `json:"ai_narrative_final,omitempty"`
-	MissionIDsJSON   string `json:"mission_ids_json,omitempty"`
-	ReportPDFURL     string `json:"report_pdf_url,omitempty"`
+	ID               string   `json:"id"`
+	ParticipantID    string   `json:"participant_id"`
+	SessionID        string   `json:"session_id"`
+	Status           string   `json:"status"`
+	AINarrativeFinal string   `json:"ai_narrative_final,omitempty"`
+	MissionIDs       []string `json:"mission_ids,omitempty"`
+	ReportPDFURL     string   `json:"report_pdf_url,omitempty"`
 }
 
 // NewPublicReportDTO builds the safe public view (no PII beyond IDs, no token).
@@ -47,7 +50,7 @@ func NewPublicReportDTO(r *entity.Report) *PublicReportDTO {
 		SessionID:        r.SessionID,
 		Status:           string(r.Status),
 		AINarrativeFinal: r.AINarrativeFinal,
-		MissionIDsJSON:   string(r.MissionIDsJSON),
+		MissionIDs:       r.MissionIDs,
 		ReportPDFURL:     r.ReportPDFURL,
 	}
 }
@@ -75,10 +78,15 @@ type ReportTokenResponse struct {
 
 // NewReportTokenResponse builds the token-bearing response.
 func NewReportTokenResponse(r *entity.Report) *ReportTokenResponse {
+	var expiresAt *string
+	if r.ParentTokenExpiresAt != nil {
+		s := apputil.FormatISO(*r.ParentTokenExpiresAt)
+		expiresAt = &s
+	}
 	return &ReportTokenResponse{
 		ID:                r.ID,
 		ParentAccessToken: r.ParentAccessToken,
-		TokenExpiresAt:    r.ParentTokenExpiresAt,
+		TokenExpiresAt:    expiresAt,
 		Status:            string(r.Status),
 	}
 }

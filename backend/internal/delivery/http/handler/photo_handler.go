@@ -9,6 +9,7 @@ import (
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	apputil "kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // PhotoHandler serves /api/photos/* (CRUD over SmartPhoto records). Upload is a
@@ -80,7 +81,11 @@ func (h *PhotoHandler) Update(c *echo.Context) error {
 		fields["taken_by"] = req.TakenBy
 	}
 	if req.TakenAt != "" {
-		fields["taken_at"] = req.TakenAt
+		if t, ok := apputil.ParseISO(req.TakenAt); ok {
+			fields["taken_at"] = t
+		} else {
+			fields["taken_at"] = req.TakenAt
+		}
 	}
 	if req.FrameID != "" {
 		fields["frame_id"] = req.FrameID

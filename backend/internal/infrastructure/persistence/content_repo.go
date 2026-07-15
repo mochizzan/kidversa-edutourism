@@ -139,6 +139,44 @@ func NewRecordingRepository(db *gorm.DB) repository.RecordingRepository {
 	return &GormRecordingRepository{db: db}
 }
 
+func (r *GormRecordingRepository) loadEmotionTags(ctx context.Context, recordings []entity.Recording) error {
+	if len(recordings) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(recordings))
+	for i := range recordings {
+		ids = append(ids, recordings[i].ID)
+	}
+	var rows []RecordingEmotionTagModel
+	if err := r.db.WithContext(ctx).Where("recording_id IN ?", ids).Find(&rows).Error; err != nil {
+		return err
+	}
+	byRec := make(map[string][]string, len(recordings))
+	for _, row := range rows {
+		byRec[row.RecordingID] = append(byRec[row.RecordingID], row.EmotionTag)
+	}
+	for i := range recordings {
+		recordings[i].EmotionTags = byRec[recordings[i].ID]
+	}
+	return nil
+}
+
+func (r *GormRecordingRepository) saveEmotionTags(ctx context.Context, recordingID string, tags []string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("recording_id = ?", recordingID).Delete(&RecordingEmotionTagModel{}).Error; err != nil {
+			return err
+		}
+		if len(tags) == 0 {
+			return nil
+		}
+		rows := make([]RecordingEmotionTagModel, 0, len(tags))
+		for _, tag := range tags {
+			rows = append(rows, RecordingEmotionTagModel{RecordingID: recordingID, EmotionTag: tag})
+		}
+		return tx.Create(&rows).Error
+	})
+}
+
 func (r *GormRecordingRepository) Create(ctx context.Context, rec *entity.Recording) error {
 	m := recordingModelFromEntity(rec)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
@@ -148,6 +186,9 @@ func (r *GormRecordingRepository) Create(ctx context.Context, rec *entity.Record
 		return apperrors.Internal("internal_error", err)
 	}
 	*rec = *m.ToEntity()
+	if err := r.saveEmotionTags(ctx, rec.ID, rec.EmotionTags); err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
 	return nil
 }
 
@@ -165,7 +206,13 @@ func (r *GormRecordingRepository) GetByID(ctx context.Context, id, tenantID stri
 		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	return m.ToEntity(), nil
+	e := m.ToEntity()
+	recs := []entity.Recording{*e}
+	if err := r.loadEmotionTags(ctx, recs); err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	*e = recs[0]
+	return e, nil
 }
 
 func (r *GormRecordingRepository) Update(ctx context.Context, rec *entity.Recording) error {
@@ -174,6 +221,9 @@ func (r *GormRecordingRepository) Update(ctx context.Context, rec *entity.Record
 		if isDuplicate(err) {
 			return apperrors.Conflict("conflict", err)
 		}
+		return apperrors.Internal("internal_error", err)
+	}
+	if err := r.saveEmotionTags(ctx, rec.ID, rec.EmotionTags); err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
@@ -221,6 +271,9 @@ func (r *GormRecordingRepository) List(ctx context.Context, f repository.Recordi
 	items := make([]entity.Recording, 0, len(models))
 	for i := range models {
 		items = append(items, *models[i].ToEntity())
+	}
+	if err := r.loadEmotionTags(ctx, items); err != nil {
+		return nil, apperrors.Internal("internal_error", err)
 	}
 	return &repository.Paginated[entity.Recording]{Items: items, Total: int(total)}, nil
 }
@@ -271,7 +324,7 @@ func (r *GormConsentRepository) GetValue(ctx context.Context, participantID, ses
 // Respond records a parent's consent decision. It upserts the latest value for
 // the (participant, session, type) tuple and writes a new audit log row.
 func (r *GormConsentRepository) Respond(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType, value bool, ip, ua string) error {
-	now := time.Now().Format(time.RFC3339)
+	now := time.Now().UTC()
 	log := &entity.ConsentLog{
 		ParticipantID: participantID,
 		SessionID:     sessionID,
@@ -342,14 +395,14 @@ func (r *GormConsentRepository) SendRequest(ctx context.Context, participantID, 
 	if err != nil {
 		return "", apperrors.Internal("internal_error", err)
 	}
-	now := time.Now()
-	expiresAt := now.Add(r.consentTokenTTL).Format(time.RFC3339)
+	now := time.Now().UTC()
+	expiresAt := now.Add(r.consentTokenTTL)
 	log := &entity.ConsentLog{
 		ParticipantID: participantID,
 		SessionID:     sessionID,
 		ConsentType:   consentType,
 		Value:         false,
-		SentAt:        now.Format(time.RFC3339),
+		SentAt:        now,
 		ConsentToken:  token,
 		ExpiresAt:     &expiresAt,
 	}
@@ -379,18 +432,18 @@ func (r *GormConsentRepository) RespondByToken(ctx context.Context, token string
 		return apperrors.Conflict("token_consumed", errors.New("consent token already used"))
 	}
 	if m.ExpiresAt != nil {
-		if exp, err := time.Parse(time.RFC3339, *m.ExpiresAt); err == nil && time.Now().After(exp) {
+		if m.ExpiresAt != nil && time.Now().After(*m.ExpiresAt) {
 			return apperrors.Forbidden("token_expired", errors.New("consent token expired"))
 		}
 	}
-	now := time.Now().Format(time.RFC3339)
+	now := time.Now().UTC()
 	updates := map[string]interface{}{
 		"value":        value,
 		"responded_at": now,
 		"consumed_at":  now,
 		"ip_address":   ip,
 		"user_agent":   ua,
-		"updated_at":   time.Now(),
+		"updated_at":   now,
 	}
 	if err := r.db.WithContext(ctx).Model(&ConsentLogModel{}).
 		Where("id = ?", m.ID).

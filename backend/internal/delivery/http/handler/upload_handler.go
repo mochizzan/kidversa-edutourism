@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
@@ -66,9 +67,12 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 	if takenBy == "" {
 		takenBy = userID
 	}
-	takenAt := (*c).FormValue("taken_at")
-	if takenAt == "" {
-		takenAt = apputil.NowISO()
+	takenAtStr := (*c).FormValue("taken_at")
+	var takenAt time.Time
+	if t, ok := apputil.ParseISO(takenAtStr); ok {
+		takenAt = t
+	} else {
+		takenAt = apputil.Now()
 	}
 	isReport := (*c).FormValue("is_report_photo") == "true" || (*c).FormValue("is_report_photo") == "1"
 

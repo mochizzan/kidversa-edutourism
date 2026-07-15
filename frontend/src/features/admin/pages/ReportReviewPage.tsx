@@ -149,7 +149,7 @@ const ReportReviewPage = () => {
         (m) => m.program_id === sess.program_id
       )
       setMissions(programMissions)
-      setAssignedMissionIds(rpt.mission_ids_json || [])
+      setAssignedMissionIds(rpt.mission_ids || [])
     } catch (err) {
       console.error('Failed to load report data:', err)
       setError('Gagal memuat data laporan.')

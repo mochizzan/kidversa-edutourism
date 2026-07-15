@@ -7,6 +7,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	apputil "kidversa-edutourism-backend/internal/pkg/util"
 	assessmentuc "kidversa-edutourism-backend/internal/usecase/assessment"
 )
 
@@ -28,7 +29,7 @@ func (h *AssessmentHandler) Upsert(c *echo.Context) error {
 	}
 	a, err := h.uc.Upsert((*c).Request().Context(),
 		repository.AssessmentFilter{ParticipantID: req.ParticipantID, SessionID: req.SessionID, SessionStageID: req.SessionStageID},
-		req.StarRating, req.Comment, req.AssessedBy, req.AssessedAt, req.SyncStatus)
+		req.StarRating, req.Comment, req.AssessedBy, apputil.ParseISOOrNow(req.AssessedAt), req.SyncStatus)
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func (h *AssessmentHandler) BulkUpsert(c *echo.Context) error {
 			StarRating:     it.StarRating,
 			Comment:        it.Comment,
 			AssessedBy:     it.AssessedBy,
-			AssessedAt:     it.AssessedAt,
+			AssessedAt:     apputil.ParseISOOrNow(it.AssessedAt),
 			SyncStatus:     entity.SyncStatus(it.SyncStatus),
 		})
 	}

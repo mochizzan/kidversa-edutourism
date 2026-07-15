@@ -11,8 +11,6 @@ import (
 // SmartPhotoModel is the GORM persistence model for photos.
 type SmartPhotoModel struct {
 	entity.SmartPhoto
-	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
 }
 
@@ -46,8 +44,6 @@ func smartPhotoModelFromEntity(e *entity.SmartPhoto) *SmartPhotoModel {
 // RecordingModel is the GORM persistence model for recordings.
 type RecordingModel struct {
 	entity.Recording
-	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
 }
 
@@ -81,8 +77,6 @@ func recordingModelFromEntity(e *entity.Recording) *RecordingModel {
 // ConsentLogModel is the GORM persistence model for consent logs.
 type ConsentLogModel struct {
 	entity.ConsentLog
-	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
 }
 

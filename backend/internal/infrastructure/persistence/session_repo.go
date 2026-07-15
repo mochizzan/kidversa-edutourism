@@ -342,7 +342,6 @@ func (r *GormSessionRepository) DeleteParticipant(ctx context.Context, id string
 		table string
 		col   string
 	}{
-		{"participant_missions", "participant_id"},
 		{"smart_photos", "participant_id"},
 		{"recordings", "participant_id"},
 		{"assessments", "participant_id"},

@@ -90,7 +90,7 @@ func (h *LiveHandler) PublishEvent(c *echo.Context) error {
 	sessionID := (*c).Param("sessionId")
 	e := &entity.TimelineEvent{
 		BaseModel: entity.BaseModel{ID: uuid.NewString()}, SessionID: sessionID, GroupID: req.GroupID,
-		Type: req.Type, Message: req.Message, UserID: appmiddleware.GetUserID(c),
+		Type: entity.TimelineEventType(req.Type), Message: req.Message, UserID: appmiddleware.GetUserID(c),
 	}
 	if err := h.svc.PublishEvent((*c).Request().Context(), sessionID, e); err != nil {
 		return err

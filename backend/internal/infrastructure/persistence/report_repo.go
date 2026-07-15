@@ -34,6 +34,39 @@ func (r *GormReportRepository) Create(ctx context.Context, rep *entity.Report) e
 	return nil
 }
 
+// missionIDRow is a lightweight projection of participant_missions used only to
+// derive each report's MissionIDs (avoids scanning full entity rows).
+type missionIDRow struct {
+	ReportID      string `gorm:"column:report_id"`
+	MissionBankID string `gorm:"column:mission_bank_id"`
+}
+
+// loadMissionIDs fills each report's derived MissionIDs from participant_missions.
+func (r *GormReportRepository) loadMissionIDs(ctx context.Context, reports []entity.Report) error {
+	if len(reports) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(reports))
+	for i := range reports {
+		ids = append(ids, reports[i].ID)
+	}
+	var rows []missionIDRow
+	if err := r.db.WithContext(ctx).Table("participant_missions").
+		Select("report_id, mission_bank_id").
+		Where("report_id IN ?", ids).
+		Scan(&rows).Error; err != nil {
+		return err
+	}
+	byReport := make(map[string][]string, len(reports))
+	for _, row := range rows {
+		byReport[row.ReportID] = append(byReport[row.ReportID], row.MissionBankID)
+	}
+	for i := range reports {
+		reports[i].MissionIDs = byReport[reports[i].ID]
+	}
+	return nil
+}
+
 func (r *GormReportRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.Report, error) {
 	var m ReportModel
 	q := r.db.WithContext(ctx).Where("id = ?", id)
@@ -48,7 +81,13 @@ func (r *GormReportRepository) GetByID(ctx context.Context, id, tenantID string)
 		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	return m.ToEntity(), nil
+	e := m.ToEntity()
+	reports := []entity.Report{*e}
+	if err := r.loadMissionIDs(ctx, reports); err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	*e = reports[0]
+	return e, nil
 }
 
 // GetByToken resolves a report only if the parent token is valid: present,
@@ -65,12 +104,17 @@ func (r *GormReportRepository) GetByToken(ctx context.Context, token string) (*e
 		return nil, apperrors.Forbidden("token_invalid", errors.New("token revoked"))
 	}
 	if m.ParentTokenExpiresAt != nil {
-		exp, err := time.Parse(time.RFC3339, *m.ParentTokenExpiresAt)
-		if err == nil && time.Now().After(exp) {
+		if time.Now().After(*m.ParentTokenExpiresAt) {
 			return nil, apperrors.Forbidden("token_expired", errors.New("token expired"))
 		}
 	}
-	return m.ToEntity(), nil
+	e := m.ToEntity()
+	reports := []entity.Report{*e}
+	if err := r.loadMissionIDs(ctx, reports); err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	*e = reports[0]
+	return e, nil
 }
 
 func (r *GormReportRepository) List(ctx context.Context, f repository.ReportFilter, page, limit int) (*repository.Paginated[entity.Report], error) {
@@ -99,6 +143,9 @@ func (r *GormReportRepository) List(ctx context.Context, f repository.ReportFilt
 	items := make([]entity.Report, 0, len(models))
 	for i := range models {
 		items = append(items, *models[i].ToEntity())
+	}
+	if err := r.loadMissionIDs(ctx, items); err != nil {
+		return nil, apperrors.Internal("internal_error", err)
 	}
 	return &repository.Paginated[entity.Report]{Items: items, Total: int(total)}, nil
 }

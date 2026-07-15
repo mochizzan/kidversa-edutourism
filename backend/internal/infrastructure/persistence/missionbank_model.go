@@ -9,12 +9,13 @@ import (
 )
 
 // MissionBankModel is the GORM persistence model for mission-bank templates.
+// related_stage_ids is stored in the mission_bank_stages junction table (1NF),
+// not as a JSON column, so this model no longer carries that field.
 type MissionBankModel struct {
 	entity.MissionBank
-	RelatedStageIDsJSON entity.RawJSON `gorm:"column:related_stage_ids" json:"related_stage_ids_json,omitempty"`
-	CreatedAt           time.Time      `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt           time.Time      `gorm:"column:updated_at" json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
+	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
 }
 
 // TableName pins the table name.

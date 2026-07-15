@@ -2,6 +2,7 @@ package assessment
 
 import (
 	"context"
+	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -20,7 +21,7 @@ func NewUsecase(repo repository.AssessmentRepository) *Usecase {
 }
 
 // Upsert creates or updates an assessment keyed on (participant_id, session_stage_id).
-func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy, assessedAt, syncStatus string) (*entity.Assessment, error) {
+func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy string, assessedAt time.Time, syncStatus string) (*entity.Assessment, error) {
 	if req.ParticipantID == "" || req.SessionStageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
 	}
@@ -33,7 +34,7 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 		if assessedBy != "" {
 			existing.AssessedBy = assessedBy
 		}
-		if assessedAt != "" {
+		if !assessedAt.IsZero() {
 			existing.AssessedAt = assessedAt
 		}
 		if syncStatus != "" {
@@ -54,8 +55,8 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 		AssessedAt:     assessedAt,
 		SyncStatus:     entity.SyncStatus(syncStatus),
 	}
-	if a.AssessedAt == "" {
-		a.AssessedAt = apputil.NowISO()
+	if a.AssessedAt.IsZero() {
+		a.AssessedAt = apputil.Now()
 	}
 	if a.SyncStatus == "" {
 		a.SyncStatus = entity.SyncLocal

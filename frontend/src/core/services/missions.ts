@@ -110,7 +110,7 @@ const create = async (data: CreateMissionBankDTO): Promise<MissionBank> => {
     is_active: true,
   }
   if (data.related_stage_ids && data.related_stage_ids.length > 0) {
-    body.related_stage_ids_json = JSON.stringify(data.related_stage_ids)
+    body.related_stage_ids = data.related_stage_ids
   }
   const res = await apiRequest<Envelope<MissionBank>>(
     'POST',
@@ -133,7 +133,7 @@ const update = async (
   if (data.description_parent !== undefined)
     body.description_parent = data.description_parent
   if (data.related_stage_ids !== undefined) {
-    body.related_stage_ids_json = JSON.stringify(data.related_stage_ids)
+    body.related_stage_ids = data.related_stage_ids
   }
   const res = await apiRequest<Envelope<MissionBank>>(
     'PUT',

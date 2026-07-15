@@ -5,7 +5,7 @@ export interface ParticipantMissionsService {
   getByReport(reportId: string): Promise<ParticipantMission[]>
   getByParticipant(participantId: string): Promise<ParticipantMission[]>
   toggleComplete(missionId: string): Promise<ParticipantMission>
-  create(req: { participant_id: string; report_id: string; mission_bank_id: string; is_completed: boolean }): Promise<ParticipantMission>
+  create(req: { report_id: string; mission_bank_id: string; is_completed: boolean }): Promise<ParticipantMission>
   delete(missionId: string): Promise<void>
 }
 
@@ -31,13 +31,11 @@ const toggleComplete = async (missionId: string): Promise<ParticipantMission> =>
 }
 
 const create = async (req: {
-  participant_id: string
   report_id: string
   mission_bank_id: string
   is_completed: boolean
 }): Promise<ParticipantMission> => {
   return itemRequest<ParticipantMission>('POST', '/api/participant-missions', {
-    participant_id: req.participant_id,
     report_id: req.report_id,
     mission_bank_id: req.mission_bank_id,
     is_completed: req.is_completed,

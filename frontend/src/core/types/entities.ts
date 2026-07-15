@@ -192,7 +192,7 @@ export interface Recording {
   duration_seconds: number
   file_size_bytes?: number
   transcript_text?: string
-  emotion_tags_json?: Record<string, unknown>
+  emotion_tags?: string[]
   review_status: import('./enums').RecordingsReviewStatus
   reviewed_by?: string
   reviewed_at?: string
@@ -206,7 +206,7 @@ export interface Report {
   session_id: string
   ai_narrative_draft?: string
   ai_narrative_final?: string
-  mission_ids_json?: string[]
+  mission_ids?: string[]
   report_pdf_url?: string
   parent_access_token: string
   status: import('./enums').ReportStatus
@@ -217,7 +217,6 @@ export interface Report {
 
 export interface ParticipantMission {
   id: string
-  participant_id: string
   report_id: string
   mission_bank_id: string
   is_completed: boolean

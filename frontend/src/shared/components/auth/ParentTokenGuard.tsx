@@ -13,7 +13,7 @@ export interface PublicReport {
   session_id: string
   status: string
   ai_narrative_final?: string
-  mission_ids_json?: string
+  mission_ids?: string[]
   report_pdf_url?: string
 }
 

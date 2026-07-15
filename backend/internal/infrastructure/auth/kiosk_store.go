@@ -18,7 +18,6 @@ type KioskToken struct {
 	ID         string     `gorm:"column:id;type:varchar(36);primaryKey" json:"-"`
 	Token      string     `gorm:"column:token;type:varchar(64);uniqueIndex" json:"-"`
 	SessionID  string     `gorm:"column:session_id;type:varchar(36);index" json:"-"`
-	TenantID   string     `gorm:"column:tenant_id;type:varchar(36)" json:"-"`
 	ExpiresAt  time.Time  `gorm:"column:expires_at" json:"-"`
 	ConsumedAt *time.Time `gorm:"column:consumed_at;type:datetime(3)" json:"-"`
 	CreatedAt  time.Time  `gorm:"column:created_at" json:"-"`
@@ -59,9 +58,11 @@ func NewKioskStore(db *gorm.DB) *DBKioskStore {
 	return &DBKioskStore{db: db, cache: make(map[string]*KioskRecord), nowFn: time.Now}
 }
 
-// Issue creates a new kiosk token bound to a session+tenant, cached for fast lookup.
+// Issue creates a new kiosk token bound to a session, cached for fast lookup.
+// tenantID is accepted for the in-memory cache (the derived tenant binding) but
+// is no longer persisted; it is derivable from session_id -> sessions.tenant_id.
 func (s *DBKioskStore) Issue(ctx context.Context, sessionID, tenantID string, ttl time.Duration) (string, error) {
-	if sessionID == "" || tenantID == "" {
+	if sessionID == "" {
 		return "", apperrors.BadRequest("validation_error", nil)
 	}
 	buf := make([]byte, 32)
@@ -74,7 +75,6 @@ func (s *DBKioskStore) Issue(ctx context.Context, sessionID, tenantID string, tt
 		ID:        newKioskUUID(),
 		Token:     token,
 		SessionID: sessionID,
-		TenantID:  tenantID,
 		ExpiresAt: now.Add(ttl),
 		CreatedAt: now,
 	}
@@ -119,16 +119,25 @@ func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, stri
 	if s.nowFn().After(rec.ExpiresAt) {
 		return "", "", apperrors.NotFound("kiosk_token_expired", nil)
 	}
+	// tenant_id is derived from session_id -> sessions.tenant_id (no longer stored).
+	var tenantID string
+	if err := s.db.WithContext(ctx).
+		Table("sessions").
+		Select("tenant_id").
+		Where("id = ?", rec.SessionID).
+		Scan(&tenantID).Error; err != nil {
+		return "", "", apperrors.Internal("internal_error", err)
+	}
 	// Populate cache for subsequent fast validation.
 	s.mu.Lock()
 	s.cache[token] = &KioskRecord{
 		Token:     rec.Token,
 		SessionID: rec.SessionID,
-		TenantID:  rec.TenantID,
+		TenantID:  tenantID,
 		ExpiresAt: rec.ExpiresAt,
 	}
 	s.mu.Unlock()
-	return rec.SessionID, rec.TenantID, nil
+	return rec.SessionID, tenantID, nil
 }
 
 // Consume marks a token as used (single-use kiosk access).

@@ -32,19 +32,17 @@ const EMOTION_COLORS: Record<string, { label: string; color: string; bgColor: st
   senang: { label: 'Senang', color: 'text-emerald-700', bgColor: 'bg-emerald-100' },
 }
 
-function parseEmotionTags(tags: Record<string, unknown> | undefined): EmotionTag[] {
-  if (!tags || typeof tags !== 'object') return []
-  return Object.entries(tags)
-    .map(([key, value]) => {
-      const pct = typeof value === 'number' ? value : 0
+function parseEmotionTags(tags: string[] | undefined): EmotionTag[] {
+  if (!Array.isArray(tags)) return []
+  return tags
+    .map((key) => {
       const config = EMOTION_COLORS[key] || {
         label: key,
         color: 'text-on-surface-variant',
         bgColor: 'bg-surface-variant',
       }
-      return { label: config.label, percentage: pct, color: config.color, bgColor: config.bgColor }
+      return { label: config.label, percentage: 0, color: config.color, bgColor: config.bgColor }
     })
-    .sort((a, b) => b.percentage - a.percentage)
 }
 
 const RecordingDetailPage = () => {
@@ -137,7 +135,7 @@ const RecordingDetailPage = () => {
     }
   }
 
-  const emotions = recording ? parseEmotionTags(recording.emotion_tags_json) : []
+  const emotions = recording ? parseEmotionTags(recording.emotion_tags) : []
 
   if (loading) {
     return (

@@ -158,7 +158,7 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) 
 	for i := range stages {
 		if stages[i].Status == entity.SessionStageWaiting {
 			stages[i].Status = entity.SessionStageActive
-			now := util.NowISO()
+			now := util.Now()
 			stages[i].StartedAt = &now
 			if err := u.sessionRepo.UpdateSessionStage(ctx, &stages[i]); err != nil {
 				return nil, err
@@ -187,7 +187,7 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID strin
 	}
 	for i := range stages {
 		stages[i].Status = entity.SessionStageCompleted
-		now := util.NowISO()
+		now := util.Now()
 		stages[i].CompletedAt = &now
 		if err := u.sessionRepo.UpdateSessionStage(ctx, &stages[i]); err != nil {
 			return nil, err
@@ -226,7 +226,7 @@ func (u *SessionUsecase) CancelSession(ctx context.Context, id, tenantID string)
 	for i := range stages {
 		if stages[i].Status == entity.SessionStageActive {
 			stages[i].Status = entity.SessionStageCompleted
-			now := util.NowISO()
+			now := util.Now()
 			stages[i].CompletedAt = &now
 			if err := u.sessionRepo.UpdateSessionStage(ctx, &stages[i]); err != nil {
 				return nil, err

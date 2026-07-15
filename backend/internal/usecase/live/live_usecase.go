@@ -76,7 +76,7 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, ac
 	if p == nil {
 		p = &entity.GroupStageProgress{GroupID: groupID, SessionStageID: stageID, Status: entity.ProgressLocked}
 	}
-	now := apputil.NowISO()
+	now := apputil.Now()
 	p.UnlockedBy = &actorID
 	p.UnlockReason = "override"
 	switch action {
@@ -135,7 +135,7 @@ func (s *Service) PublishEvent(ctx context.Context, sessionID string, e *entity.
 	if err := s.repo.CreateTimeline(ctx, e); err != nil {
 		return err
 	}
-	s.publish(ctx, sessionID, "timeline:"+e.Type, e)
+	s.publish(ctx, sessionID, "timeline:"+string(e.Type), e)
 	return nil
 }
 

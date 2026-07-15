@@ -54,7 +54,7 @@ func (u *Usecase) Approve(ctx context.Context, reportID, approvedBy string) (*en
 	}
 	r.Status = entity.ReportApproved
 	r.ApprovedBy = &approvedBy
-	now := time.Now().Format(time.RFC3339)
+	now := time.Now().UTC()
 	r.GeneratedAt = &now
 	if err := u.repo.Update(ctx, r); err != nil {
 		return nil, err
@@ -76,10 +76,10 @@ func (u *Usecase) Send(ctx context.Context, reportID string, ttlHours int) (*ent
 	}
 	r.ParentAccessToken = tok
 	r.ParentTokenRevoked = false
-	exp := time.Now().Add(time.Duration(ttlHours) * time.Hour).Format(time.RFC3339)
+	exp := time.Now().UTC().Add(time.Duration(ttlHours) * time.Hour)
 	r.ParentTokenExpiresAt = &exp
 	r.Status = entity.ReportSent
-	now := time.Now().Format(time.RFC3339)
+	now := time.Now().UTC()
 	r.SentAt = &now
 	if err := u.repo.Update(ctx, r); err != nil {
 		return nil, err

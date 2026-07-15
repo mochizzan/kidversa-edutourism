@@ -131,3 +131,22 @@ const (
 	ApprovalApproved ApprovalStatus = "approved"
 	ApprovalRejected ApprovalStatus = "rejected"
 )
+
+// TimelineEventType enumerates the live-dashboard timeline event kinds (BCNF enum).
+type TimelineEventType string
+
+const (
+	TimelineGroupProgress TimelineEventType = "group:progress"
+	TimelineGroupCompleted TimelineEventType = "group:completed"
+	TimelineStageUnlock   TimelineEventType = "stage:unlock"
+	TimelineOverride       TimelineEventType = "override"
+)
+
+// Valid reports whether the timeline event type is one of the schema-enforced values.
+func (t TimelineEventType) Valid() bool {
+	switch t {
+	case TimelineGroupProgress, TimelineGroupCompleted, TimelineStageUnlock, TimelineOverride:
+		return true
+	}
+	return false
+}

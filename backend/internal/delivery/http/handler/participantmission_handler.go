@@ -29,13 +29,12 @@ func (h *ParticipantMissionHandler) Create(c *echo.Context) error {
 		return err
 	}
 	m := &entity.ParticipantMission{
-		ParticipantID: req.ParticipantID,
 		ReportID:      req.ReportID,
 		MissionBankID: req.MissionBankID,
 		IsCompleted:   req.IsCompleted,
 	}
 	if m.IsCompleted {
-		now := apputil.NowISO()
+		now := apputil.Now()
 		m.CompletedAt = &now
 	}
 	if err := h.repo.Create((*c).Request().Context(), m); err != nil {
@@ -94,13 +93,12 @@ func (h *ParticipantMissionHandler) Replace(c *echo.Context) error {
 	for i := range req.Items {
 		it := req.Items[i]
 		m := entity.ParticipantMission{
-			ParticipantID: it.ParticipantID,
 			ReportID:      req.ReportID,
 			MissionBankID: it.MissionBankID,
 			IsCompleted:   it.IsCompleted,
 		}
 		if m.IsCompleted {
-			now := apputil.NowISO()
+			now := apputil.Now()
 			m.CompletedAt = &now
 		}
 		items = append(items, m)
@@ -140,7 +138,7 @@ func (h *ParticipantMissionHandler) Toggle(c *echo.Context) error {
 	}
 	m.IsCompleted = !m.IsCompleted
 	if m.IsCompleted {
-		now := apputil.NowISO()
+		now := apputil.Now()
 		m.CompletedAt = &now
 	} else {
 		m.CompletedAt = nil

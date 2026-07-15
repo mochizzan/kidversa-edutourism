@@ -13,8 +13,9 @@ func NewParticipantMissionResponse(m *entity.ParticipantMission) *ParticipantMis
 }
 
 // ParticipantMissionRequest is the create/update payload.
+// ParticipantID is intentionally omitted: it is derivable from
+// report_id -> reports.participant_id (3NF).
 type ParticipantMissionRequest struct {
-	ParticipantID string `json:"participant_id" validate:"required"`
 	ReportID      string `json:"report_id" validate:"required"`
 	MissionBankID string `json:"mission_bank_id" validate:"required"`
 	IsCompleted   bool   `json:"is_completed"`

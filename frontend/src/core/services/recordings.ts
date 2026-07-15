@@ -14,15 +14,15 @@ interface RecordingListEnvelope {
   meta?: { page: number; limit: number; total: number }
 }
 
-// C7: the backend RawJSON column `emotion_tags_json` arrives as a JSON string
-// (or a base64 of the JSON bytes). Normalize it back into the typed
-// Record<string, unknown> the frontend expects.
+// C7: the backend derives emotion tags from the recording_emotion_tags junction
+// table and returns them as a plain string[] under `emotion_tags`. Normalize
+// defensively for older payloads that still carry emotion_tags_json.
 function normalizeRecording(raw: Recording): Recording {
   return {
     ...raw,
-    emotion_tags_json: parseRawJSON<Record<string, unknown> | undefined>(
-      raw.emotion_tags_json,
-      raw.emotion_tags_json,
+    emotion_tags: parseRawJSON<string[] | undefined>(
+      (raw as Partial<Recording> & { emotion_tags_json?: unknown }).emotion_tags_json,
+      (raw as Partial<Recording> & { emotion_tags?: string[] }).emotion_tags,
     ),
   }
 }
