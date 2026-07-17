@@ -322,7 +322,7 @@ func (r *GormConsentRepository) GetValue(ctx context.Context, participantID, ses
 }
 
 // Respond records a parent's consent decision. It upserts the latest value for
-// the (participant, session, type) tuple and writes a new audit log row.
+// the (participant, session, type) tuple: updates existing row or creates new.
 func (r *GormConsentRepository) Respond(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType, value bool, ip, ua string) error {
 	now := time.Now().UTC()
 	log := &entity.ConsentLog{
@@ -335,9 +335,32 @@ func (r *GormConsentRepository) Respond(ctx context.Context, participantID, sess
 		IPAddress:     ip,
 		UserAgent:     ua,
 	}
-	if err := r.Create(ctx, log); err != nil {
-		return err
+	// Upsert: try to find existing row first.
+	existing := ConsentLogModel{}
+	err := r.db.WithContext(ctx).
+		Where("participant_id = ? AND session_id = ? AND consent_type = ?", participantID, sessionID, string(consentType)).
+		First(&existing).Error
+	if err == nil {
+		// Row exists — update with new consent decision.
+		return r.db.WithContext(ctx).
+			Model(&existing).
+			Updates(map[string]interface{}{
+				"value":         value,
+				"sent_at":       now,
+				"responded_at":  &now,
+				"ip_address":    ip,
+				"user_agent":    ua,
+			}).Error
 	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return apperrors.Internal("internal_error", err)
+	}
+	// No existing row — create new.
+	m := ConsentLogModel{ConsentLog: *log}
+	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	*log = m.ConsentLog
 	return nil
 }
 
