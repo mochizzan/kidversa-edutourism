@@ -43,7 +43,7 @@ const ConsentMonitorPage = () => {
   const [sending, setSending] = useState<Record<string, boolean>>({})
   const [activeBatch, setActiveBatch] = useState<{ sessionId: string; batchId: string; total: number } | null>(null)
 
-  const { progress } = useConsentProgress(activeBatch?.batchId ?? null)
+  const { progress, connected } = useConsentProgress(activeBatch?.batchId ?? null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -111,6 +111,15 @@ const ConsentMonitorPage = () => {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // React to SSE disconnection: if the stream drops while a batch is active
+  // (and "done" never arrived), clear the batch so the button can be retried.
+  useEffect(() => {
+    if (activeBatch && !connected && progress?.type !== 'done') {
+      addToast({ type: 'warning', message: 'Koneksi SSE terputus. Klik "Kirim via WhatsApp" untuk mengulang.' })
+      setActiveBatch(null)
+    }
+  }, [connected, activeBatch, progress, addToast])
 
   // React to SSE progress: when the batch is done, reload and clear the batch.
   useEffect(() => {
