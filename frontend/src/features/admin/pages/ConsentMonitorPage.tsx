@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Shield,
   Loader2,
@@ -45,6 +45,8 @@ const ConsentMonitorPage = () => {
   const [activeBatch, setActiveBatch] = useState<{ sessionId: string; batchId: string; total: number } | null>(null)
 
   const { progress, connected } = useConsentProgress(activeBatch?.batchId ?? null)
+
+  const sseEverConnected = useRef(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -113,10 +115,17 @@ const ConsentMonitorPage = () => {
     loadData()
   }, [loadData])
 
+  // Track whether the SSE stream has connected at least once.
+  useEffect(() => {
+    if (connected) sseEverConnected.current = true
+  }, [connected])
+
   // React to SSE disconnection: if the stream drops while a batch is active
   // (and "done" never arrived), clear the batch so the button can be retried.
+  // Only treat a disconnect as real recovery if the stream had connected before,
+  // so the initial pre-connect `connected === false` does not false-fire.
   useEffect(() => {
-    if (activeBatch && !connected && progress?.type !== 'done') {
+    if (activeBatch && sseEverConnected.current && !connected && progress?.type !== 'done') {
       addToast({ type: 'warning', message: 'Koneksi SSE terputus. Klik "Kirim via WhatsApp" untuk mengulang.' })
       setActiveBatch(null)
     }
