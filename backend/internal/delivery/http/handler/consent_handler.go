@@ -96,6 +96,8 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 		if p.ConsentRecording && p.ConsentPhoto {
 			continue
 		}
+		// When force=true we already cleared tokens above (lines 86-90), so skip
+		// this active-token guard and re-eligibilize everyone not yet consented.
 		if !force && p.ConsentCombinedToken != nil && p.ConsentCombinedTokenExpiresAt != nil && p.ConsentCombinedTokenExpiresAt.After(now) {
 			continue
 		}
