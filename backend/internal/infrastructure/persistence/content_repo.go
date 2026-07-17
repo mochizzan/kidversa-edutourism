@@ -280,7 +280,7 @@ func (r *GormRecordingRepository) List(ctx context.Context, f repository.Recordi
 
 // GormConsentRepository implements repository.ConsentRepository.
 type GormConsentRepository struct {
-	db            *gorm.DB
+	db              *gorm.DB
 	consentTokenTTL time.Duration
 }
 
@@ -373,11 +373,70 @@ func (r *GormConsentRepository) ListBySession(ctx context.Context, sessionID str
 	return out, nil
 }
 
-// GetByToken resolves a consent-log row by its single-use token.
-func (r *GormConsentRepository) GetByToken(ctx context.Context, token string) (*entity.ConsentLog, error) {
-	var m ConsentLogModel
+// ListBySessionIDs returns all consent rows for multiple sessions in one query.
+func (r *GormConsentRepository) ListBySessionIDs(ctx context.Context, sessionIDs []string) (map[string][]entity.ConsentLog, error) {
+	if len(sessionIDs) == 0 {
+		return make(map[string][]entity.ConsentLog), nil
+	}
+	var models []ConsentLogModel
 	if err := r.db.WithContext(ctx).
-		Where("consent_token = ?", token).
+		Where("session_id IN ?", sessionIDs).
+		Order("created_at DESC").
+		Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	grouped := make(map[string][]entity.ConsentLog)
+	for i := range models {
+		e := models[i].ToEntity()
+		grouped[e.SessionID] = append(grouped[e.SessionID], *e)
+	}
+	return grouped, nil
+}
+
+// SendRequest records that a consent request was sent. It upserts the
+// (participant, session, type) row: if a row already exists, updates sent_at
+// and clears responded_at (re-send scenario). Otherwise creates a new row.
+func (r *GormConsentRepository) SendRequest(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) error {
+	now := time.Now().UTC()
+	m := ConsentLogModel{
+		ConsentLog: entity.ConsentLog{
+			ParticipantID: participantID,
+			SessionID:     sessionID,
+			ConsentType:   consentType,
+			SentAt:        now,
+		},
+	}
+	// Upsert: if row exists for this (participant, session, type), update sent_at.
+	existing := ConsentLogModel{}
+	err := r.db.WithContext(ctx).
+		Where("participant_id = ? AND session_id = ? AND consent_type = ?", participantID, sessionID, string(consentType)).
+		First(&existing).Error
+	if err == nil {
+		// Row exists — update sent_at, clear responded_at (re-send).
+		return r.db.WithContext(ctx).
+			Model(&existing).
+			Updates(map[string]interface{}{
+				"sent_at":      now,
+				"responded_at": nil,
+				"value":        false,
+			}).Error
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return apperrors.Internal("internal_error", err)
+	}
+	// No existing row — create new.
+	return r.db.WithContext(ctx).Create(&m).Error
+}
+
+// GetByCombinedToken resolves a participant by their active combined consent
+// token (WhatsApp delivery flow). Queries the participants table directly.
+func (r *GormConsentRepository) GetByCombinedToken(ctx context.Context, token string) (*entity.Participant, error) {
+	if token == "" {
+		return nil, apperrors.NotFound("token_invalid", errors.New("token required"))
+	}
+	var m ParticipantModel
+	if err := r.db.WithContext(ctx).
+		Where("consent_combined_token = ?", token).
 		First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("token_invalid", err)
@@ -385,72 +444,6 @@ func (r *GormConsentRepository) GetByToken(ctx context.Context, token string) (*
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	return m.ToEntity(), nil
-}
-
-// SendRequest issues a single-use consent token for a (participant, session, type)
-// and persists it on a new consent-log row. The token is cryptographically random
-// (>=32 bytes hex) and expires in 24h.
-func (r *GormConsentRepository) SendRequest(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) (string, error) {
-	token, err := generateConsentToken()
-	if err != nil {
-		return "", apperrors.Internal("internal_error", err)
-	}
-	now := time.Now().UTC()
-	expiresAt := now.Add(r.consentTokenTTL)
-	log := &entity.ConsentLog{
-		ParticipantID: participantID,
-		SessionID:     sessionID,
-		ConsentType:   consentType,
-		Value:         false,
-		SentAt:        now,
-		ConsentToken:  token,
-		ExpiresAt:     &expiresAt,
-	}
-	if err := r.Create(ctx, log); err != nil {
-		return "", err
-	}
-	return token, nil
-}
-
-// RespondByToken records a parent's consent decision via a single-use token
-// (public flow). Replays / expired tokens are rejected (SC6 replay protection).
-func (r *GormConsentRepository) RespondByToken(ctx context.Context, token string, value bool, ip, ua string) error {
-	if token == "" {
-		return apperrors.NotFound("token_invalid", errors.New("token required"))
-	}
-	var m ConsentLogModel
-	if err := r.db.WithContext(ctx).
-		Where("consent_token = ?", token).
-		First(&m).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperrors.NotFound("token_invalid", err)
-		}
-		return apperrors.Internal("internal_error", err)
-	}
-	// Replay protection: already consumed or expired.
-	if m.ConsumedAt != nil {
-		return apperrors.Conflict("token_consumed", errors.New("consent token already used"))
-	}
-	if m.ExpiresAt != nil {
-		if m.ExpiresAt != nil && time.Now().After(*m.ExpiresAt) {
-			return apperrors.Forbidden("token_expired", errors.New("consent token expired"))
-		}
-	}
-	now := time.Now().UTC()
-	updates := map[string]interface{}{
-		"value":        value,
-		"responded_at": now,
-		"consumed_at":  now,
-		"ip_address":   ip,
-		"user_agent":   ua,
-		"updated_at":   now,
-	}
-	if err := r.db.WithContext(ctx).Model(&ConsentLogModel{}).
-		Where("id = ?", m.ID).
-		Updates(updates).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
 }
 
 // generateConsentToken returns a cryptographically-random hex token (32 bytes → 64 hex chars).
