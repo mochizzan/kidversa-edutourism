@@ -1687,6 +1687,9 @@
   .border-green-500 {
     border-color: var(--color-green-500);
   }
+  .border-green-600 {
+    border-color: var(--color-green-600);
+  }
   .border-purple-50 {
     border-color: var(--color-purple-50);
   }
@@ -3196,6 +3199,13 @@
       }
     }
   }
+  .hover\:border-green-400 {
+    &:hover {
+      @media (hover: hover) {
+        border-color: var(--color-green-400);
+      }
+    }
+  }
   .hover\:border-white\/30 {
     &:hover {
       @media (hover: hover) {
@@ -3339,6 +3349,13 @@
       }
     }
   }
+  .hover\:text-green-700 {
+    &:hover {
+      @media (hover: hover) {
+        color: var(--color-green-700);
+      }
+    }
+  }
   .hover\:text-white {
     &:hover {
       @media (hover: hover) {
@@ -3450,9 +3467,20 @@
       --tw-ring-color: var(--color-green-400);
     }
   }
+  .focus-visible\:ring-green-500 {
+    &:focus-visible {
+      --tw-ring-color: var(--color-green-500);
+    }
+  }
   .focus-visible\:ring-red-400 {
     &:focus-visible {
       --tw-ring-color: var(--color-red-400);
+    }
+  }
+  .focus-visible\:ring-offset-2 {
+    &:focus-visible {
+      --tw-ring-offset-width: 2px;
+      --tw-ring-offset-shadow: var(--tw-ring-inset,) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
     }
   }
   .focus-visible\:outline-2 {
@@ -3574,6 +3602,11 @@
       left: calc(var(--spacing) * 5);
     }
   }
+  .sm\:col-span-1 {
+    @media (width >= 40rem) {
+      grid-column: span 1 / span 1;
+    }
+  }
   .sm\:col-span-2 {
     @media (width >= 40rem) {
       grid-column: span 2 / span 2;
@@ -3619,6 +3652,11 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
+  .sm\:grid-cols-3 {
+    @media (width >= 40rem) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
   .sm\:grid-cols-4 {
     @media (width >= 40rem) {
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3642,6 +3680,11 @@
   .sm\:justify-start {
     @media (width >= 40rem) {
       justify-content: flex-start;
+    }
+  }
+  .sm\:py-10 {
+    @media (width >= 40rem) {
+      padding-block: calc(var(--spacing) * 10);
     }
   }
   .md\:top-auto {

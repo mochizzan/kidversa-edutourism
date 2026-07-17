@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  CheckCircle,
+  CheckCircle2,
+  XCircle,
   Camera,
   Mic,
   User,
-  Shield,
-  Loader2,
+  ShieldCheck,
   AlertTriangle,
+  CalendarDays,
+  MapPin,
+  Check,
 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Card } from '../../../shared/components/ui/Card'
@@ -16,13 +19,111 @@ import {
   ParentTokenGuard,
   useParentToken,
 } from '../../../shared/components/auth/ParentTokenGuard'
-import { consentService } from '../../../core/services/consent'
+import { consentService, type ConsentInfo } from '../../../core/services/consent'
 import { ApiError } from '../../../core/services/backendClient'
 import { cn } from '../../../core/utils/cn'
+import { formatDate } from '../../../shared/utils'
+
+/* ── A single Ya / Tidak choice control ── */
+interface ChoiceProps {
+  label: string
+  value: boolean | null
+  onChange: (v: boolean) => void
+}
+
+function YaTidakChoice({ label, value, onChange }: ChoiceProps) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="grid grid-cols-2 gap-3"
+    >
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === true}
+        onClick={() => onChange(true)}
+        className={cn(
+          'flex items-center justify-center gap-2 rounded-2xl border-2 px-4 py-4 text-base font-semibold transition-all',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+          value === true
+            ? 'border-green-600 bg-green-50 text-green-700 focus-visible:ring-green-500'
+            : 'border-outline-variant bg-surface text-on-surface-variant hover:border-green-400 hover:text-green-700 focus-visible:ring-green-400',
+        )}
+      >
+        <CheckCircle2
+          className={cn(
+            'w-5 h-5 shrink-0',
+            value === true ? 'text-green-600' : 'text-on-surface-variant/60',
+          )}
+        />
+        Ya, Setuju
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === false}
+        onClick={() => onChange(false)}
+        className={cn(
+          'flex items-center justify-center gap-2 rounded-2xl border-2 px-4 py-4 text-base font-semibold transition-all',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+          value === false
+            ? 'border-error bg-error-container text-on-error-container focus-visible:ring-error'
+            : 'border-outline-variant bg-surface text-on-surface-variant hover:border-error/60 hover:text-on-error-container focus-visible:ring-error/60',
+        )}
+      >
+        <XCircle
+          className={cn(
+            'w-5 h-5 shrink-0',
+            value === false ? 'text-error' : 'text-on-surface-variant/60',
+          )}
+        />
+        Tidak
+      </button>
+    </div>
+  )
+}
+
+/* ── Reusable state panel (error / expired / success) ── */
+function StatePanel({
+  tone,
+  icon,
+  title,
+  children,
+}: {
+  tone: 'warn' | 'error' | 'success'
+  icon: React.ReactNode
+  title: string
+  children: React.ReactNode
+}) {
+  const tones = {
+    warn: 'bg-yellow-50 text-yellow-700',
+    error: 'bg-error-container text-on-error-container',
+    success: 'bg-green-50 text-green-700',
+  }
+  return (
+    <div className="text-center py-6 px-2">
+      <div
+        className={cn(
+          'w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4',
+          tones[tone],
+        )}
+      >
+        {icon}
+      </div>
+      <h2 className="text-xl font-bold text-on-surface mb-2">{title}</h2>
+      <div className="text-sm text-on-surface-variant max-w-sm mx-auto">{children}</div>
+    </div>
+  )
+}
 
 /* ── Inner form component (inside guard) ── */
 function ConsentForm() {
   const { token } = useParentToken()
+  const { addToast } = useGlobalToast()
+
+  const [info, setInfo] = useState<ConsentInfo | null>(null)
+  const [infoLoading, setInfoLoading] = useState(true)
 
   const [recordingConsent, setRecordingConsent] = useState<boolean | null>(null)
   const [photoConsent, setPhotoConsent] = useState<boolean | null>(null)
@@ -31,7 +132,35 @@ function ConsentForm() {
   const [success, setSuccess] = useState(false)
   const [alreadySubmitted, setAlreadySubmitted] = useState(false)
   const [lockedError, setLockedError] = useState<string | null>(null)
-  const { addToast } = useGlobalToast()
+
+  useEffect(() => {
+    if (!token) {
+      setInfoLoading(false)
+      return
+    }
+    consentService
+      .getInfo(token)
+      .then((res) => {
+        if (res.status === 'invalid') {
+          setLockedError(
+            'Tautan persetujuan tidak valid atau sudah digunakan. Silakan hubungi koordinator untuk tautan baru.',
+          )
+          return
+        }
+        if (res.status === 'expired') {
+          setLockedError(
+            'Tautan persetujuan sudah kedaluwarsa. Silakan hubungi koordinator untuk tautan baru.',
+          )
+          return
+        }
+        setInfo(res)
+      })
+      .catch(() => {
+        // Non-fatal: the form still works; personalization just stays generic.
+        setInfo({ status: 'ok' })
+      })
+      .finally(() => setInfoLoading(false))
+  }, [token])
 
   const handleSubmit = async () => {
     if (lockedError) return
@@ -51,9 +180,6 @@ function ConsentForm() {
       setSuccess(true)
     } catch (err) {
       const code = err instanceof ApiError ? err.code : ''
-      // The combined consent token is single-use: after a successful submit the
-      // token is cleared, so reopening the link yields token_invalid. Treat both
-      // token_consumed and token_invalid as "already submitted".
       if (code === 'token_consumed' || code === 'token_invalid') {
         setAlreadySubmitted(true)
         return
@@ -74,163 +200,185 @@ function ConsentForm() {
   /* ── Locked (invalid/expired token) ── */
   if (lockedError) {
     return (
-      <div className="text-center py-8">
-        <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
-          <AlertTriangle className="w-8 h-8 text-yellow-600" />
-        </div>
-        <h2 className="text-xl font-bold text-on-surface mb-2">Tautan Tidak Berlaku</h2>
-        <p className="text-sm text-on-surface-variant max-w-sm mx-auto">{lockedError}</p>
-      </div>
+      <StatePanel
+        tone="warn"
+        icon={<AlertTriangle className="w-8 h-8 text-yellow-600" />}
+        title="Tautan Tidak Berlaku"
+      >
+        {lockedError}
+      </StatePanel>
     )
   }
 
   /* ── Already submitted (single-use token already used) ── */
   if (alreadySubmitted) {
     return (
-      <div className="text-center py-8">
-        <div className="w-16 h-16 rounded-full bg-primary-container flex items-center justify-center mx-auto mb-4">
-          <CheckCircle className="w-8 h-8 text-on-primary-container" />
-        </div>
-        <h2 className="text-xl font-bold text-on-surface mb-2">
-          Persetujuan Sudah Dikirim
-        </h2>
-        <p className="text-sm text-on-surface-variant mb-6">
-          Persetujuan dari tautan ini sudah diterima sebelumnya.
-        </p>
-
-        <div className="space-y-3 text-left max-w-sm mx-auto">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-surface-variant">
-            <span className="text-sm">Izin Rekaman</span>
-            <span className="text-sm font-medium text-green-600">Sudah dikirim</span>
-          </div>
-          <div className="flex items-center justify-between p-3 rounded-xl bg-surface-variant">
-            <span className="text-sm">Izin Foto</span>
-            <span className="text-sm font-medium text-green-600">Sudah dikirim</span>
-          </div>
-        </div>
-      </div>
+      <StatePanel
+        tone="success"
+        icon={<Check className="w-8 h-8 text-green-600" />}
+        title="Persetujuan Sudah Dikirim"
+      >
+        Persetujuan dari tautan ini sudah diterima sebelumnya. Terima kasih telah
+        mengonfirmasi izin untuk {info?.child_name || 'buah hati Anda'}.
+      </StatePanel>
     )
   }
 
   /* ── Success ── */
   if (success) {
     return (
-      <div className="text-center py-8">
-        <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle className="w-8 h-8 text-green-600" />
-        </div>
-        <h2 className="text-xl font-bold text-on-surface mb-2">
-          Terima Kasih!
-        </h2>
-        <p className="text-sm text-on-surface-variant mb-2">
-          Persetujuan Anda berhasil dikirim.
+      <StatePanel
+        tone="success"
+        icon={<CheckCircle2 className="w-8 h-8 text-green-600" />}
+        title="Terima Kasih!"
+      >
+        <p className="mb-1">Persetujuan Anda berhasil dikirim.</p>
+        <p className="text-xs">
+          Koordinator akan memproses data partisipasi {info?.child_name || 'buah hati Anda'}.
         </p>
-        <p className="text-xs text-on-surface-variant">
-          Koordinator akan memproses data partisipasi buah hati Anda.
-        </p>
-      </div>
+      </StatePanel>
     )
   }
 
+  const completedSteps =
+    (recordingConsent !== null ? 1 : 0) +
+    (photoConsent !== null ? 1 : 0) +
+    (parentName.trim() ? 1 : 0)
+  const progressPct = Math.round((completedSteps / 3) * 100)
+
   /* ── Form ── */
   return (
-    <div className="space-y-6">
-      {/* Child info */}
-      <Card>
+    <div className="space-y-5">
+      {/* Child + session identity */}
+      <Card padding="md">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
             <User className="w-7 h-7" />
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-on-surface">Formulir Persetujuan</h2>
-            <p className="text-sm text-on-surface-variant">
-              Orang Tua / Wali Peserta
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wide text-on-surface-variant">
+              Formulir Persetujuan
             </p>
+            {infoLoading ? (
+              <div className="h-6 w-32 mt-0.5 rounded bg-surface-variant animate-pulse" />
+            ) : (
+              <h2 className="text-lg font-bold text-on-surface truncate">
+                {info?.child_name || 'Peserta Edutourism'}
+              </h2>
+            )}
+            {!infoLoading && info?.parent_name && (
+              <p className="text-sm text-on-surface-variant truncate">
+                Orang tua / wali: {info.parent_name}
+              </p>
+            )}
           </div>
         </div>
+
+        {!infoLoading && (info?.session_name || info?.session_date || info?.location) && (
+          <div className="mt-4 pt-4 border-t border-outline-variant grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            {info.session_name && (
+              <div className="flex items-start gap-2 min-w-0">
+                <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-xs text-on-surface-variant">Sesi</p>
+                  <p className="font-medium text-on-surface truncate">{info.session_name}</p>
+                </div>
+              </div>
+            )}
+            {info?.session_date && (
+              <div className="flex items-start gap-2">
+                <CalendarDays className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-on-surface-variant">Tanggal</p>
+                  <p className="font-medium text-on-surface">{formatDate(info.session_date)}</p>
+                </div>
+              </div>
+            )}
+            {info?.location && (
+              <div className="flex items-start gap-2 min-w-0 sm:col-span-1">
+                <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-xs text-on-surface-variant">Lokasi</p>
+                  <p className="font-medium text-on-surface truncate">{info.location}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
-      {/* Info banner */}
-      <div className="bg-primary-container/50 rounded-2xl p-4 flex items-start gap-3">
-        <Shield className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+      {/* Privacy banner */}
+      <div className="bg-primary-container/60 rounded-2xl p-4 flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <p className="text-sm text-on-surface-variant">
-          Kami meminta izin Anda untuk merekam dan mengambil foto selama kegiatan edutourism. Data
-          hanya digunakan untuk keperluan laporan perkembangan anak dan tidak akan disebarluaskan.
+          Kami meminta izin Anda untuk merekam dan memotret selama kegiatan edutourism. Data
+          hanya digunakan untuk laporan perkembangan anak dan{' '}
+          <span className="font-medium text-on-surface">tidak disebarluaskan</span>.
         </p>
       </div>
 
+      {/* Progress meter */}
+      <div className="px-1">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-medium text-on-surface-variant">
+            Kelengkapan persetujuan
+          </span>
+          <span className="text-xs font-semibold text-primary">{progressPct}%</span>
+        </div>
+        <div
+          className="h-2 w-full rounded-full bg-surface-variant overflow-hidden"
+          role="progressbar"
+          aria-valuenow={progressPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      </div>
+
       {/* Recording consent */}
-      <Card title="Izin Rekaman" subtitle="Rekaman suara selama kegiatan">
-        <p className="text-sm text-on-surface-variant mb-4">
+      <Card padding="md">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary flex items-center justify-center shrink-0">
+            <Mic className="w-5 h-5" />
+          </span>
+          <div>
+            <h3 className="text-base font-semibold text-on-surface">Izin Rekaman</h3>
+            <p className="text-xs text-on-surface-variant">Rekaman suara selama kegiatan</p>
+          </div>
+        </div>
+        <p className="text-sm text-on-surface-variant mt-3 mb-4">
           Rekaman digunakan untuk menilai perkembangan bicara dan interaksi anak selama kegiatan.
         </p>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setRecordingConsent(true)}
-            className={cn(
-              'flex-1 py-3 rounded-xl border-2 font-medium text-sm transition-all',
-              recordingConsent === true
-                ? 'border-green-500 bg-green-50 text-green-700'
-                : 'border-outline-variant text-on-surface-variant hover:border-on-surface-variant'
-            )}
-          >
-            <span className="flex items-center justify-center gap-2">
-              <CheckCircle className="w-4 h-4" /> Ya, Setuju
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setRecordingConsent(false)}
-            className={cn(
-              'flex-1 py-3 rounded-xl border-2 font-medium text-sm transition-all',
-              recordingConsent === false
-                ? 'border-error bg-error-container text-on-error-container'
-                : 'border-outline-variant text-on-surface-variant hover:border-on-surface-variant'
-            )}
-          >
-            <span className="flex items-center justify-center gap-2">
-              <Mic className="w-4 h-4" /> Tidak
-            </span>
-          </button>
-        </div>
+        <YaTidakChoice
+          label="Izin rekaman suara"
+          value={recordingConsent}
+          onChange={setRecordingConsent}
+        />
       </Card>
 
       {/* Photo consent */}
-      <Card title="Izin Foto" subtitle="Pengambilan foto selama kegiatan">
-        <p className="text-sm text-on-surface-variant mb-4">
+      <Card padding="md">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary flex items-center justify-center shrink-0">
+            <Camera className="w-5 h-5" />
+          </span>
+          <div>
+            <h3 className="text-base font-semibold text-on-surface">Izin Foto</h3>
+            <p className="text-xs text-on-surface-variant">Pengambilan foto selama kegiatan</p>
+          </div>
+        </div>
+        <p className="text-sm text-on-surface-variant mt-3 mb-4">
           Foto digunakan untuk dokumentasi kegiatan dan disertakan dalam laporan perkembangan anak.
         </p>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setPhotoConsent(true)}
-            className={cn(
-              'flex-1 py-3 rounded-xl border-2 font-medium text-sm transition-all',
-              photoConsent === true
-                ? 'border-green-500 bg-green-50 text-green-700'
-                : 'border-outline-variant text-on-surface-variant hover:border-on-surface-variant'
-            )}
-          >
-            <span className="flex items-center justify-center gap-2">
-              <CheckCircle className="w-4 h-4" /> Ya, Setuju
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setPhotoConsent(false)}
-            className={cn(
-              'flex-1 py-3 rounded-xl border-2 font-medium text-sm transition-all',
-              photoConsent === false
-                ? 'border-error bg-error-container text-on-error-container'
-                : 'border-outline-variant text-on-surface-variant hover:border-on-surface-variant'
-            )}
-          >
-            <span className="flex items-center justify-center gap-2">
-              <Camera className="w-4 h-4" /> Tidak
-            </span>
-          </button>
-        </div>
+        <YaTidakChoice
+          label="Izin foto"
+          value={photoConsent}
+          onChange={setPhotoConsent}
+        />
       </Card>
 
       {/* Parent name */}
@@ -240,19 +388,18 @@ function ConsentForm() {
         value={parentName}
         onChange={(e) => setParentName(e.target.value)}
         error={!parentName.trim() ? 'Nama wajib diisi' : undefined}
+        leftIcon={<User className="w-4 h-4" />}
       />
 
       {/* Submit */}
       <Button
         className="w-full"
+        size="lg"
         onClick={handleSubmit}
         disabled={submitting}
+        loading={submitting}
       >
-        {submitting ? (
-          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Mengirim...</>
-        ) : (
-          'Kirim Persetujuan'
-        )}
+        {!submitting && 'Kirim Persetujuan'}
       </Button>
     </div>
   )
@@ -262,7 +409,11 @@ function ConsentForm() {
 const ConsentFormPage = () => {
   return (
     <ParentTokenGuard kind="consent">
-      <ConsentForm />
+      <div className="min-h-screen bg-surface px-4 py-6 sm:py-10">
+        <div className="mx-auto w-full max-w-xl">
+          <ConsentForm />
+        </div>
+      </div>
     </ParentTokenGuard>
   )
 }

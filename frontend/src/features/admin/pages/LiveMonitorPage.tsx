@@ -24,6 +24,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { cn } from '../../../core/utils'
+import { formatDate } from '../../../shared/utils'
 import { ApiError } from '../../../core/services/backendClient'
 import { redirectToLogin } from '../../../core/stores/authStore'
 import type { Session, SessionStage, ProgramStage } from '../../../core/types'
@@ -323,7 +324,7 @@ const LiveMonitorPage = () => {
           <div className="flex items-center gap-4 mt-2 text-sm text-on-surface-variant">
             <span className="flex items-center gap-1">
               <Calendar className="w-4 h-4" />
-              {activeSession.session_date}
+              {formatDate(activeSession.session_date)}
             </span>
             <span className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
@@ -353,7 +354,7 @@ const LiveMonitorPage = () => {
                 className="px-3 py-1.5 rounded-xl border text-sm bg-surface-container-low border-outline-variant/60 text-on-surface"
               >
                 {allActiveSessions.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} — {s.session_date}</option>
+                  <option key={s.id} value={s.id}>{s.name} — {formatDate(s.session_date)}</option>
                 ))}
               </select>
             </div>

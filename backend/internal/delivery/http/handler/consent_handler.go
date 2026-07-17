@@ -178,7 +178,7 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 		} else {
 			chatID := normalizeWhatsAppPhone(p.ParentPhone) + "@c.us"
 			url := fmt.Sprintf("%s?token=%s", h.cfg.ParentConsentBaseURL, *p.ConsentCombinedToken)
-			msg := buildConsentMessage(p.ParentName, p.ChildName, session.Name, session.SessionDate, session.Location, url)
+			msg := buildConsentMessage(p.ParentName, p.ChildName, session.Name, formatSessionDateID(session.SessionDate), session.Location, url)
 			if serr := h.messaging.SendTextMessage(ctx, chatID, msg); serr != nil {
 				status = "failed"
 				errMsg = "Gagal mengirim WhatsApp"
@@ -296,6 +296,42 @@ func (h *ConsentHandler) RespondCombined(c *echo.Context) error {
 	})
 }
 
+// Info handles GET /api/consent/info?token= (PUBLIC): returns a stripped,
+// non-sensitive snapshot (child name, session name/date/location) so the parent
+// consent page can be personalized and informative. No auth — the token is the
+// bearer. A valid, unexpired token yields status "ok"; an expired token yields
+// "expired"; an unknown or already-consumed token yields "invalid".
+func (h *ConsentHandler) Info(c *echo.Context) error {
+	token := (*c).QueryParam("token")
+	if token == "" {
+		return appresp.OK(c, dto.ConsentInfoResponse{Status: "invalid"})
+	}
+
+	participant, err := h.consent.GetByCombinedToken((*c).Request().Context(), token)
+	if err != nil {
+		// Already-consumed tokens are cleared, so they read as not-found.
+		return appresp.OK(c, dto.ConsentInfoResponse{Status: "invalid"})
+	}
+
+	if participant.ConsentCombinedTokenExpiresAt != nil && time.Now().UTC().After(*participant.ConsentCombinedTokenExpiresAt) {
+		return appresp.OK(c, dto.ConsentInfoResponse{Status: "expired"})
+	}
+
+	res := dto.ConsentInfoResponse{
+		Status:     "ok",
+		ChildName:  participant.ChildName,
+		ParentName: participant.ParentName,
+	}
+	if participant.SessionID != nil && *participant.SessionID != "" {
+		if session, serr := h.sessionRepo.GetSessionByID((*c).Request().Context(), *participant.SessionID, ""); serr == nil {
+			res.SessionName = session.Name
+			res.SessionDate = session.SessionDate
+			res.Location = session.Location
+		}
+	}
+	return appresp.OK(c, res)
+}
+
 // Summary handles GET /api/consent/summary (JWT): returns consent logs for
 // multiple sessions in one call, grouped by session_id.
 func (h *ConsentHandler) Summary(c *echo.Context) error {
@@ -363,6 +399,39 @@ func normalizeWhatsAppPhone(phone string) string {
 		digits = "62" + digits[1:]
 	}
 	return digits
+}
+
+// indoMonths maps a 1-based month number to its Indonesian name.
+var indoMonths = [...]string{
+	"", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+	"Juli", "Agustus", "September", "Oktober", "November", "Desember",
+}
+
+// wibLocation is the Asia/Jakarta (WIB) location, resolved once. Falls back to a
+// fixed +07:00 offset if the tz database is unavailable.
+var wibLocation = func() *time.Location {
+	if loc, err := time.LoadLocation("Asia/Jakarta"); err == nil {
+		return loc
+	}
+	return time.FixedZone("WIB", 7*3600)
+}()
+
+// formatSessionDateID renders a stored session date into a human-friendly
+// Indonesian format (e.g. "15 Juli 2026"). It accepts either an RFC3339
+// timestamp ("2026-07-15T00:00:00+07:00") or a plain date ("2026-07-15"). The
+// raw value is returned unchanged if it cannot be parsed.
+func formatSessionDateID(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	layouts := []string{time.RFC3339, "2006-01-02T15:04:05", "2006-01-02"}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, raw); err == nil {
+			t = t.In(wibLocation)
+			return fmt.Sprintf("%d %s %d", t.Day(), indoMonths[int(t.Month())], t.Year())
+		}
+	}
+	return raw
 }
 
 // buildConsentMessage composes the Indonesian WhatsApp consent request.

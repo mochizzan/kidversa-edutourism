@@ -297,6 +297,7 @@ function MissionsView() {
                           {new Date(pm.completed_at).toLocaleDateString('id-ID', {
                             day: 'numeric',
                             month: 'short',
+                            timeZone: 'Asia/Jakarta',
                           })}
                         </p>
                       )}

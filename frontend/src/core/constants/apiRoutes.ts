@@ -25,6 +25,7 @@ export const API_ROUTES = {
     SEND_WHATSAPP_STREAM: (batchId: string) =>
       `/api/consent/send-whatsapp/stream?batch_id=${encodeURIComponent(batchId)}`,
     RESPOND_COMBINED: '/api/consent/respond-combined',
+    INFO: (token: string) => `/api/consent/info?token=${encodeURIComponent(token)}`,
     SUMMARY: '/api/consent/summary',
   },
 

@@ -47,6 +47,7 @@ function formatTimestamp(isoString: string): string {
     minute: '2-digit',
     day: 'numeric',
     month: 'short',
+    timeZone: 'Asia/Jakarta',
   }).format(date)
 }
 

@@ -174,6 +174,16 @@ export interface ConsentService {
   submitCombined(token: string, recording: boolean, photo: boolean): Promise<void>
   getBySession(sessionId: string): Promise<ConsentLog[]>
   getSummary(sessionIds: string[]): Promise<Record<string, ConsentLog[]>>
+  getInfo(token: string): Promise<ConsentInfo>
+}
+
+export interface ConsentInfo {
+  status: 'ok' | 'invalid' | 'expired' | 'consumed'
+  child_name?: string
+  parent_name?: string
+  session_name?: string
+  session_date?: string
+  location?: string
 }
 
 // Assessments

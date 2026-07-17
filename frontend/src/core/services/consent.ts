@@ -2,7 +2,10 @@ import type { ConsentLog } from '../types'
 import type {
   ConsentService,
   ConsentSendWhatsAppResponse,
+  ConsentInfo,
 } from './types'
+
+export type { ConsentInfo }
 import { apiRequest } from './backendClient'
 import { itemRequest, itemsRequest } from './apiEnvelope'
 import { API_ROUTES } from '../constants/apiRoutes'
@@ -52,9 +55,14 @@ const submitCombined = async (
   })
 }
 
+const getInfo = async (token: string): Promise<ConsentInfo> => {
+  return itemRequest<ConsentInfo>('GET', API_ROUTES.CONSENT.INFO(token))
+}
+
 export const consentService: ConsentService = {
   sendViaWhatsApp,
   submitCombined,
   getBySession,
   getSummary,
+  getInfo,
 }

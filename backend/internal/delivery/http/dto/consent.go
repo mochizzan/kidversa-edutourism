@@ -79,3 +79,16 @@ type ConsentRespondCombinedResponse struct {
 	ChildName  string `json:"child_name"`
 	ParentName string `json:"parent_name"`
 }
+
+// ConsentInfoResponse is the public, stripped payload for a consent token (no
+// auth — token is the bearer). It exposes only what a parent needs to recognize
+// the request: the child's name, the session name/date/location, and whether the
+// token has already been consumed or expired. Parent phone/email stay private.
+type ConsentInfoResponse struct {
+	Status      string `json:"status"` // "ok" | "consumed" | "invalid" | "expired"
+	ChildName   string `json:"child_name,omitempty"`
+	ParentName  string `json:"parent_name,omitempty"`
+	SessionName string `json:"session_name,omitempty"`
+	SessionDate string `json:"session_date,omitempty"`
+	Location    string `json:"location,omitempty"`
+}

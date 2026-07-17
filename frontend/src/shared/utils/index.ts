@@ -1,5 +1,7 @@
 export { cn } from '../../core/utils/cn'
 
+const WIB_TIME_ZONE = 'Asia/Jakarta'
+
 export function formatDate(date: string | Date) {
   const d = new Date(date)
   if (isNaN(d.getTime())) return '-'
@@ -7,19 +9,22 @@ export function formatDate(date: string | Date) {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    timeZone: WIB_TIME_ZONE,
   }).format(d)
 }
 
 export function formatDateTime(date: string | Date) {
   const d = new Date(date)
   if (isNaN(d.getTime())) return '-'
-  return new Intl.DateTimeFormat('id-ID', {
+  const formatted = new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: WIB_TIME_ZONE,
   }).format(d)
+  return `${formatted} WIB`
 }
 
 export function formatFileSize(bytes: number) {
