@@ -14,13 +14,10 @@ import {
   Smartphone,
   Layers,
 } from 'lucide-react'
-import { useAuth } from '../../../core/hooks/useAuth'
 import { Card } from '../../../shared/components/ui/Card'
 import { ROUTES } from '../../../core/constants/app'
 import { Button } from '../../../shared/components/ui/Button'
-import { userService } from '../../../core/services/users'
-import { useAuthStore } from '../../../core/stores/authStore'
-import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { useFacilitatorProfile } from '../hooks/useFacilitatorProfile'
 import EditNameModal from '../components/EditNameModal'
 import EditEmailModal from '../components/EditEmailModal'
 import EditPhoneModal from '../components/EditPhoneModal'
@@ -38,33 +35,13 @@ const roleLabel: Record<string, string> = {
 }
 
 const ProfilePage = () => {
-  const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const setUser = useAuthStore((s) => s.setUser)
-  const { addToast } = useGlobalToast()
+  const { user, handleLogout, handleAvatarUpload } = useFacilitatorProfile()
   const [editField, setEditField] = useState<'name' | 'email' | 'phone' | null>(null)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [pendingDragFile, setPendingDragFile] = useState<File | null>(null)
   const [avatarDragOver, setAvatarDragOver] = useState(false)
   const dragCounterRef = useRef(0)
-
-  const handleLogout = async () => {
-    await logout()
-    navigate(ROUTES.AUTH.LOGIN, { replace: true })
-  }
-
-  const handleAvatarUpload = async (file: File) => {
-    if (!user) return
-    try {
-      const updated = await userService.uploadAvatar(user.id, file)
-      const { password_hash: _, ...cleanUser } = updated
-      setUser(cleanUser as UserType)
-      addToast({ type: 'success', message: 'Foto profil berhasil diperbarui' })
-    } catch (err) {
-      addToast({ type: 'error', message: 'Gagal memperbarui foto profil' })
-      throw err
-    }
-  }
 
   const handleAvatarDragEnter = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation()
