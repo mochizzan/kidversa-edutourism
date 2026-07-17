@@ -66,12 +66,12 @@ export interface SessionService {
   cancel(id: string): Promise<Session>
   delete(id: string): Promise<void>
 
-  assignFacilitator(sessionId: string, stageId: string, userId: string): Promise<SessionStage>
+  assignFacilitator(sessionId: string, stageId: string, userId: string | null): Promise<SessionStage>
   getStages(sessionId: string): Promise<SessionStage[]>
   getGroups(sessionId: string): Promise<SessionGroup[]>
 
   createGroup(sessionId: string, name: string): Promise<SessionGroup>
-  updateGroup(sessionId: string, groupId: string, name: string): Promise<SessionGroup>
+  updateGroup(sessionId: string, groupId: string, data: { name: string; facilitatorId: string | null }): Promise<SessionGroup>
   deleteGroup(sessionId: string, groupId: string): Promise<void>
 
   getParticipants(sessionId: string, groupId?: string): Promise<Participant[]>
@@ -142,10 +142,38 @@ export interface ReportService {
 }
 
 // Consent
+export interface ConsentParticipantResult {
+  participant_id: string
+  child_name: string
+  parent_phone: string
+  status: 'sent' | 'failed' | 'skipped'
+  error?: string
+}
+
+export interface ConsentSendWhatsAppResponse {
+  status: 'queued'
+  batch_id: string
+  total: number
+}
+
+export interface ConsentProgressEvent {
+  type: 'progress' | 'done'
+  data: {
+    participant_id?: string
+    child_name?: string
+    status?: string
+    error?: string
+    sent?: number
+    failed?: number
+    total?: number
+  }
+}
+
 export interface ConsentService {
-  sendRequest(sessionId: string): Promise<void>
+  sendViaWhatsApp(sessionId: string, force?: boolean): Promise<ConsentSendWhatsAppResponse>
+  submitCombined(token: string, recording: boolean, photo: boolean): Promise<void>
   getBySession(sessionId: string): Promise<ConsentLog[]>
-  submit(token: string, recording: boolean, photo: boolean): Promise<void>
+  getSummary(sessionIds: string[]): Promise<Record<string, ConsentLog[]>>
 }
 
 // Assessments

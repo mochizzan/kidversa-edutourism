@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Send,
+  RefreshCw,
   CheckCircle2,
   XCircle,
   Clock,
@@ -134,14 +135,16 @@ const ConsentMonitorPage = () => {
     }
   }, [progress, activeBatch, addToast, loadData])
 
-  const handleSendWhatsApp = async (sessionId: string) => {
+  const handleSendWhatsApp = async (sessionId: string, force = false) => {
     setSending((prev) => ({ ...prev, [sessionId]: true }))
     try {
-      const res = await consentService.sendViaWhatsApp(sessionId)
+      const res = await consentService.sendViaWhatsApp(sessionId, force)
       setActiveBatch({ sessionId, batchId: res.batch_id, total: res.total })
       addToast({
         type: 'info',
-        message: `Mengirim permintaan consent via WhatsApp ke ${res.total} peserta...`,
+        message: force
+          ? `Mengirim ulang permintaan consent via WhatsApp ke ${res.total} peserta...`
+          : `Mengirim permintaan consent via WhatsApp ke ${res.total} peserta...`,
       })
     } catch (err) {
       const message = err instanceof ApiError
@@ -283,6 +286,16 @@ const ConsentMonitorPage = () => {
                         disabled={isActiveBatch}
                       >
                         {isActiveBatch ? 'Mengirim...' : 'Kirim via WhatsApp'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<RefreshCw className="w-4 h-4" />}
+                        onClick={() => handleSendWhatsApp(session.id, true)}
+                        loading={sending[session.id] || isActiveBatch}
+                        disabled={isActiveBatch}
+                      >
+                        Kirim Ulang
                       </Button>
                       <Button
                         variant="ghost"
