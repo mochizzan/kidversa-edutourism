@@ -85,12 +85,12 @@ const ConsentMonitorPage = () => {
 
         const pendingCount = participants.filter((p) => {
           const hasRecording = logs.some(
-            (l) => l.participant_id === p.id && l.consent_type === ConsentType.RECORDING,
+            (l) => l.participant_id === p.id && l.consent_type === ConsentType.RECORDING && l.responded_at,
           )
           const hasPhoto = logs.some(
-            (l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO,
+            (l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO && l.responded_at,
           )
-          return !hasRecording || !hasPhoto || !p.consent_at
+          return !hasRecording || !hasPhoto
         }).length
 
         dataMap[session.id] = {
@@ -169,13 +169,13 @@ const ConsentMonitorPage = () => {
     participantId: string,
     consentType: ConsentType,
     logs: ConsentLog[]
-  ): 'granted' | 'denied' | 'pending' => {
+  ): 'not_sent' | 'pending' | 'granted' | 'denied' => {
     const log = logs.find(
       (l) => l.participant_id === participantId && l.consent_type === consentType
     )
-    if (!log) return 'pending'
-    if (log.responded_at) return log.value ? 'granted' : 'denied'
-    return 'pending'
+    if (!log) return 'not_sent'
+    if (!log.responded_at) return 'pending'
+    return log.value ? 'granted' : 'denied'
   }
 
   const toggleSession = (sessionId: string) => {
