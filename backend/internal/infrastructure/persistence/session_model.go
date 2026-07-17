@@ -8,6 +8,12 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 )
 
+// sessionDateLayout is the MariaDB DATE format (YYYY-MM-DD). Used to
+// normalize the SessionDate round-trip: the go-sql-driver reads DATE
+// columns as RFC3339 strings when parseTime=true; we reformat on read
+// and write so MySQL always receives a valid DATE literal.
+const sessionDateLayout = "2006-01-02"
+
 // SessionModel is the GORM persistence model for sessions.
 type SessionModel struct {
 	entity.Session
@@ -32,11 +38,18 @@ func (m *SessionModel) BeforeCreate(*gorm.DB) error {
 // ToEntity maps the model back to the domain entity.
 func (m *SessionModel) ToEntity() *entity.Session {
 	e := m.Session
+	if t, err := time.Parse(time.RFC3339, e.SessionDate); err == nil {
+		e.SessionDate = t.Format(sessionDateLayout)
+	}
 	return &e
 }
 
 func sessionModelFromEntity(e *entity.Session) *SessionModel {
-	return &SessionModel{Session: *e}
+	m := &SessionModel{Session: *e}
+	if t, err := time.Parse(time.RFC3339, m.SessionDate); err == nil {
+		m.SessionDate = t.Format(sessionDateLayout)
+	}
+	return m
 }
 
 // SessionStageModel is the GORM persistence model for session stages.
