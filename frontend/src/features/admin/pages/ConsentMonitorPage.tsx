@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronRight,
   Send,
-  RefreshCw,
   CheckCircle2,
   XCircle,
   Clock,
@@ -18,6 +17,8 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { sessionService } from '../../../core/services/sessions'
 import { consentService } from '../../../core/services/consent'
+import { ApiError } from '../../../core/services/backendClient'
+import { useConsentProgress } from '../../../shared/hooks/useConsentProgress'
 import type { Session, Participant, ConsentLog } from '../../../core/types'
 import { ConsentType } from '../../../core/types'
 import { formatDate, formatDateTime } from '../../../shared/utils'
@@ -39,32 +40,53 @@ const ConsentMonitorPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedSession, setExpandedSession] = useState<string | null>(null)
-  const [sendingRequest, setSendingRequest] = useState<Record<string, boolean>>({})
+  const [sending, setSending] = useState<Record<string, boolean>>({})
+  const [activeBatch, setActiveBatch] = useState<{ sessionId: string; batchId: string; total: number } | null>(null)
+
+  const { progress } = useConsentProgress(activeBatch?.batchId ?? null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await sessionService.getAll({ limit: 100 })
-      setSessions(res.data)
+      const sessions = res.data
+      setSessions(sessions)
+
+      // Batch consent logs — 1 call instead of N sequential calls
+      const consentMap = await consentService.getSummary(sessions.map((s) => s.id))
+
+      // Parallelize participant fetches — N concurrent instead of N sequential
+      const participantResults = await Promise.all(
+        sessions.map((s) => sessionService.getParticipants(s.id)),
+      )
 
       const dataMap: Record<string, SessionConsentData> = {}
-
-      for (const session of res.data) {
-        const participants = await sessionService.getParticipants(session.id)
-        const logs = await consentService.getBySession(session.id)
+      sessions.forEach((session, i) => {
+        const participants = participantResults[i]
+        const logs = consentMap[session.id] ?? []
 
         const consentedRecording = participants.filter(
-          (p) => logs.some((l) => l.participant_id === p.id && l.consent_type === ConsentType.RECORDING && l.value)
+          (p) =>
+            logs.some(
+              (l) => l.participant_id === p.id && l.consent_type === ConsentType.RECORDING && l.value,
+            ),
         ).length
 
         const consentedPhoto = participants.filter(
-          (p) => logs.some((l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO && l.value)
+          (p) =>
+            logs.some(
+              (l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO && l.value,
+            ),
         ).length
 
         const pendingCount = participants.filter((p) => {
-          const hasRecording = logs.some((l) => l.participant_id === p.id && l.consent_type === ConsentType.RECORDING)
-          const hasPhoto = logs.some((l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO)
+          const hasRecording = logs.some(
+            (l) => l.participant_id === p.id && l.consent_type === ConsentType.RECORDING,
+          )
+          const hasPhoto = logs.some(
+            (l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO,
+          )
           return !hasRecording || !hasPhoto || !p.consent_at
         }).length
 
@@ -76,7 +98,7 @@ const ConsentMonitorPage = () => {
           consentedPhoto,
           pendingCount,
         }
-      }
+      })
 
       setConsentData(dataMap)
     } catch {
@@ -90,38 +112,35 @@ const ConsentMonitorPage = () => {
     loadData()
   }, [loadData])
 
-  const handleSendRequest = async (sessionId: string) => {
-    setSendingRequest((prev) => ({ ...prev, [sessionId]: true }))
-    try {
-      await consentService.sendRequest(sessionId)
-      addToast({ type: 'success', message: 'Permintaan consent berhasil dikirim' })
-      // Reload data
-      loadData()
-    } catch {
-      addToast({ type: 'error', message: 'Gagal mengirim permintaan consent' })
-    } finally {
-      setSendingRequest((prev) => ({ ...prev, [sessionId]: false }))
-    }
-  }
-
-  const handleResendParticipant = async (
-    sessionId: string,
-    _participantId: string,
-    _participantName: string
-  ) => {
-    // Use session-level resend as a proxy for individual resend
-    setSendingRequest((prev) => ({ ...prev, [sessionId]: true }))
-    try {
-      await consentService.sendRequest(sessionId)
+  // React to SSE progress: when the batch is done, reload and clear the batch.
+  useEffect(() => {
+    if (!activeBatch) return
+    if (progress?.type === 'done') {
       addToast({
         type: 'success',
-        message: `Permintaan consent ulang dikirim ke ${_participantName}`,
+        message: `Pengiriman selesai: ${progress.data.sent ?? 0}/${progress.data.total ?? 0} peserta`,
       })
+      setActiveBatch(null)
       loadData()
-    } catch {
-      addToast({ type: 'error', message: 'Gagal mengirim ulang permintaan' })
+    }
+  }, [progress, activeBatch, addToast, loadData])
+
+  const handleSendWhatsApp = async (sessionId: string) => {
+    setSending((prev) => ({ ...prev, [sessionId]: true }))
+    try {
+      const res = await consentService.sendViaWhatsApp(sessionId)
+      setActiveBatch({ sessionId, batchId: res.batch_id, total: res.total })
+      addToast({
+        type: 'info',
+        message: `Mengirim permintaan consent via WhatsApp ke ${res.total} peserta...`,
+      })
+    } catch (err) {
+      const message = err instanceof ApiError
+        ? err.message
+        : 'Gagal mengirim permintaan consent'
+      addToast({ type: 'error', message })
     } finally {
-      setSendingRequest((prev) => ({ ...prev, [sessionId]: false }))
+      setSending((prev) => ({ ...prev, [sessionId]: false }))
     }
   }
 
@@ -184,6 +203,7 @@ const ConsentMonitorPage = () => {
             const data = consentData[session.id]
             if (!data) return null
             const totalParticipants = data.participants.length
+            const isActiveBatch = activeBatch?.sessionId === session.id
 
             return (
               <div
@@ -214,6 +234,26 @@ const ConsentMonitorPage = () => {
                     </div>
                   </div>
 
+                  {/* Batch progress indicator */}
+                  {isActiveBatch && progress && (
+                    <div className="mt-3 rounded-xl bg-primary-container/40 p-3 text-sm">
+                      {progress.type === 'progress' && progress.data.status ? (
+                        <span className="text-on-surface-variant">
+                          Mengirim ke {progress.data.child_name ?? progress.data.participant_id}...
+                          {' '}({progress.data.status})
+                        </span>
+                      ) : progress.type === 'done' ? (
+                        <span className="text-green-700 font-medium">
+                          Selesai: {progress.data.sent ?? 0}/{progress.data.total ?? 0} berhasil
+                        </span>
+                      ) : (
+                        <span className="text-on-surface-variant">
+                          Mengirim {activeBatch.total} peserta...
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Consent Summary */}
                   <div className="flex items-center gap-4 mt-3 text-sm">
                     <span className="text-on-surface-variant">Rekaman:</span>
@@ -229,10 +269,11 @@ const ConsentMonitorPage = () => {
                         variant="secondary"
                         size="sm"
                         icon={<Send className="w-4 h-4" />}
-                        onClick={() => handleSendRequest(session.id)}
-                        loading={sendingRequest[session.id]}
+                        onClick={() => handleSendWhatsApp(session.id)}
+                        loading={sending[session.id] || isActiveBatch}
+                        disabled={isActiveBatch}
                       >
-                        Kirim Consent Request
+                        {isActiveBatch ? 'Mengirim...' : 'Kirim via WhatsApp'}
                       </Button>
                       <Button
                         variant="ghost"
@@ -270,7 +311,6 @@ const ConsentMonitorPage = () => {
                           <span className="flex-1">Rekaman</span>
                           <span className="flex-1">Foto</span>
                           <span className="flex-[1.5]">Tanggal Respon</span>
-                          <span className="flex-1">Aksi</span>
                         </div>
 
                         {data.participants.map((participant) => {
@@ -284,8 +324,6 @@ const ConsentMonitorPage = () => {
                             ConsentType.PHOTO,
                             data.logs
                           )
-                          const hasPending =
-                            recordingStatus === 'pending' || photoStatus === 'pending'
                           const log = data.logs.find(
                             (l) => l.participant_id === participant.id
                           )
@@ -347,25 +385,6 @@ const ConsentMonitorPage = () => {
                                     ? formatDateTime(log.responded_at)
                                     : '-'}
                                 </span>
-                              </div>
-                              <div className="flex-1">
-                                {hasPending && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    icon={<RefreshCw className="w-3.5 h-3.5" />}
-                                    onClick={() =>
-                                      handleResendParticipant(
-                                        session.id,
-                                        participant.id,
-                                        participant.parent_name
-                                      )
-                                    }
-                                    loading={sendingRequest[session.id]}
-                                  >
-                                    Kirim Ulang
-                                  </Button>
-                                )}
                               </div>
                             </div>
                           )
