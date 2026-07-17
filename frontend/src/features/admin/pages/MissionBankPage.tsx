@@ -1,20 +1,27 @@
-import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { Plus, Pencil, Power, PowerOff, Search, ChevronLeft, ChevronRight, Loader2, AlertCircle, Home, Users, School, FileText } from 'lucide-react'
+import {
+  Plus,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  AlertCircle,
+  Home,
+  Users,
+  School,
+  FileText,
+} from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
-import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Select } from '../../../shared/components/ui/Select'
 import { Input } from '../../../shared/components/ui/Input'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
-import { useGlobalToast } from '../../../shared/components/feedback/Toast'
-import { missionService } from '../../../core/services/missions'
-import { programService } from '../../../core/services/programs'
-import type { MissionBank, Program } from '../../../core/types'
 import { MissionCategory } from '../../../core/types'
 import { cn } from '../../../core/utils'
+import { useMissionBank } from '../hooks/useMissionBank'
+import { MissionCard } from '../components/MissionCard'
 
 const CATEGORY_CONFIG = [
   { key: '', label: 'Semua', icon: null },
@@ -23,173 +30,39 @@ const CATEGORY_CONFIG = [
   { key: MissionCategory.SCHOOL, label: 'SCHOOL', icon: <School className="w-4 h-4" /> },
 ]
 
-const CATEGORY_META: Record<string, { icon: string; color: string }> = {
-  HOME: { icon: '🏠', color: 'bg-blue-100 text-blue-700' },
-  PARENT: { icon: '👨‍👩‍👧', color: 'bg-purple-100 text-purple-700' },
-  SCHOOL: { icon: '🏫', color: 'bg-amber-100 text-amber-700' },
+const CATEGORY_META: Record<string, { icon: string }> = {
+  HOME: { icon: '🏠' },
+  PARENT: { icon: '👨‍👩‍👧' },
+  SCHOOL: { icon: '🏫' },
 }
 
 const MissionBankPage = () => {
   const navigate = useNavigate()
-  const { addToast } = useGlobalToast()
 
-  // Filters
-  const [selectedProgram, setSelectedProgram] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const {
+    missions,
+    programs,
+    stats,
+    loading,
+    error,
+    page,
+    total,
+    totalPages,
+    selectedProgram,
+    selectedCategory,
+    searchQuery,
+    deactivateTarget,
+    deactivating,
+    setSearchQuery,
+    setPage,
+    setSelectedProgram,
+    setSelectedCategory,
+    setDeactivateTarget,
+    loadMissions,
+    handleToggleActive,
+    confirmToggle,
+  } = useMissionBank()
 
-  // Data
-  const [missions, setMissions] = useState<MissionBank[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const pageSize = 10
-
-  // Programs for dropdown
-  const [programs, setPrograms] = useState<Program[]>([])
-
-  // Stats
-  const [stats, setStats] = useState<Record<string, number>>({ HOME: 0, PARENT: 0, SCHOOL: 0 })
-
-  // Modal state - REMOVED
-  // const [modalOpen, setModalOpen] = useState(false)
-  // const [editingMission, setEditingMission] = useState<MissionBank | null>(null)
-  // const [saving, setSaving] = useState(false)
-
-  // Delete / deactivate
-  const [deactivateTarget, setDeactivateTarget] = useState<MissionBank | null>(null)
-  const [deactivating, setDeactivating] = useState(false)
-
-  // Load programs
-  useEffect(() => {
-    programService.getAll({ limit: 100 }).then((res) => setPrograms(res.data))
-  }, [])
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-      setPage(1)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
-
-  // Load missions
-  const loadMissions = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await missionService.getAll({
-        page,
-        limit: pageSize,
-        search: debouncedSearch || undefined,
-        filters: {
-          ...(selectedProgram ? { program_id: selectedProgram } : {}),
-          ...(selectedCategory ? { category: selectedCategory } : {}),
-        },
-      })
-      setMissions(res.data)
-      setTotal(res.total)
-    } catch {
-      setError('Gagal memuat data misi')
-    } finally {
-      setLoading(false)
-    }
-  }, [page, pageSize, debouncedSearch, selectedProgram, selectedCategory])
-
-  useEffect(() => {
-    loadMissions()
-  }, [loadMissions])
-
-  // Load stats
-  const loadStats = useCallback(async () => {
-    const counts: Record<string, number> = { HOME: 0, PARENT: 0, SCHOOL: 0 }
-    for (const cat of ['HOME', 'PARENT', 'SCHOOL'] as const) {
-      try {
-        const res = await missionService.getAll({
-          page: 1,
-          limit: 1,
-          filters: {
-            ...(selectedProgram ? { program_id: selectedProgram } : {}),
-            category: cat,
-          },
-        })
-        counts[cat] = res.total
-      } catch {
-        counts[cat] = 0
-      }
-    }
-    setStats(counts)
-  }, [selectedProgram])
-
-  useEffect(() => {
-    loadStats()
-  }, [loadStats])
-
-  // Load stages when program changes
-  // const loadStages = useCallback(async (programId: string) => {
-  //   if (!programId) {
-  //     setStages([])
-  //     return
-  //   }
-  //   try {
-  //     const res = await programService.getStages(programId)
-  //     setStages(res)
-  //   } catch {
-  //     setStages([])
-  //   }
-  // }, [])
-
-  // Toggle active
-  const handleToggleActive = async (mission: MissionBank) => {
-    if (mission.is_active) {
-      // Check min 3 active missions for this category+program
-      try {
-        const res = await missionService.getAll({
-          page: 1,
-          limit: 100,
-          filters: {
-            program_id: mission.program_id,
-            category: mission.category,
-          },
-        })
-        const activeCount = res.data.filter((m) => m.is_active && m.id !== mission.id).length
-        if (activeCount < 3) {
-          addToast({
-            type: 'warning',
-            message: `Tidak dapat menonaktifkan. Minimal 3 misi aktif diperlukan untuk kategori ${mission.category} di program ini. Saat ini hanya ${activeCount} misi aktif lainnya.`,
-          })
-          return
-        }
-      } catch {
-        // If we can't check, proceed with toggle
-      }
-    }
-    setDeactivateTarget(mission)
-  }
-
-  const confirmToggle = async () => {
-    if (!deactivateTarget) return
-    setDeactivating(true)
-    try {
-      await missionService.toggleActive(deactivateTarget.id)
-      addToast({
-        type: 'success',
-        message: deactivateTarget.is_active ? 'Misi dinonaktifkan' : 'Misi diaktifkan',
-      })
-      loadMissions()
-      loadStats()
-    } catch {
-      addToast({ type: 'error', message: 'Gagal mengubah status misi' })
-    } finally {
-      setDeactivating(false)
-      setDeactivateTarget(null)
-    }
-  }
-
-  const totalPages = Math.ceil(total / pageSize)
   const currentAction = deactivateTarget?.is_active ? 'Nonaktifkan' : 'Aktifkan'
 
   return (
@@ -198,13 +71,15 @@ const MissionBankPage = () => {
         title="Bank Misi"
         subtitle="Kelola bank misi untuk program edutourism."
         actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.MISSION_NEW)}>
+          <Button
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => navigate(ROUTES.ADMIN.MISSION_NEW)}
+          >
             Tambah Misi Baru
           </Button>
         }
       />
 
-      {/* Stats Banner */}
       <div className="bg-surface-container-low rounded-2xl px-6 py-4">
         <div className="flex items-center gap-6 flex-wrap">
           <span className="text-sm text-on-surface-variant">Ringkasan Misi:</span>
@@ -219,13 +94,10 @@ const MissionBankPage = () => {
               </span>
             )
           })}
-          <span className="text-xs text-green-600 font-medium ml-auto">
-            Semua kategori siap
-          </span>
+          <span className="text-xs text-green-600 font-medium ml-auto">Semua kategori siap</span>
         </div>
       </div>
 
-      {/* Filters */}
       <div className="bg-surface-container-low p-4 rounded-2xl flex flex-col sm:flex-row gap-4 items-end">
         <div className="w-full sm:w-64">
           <Select
@@ -234,10 +106,7 @@ const MissionBankPage = () => {
               ...programs.map((p) => ({ value: p.id, label: p.name })),
             ]}
             value={selectedProgram}
-            onChange={(e) => {
-              setSelectedProgram(e.target.value)
-              setPage(1)
-            }}
+            onChange={(e) => setSelectedProgram(e.target.value)}
             placeholder="Semua Program"
           />
         </div>
@@ -251,20 +120,16 @@ const MissionBankPage = () => {
         </div>
       </div>
 
-      {/* Category Tabs */}
       <div className="flex gap-1 border-b border-outline-variant">
         {CATEGORY_CONFIG.map((cat) => (
           <button
             key={cat.key}
-            onClick={() => {
-              setSelectedCategory(cat.key)
-              setPage(1)
-            }}
+            onClick={() => setSelectedCategory(cat.key)}
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
               selectedCategory === cat.key
                 ? 'border-primary text-primary'
-                : 'border-transparent text-on-surface-variant hover:text-on-surface hover:border-outline-variant'
+                : 'border-transparent text-on-surface-variant hover:text-on-surface hover:border-outline-variant',
             )}
           >
             {cat.icon}
@@ -273,7 +138,6 @@ const MissionBankPage = () => {
         ))}
       </div>
 
-      {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -281,7 +145,6 @@ const MissionBankPage = () => {
         </div>
       )}
 
-      {/* Error State */}
       {!loading && error && (
         <div className="bg-error-container/30 rounded-2xl p-6 text-center">
           <AlertCircle className="w-10 h-10 mx-auto mb-3 text-on-error-container" />
@@ -292,7 +155,6 @@ const MissionBankPage = () => {
         </div>
       )}
 
-      {/* Empty State */}
       {!loading && !error && missions.length === 0 && (
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
@@ -310,99 +172,20 @@ const MissionBankPage = () => {
         />
       )}
 
-      {/* Mission Cards */}
       {!loading && !error && missions.length > 0 && (
         <div className="grid gap-4">
-          {missions.map((mission) => {
-            const meta = CATEGORY_META[mission.category] || CATEGORY_META.HOME
-            return (
-              <div
-                key={mission.id}
-                className="bg-surface rounded-2xl border border-outline-variant p-5 hover:shadow-sm transition-shadow"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <span className="text-2xl shrink-0">{meta.icon}</span>
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-on-surface truncate">
-                        {mission.title_child}
-                      </h3>
-                      <p className="text-sm text-on-surface-variant mt-0.5">
-                        {mission.title_parent}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant={mission.is_active ? 'success' : 'neutral'}>
-                      {mission.is_active ? 'Aktif' : 'Nonaktif'}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Description (expandable) */}
-                {mission.description_parent && (
-                  <details className="mt-3 group">
-                    <summary className="text-xs text-primary cursor-pointer hover:text-primary-dark transition-colors">
-                      {mission.description_parent.length > 80
-                        ? 'Lihat deskripsi'
-                        : 'Detail'}
-                    </summary>
-                    <p className="mt-2 text-sm text-on-surface-variant leading-relaxed">
-                      {mission.description_parent}
-                    </p>
-                  </details>
-                )}
-
-                {/* Stage tags */}
-                {mission.related_stage_ids && mission.related_stage_ids.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {mission.related_stage_ids.map((stageId) => {
-                      return (
-                        <Badge key={stageId} variant="accent" size="sm">
-                          {`Stage ${stageId.slice(-4)}`}
-                        </Badge>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-outline-variant">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={<Pencil className="w-4 h-4" />}
-                    onClick={() => navigate(`/admin/missions/${mission.id}/edit`)}
-                  >
-                    Edit
-                  </Button>
-                  {mission.is_active ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<PowerOff className="w-4 h-4 text-warning" />}
-                      onClick={() => handleToggleActive(mission)}
-                    >
-                      Nonaktifkan
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={<Power className="w-4 h-4 text-green-600" />}
-                      onClick={() => setDeactivateTarget(mission)}
-                    >
-                      Aktifkan
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+          {missions.map((mission) => (
+            <MissionCard
+              key={mission.id}
+              mission={mission}
+              onEdit={(m) => navigate(`/admin/missions/${m.id}/edit`)}
+              onToggleActive={handleToggleActive}
+              onActivate={setDeactivateTarget}
+            />
+          ))}
         </div>
       )}
 
-      {/* Pagination */}
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-on-surface-variant">
@@ -430,7 +213,6 @@ const MissionBankPage = () => {
         </div>
       )}
 
-      {/* Toggle confirmation modal */}
       <Modal
         open={!!deactivateTarget}
         onClose={() => setDeactivateTarget(null)}
@@ -452,7 +234,8 @@ const MissionBankPage = () => {
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Apakah Anda yakin ingin {currentAction.toLowerCase()} misi "{deactivateTarget?.title_child}"?
+          Apakah Anda yakin ingin {currentAction.toLowerCase()} misi "{deactivateTarget?.title_child}
+          "?
         </p>
       </Modal>
     </div>
