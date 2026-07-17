@@ -92,8 +92,11 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 	// Eligible participants: not yet fully consented, no active token, valid phone.
 	eligible := make([]entity.Participant, 0, len(participants))
 	now := time.Now().UTC()
+	ctx := (*c).Request().Context()
 	for _, p := range participants {
-		if p.ConsentRecording && p.ConsentPhoto {
+		recGranted, _ := h.consent.GetValue(ctx, p.ID, req.SessionID, entity.ConsentRecording)
+		photoGranted, _ := h.consent.GetValue(ctx, p.ID, req.SessionID, entity.ConsentPhoto)
+		if recGranted && photoGranted {
 			continue
 		}
 		// When force=true we already cleared tokens above (lines 86-90), so skip
