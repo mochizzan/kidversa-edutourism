@@ -389,9 +389,13 @@ const ConsentMonitorPage = () => {
                                   <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600">
                                     <XCircle className="w-3.5 h-3.5" /> Tolak
                                   </span>
-                                ) : (
+                                ) : recordingStatus === 'pending' ? (
                                   <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600">
                                     <Clock className="w-3.5 h-3.5" /> Menunggu
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400">
+                                    <Send className="w-3.5 h-3.5" /> Belum Dikirim
                                   </span>
                                 )}
                               </div>
@@ -404,9 +408,13 @@ const ConsentMonitorPage = () => {
                                   <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600">
                                     <XCircle className="w-3.5 h-3.5" /> Tolak
                                   </span>
-                                ) : (
+                                ) : photoStatus === 'pending' ? (
                                   <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600">
                                     <Clock className="w-3.5 h-3.5" /> Menunggu
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400">
+                                    <Send className="w-3.5 h-3.5" /> Belum Dikirim
                                   </span>
                                 )}
                               </div>
