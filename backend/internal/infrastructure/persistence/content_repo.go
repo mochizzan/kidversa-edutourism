@@ -345,11 +345,11 @@ func (r *GormConsentRepository) Respond(ctx context.Context, participantID, sess
 		return r.db.WithContext(ctx).
 			Model(&existing).
 			Updates(map[string]interface{}{
-				"value":         value,
-				"sent_at":       now,
-				"responded_at":  &now,
-				"ip_address":    ip,
-				"user_agent":    ua,
+				"value":        value,
+				"sent_at":      now,
+				"responded_at": &now,
+				"ip_address":   ip,
+				"user_agent":   ua,
 			}).Error
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
