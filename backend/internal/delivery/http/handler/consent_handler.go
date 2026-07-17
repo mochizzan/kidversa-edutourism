@@ -167,7 +167,7 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 			if serr := h.messaging.SendTextMessage(ctx, chatID, msg); serr != nil {
 				status = "failed"
 				errMsg = "Gagal mengirim WhatsApp"
-				log.Printf("consent: whatsapp send failed for %s (%s): %v", p.ID, p.ParentPhone, serr)
+				log.Printf("consent: whatsapp send failed for participant %s: %v", p.ID, serr)
 			} else {
 				sent++
 			}
