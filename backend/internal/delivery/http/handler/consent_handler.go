@@ -182,6 +182,20 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 				log.Printf("consent: whatsapp send failed for participant %s: %v", p.ID, serr)
 			} else {
 				sent++
+				// Record that consent requests were sent (audit trail) for each
+				// participant type. Failures are non-fatal — just log them.
+				sessionID := ""
+				if p.SessionID != nil {
+					sessionID = *p.SessionID
+				}
+				if sessionID != "" {
+					if sErr := h.consent.SendRequest(ctx, p.ID, sessionID, entity.ConsentRecording); sErr != nil {
+						log.Printf("consent: send-request record failed for %s RECORDING: %v", p.ID, sErr)
+					}
+					if sErr := h.consent.SendRequest(ctx, p.ID, sessionID, entity.ConsentPhoto); sErr != nil {
+						log.Printf("consent: send-request record failed for %s PHOTO: %v", p.ID, sErr)
+					}
+				}
 			}
 		}
 
