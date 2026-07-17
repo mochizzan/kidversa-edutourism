@@ -69,6 +69,10 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 	}
 	tenantID := appmiddleware.GetTenantID(c)
 
+	// force is an optional query flag (?force=true): clears any active tokens for
+	// the session so stuck/undelivered batches can be re-sent before TTL expiry.
+	force := (*c).QueryParam("force") == "true"
+
 	session, err := h.sessionRepo.GetSessionByID((*c).Request().Context(), req.SessionID, tenantID)
 	if err != nil {
 		return err
@@ -79,6 +83,12 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 		return err
 	}
 
+	if force {
+		if cerr := h.sessionRepo.ClearParticipantTokens((*c).Request().Context(), req.SessionID, tenantID); cerr != nil {
+			return cerr
+		}
+	}
+
 	// Eligible participants: not yet fully consented, no active token, valid phone.
 	eligible := make([]entity.Participant, 0, len(participants))
 	now := time.Now().UTC()
@@ -86,7 +96,7 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 		if p.ConsentRecording && p.ConsentPhoto {
 			continue
 		}
-		if p.ConsentCombinedToken != nil && p.ConsentCombinedTokenExpiresAt != nil && p.ConsentCombinedTokenExpiresAt.After(now) {
+		if !force && p.ConsentCombinedToken != nil && p.ConsentCombinedTokenExpiresAt != nil && p.ConsentCombinedTokenExpiresAt.After(now) {
 			continue
 		}
 		if !isValidWhatsAppPhone(p.ParentPhone) {

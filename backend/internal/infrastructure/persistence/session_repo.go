@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -70,6 +71,15 @@ func (r *GormSessionRepository) ListSessions(ctx context.Context, f repository.S
 		like := "%" + strings.ToLower(f.Search) + "%"
 		q = q.Where("LOWER(name) LIKE ? OR LOWER(location) LIKE ?", like, like)
 	}
+	// When FacilitatorID is set, restrict to sessions where the facilitator
+	// is assigned to at least one session_stage OR session_group.
+	if f.FacilitatorID != "" {
+		q = q.Where(
+			"id IN (SELECT session_id FROM session_stages WHERE facilitator_id = ?) "+
+				"OR id IN (SELECT session_id FROM session_groups WHERE facilitator_id = ?)",
+			f.FacilitatorID, f.FacilitatorID,
+		)
+	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
@@ -129,7 +139,13 @@ func (r *GormSessionRepository) ListSessionStages(ctx context.Context, sessionID
 
 func (r *GormSessionRepository) UpdateSessionStage(ctx context.Context, s *entity.SessionStage) error {
 	m := sessionStageModelFromEntity(s)
-	if err := r.db.WithContext(ctx).Model(&SessionStageModel{}).Where("id = ?", s.ID).Updates(m).Error; err != nil {
+	// Select forces FacilitatorID into the UPDATE even when nil (GORM otherwise
+	// skips zero-value fields, so a nil *string would not produce SET facilitator_id = NULL).
+	if err := r.db.WithContext(ctx).
+		Model(&SessionStageModel{}).
+		Where("id = ?", s.ID).
+		Select("FacilitatorID", "Status", "UpdatedAt").
+		Updates(m).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
@@ -177,7 +193,13 @@ func (r *GormSessionRepository) ListSessionGroups(ctx context.Context, sessionID
 
 func (r *GormSessionRepository) UpdateSessionGroup(ctx context.Context, g *entity.SessionGroup) error {
 	m := sessionGroupModelFromEntity(g)
-	if err := r.db.WithContext(ctx).Model(&SessionGroupModel{}).Where("id = ?", g.ID).Updates(m).Error; err != nil {
+	// Select forces FacilitatorID into the UPDATE even when nil (so clearing it
+	// produces SET facilitator_id = NULL; GORM otherwise skips zero-value fields).
+	if err := r.db.WithContext(ctx).
+		Model(&SessionGroupModel{}).
+		Where("id = ?", g.ID).
+		Select("Name", "Status", "FacilitatorID", "UpdatedAt").
+		Updates(m).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
@@ -318,6 +340,44 @@ func (r *GormSessionRepository) UpdateParticipant(ctx context.Context, p *entity
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
+}
+
+// UpdateParticipantFields applies a partial (map) update so zero/false values
+// persist (GORM zero-value bug, C2).
+func (r *GormSessionRepository) UpdateParticipantFields(ctx context.Context, id string, fields map[string]interface{}) error {
+	if err := r.db.WithContext(ctx).Model(&ParticipantModel{}).Where("id = ?", id).Updates(fields).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// UpdateParticipantTokenIfAvailable atomically sets a combined consent token only
+// if no active token currently exists. Returns (true, nil) on success, (false, nil)
+// if the token slot is already occupied by a concurrent request.
+func (r *GormSessionRepository) UpdateParticipantTokenIfAvailable(ctx context.Context, participantID string, token string, expiresAt interface{}) (bool, error) {
+	result := r.db.WithContext(ctx).
+		Model(&ParticipantModel{}).
+		Where("id = ? AND (consent_combined_token IS NULL OR consent_combined_token_expires_at < ?)", participantID, time.Now()).
+		Updates(map[string]interface{}{
+			"consent_combined_token":            token,
+			"consent_combined_token_expires_at": expiresAt,
+		})
+	if result.Error != nil {
+		return false, apperrors.Internal("internal_error", result.Error)
+	}
+	return result.RowsAffected > 0, nil
+}
+
+// ClearParticipantTokens clears active combined consent tokens for a session's
+// participants (force-resend recovery), so the eligibility filter re-includes them.
+func (r *GormSessionRepository) ClearParticipantTokens(ctx context.Context, sessionID, tenantID string) error {
+	return r.db.WithContext(ctx).
+		Model(&ParticipantModel{}).
+		Where("session_id = ? AND tenant_id = ? AND consent_combined_token IS NOT NULL", sessionID, tenantID).
+		Updates(map[string]interface{}{
+			"consent_combined_token":            nil,
+			"consent_combined_token_expires_at": nil,
+		}).Error
 }
 
 func (r *GormSessionRepository) DeleteParticipant(ctx context.Context, id string) error {

@@ -8,10 +8,11 @@ import (
 
 // SessionFilter narrows a session list query.
 type SessionFilter struct {
-	TenantID    string
-	Search      string
-	Status      string
-	SessionDate string
+	TenantID      string
+	Search        string
+	Status        string
+	SessionDate   string
+	FacilitatorID string
 }
 
 // GroupWithParticipants bundles a session group with its participants.
@@ -73,7 +74,18 @@ type SessionRepository interface {
 	ListParticipants(ctx context.Context, sessionID, groupID, tenantID string) ([]entity.Participant, error)
 	ListParticipantsPaginated(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*Paginated[entity.Participant], error)
 	UpdateParticipant(ctx context.Context, p *entity.Participant) error
+	// UpdateParticipantFields applies a partial (map) update to a participant. Use
+	// this instead of UpdateParticipant(struct) so zero/false values persist (C2).
+	UpdateParticipantFields(ctx context.Context, id string, fields map[string]interface{}) error
+	// UpdateParticipantTokenIfAvailable atomically sets a combined consent token
+	// on a participant only if no active token exists (WHERE guard). Returns true
+	// if the update succeeded (rows affected = 1), false if skipped (token already set).
+	UpdateParticipantTokenIfAvailable(ctx context.Context, participantID string, token string, expiresAt interface{}) (bool, error)
 	DeleteParticipant(ctx context.Context, id string) error
+	// ClearParticipantTokens clears any active combined consent tokens for a
+	// session's participants (force-resend recovery). Tokens are set to NULL so
+	// the eligibility filter re-includes those participants on the next send.
+	ClearParticipantTokens(ctx context.Context, sessionID, tenantID string) error
 
 	// Transaction helper: run fn inside a DB transaction (GORM-backed repos provide this).
 	Transaction(ctx context.Context, fn func(tx SessionRepository) error) error
