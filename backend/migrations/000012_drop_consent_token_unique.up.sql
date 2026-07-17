@@ -1,0 +1,14 @@
+-- 000012_drop_consent_token_unique.up.sql
+-- Drop the orphaned UNIQUE constraint on consent_logs.consent_token.
+--
+-- Rationale: The old per-row token flow (GetByToken/RespondByToken) was removed
+-- in the consent combined-token refactor. The new flow uses
+-- participants.consent_combined_token. The consent_logs.consent_token column is
+-- unused, but the UNIQUE constraint blocks the new SendRequest flow because
+-- ConsentToken is a Go string (zero value "" -> '' in SQL), and multiple ''
+-- rows violate the constraint.
+--
+-- MariaDB UNIQUE behavior: multiple NULLs are allowed (NULL != NULL), but ''
+-- is a value -- only one row can have consent_token = ''. Dropping the
+-- constraint lets SendRequest create rows for both RECORDING and PHOTO.
+ALTER TABLE consent_logs DROP INDEX uq_consent_token;
