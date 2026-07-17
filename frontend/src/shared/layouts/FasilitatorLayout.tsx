@@ -45,15 +45,15 @@ const FasilitatorLayout = () => {
   return (
     <div className="min-h-screen bg-surface-container-low flex flex-col">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#ECECEC] px-4 md:px-6 lg:px-8 h-16 md:h-[72px] lg:h-[75px] flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-white border-b border-outline-variant px-4 md:px-6 lg:px-8 h-16 md:h-[72px] lg:h-[75px] flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           {/* Brand Logo — image from assets */}
           <Logo className="w-9 h-9 md:w-10 md:h-10 rounded-lg object-contain shrink-0 shadow-sm" />
           <div className="min-w-0">
-            <h1 className="text-sm md:text-base font-bold text-[#1C1B1F] leading-tight truncate">
+            <h1 className="text-sm md:text-base font-bold text-on-surface leading-tight truncate">
               Hai, {userName}
             </h1>
-            <p className="text-[10px] md:text-[11px] text-[#49454F] font-normal leading-tight">
+            <p className="text-[10px] md:text-[11px] text-on-surface-variant font-normal leading-tight">
               Fasilitator
             </p>
           </div>
@@ -78,7 +78,7 @@ const FasilitatorLayout = () => {
       </main>
 
       {/* ── Bottom Navigation ── */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E6E0E9] z-50 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-surface-container-highest z-50 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center justify-around max-w-lg mx-auto">
           {navItems.map((item) => {
             const Icon = item.icon
@@ -95,19 +95,19 @@ const FasilitatorLayout = () => {
                   'min-w-[80px] min-h-[64px] py-2 px-3',
                   'transition-colors duration-200',
                   isActive
-                    ? 'text-[#5B2C8D]'
-                    : 'text-[#CAC4D0] hover:text-[#49454F]'
+                    ? 'text-primary'
+                    : 'text-outline-variant hover:text-on-surface-variant'
                 )}
               >
                 {/* Active indicator bar */}
                 {isActive && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[#5B2C8D] rounded-full" />
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
                 )}
 
                 <Icon
                   className={cn(
                     'w-6 h-6',
-                    isActive ? 'text-[#5B2C8D]' : ''
+                    isActive ? 'text-primary' : ''
                   )}
                 />
 
@@ -115,8 +115,8 @@ const FasilitatorLayout = () => {
                   className={cn(
                     'text-[10px] font-medium leading-tight',
                     isActive
-                      ? 'text-[#5B2C8D] font-bold'
-                      : 'text-[#CAC4D0]'
+                      ? 'text-primary font-bold'
+                      : 'text-outline-variant'
                   )}
                 >
                   {item.label}

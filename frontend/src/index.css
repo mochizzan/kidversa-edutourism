@@ -105,6 +105,14 @@
   --color-surface-container: #F3EDF7;
   --color-surface-container-high: #ECE6F0;
   --color-surface-container-highest: #E6E0E9;
+
+  /* Camera / glassmorphism UI (SmartPhoto & Recording) */
+  --color-camera-overlay: rgba(0, 0, 0, 0.5);
+  --color-on-camera-overlay: #FFFFFF;
+  --color-outline-camera: rgba(255, 255, 255, 0.2);
+  --color-error-dark: #8C2017;
+  --color-warning-surface: #FFF8EB;
+  --color-warning-text: #D48B1C;
 }
 
 :root {

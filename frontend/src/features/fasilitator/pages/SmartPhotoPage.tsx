@@ -560,38 +560,38 @@ const SmartPhotoPage = () => {
 
   if (dataLoading) {
     return (
-      <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-[#F8F7FC] text-[#1C1B1F]">
-        <div className="animate-spin w-10 h-10 border-4 border-[#5B2C8D] border-t-transparent rounded-full" />
-        <p className="text-sm text-[#49454F]">Memuat data peserta...</p>
+      <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-surface-container-low text-on-surface">
+        <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
+        <p className="text-sm text-on-surface-variant">Memuat data peserta...</p>
       </div>
     )
   }
 
   if (!participant) {
     return (
-      <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-[#F8F7FC] text-[#1C1B1F]">
-        <AlertTriangle className="w-16 h-16 text-[#B3261E]" />
+      <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-surface-container-low text-on-surface">
+        <AlertTriangle className="w-16 h-16 text-error" />
         <h2 className="text-xl font-bold">Anak Tidak Ditemukan</h2>
-        <p className="text-[#49454F]">Data anak tidak tersedia atau telah dihapus.</p>
+        <p className="text-on-surface-variant">Data anak tidak tersedia atau telah dihapus.</p>
         <Button onClick={() => navigate(-1)}>Kembali</Button>
       </div>
     )
   }
 
   return (
-    <div className="min-h-dvh bg-[#F8F7FC] -mx-4 -my-5 lg:-mx-6 lg:-my-6 pb-24">
+    <div className="min-h-dvh bg-surface-container-low -mx-4 -my-5 lg:-mx-6 lg:-my-6 pb-24">
     <div className="p-4 md:p-6 lg:p-8 space-y-5 max-w-5xl mx-auto">
       {/* ── Sub-Header & Page Title ── */}
       <div className="flex items-center gap-4 md:gap-6">
         <button
           onClick={handleBack}
-          className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-100 shadow-sm flex items-center justify-center text-[#5B2C8D] hover:scale-105 active:scale-95 transition-all flex-shrink-0"
+          className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white border border-slate-100 shadow-sm flex items-center justify-center text-primary hover:scale-105 active:scale-95 transition-all flex-shrink-0"
         >
           <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 stroke-[2.5]" />
         </button>
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-[#1C1B1F] leading-tight">Ambil Foto</h2>
-          <p className="text-xs md:text-sm text-[#49454F] font-medium">Pastikan objek terlihat jelas dalam frame</p>
+          <h2 className="text-2xl md:text-3xl font-extrabold text-on-surface leading-tight">Ambil Foto</h2>
+          <p className="text-xs md:text-sm text-on-surface-variant font-medium">Pastikan objek terlihat jelas dalam frame</p>
         </div>
       </div>
 
@@ -612,8 +612,8 @@ const SmartPhotoPage = () => {
         {phase === 'camera' && (
           <>
             {pageError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-[#1C1B1F] text-white z-10">
-                <AlertTriangle className="w-16 h-16 text-[#F5A623]" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-on-surface text-white z-10">
+                <AlertTriangle className="w-16 h-16 text-accent" />
                 <p className="text-sm text-white/70 text-center max-w-[280px]">{pageError}</p>
                 <Button
                   variant="secondary"
@@ -638,8 +638,8 @@ const SmartPhotoPage = () => {
             )}
 
             {cameraState === 'loading' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#1C1B1F] text-white z-10">
-                <div className="animate-spin w-10 h-10 border-4 border-[#5B2C8D] border-t-transparent rounded-full" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-on-surface text-white z-10">
+                <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
                 <p className="text-sm text-white/60">Mengakses kamera...</p>
               </div>
             )}
@@ -691,10 +691,10 @@ const SmartPhotoPage = () => {
                           onClick={() => { handleDeviceChange(''); setCameraPickerOpen(false) }}
                           className={cn(
                             'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
-                            !selectedDeviceId ? 'bg-[#F3EEFA] text-[#5B2C8D]' : 'hover:bg-[#F7F2FA] text-[#1C1B1F]',
+                            !selectedDeviceId ? 'bg-primary-container text-primary' : 'hover:bg-surface-container-low text-on-surface',
                           )}
                         >
-                          <Camera className="w-4 h-4 text-[#5B2C8D]" />
+                          <Camera className="w-4 h-4 text-primary" />
                           <span>Otomatis</span>
                         </button>
                         {devices.map((device) => {
@@ -705,10 +705,10 @@ const SmartPhotoPage = () => {
                               onClick={() => { handleDeviceChange(device.deviceId); setCameraPickerOpen(false) }}
                               className={cn(
                                 'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold truncate',
-                                isSelected ? 'bg-[#F3EEFA] text-[#5B2C8D]' : 'hover:bg-[#F7F2FA] text-[#1C1B1F]',
+                                isSelected ? 'bg-primary-container text-primary' : 'hover:bg-surface-container-low text-on-surface',
                               )}
                             >
-                              <Monitor className="w-4 h-4 text-[#49454F]" />
+                              <Monitor className="w-4 h-4 text-on-surface-variant" />
                               <span className="truncate">{device.label || 'Kamera'}</span>
                             </button>
                           )
@@ -752,8 +752,8 @@ const SmartPhotoPage = () => {
                   disabled={isMaxPhotos || cameraState !== 'active'}
                   className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-lg active:scale-90 transition-all flex-shrink-0 relative group"
                 >
-                  <div className="absolute inset-[3px] rounded-full border-2 border-[#5B2C8D]/30 group-hover:border-[#5B2C8D]/50 transition-all" />
-                  <Camera className="w-6 h-6 text-[#5B2C8D]" />
+                  <div className="absolute inset-[3px] rounded-full border-2 border-primary/30 group-hover:border-primary/50 transition-all" />
+                  <Camera className="w-6 h-6 text-primary" />
                 </button>
 
                 {/* Kanan: Frame Label — with icon */}
@@ -784,7 +784,7 @@ const SmartPhotoPage = () => {
         {phase === 'gallery' && (
           <div className="w-full h-full overflow-y-auto bg-white rounded-3xl p-4 md:p-6">
             {photos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-3 text-[#49454F]">
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-on-surface-variant">
                 <Camera className="w-16 h-16 opacity-30" />
                 <p className="text-sm">Belum ada foto untuk {participant.child_name}</p>
               </div>
@@ -794,7 +794,7 @@ const SmartPhotoPage = () => {
                   <button
                     key={photo.id}
                     onClick={() => setFullscreenPhoto(photo)}
-                    className="aspect-[3/4] overflow-hidden rounded-2xl bg-[#F7F2FA] relative group border border-[#E6E0E9] shadow-sm"
+                    className="aspect-[3/4] overflow-hidden rounded-2xl bg-surface-container-low relative group border border-surface-container-highest shadow-sm"
                   >
                     <img
                       src={(resolveStoredUpload(photo.framed_file_url || photo.original_file_url, 'photo')) ?? (photo.framed_file_url || photo.original_file_url)}
@@ -802,7 +802,7 @@ const SmartPhotoPage = () => {
                       className="w-full h-full object-cover"
                     />
                     {photo.is_report_photo && (
-                      <div className="absolute top-2 right-2 bg-[#F5A623] text-white rounded-full p-1 shadow">
+                      <div className="absolute top-2 right-2 bg-accent text-white rounded-full p-1 shadow">
                         <Award className="w-3.5 h-3.5" />
                       </div>
                     )}
@@ -820,35 +820,35 @@ const SmartPhotoPage = () => {
 
       {/* ── Editor Controls ── */}
       {phase === 'editor' && (
-        <div className="bg-white border border-[#E6E0E9] rounded-3xl p-5 shadow-sm space-y-4 max-w-lg md:mx-auto">
+        <div className="bg-white border border-surface-container-highest rounded-3xl p-5 shadow-sm space-y-4 max-w-lg md:mx-auto">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setFramePickerOpen(true)}
-              className="flex items-center gap-2 text-sm font-extrabold text-[#1C1B1F] bg-[#F7F2FA] hover:bg-[#ECE6F0] px-4 py-2 rounded-xl transition-all"
+              className="flex items-center gap-2 text-sm font-extrabold text-on-surface bg-surface-container-low hover:bg-surface-container-high px-4 py-2 rounded-xl transition-all"
             >
-              <LayoutGrid className="w-4 h-4 text-[#5B2C8D]" />
+              <LayoutGrid className="w-4 h-4 text-primary" />
               {selectedFrameId ? 'Ganti Frame' : 'Pilih Frame'}
             </button>
             {selectedFrameId && (
-              <button onClick={() => setSelectedFrameId(null)} className="text-xs font-bold text-[#B3261E] hover:underline">
+              <button onClick={() => setSelectedFrameId(null)} className="text-xs font-bold text-error hover:underline">
                 Hapus Frame
               </button>
             )}
           </div>
 
           <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 text-sm font-bold text-[#1C1B1F] cursor-pointer">
+            <label className="flex items-center gap-2 text-sm font-bold text-on-surface cursor-pointer">
               <input
                 type="checkbox"
                 checked={isReportPhoto}
                 onChange={(e) => setIsReportPhoto(e.target.checked)}
                 disabled={!participant.consent_photo}
-                className="w-4 h-4 rounded accent-[#5B2C8D]"
+                className="w-4 h-4 rounded accent-primary"
               />
               Jadikan Foto Raport
             </label>
             {!participant.consent_photo && (
-              <span className="text-[10px] text-[#D48B1C] bg-[#FFF8EB] px-2 py-0.5 rounded-full font-bold">
+              <span className="text-[10px] text-warning-text bg-warning-surface px-2 py-0.5 rounded-full font-bold">
                 Izin foto belum diberikan
               </span>
             )}
@@ -874,7 +874,7 @@ const SmartPhotoPage = () => {
             <Button
               variant="ghost"
               onClick={handleDiscard}
-              className="text-[#49454F]"
+              className="text-on-surface-variant"
             >
               Batal
             </Button>
@@ -908,7 +908,7 @@ const SmartPhotoPage = () => {
           </button>
           <button
             onClick={() => setConfirmDeletePhoto(true)}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-[#B3261E] text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-md hover:bg-[#8C2017] transition-all"
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-error text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-md hover:bg-error-dark transition-all"
           >
             <Trash2 className="w-4 h-4" />
             Hapus Foto
@@ -947,8 +947,8 @@ const CircleControlBtn = ({ icon: Icon, label, onClick, active }: { icon: any, l
     <div className={cn(
       'w-12 h-12 rounded-full backdrop-blur-md border flex items-center justify-center group-active:scale-95 transition-all shadow-lg',
       active
-        ? 'bg-white/90 border-[#5B2C8D]/40 text-[#5B2C8D]'
-        : 'bg-black/50 border-white/20 text-white group-hover:bg-black/60',
+        ? 'bg-white/90 border-primary/40 text-primary'
+        : 'bg-camera-overlay border-outline-camera text-white group-hover:bg-black/60',
     )}>
       <Icon className="w-5 h-5" />
     </div>
