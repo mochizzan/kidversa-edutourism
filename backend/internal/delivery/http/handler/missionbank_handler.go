@@ -5,8 +5,8 @@ import (
 
 	"github.com/labstack/echo/v5"
 
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
@@ -35,14 +35,14 @@ func (h *MissionBankHandler) Create(c *echo.Context) error {
 	// SUPER_ADMIN), never trusted from the request body (anti-forgery, F5).
 	tenantID := appmiddleware.GetTenantID(c)
 	m := &entity.MissionBank{
-		TenantID:            tenantID,
-		ProgramID:           req.ProgramID,
-		Category:            entity.MissionCategory(req.Category),
-		TitleChild:          req.TitleChild,
-		TitleParent:         req.TitleParent,
-		DescriptionParent:   req.DescriptionParent,
-		RelatedStageIDs:     req.RelatedStageIDs,
-		IsActive:            req.IsActive,
+		TenantID:          tenantID,
+		ProgramID:         req.ProgramID,
+		Category:          entity.MissionCategory(req.Category),
+		TitleChild:        req.TitleChild,
+		TitleParent:       req.TitleParent,
+		DescriptionParent: req.DescriptionParent,
+		RelatedStageIDs:   req.RelatedStageIDs,
+		IsActive:          req.IsActive,
 	}
 	if err := h.repo.Create((*c).Request().Context(), m); err != nil {
 		return err

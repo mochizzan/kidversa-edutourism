@@ -60,7 +60,7 @@ func (h *SessionGroupHandler) UpdateGroup(c *echo.Context) error {
 	if err := (*c).Bind(&req); err != nil {
 		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
 	}
-	g, err := h.uc.UpdateGroup((*c).Request().Context(), groupID, req.Name, req.Status, appmiddleware.GetTenantID(c))
+	g, err := h.uc.UpdateGroup((*c).Request().Context(), groupID, req.Name, req.Status, appmiddleware.GetTenantID(c), req.FacilitatorID)
 	if err != nil {
 		return err
 	}

@@ -77,23 +77,15 @@ const RecordingDetailPage = () => {
       }
       setRecording(rec)
 
-      // Try to get participant and session info
+      // Try to get participant and session info directly from the recording's own IDs
       try {
-        // Find which session this recording belongs to via session stages
-        const allSessions = await sessionService.getAll({ limit: 100 })
-        for (const session of allSessions.data) {
-          const recordings = await recordingService.getBySession(session.id)
-          if (recordings.some((r) => r.id === recordingId)) {
-            setSessionName(session.name)
-            const detail = await sessionService.getById(session.id)
-            const participant = detail?.groups
-              .flatMap((g) => g.participants)
-              .find((p) => p.id === rec.participant_id)
-            if (participant) {
-              setChildName(participant.child_name)
-            }
-            break
-          }
+        const detail = await sessionService.getById(rec.session_id)
+        setSessionName(detail?.name || '')
+        const participant = detail?.groups
+          .flatMap((g) => g.participants)
+          .find((p) => p.id === rec.participant_id)
+        if (participant) {
+          setChildName(participant.child_name)
         }
       } catch {
         // Non-critical, continue

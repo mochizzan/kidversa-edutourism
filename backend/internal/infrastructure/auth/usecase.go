@@ -25,6 +25,8 @@ type RefreshStore interface {
 	Revoke(ctx context.Context, tokenHash string) error
 	RevokeAllForUser(ctx context.Context, userID string) error
 	GetByHash(ctx context.Context, tokenHash string) (*RefreshRecord, error)
+	CleanExpired(ctx context.Context, before time.Time) (int64, error)
+	StartCleanup(ctx context.Context, interval, maxAge time.Duration) func()
 }
 
 // RefreshRecord is a stored refresh token row.
@@ -133,8 +135,8 @@ func (u *Usecase) Logout(ctx context.Context, refreshTok, accessJTI string, acce
 	return nil
 }
 
-	// Logout revokes the current refresh token and denylists the access jti.
-	// ttl is clamped to [1h, KioskTokenTTL] (plan B11). The raw token is never logged.
+// Logout revokes the current refresh token and denylists the access jti.
+// ttl is clamped to [1h, KioskTokenTTL] (plan B11). The raw token is never logged.
 func (u *Usecase) IssueKioskToken(ctx context.Context, sessionID, tenantID string, ttl time.Duration) (string, error) {
 	const minTTL = time.Hour
 	const maxTTL = KioskTokenTTL

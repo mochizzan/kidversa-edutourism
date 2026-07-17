@@ -2,6 +2,7 @@ import type { Assessment, CreateAssessmentDTO } from '../types'
 import type { AssessmentService } from './types'
 import { arrayRequest, itemRequest } from './apiEnvelope'
 import { useAuthStore } from '../stores/authStore'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 interface AssessmentUpsertRequest {
   participant_id: string
@@ -18,7 +19,7 @@ const upsert = async (data: CreateAssessmentDTO): Promise<Assessment> => {
   // The backend upsert DTO requires `session_id` and `assessed_by`. `session_id`
   // is carried on CreateAssessmentDTO (resolved by the caller from the stage);
   // `assessed_by` is the authenticated staff member performing the assessment.
-  return itemRequest<Assessment>('POST', '/api/assessments/upsert', {
+  return itemRequest<Assessment>('POST', `${API_ROUTES.ASSESSMENTS.BASE}/upsert`, {
     participant_id: data.participant_id,
     session_id: data.session_id,
     session_stage_id: data.session_stage_id,
@@ -40,20 +41,20 @@ const bulkUpsert = async (data: CreateAssessmentDTO[]): Promise<Assessment[]> =>
     assessed_by: assessedBy,
     sync_status: 'synced',
   }))
-  return arrayRequest<Assessment>('POST', '/api/assessments/bulk-upsert', { items })
+  return arrayRequest<Assessment>('POST', `${API_ROUTES.ASSESSMENTS.BASE}/bulk-upsert`, { items })
 }
 
 const getByParticipant = async (participantId: string): Promise<Assessment[]> => {
   return arrayRequest<Assessment>(
     'GET',
-    `/api/assessments?participant_id=${encodeURIComponent(participantId)}`,
+    API_ROUTES.ASSESSMENTS.BY_PARTICIPANT(participantId),
   )
 }
 
 const getBySession = async (sessionId: string): Promise<Assessment[]> => {
   return arrayRequest<Assessment>(
     'GET',
-    `/api/assessments?session_id=${encodeURIComponent(sessionId)}`,
+    API_ROUTES.ASSESSMENTS.BY_SESSION(sessionId),
   )
 }
 

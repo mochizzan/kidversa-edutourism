@@ -47,26 +47,25 @@ function ConsentForm() {
     setSubmitting(true)
 
     try {
-      await consentService.submit(token, recordingConsent, photoConsent)
+      await consentService.submitCombined(token, recordingConsent, photoConsent)
       setSuccess(true)
     } catch (err) {
       const code = err instanceof ApiError ? err.code : ''
-      const message =
-        code === 'token_consumed'
-          ? 'Persetujuan untuk tautan ini sudah dikirim sebelumnya.'
-          : code === 'token_expired'
-          ? 'Tautan persetujuan sudah kedaluwarsa. Silakan hubungi koordinator.'
-          : code === 'token_invalid'
-          ? 'Tautan tidak valid. Silakan hubungi koordinator.'
-          : 'Gagal mengirim persetujuan. Silakan coba lagi.'
-      // Single-use tokens: a replay/already-consumed token means it was used.
-      if (code === 'token_consumed') {
+      // The combined consent token is single-use: after a successful submit the
+      // token is cleared, so reopening the link yields token_invalid. Treat both
+      // token_consumed and token_invalid as "already submitted".
+      if (code === 'token_consumed' || code === 'token_invalid') {
         setAlreadySubmitted(true)
-      } else if (code === 'token_expired' || code === 'token_invalid') {
-        setLockedError(message)
-      } else {
-        addToast({ type: 'error', message })
+        return
       }
+      if (code === 'token_expired') {
+        setLockedError('Tautan persetujuan sudah kedaluwarsa. Silakan hubungi koordinator.')
+        return
+      }
+      addToast({
+        type: 'error',
+        message: 'Gagal mengirim persetujuan. Silakan coba lagi.',
+      })
     } finally {
       setSubmitting(false)
     }

@@ -6,16 +6,16 @@ import (
 	"github.com/labstack/echo/v5"
 
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
-	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/domain/entity"
+	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	"kidversa-edutourism-backend/internal/usecase/live"
 )
 
 // NotificationHandler serves /api/notifications/* (SSE + list/mark-read).
 type NotificationHandler struct {
-	svc         *live.Service
-	hub         *sse.Hub
+	svc          *live.Service
+	hub          *sse.Hub
 	keepaliveSec int
 }
 

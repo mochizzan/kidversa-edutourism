@@ -60,7 +60,7 @@ const ActivitiesPage = () => {
         if (!detail) continue
 
         // Find stages assigned to this fasilitator
-        const myStages = detail.stages.filter((s) => s.fasilitator_id === user.id)
+        const myStages = detail.stages.filter((s) => s.facilitator_id === user.id)
         if (myStages.length === 0) continue
 
         // Get program stages for name lookup

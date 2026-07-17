@@ -113,3 +113,26 @@ func (s *InMemoryRefreshStore) GetByHash(_ context.Context, tokenHash string) (*
 	}
 	return r, nil
 }
+
+func (s *InMemoryRefreshStore) CleanExpired(_ context.Context, before time.Time) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var count int64
+	for hash, r := range s.store {
+		if r.ExpiresAt.Before(before) {
+			delete(s.store, hash)
+			count++
+		}
+	}
+	return count, nil
+}
+
+// StartCleanup is a no-op for the in-memory store (no persistence to purge).
+// It returns a stop function for API parity with the DB-backed implementation.
+func (s *InMemoryRefreshStore) StartCleanup(_ context.Context, _ time.Duration, _ time.Duration) func() {
+	done := make(chan struct{})
+	go func() {
+		<-done
+	}()
+	return func() { close(done) }
+}

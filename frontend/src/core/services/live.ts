@@ -11,6 +11,7 @@
 
 import { GroupStageProgressStatus, type SessionGroup, type Participant } from '../types'
 import { apiRequest } from './backendClient'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 export interface GroupStageProgressRow {
   id: string
@@ -57,8 +58,8 @@ interface LiveSnapshot {
 // progress list, and the timeline events. Drives the monitor/list pages.
 async function fetchSnapshot(sessionId: string): Promise<LiveSnapshot> {
   const [groupsRes, timelineRes] = await Promise.all([
-    apiRequest<GroupsEnvelope>('GET', `/api/live/${sessionId}/groups`),
-    apiRequest<TimelineEnvelope>('GET', `/api/live/${sessionId}/timeline`),
+    apiRequest<GroupsEnvelope>('GET', API_ROUTES.LIVE.GROUPS(sessionId)),
+    apiRequest<TimelineEnvelope>('GET', API_ROUTES.LIVE.TIMELINE(sessionId)),
   ])
 
   const groupsWithProgress = groupsRes.groups ?? []
@@ -120,27 +121,27 @@ export const liveService = {
 
   // Facilitator overrides — POST /api/live/groups/:groupId/stages/:stageId/{unlock,complete,skip}
   unlockStage: async (groupId: string, sessionStageId: string, userId: string): Promise<void> => {
-    await apiRequest('POST', `/api/live/groups/${groupId}/stages/${sessionStageId}/unlock`, { userId })
+    await apiRequest('POST', API_ROUTES.LIVE.UNLOCK_STAGE(groupId, sessionStageId), { userId })
     invalidateSnapshot()
   },
 
   completeStage: async (groupId: string, sessionStageId: string): Promise<void> => {
-    await apiRequest('POST', `/api/live/groups/${groupId}/stages/${sessionStageId}/complete`)
+    await apiRequest('POST', API_ROUTES.LIVE.COMPLETE_STAGE(groupId, sessionStageId))
     invalidateSnapshot()
   },
 
   skipStage: async (groupId: string, sessionStageId: string, reason: string, userId: string): Promise<void> => {
-    await apiRequest('POST', `/api/live/groups/${groupId}/stages/${sessionStageId}/skip`, { reason, userId })
+    await apiRequest('POST', API_ROUTES.LIVE.SKIP_STAGE(groupId, sessionStageId), { reason, userId })
     invalidateSnapshot()
   },
 
   jumpToStage: async (groupId: string, targetStageId: string, reason: string, userId: string): Promise<void> => {
-    await apiRequest('POST', `/api/live/groups/${groupId}/jump`, { stage_id: targetStageId, reason, userId })
+    await apiRequest('POST', API_ROUTES.LIVE.JUMP(groupId), { stage_id: targetStageId, reason, userId })
     invalidateSnapshot()
   },
 
   resetProgress: async (groupId: string, reason: string, userId: string): Promise<void> => {
-    await apiRequest('POST', `/api/live/groups/${groupId}/reset`, { reason, userId })
+    await apiRequest('POST', API_ROUTES.LIVE.RESET(groupId), { reason, userId })
     invalidateSnapshot()
   },
 
@@ -151,7 +152,7 @@ export const liveService = {
     message: string,
     userId?: string,
   ): Promise<void> => {
-    await apiRequest('POST', `/api/live/events`, { session_id: sessionId, group_id: groupId, type, message, user_id: userId })
+    await apiRequest('POST', API_ROUTES.LIVE.EVENTS, { session_id: sessionId, group_id: groupId, type, message, user_id: userId })
     invalidateSnapshot(sessionId)
   },
 

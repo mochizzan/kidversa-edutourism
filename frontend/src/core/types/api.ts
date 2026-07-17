@@ -45,6 +45,8 @@ export interface CreateSessionDTO {
   program_id: string
   name: string
   session_date: string
+  start_time?: string
+  end_time?: string
   location: string
   notes?: string
 }

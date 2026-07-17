@@ -32,6 +32,10 @@ pnpm preview          # preview production build
 - Full Go backend: Echo v5 handlers, GORM models, MariaDB 12 (`mariadb-12` container).
 - Build/verify: `cd backend && go build ./... && go vet ./...`. Migrations: `go run ./cmd/migrate` (needs `APP_ENV=dev` in `backend/.env` + running MariaDB). Tests: `TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3306 TEST_DB_USER=root TEST_DB_PASSWORD=admin TEST_DB_NAME=kidversa_test go test ./...`.
 - Echo **v5** is in `go.mod` (not v4, despite README).
+- **CI (`backend/.github/workflows/ci.yml`)** is the source of truth for verification order: `gofmt -l` (fails if non-empty) → `go vet ./...` → `go build ./...` → `go test ./...`. Frontend job: `pnpm install` → `pnpm build`.
+- **gofmt is enforced.** Run `gofmt -w .` in `backend/` before committing or the CI lint step fails.
+- **Go 1.26** / **Node 20** are the pinned toolchain versions in CI.
+- **`go test ./...` requires a running MariaDB 12** (CI spins `mariadb:12` and tests against `kidversa_test` with root/admin). The test env vars above must point at a live DB — tests are integration tests, not unit.
 
 ## Architecture
 

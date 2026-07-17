@@ -42,24 +42,30 @@ const SessionDetailPage = () => {
   const [newDate, setNewDate] = useState('')
   const [newLocation, setNewLocation] = useState('')
   const [newNotes, setNewNotes] = useState('')
+  const [newStartTime, setNewStartTime] = useState('')
+  const [newEndTime, setNewEndTime] = useState('')
   const [creating, setCreating] = useState(false)
   const programsLoaded = useRef(false)
 
-  const loadSession = async () => {
+  const loadSession = async (showLoading = false) => {
     if (!sessionId || isNew) return
-    setLoading(true)
+    if (showLoading) setLoading(true)
     try {
       const s = await sessionService.getById(sessionId)
       setSession(s)
-      const users = await userService.getAll({ filters: { role: UserRole.FASILITATOR } })
-      setFacilitators(users.data)
+      try {
+        const users = await userService.getAll({ filters: { role: UserRole.FASILITATOR } })
+        setFacilitators(users.data)
+      } catch {
+        setFacilitators([])
+      }
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadSession()
+    loadSession(true)
   }, [sessionId])
 
   useEffect(() => {
@@ -96,7 +102,9 @@ const SessionDetailPage = () => {
     setCreating(true)
     try {
       const created = await sessionService.create({
-        program_id: newProgramId, name: newName, session_date: newDate, location: newLocation, notes: newNotes || undefined,
+        program_id: newProgramId, name: newName, session_date: newDate,
+        start_time: newStartTime || undefined, end_time: newEndTime || undefined,
+        location: newLocation, notes: newNotes || undefined,
       })
       navigate(`/admin/sessions/${created.id}`, { replace: true })
     } catch (err) {
@@ -151,6 +159,8 @@ const SessionDetailPage = () => {
               newName={newName} setNewName={setNewName}
               newProgramId={newProgramId} setNewProgramId={setNewProgramId}
               newDate={newDate} setNewDate={setNewDate}
+              newStartTime={newStartTime} setNewStartTime={setNewStartTime}
+              newEndTime={newEndTime} setNewEndTime={setNewEndTime}
               newLocation={newLocation} setNewLocation={setNewLocation}
               newNotes={newNotes} setNewNotes={setNewNotes}
               creating={creating} onCancel={() => navigate(ROUTES.ADMIN.SESSIONS)} onSubmit={handleCreate} />
@@ -174,8 +184,8 @@ const SessionDetailPage = () => {
         activeKey={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'info' && <SessionInfoTab session={session} programName={programMap.get(session.program_id) || session.program_id} />}
-      {activeTab === 'stages' && <SessionStagesTab stages={session.stages} facilitators={facilitators} sessionId={sessionId!} stageMap={stageMap} />}
-      {activeTab === 'groups' && <SessionGroupsTab sessionId={sessionId!} sessionStatus={session.status} groups={session.groups} onRefresh={loadSession} />}
+      {activeTab === 'stages' && <SessionStagesTab stages={session.stages} facilitators={facilitators} sessionId={sessionId!} stageMap={stageMap} onRefresh={loadSession} />}
+      {activeTab === 'groups' && <SessionGroupsTab sessionId={sessionId!} sessionStatus={session.status} groups={session.groups} facilitators={facilitators} onRefresh={loadSession} />}
     </div>
   )
 }

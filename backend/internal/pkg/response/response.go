@@ -46,6 +46,11 @@ func Accepted(c *echo.Context) error {
 	return (*c).NoContent(http.StatusAccepted)
 }
 
+// AcceptedWithData writes a 202 response with data (async work accepted).
+func AcceptedWithData(c *echo.Context, data interface{}) error {
+	return (*c).JSON(http.StatusAccepted, Envelope{Data: data})
+}
+
 // NoContent writes a 204 response.
 func NoContent(c *echo.Context) error {
 	return (*c).NoContent(http.StatusNoContent)

@@ -4,6 +4,7 @@ import { apiRequest } from './backendClient'
 import { withTenantHeader, normalizeTenantId, itemRequest, voidRequest } from './apiEnvelope'
 import { uploadMultipart } from './uploadMultipart'
 import { parseRawJSON } from '../utils/rawJson'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 // Recording service — backed by /api/recordings (+ /api/recordings/upload
 // multipart) (B6). Replaces the IndexedDB barrel. Preserves the
@@ -33,7 +34,7 @@ const getBySession = async (sessionId: string): Promise<Recording[]> => {
   qs.set('limit', '100')
   const res = await apiRequest<RecordingListEnvelope>(
     'GET',
-    `/api/recordings?${qs.toString()}`,
+    `${API_ROUTES.RECORDINGS.BASE}?${qs.toString()}`,
     undefined,
     { headers: withTenantHeader() },
   )
@@ -48,7 +49,7 @@ const getByParticipant = async (
   qs.set('limit', '100')
   const res = await apiRequest<RecordingListEnvelope>(
     'GET',
-    `/api/recordings?${qs.toString()}`,
+    `${API_ROUTES.RECORDINGS.BASE}?${qs.toString()}`,
     undefined,
     { headers: withTenantHeader() },
   )
@@ -58,7 +59,7 @@ const getByParticipant = async (
 const getById = async (id: string): Promise<Recording | null> => {
   const res = await apiRequest<{ data: Recording }>(
     'GET',
-    `/api/recordings/${id}`,
+    API_ROUTES.RECORDINGS.DETAIL(id),
     undefined,
     { headers: withTenantHeader() },
   )
@@ -80,7 +81,7 @@ const update = async (
   if (data.review_status !== undefined) body.review_status = data.review_status
   if (data.reviewed_by !== undefined) body.reviewed_by = data.reviewed_by
   if (data.reviewed_at !== undefined) body.reviewed_at = data.reviewed_at
-  return itemRequest<Recording>('PUT', `/api/recordings/${id}`, body)
+  return itemRequest<Recording>('PUT', API_ROUTES.RECORDINGS.DETAIL(id), body)
 }
 
 const upload = async (
@@ -92,11 +93,11 @@ const upload = async (
   form.append('file', file)
   form.append('participant_id', participantId)
   form.append('session_stage_id', sessionStageId)
-  return uploadMultipart<Recording>('/api/recordings/upload', form)
+  return uploadMultipart<Recording>(API_ROUTES.RECORDINGS.UPLOAD, form)
 }
 
 const remove = async (id: string): Promise<void> => {
-  await voidRequest('DELETE', `/api/recordings/${id}`)
+  await voidRequest('DELETE', API_ROUTES.RECORDINGS.DETAIL(id))
 }
 
 export const recordingService: RecordingService = {

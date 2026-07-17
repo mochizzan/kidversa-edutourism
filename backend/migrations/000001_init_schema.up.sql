@@ -137,7 +137,8 @@ CREATE TABLE mission_banks (
 
 CREATE TABLE sessions (
   id CHAR(36) NOT NULL, tenant_id CHAR(36) NOT NULL, program_id CHAR(36) NOT NULL,
-  name VARCHAR(160) NOT NULL, session_date VARCHAR(20) NOT NULL, location VARCHAR(200) NOT NULL,
+  name VARCHAR(160) NOT NULL, session_date DATE NOT NULL,
+  start_time TIME NULL, end_time TIME NULL, location VARCHAR(200) NOT NULL,
   status ENUM('DRAFT','ACTIVE','COMPLETED','CANCELLED') NOT NULL DEFAULT 'DRAFT',
   notes TEXT NULL, created_by CHAR(36) NOT NULL,
   created_at DATETIME(3) NOT NULL DEFAULT NOW(3),

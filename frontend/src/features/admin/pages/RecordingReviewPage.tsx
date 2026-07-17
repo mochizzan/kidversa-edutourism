@@ -31,8 +31,13 @@ const RecordingReviewPage = () => {
       const sessionsRes = await sessionService.getAll({ limit: 100 })
       const sessionsWithRecordings: SessionWithRecordings[] = []
 
-      for (const session of sessionsRes.data) {
-        const recordings = await recordingService.getBySession(session.id)
+      const results = await Promise.all(
+        sessionsRes.data.map(async (session) => ({
+          session,
+          recordings: await recordingService.getBySession(session.id),
+        }))
+      )
+      for (const { session, recordings } of results) {
         if (recordings.length > 0) {
           sessionsWithRecordings.push({
             ...session,

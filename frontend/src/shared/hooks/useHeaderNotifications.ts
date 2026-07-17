@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../core/hooks/useAuth'
-import { useConnectionStatus } from './useConnectionStatus'
 import { openSSE, refreshAccessToken } from '../../core/services/backendClient'
 import { notifications } from '../../core/services/notifications'
 import { ROUTES } from '../../core/constants/app'
@@ -10,7 +9,7 @@ export interface HeaderNotification {
   id: string
   tenant_id?: string | null
   tenant_name?: string
-  type: 'user_approval' | 'sync' | 'connection'
+  type: 'user_approval' | 'sync'
   title: string
   description: string
   route?: string
@@ -20,46 +19,13 @@ export interface HeaderNotification {
 
 export function useHeaderNotifications() {
   const { user, token } = useAuth()
-  const { status: connectionStatus } = useConnectionStatus()
   const [notificationsState, setNotificationsState] = useState<HeaderNotification[]>([])
   const [realUnread, setRealUnread] = useState(0)
   const [acknowledged, setAcknowledged] = useState(false)
 
-  // Connection-status notices are always shown, independent of SSE.
-  const connectionNotifs = useCallback((): HeaderNotification[] => {
-    const notifs: HeaderNotification[] = []
-    if (connectionStatus === 'reconnecting') {
-      notifs.push({
-        id: 'offline',
-        type: 'connection',
-        title: 'Backend tidak tersedia',
-        description: 'Menghubungkan kembali ke server…',
-        color: 'text-orange-600 bg-orange-100',
-      })
-    }
-    notifs.push({
-      id: 'connection-status',
-      type: 'connection',
-      title:
-        connectionStatus === 'online'
-          ? 'Terhubung ke Server'
-          : connectionStatus === 'degraded'
-            ? 'Koneksi Terbatas'
-            : 'Menghubungkan…',
-      description: connectionStatus === 'online' ? 'Semua data tersinkronisasi' : 'Coba lagi nanti',
-      color:
-        connectionStatus === 'online'
-          ? 'text-green-600 bg-green-100'
-          : connectionStatus === 'degraded'
-            ? 'text-blue-600 bg-blue-100'
-            : 'text-orange-600 bg-orange-100',
-    })
-    return notifs
-  }, [connectionStatus])
-
   const refresh = useCallback(async () => {
     if (!user) {
-      setNotificationsState(connectionNotifs())
+      setNotificationsState([])
       setRealUnread(0)
       return
     }
@@ -82,13 +48,13 @@ export function useHeaderNotifications() {
           count: 1,
         }
       })
-      setNotificationsState([...mapped, ...connectionNotifs()])
+      setNotificationsState([...mapped])
       setRealUnread(unread)
     } catch {
-      // Offline / transient failure — keep connection notices only.
-      setNotificationsState(connectionNotifs())
+      // Offline / transient failure — keep the last known notices.
+      setNotificationsState((prev) => prev.filter((n) => n.type === 'user_approval'))
     }
-  }, [user, connectionNotifs])
+  }, [user])
 
   // Full-SSE subscription: a wake-up signal (notif:new / notif:update)
   // triggers a refetch of GET /api/notifications. No delta merge.
@@ -100,12 +66,17 @@ export function useHeaderNotifications() {
   // would storm 401s). Waiting for `token` avoids that.
   useEffect(() => {
     if (!user || !token) {
-      setNotificationsState(connectionNotifs())
+      setNotificationsState([])
       return
     }
     let closed = false
     let retryTimer: ReturnType<typeof setTimeout> | null = null
     let attempts = 0
+    // Tracks whether the current connection ever opened successfully. If it did,
+    // a subsequent error is almost certainly a transient proxy/network drop
+    // (e.g. Vite dev proxy recycling an idle socket), not an auth failure — so
+    // we reconnect WITHOUT a token refresh and let it heal naturally.
+    let everOpened = false
     const MAX_ATTEMPTS = 5
 
     const open = () => {
@@ -117,17 +88,25 @@ export function useHeaderNotifications() {
       source = openSSE('/api/notifications/stream', onEvent, {
         onError: () => {
           // EventSource auto-reconnects, but on a 401 it would loop forever.
-          // Close it and retry after refreshing the token (backoff), with a cap.
+          // Close it and retry with backoff (capped).
           source.close()
           if (closed || attempts >= MAX_ATTEMPTS) return
           attempts++
           const delay = Math.min(1000 * 2 ** (attempts - 1), 8000)
+          // Only force a token refresh when the connection never opened — that
+          // signals a likely auth (401) failure. A drop after a healthy open is
+          // a transient proxy/network error; reconnecting alone recovers it and
+          // avoids an unnecessary token-refresh storm.
+          const wasHealthy = everOpened
           retryTimer = setTimeout(async () => {
-            try {
-              await refreshAccessToken()
-            } catch {
-              // token refresh failed; give up, connection watcher will retry.
-              return
+            if (closed) return
+            if (!wasHealthy) {
+              try {
+                await refreshAccessToken()
+              } catch {
+                // token refresh failed; give up, connection watcher will retry.
+                return
+              }
             }
             if (!closed) open()
           }, delay)
@@ -135,6 +114,7 @@ export function useHeaderNotifications() {
       })
       source.onopen = () => {
         attempts = 0
+        everOpened = true
         void refresh()
       }
       source.addEventListener('notif:new', onEvent)
@@ -147,16 +127,7 @@ export function useHeaderNotifications() {
       closed = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [user, token, connectionNotifs, refresh])
-
-  // Re-render connection notices when status changes.
-  useEffect(() => {
-    if (!user) return
-    setNotificationsState((prev) => {
-      const approvals = prev.filter((n) => n.type === 'user_approval')
-      return [...approvals, ...connectionNotifs()]
-    })
-  }, [user, connectionNotifs])
+  }, [user, token, refresh])
 
   const acknowledge = useCallback(() => {
     setAcknowledged(true)

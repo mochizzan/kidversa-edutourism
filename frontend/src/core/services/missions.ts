@@ -5,6 +5,7 @@ import { withTenantHeader, normalizeTenantId } from './apiEnvelope'
 import { useTenantStore } from '../stores/tenantStore'
 import { STORAGE_KEYS } from '../constants/storage'
 import { parseRawJSON } from '../utils/rawJson'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 // MissionBank service — backed by /api/mission-banks (B7 for toggle-active).
 // Replaces the IndexedDB barrel. Preserves the `missionService` export name and
@@ -74,7 +75,7 @@ const getAll = async (
 
   const res = await apiRequest<MissionBankListEnvelope>(
     'GET',
-    `/api/mission-banks?${qs.toString()}`,
+    `${API_ROUTES.MISSIONS.BASE}?${qs.toString()}`,
     undefined,
     { headers: withTenantHeader() },
   )
@@ -92,7 +93,7 @@ const getAll = async (
 const getById = async (id: string): Promise<MissionBank | null> => {
   const res = await apiRequest<Envelope<MissionBank>>(
     'GET',
-    `/api/mission-banks/${id}`,
+    API_ROUTES.MISSIONS.DETAIL(id),
     undefined,
     { headers: withTenantHeader() },
   )
@@ -114,7 +115,7 @@ const create = async (data: CreateMissionBankDTO): Promise<MissionBank> => {
   }
   const res = await apiRequest<Envelope<MissionBank>>(
     'POST',
-    '/api/mission-banks',
+    API_ROUTES.MISSIONS.BASE,
     body,
     { headers: withTenantHeader() },
   )
@@ -137,7 +138,7 @@ const update = async (
   }
   const res = await apiRequest<Envelope<MissionBank>>(
     'PUT',
-    `/api/mission-banks/${id}`,
+    API_ROUTES.MISSIONS.DETAIL(id),
     body,
     { headers: withTenantHeader() },
   )
@@ -145,7 +146,7 @@ const update = async (
 }
 
 const remove = async (id: string): Promise<void> => {
-  await apiRequest<void>('DELETE', `/api/mission-banks/${id}`, undefined, {
+  await apiRequest<void>('DELETE', API_ROUTES.MISSIONS.DETAIL(id), undefined, {
     headers: withTenantHeader(),
   })
 }
@@ -153,7 +154,7 @@ const remove = async (id: string): Promise<void> => {
 const toggleActive = async (id: string): Promise<MissionBank> => {
   const res = await apiRequest<Envelope<MissionBank>>(
     'POST',
-    `/api/mission-banks/${id}/toggle-active`,
+    API_ROUTES.MISSIONS.TOGGLE_ACTIVE(id),
     undefined,
     { headers: withTenantHeader() },
   )

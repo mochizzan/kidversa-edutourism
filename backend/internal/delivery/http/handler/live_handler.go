@@ -14,8 +14,8 @@ import (
 
 // LiveHandler serves /api/live/* (dashboard state + SSE).
 type LiveHandler struct {
-	svc     *live.Service
-	hub     *sse.Hub
+	svc          *live.Service
+	hub          *sse.Hub
 	keepaliveSec int
 }
 

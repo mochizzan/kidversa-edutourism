@@ -16,11 +16,12 @@
 // - SSE uses a separate cookie (`kidversa_session`); EventSource cannot send
 //   an Authorization header, so openSSE relies on `withCredentials: true`.
 
+import { API_ROUTES } from '../constants/apiRoutes'
+
 export type ConnectionState = 'online' | 'degraded' | 'reconnecting'
 
 const USER_STORAGE_KEY = 'kidversa_user'
 const AUTH_CHANNEL = 'kidversa-auth'
-const REFRESH_ENDPOINT = '/api/auth/refresh'
 
 // ---------------------------------------------------------------------------
 // Token + user storage
@@ -243,7 +244,7 @@ export async function refreshAccessToken(): Promise<string> {
   const refreshPromise = (async (): Promise<string> => {
     authChannel?.postMessage({ type: 'refresh:start' })
     try {
-      const res = await fetch(`${getApiBaseUrl()}${REFRESH_ENDPOINT}`, {
+      const res = await fetch(`${getApiBaseUrl()}${API_ROUTES.AUTH.REFRESH}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

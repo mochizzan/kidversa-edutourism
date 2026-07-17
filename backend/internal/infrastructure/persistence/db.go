@@ -30,7 +30,10 @@ func OpenDB(cfg *config.Config) (*DB, error) {
 	sqlDB.SetMaxOpenConns(cfg.DBMaxOpen)
 	sqlDB.SetMaxIdleConns(cfg.DBMaxIdle)
 	sqlDB.SetConnMaxLifetime(cfg.DBLifetime)
-	sqlDB.SetConnMaxIdleTime(cfg.DBLifetime)
+	// Close idle connections after 5 minutes — well before MariaDB's
+	// wait_timeout (28800s) and before any network intermediary drops them.
+	// This prevents the "first request after idle hangs" problem.
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 	return &DB{DB: db}, nil
 }
 
@@ -68,4 +71,29 @@ func HealthPing(ctx context.Context, db *gorm.DB) error {
 // OpenSQLDB opens a raw *sql.DB (used by golang-migrate and bootstrap).
 func OpenSQLDB(dsn string) (*sql.DB, error) {
 	return sql.Open("mysql", dsn)
+}
+
+// StartKeepalive pings the database at the given interval to keep pooled
+// connections alive and warm the InnoDB buffer pool. Returns a stop function.
+func StartKeepalive(db *gorm.DB, interval time.Duration) func() {
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				sqlDB, err := db.DB()
+				if err != nil {
+					continue
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				_ = sqlDB.PingContext(ctx)
+				cancel()
+			}
+		}
+	}()
+	return func() { close(done) }
 }

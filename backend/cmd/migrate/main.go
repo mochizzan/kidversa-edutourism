@@ -19,7 +19,7 @@ import (
 // via BOOTSTRAP_SUPERADMIN_PASSWORD. Tenant slugs are stable identifiers used by
 // the seed logic and by operations tooling.
 const (
-	bootstrapSuperadminEmail = "superadmin@kidversa.id"
+	bootstrapSuperadminEmail   = "superadmin@kidversa.id"
 	bootstrapAdminBandungEmail = "admin.bandung@kidversa.id"
 	bootstrapTenantBandungSlug = "tenant-bandung"
 	bootstrapTenantSubangSlug  = "tenant-subang"
@@ -135,11 +135,11 @@ func upsertUser(g *gorm.DB, u entity.User) error {
 	var existing entity.User
 	if err := g.Where("email = ?", u.Email).First(&existing).Error; err == nil {
 		return g.Model(&existing).Updates(map[string]interface{}{
-			"password_hash":       u.PasswordHash,
-			"name":                u.Name,
-			"is_active":           u.IsActive,
-			"approval_status":     u.ApprovalStatus,
-			"role":                u.Role,
+			"password_hash":        u.PasswordHash,
+			"name":                 u.Name,
+			"is_active":            u.IsActive,
+			"approval_status":      u.ApprovalStatus,
+			"role":                 u.Role,
 			"must_change_password": u.MustChangePassword,
 		}).Error
 	}

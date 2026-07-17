@@ -24,7 +24,9 @@ func (h *SessionHandler) Create(c *echo.Context) error {
 	}
 	s, err := h.uc.CreateSession((*c).Request().Context(),
 		appmiddleware.GetTenantID(c), appmiddleware.GetUserID(c),
-		req.ProgramID, req.Name, req.SessionDate, req.Location, req.Notes)
+		req.ProgramID, req.Name, req.SessionDate,
+		derefString(req.StartTime), derefString(req.EndTime),
+		req.Location, req.Notes)
 	if err != nil {
 		return err
 	}
@@ -33,15 +35,25 @@ func (h *SessionHandler) Create(c *echo.Context) error {
 
 func (h *SessionHandler) List(c *echo.Context) error {
 	f := repository.SessionFilter{
-		TenantID:    appmiddleware.GetTenantID(c),
-		Search:      (*c).QueryParam("search"),
-		Status:      (*c).QueryParam("status"),
-		SessionDate: (*c).QueryParam("session_date"),
+		TenantID:      appmiddleware.GetTenantID(c),
+		Search:        (*c).QueryParam("search"),
+		Status:        (*c).QueryParam("status"),
+		SessionDate:   (*c).QueryParam("session_date"),
+		FacilitatorID: (*c).QueryParam("facilitator_id"),
 	}
 	page, limit := pagination(c)
 	res, err := h.uc.ListSessions((*c).Request().Context(), f, page, limit)
 	if err != nil {
 		return err
+	}
+	// When facilitator_id is provided, wrap each session in SessionListItem
+	// with is_my_session = true (the repo already filtered to only "my" sessions).
+	if f.FacilitatorID != "" {
+		items := make([]dto.SessionListItem, 0, len(res.Items))
+		for _, s := range res.Items {
+			items = append(items, dto.SessionListItem{Session: s, IsMySession: true})
+		}
+		return appresp.OKWithMeta(c, items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
 	}
 	return appresp.OKWithMeta(c, res.Items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
 }
@@ -85,7 +97,9 @@ func (h *SessionHandler) Update(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
 	}
 	s, err := h.uc.UpdateSession((*c).Request().Context(), id, appmiddleware.GetTenantID(c),
-		req.ProgramID, req.Name, req.SessionDate, req.Location, req.Notes, req.Status)
+		req.ProgramID, req.Name, req.SessionDate,
+		derefString(req.StartTime), derefString(req.EndTime),
+		req.Location, req.Notes, req.Status)
 	if err != nil {
 		return err
 	}
@@ -101,4 +115,12 @@ func (h *SessionHandler) Delete(c *echo.Context) error {
 		return err
 	}
 	return appresp.NoContent(c)
+}
+
+// derefString normalizes a nullable string pointer into an empty-or-value string.
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }

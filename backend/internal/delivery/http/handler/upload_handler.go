@@ -14,8 +14,8 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/config"
-	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
@@ -156,12 +156,12 @@ func (h *UploadHandler) UploadFrame(c *echo.Context) error {
 
 	tenantID := appmiddleware.GetTenantID(c)
 	f := &entity.PhotoFrame{
-		TenantID:     tenantID,
-		ProgramID:    (*c).FormValue("program_id"),
-		Name:         name,
-		FileURL:      storedRel,
-		IsActive:     true,
-		SortOrder:    0,
+		TenantID:  tenantID,
+		ProgramID: (*c).FormValue("program_id"),
+		Name:      name,
+		FileURL:   storedRel,
+		IsActive:  true,
+		SortOrder: 0,
 	}
 	if v := (*c).FormValue("sort_order"); v != "" {
 		if n, e := strconv.Atoi(strings.TrimSpace(v)); e == nil {

@@ -104,7 +104,7 @@ func (r *GormTenantRepository) Delete(ctx context.Context, id string) error {
 func (r *GormTenantRepository) CountUsers(ctx context.Context) ([]repository.TenantUserCount, error) {
 	var rows []struct {
 		TenantID string `gorm:"column:tenant_id"`
-		Count     int    `gorm:"column:cnt"`
+		Count    int    `gorm:"column:cnt"`
 	}
 	if err := r.db.WithContext(ctx).
 		Model(&UserModel{}).

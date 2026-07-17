@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, Video, Bell, Menu, X, Users, FolderOpen, Calendar, Image, Loader2, ChevronRight, Wifi, UserCheck } from 'lucide-react'
+import { Search, Bell, Menu, X, Users, FolderOpen, Calendar, Image, Loader2, ChevronRight, UserCheck } from 'lucide-react'
+import ConnectionStatus from '../feedback/ConnectionStatus'
 import { useNavigate } from 'react-router-dom'
-import { ROUTES } from '../../../core/constants/app'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { Tooltip } from '../ui/Tooltip'
 import { useGlobalSearch } from '../../hooks/useGlobalSearch'
+import { useConnectionStatus } from '../../hooks/useConnectionStatus'
 import { useHeaderNotifications } from '../../hooks/useHeaderNotifications'
 import { useTenantStore } from '../../../core/stores/tenantStore'
 import { isSuperAdmin } from '../../../core/utils/permissions'
@@ -29,8 +30,16 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const { query, setQuery, loading, results, searched, reset } = useGlobalSearch()
   const { notifications, unreadCount, acknowledge } = useHeaderNotifications()
   const { setActiveTenant, tenants } = useTenantStore()
+  const { status } = useConnectionStatus()
   const [focused, setFocused] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+
+  const connectionTooltip =
+    status === 'online'
+      ? 'Terhubung ke server — Semua data tersinkronisasi'
+      : status === 'degraded'
+        ? 'Terputus dari server — Koneksi terbatas'
+        : 'Terputus dari server — Mencoba menyambungkan kembali…'
 
   const close = useCallback(() => {
     setFocused(false)
@@ -109,7 +118,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   }
 
   const NOTIF_ICONS: Record<string, React.ReactNode> = {
-    connection: <Wifi className="w-5 h-5" />,
     user_approval: <UserCheck className="w-5 h-5" />,
     sync: <Loader2 className="w-5 h-5" />,
   }
@@ -225,13 +233,14 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         </div>
 
         <div className="flex items-center gap-4 ml-auto shrink-0">
-          <Tooltip content="Live Monitor">
-            <button
-              onClick={() => navigate(ROUTES.ADMIN.LIVE)}
-              className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+          <Tooltip content={connectionTooltip}>
+            <span
+              className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center transition-colors"
+              role="status"
+              aria-live="polite"
             >
-              <Video className="w-5 h-5" />
-            </button>
+              <ConnectionStatus />
+            </span>
           </Tooltip>
           <div ref={notificationRef} className="relative">
             <Tooltip content="Notifikasi">

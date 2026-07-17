@@ -11,6 +11,7 @@ import type {
 } from '../types'
 import { listRequest, itemRequest, voidRequest, arrayRequest } from './apiEnvelope'
 import { uploadMultipart } from './uploadMultipart'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 // Program stages are ordered by sequence_order. The list endpoint returns them
 // unsorted; sort defensively so hydration matches the idb behaviour.
@@ -19,18 +20,19 @@ function sortStages(stages: ProgramStage[]): ProgramStage[] {
 }
 
 export const programService: ProgramService = {
-  getAll: (params) => listRequest<Program & { stages?: ProgramStage[] }>('/api/programs', params),
+  getAll: (params) =>
+    listRequest<Program & { stages?: ProgramStage[] }>(API_ROUTES.PROGRAMS.BASE, params),
 
   getById: async (id) => {
     try {
       const program = await itemRequest<Program & { stages?: ProgramStage[] }>(
         'GET',
-        `/api/programs/${id}`,
+        API_ROUTES.PROGRAMS.DETAIL(id),
       )
       // Hydrate nested stages (the plan requires stages hydrated with pagination-loop).
       let stages = program.stages
       if (!stages) {
-        stages = sortStages(await arrayRequest<ProgramStage>('GET', `/api/programs/${id}/stages`))
+        stages = sortStages(await arrayRequest<ProgramStage>('GET', API_ROUTES.PROGRAMS.STAGES(id)))
       } else {
         stages = sortStages(stages)
       }
@@ -44,14 +46,14 @@ export const programService: ProgramService = {
   },
 
   create: (data: CreateProgramDTO) =>
-    itemRequest<Program>('POST', '/api/programs', {
+    itemRequest<Program>('POST', API_ROUTES.PROGRAMS.BASE, {
       name: data.name,
       description: data.description,
       thumbnail_url: data.thumbnail_url,
     }),
 
   update: (id, data: UpdateProgramDTO) =>
-    itemRequest<Program>('PUT', `/api/programs/${id}`, {
+    itemRequest<Program>('PUT', API_ROUTES.PROGRAMS.DETAIL(id), {
       name: data.name,
       description: data.description,
       thumbnail_url: data.thumbnail_url,
@@ -59,15 +61,15 @@ export const programService: ProgramService = {
     }),
 
   toggleActive: (id) =>
-    itemRequest<ToggleActiveResult>('POST', `/api/programs/${id}/toggle-active`),
+    itemRequest<ToggleActiveResult>('POST', API_ROUTES.PROGRAMS.TOGGLE_ACTIVE(id)),
 
-  delete: (id) => voidRequest('DELETE', `/api/programs/${id}`),
+  delete: (id) => voidRequest('DELETE', API_ROUTES.PROGRAMS.DETAIL(id)),
 
   getStages: (programId) =>
-    arrayRequest<ProgramStage>('GET', `/api/programs/${programId}/stages`).then(sortStages),
+    arrayRequest<ProgramStage>('GET', API_ROUTES.PROGRAMS.STAGES(programId)).then(sortStages),
 
   createStage: (programId, data: CreateStageDTO) =>
-    itemRequest<ProgramStage>('POST', `/api/programs/${programId}/stages`, {
+    itemRequest<ProgramStage>('POST', API_ROUTES.PROGRAMS.STAGES(programId), {
       sequence_order: data.sequence_order,
       name: data.name,
       description: data.description,
@@ -78,7 +80,7 @@ export const programService: ProgramService = {
     }),
 
   updateStage: (programId, stageId, data: UpdateStageDTO) =>
-    itemRequest<ProgramStage>('PUT', `/api/programs/${programId}/stages/${stageId}`, {
+    itemRequest<ProgramStage>('PUT', API_ROUTES.PROGRAMS.STAGE_DETAIL(programId, stageId), {
       sequence_order: data.sequence_order,
       name: data.name,
       description: data.description,
@@ -89,16 +91,16 @@ export const programService: ProgramService = {
     }),
 
   deleteStage: (programId, stageId) =>
-    voidRequest('DELETE', `/api/programs/${programId}/stages/${stageId}`),
+    voidRequest('DELETE', API_ROUTES.PROGRAMS.STAGE_DETAIL(programId, stageId)),
 
   reorderStages: (programId, stageIds) =>
-    voidRequest('POST', `/api/programs/${programId}/stages/reorder`, { ordered_ids: stageIds }),
+    voidRequest('POST', API_ROUTES.PROGRAMS.REORDER_STAGES(programId), { ordered_ids: stageIds }),
 
   getContents: (stageId) =>
-    arrayRequest<StageContent>('GET', `/api/programs/program-stages/${stageId}/contents`),
+    arrayRequest<StageContent>('GET', API_ROUTES.PROGRAMS.CONTENTS(stageId)),
 
   createContent: (stageId, data) =>
-    itemRequest<StageContent>('POST', `/api/programs/program-stages/${stageId}/contents`, {
+    itemRequest<StageContent>('POST', API_ROUTES.PROGRAMS.CONTENTS(stageId), {
       title: data.title,
       file_url: data.file_url,
       youtube_url: data.youtube_url,
@@ -120,13 +122,13 @@ export const programService: ProgramService = {
       form.append('youtube_url', data.youtube_url)
     }
     return uploadMultipart<StageContent>(
-      `/api/program-stages/${stageId}/contents/upload`,
+      API_ROUTES.PROGRAM_STAGES.CONTENTS_UPLOAD(stageId),
       form,
     )
   },
 
   updateContent: (stageId, contentId, data) =>
-    itemRequest<StageContent>('PUT', `/api/programs/program-stages/${stageId}/contents/${contentId}`, {
+    itemRequest<StageContent>('PUT', API_ROUTES.PROGRAMS.CONTENT_DETAIL(stageId, contentId), {
       title: data.title,
       file_url: data.file_url,
       youtube_url: data.youtube_url,
@@ -137,10 +139,10 @@ export const programService: ProgramService = {
     }),
 
   deleteContent: (stageId, contentId) =>
-    voidRequest('DELETE', `/api/programs/program-stages/${stageId}/contents/${contentId}`),
+    voidRequest('DELETE', API_ROUTES.PROGRAMS.CONTENT_DETAIL(stageId, contentId)),
 
   reorderContents: (stageId, contentIds) =>
-    voidRequest('POST', `/api/programs/program-stages/${stageId}/contents/reorder`, {
+    voidRequest('POST', API_ROUTES.PROGRAMS.REORDER_CONTENTS(stageId), {
       ordered_ids: contentIds,
     }),
 }

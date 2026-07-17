@@ -11,6 +11,17 @@ func newUUID() string {
 	return uuid.NewString()
 }
 
+// NewUUID is the exported alias of newUUID (for cross-package callers).
+func NewUUID() string {
+	return newUUID()
+}
+
+// GenerateConsentToken is the exported alias of generateConsentToken (64-hex
+// cryptographically-random consent token).
+func GenerateConsentToken() (string, error) {
+	return generateConsentToken()
+}
+
 // isDuplicate reports whether err is a MySQL/MariaDB duplicate-entry (unique constraint) error.
 func isDuplicate(err error) bool {
 	if err == nil {

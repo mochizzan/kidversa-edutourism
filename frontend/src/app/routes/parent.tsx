@@ -5,7 +5,6 @@ import { lazyRoute, SuspenseWrapper } from './helpers'
 
 // Public, unauthenticated parent routes (token in the query string).
 const ParentReportAccessPage = lazy(() => import('../../features/parent/pages/ReportPage'))
-const ParentConsentRespondPage = lazy(() => import('../../features/parent/pages/ConsentFormPage'))
 const ParentConsentFormPage = lazy(() => import('../../features/parent/pages/ConsentFormPage'))
 const ParentReportPage = lazy(() => import('../../features/parent/pages/ReportPage'))
 const ParentMissionsPage = lazy(() => import('../../features/parent/pages/MissionsPage'))
@@ -20,12 +19,12 @@ export const parentRoutes: RouteObject[] = [
       </SuspenseWrapper>
     ),
   },
-  // Public parent consent response via token (P2).
+  // Public parent consent response via token (combined consent form).
   {
     path: '/consent/respond',
     element: (
       <SuspenseWrapper>
-        <ParentConsentRespondPage />
+        <ParentConsentFormPage />
       </SuspenseWrapper>
     ),
   },
@@ -37,7 +36,6 @@ export const parentRoutes: RouteObject[] = [
       {
         element: <ParentLayout />,
         children: [
-          lazyRoute('consent', ParentConsentFormPage),
           lazyRoute('missions', ParentMissionsPage),
         ],
       },

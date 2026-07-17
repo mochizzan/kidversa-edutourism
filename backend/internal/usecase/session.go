@@ -5,8 +5,8 @@ import (
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
-	"kidversa-edutourism-backend/internal/pkg/util"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // ProgramStageReader provides read-only access to program stages.
@@ -28,7 +28,7 @@ func NewSessionUsecase(sessionRepo repository.SessionRepository, programStages P
 }
 
 // CreateSession creates a new DRAFT session owned by the tenant.
-func (u *SessionUsecase) CreateSession(ctx context.Context, tenantID, createdBy string, programID, name, sessionDate, location, notes string) (*entity.Session, error) {
+func (u *SessionUsecase) CreateSession(ctx context.Context, tenantID, createdBy string, programID, name, sessionDate, startTime, endTime, location, notes string) (*entity.Session, error) {
 	tp := &tenantID
 	if tenantID == "" {
 		tp = nil
@@ -37,11 +37,20 @@ func (u *SessionUsecase) CreateSession(ctx context.Context, tenantID, createdBy 
 	if createdBy == "" {
 		cb = nil
 	}
+	var st, et *string
+	if startTime != "" {
+		st = &startTime
+	}
+	if endTime != "" {
+		et = &endTime
+	}
 	s := &entity.Session{
 		TenantID:    tp,
 		ProgramID:   programID,
 		Name:        name,
 		SessionDate: sessionDate,
+		StartTime:   st,
+		EndTime:     et,
 		Location:    location,
 		Notes:       notes,
 		Status:      entity.SessionDraft,
@@ -105,7 +114,7 @@ func (u *SessionUsecase) ListSessions(ctx context.Context, f repository.SessionF
 }
 
 // UpdateSession patches mutable session fields (and status when provided).
-func (u *SessionUsecase) UpdateSession(ctx context.Context, id, tenantID, programID, name, sessionDate, location, notes, status string) (*entity.Session, error) {
+func (u *SessionUsecase) UpdateSession(ctx context.Context, id, tenantID, programID, name, sessionDate, startTime, endTime, location, notes, status string) (*entity.Session, error) {
 	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return nil, err
@@ -118,6 +127,14 @@ func (u *SessionUsecase) UpdateSession(ctx context.Context, id, tenantID, progra
 	}
 	if sessionDate != "" {
 		s.SessionDate = sessionDate
+	}
+	if startTime != "" {
+		st := startTime
+		s.StartTime = &st
+	}
+	if endTime != "" {
+		et := endTime
+		s.EndTime = &et
 	}
 	if location != "" {
 		s.Location = location
@@ -251,16 +268,16 @@ func (u *SessionUsecase) DeleteSession(ctx context.Context, id, tenantID string)
 	return u.sessionRepo.DeleteSession(ctx, id)
 }
 
-// AssignFacilitator assigns a facilitator to a session stage.
-func (u *SessionUsecase) AssignFacilitator(ctx context.Context, sessionID, stageID, facilitatorID string) (*entity.SessionStage, error) {
+// AssignFacilitator assigns a facilitator to a session stage. A nil
+// facilitatorID unassigns the facilitator (DB NULL).
+func (u *SessionUsecase) AssignFacilitator(ctx context.Context, sessionID, stageID string, facilitatorID *string) (*entity.SessionStage, error) {
 	stages, err := u.sessionRepo.ListSessionStages(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	for i := range stages {
 		if stages[i].ID == stageID {
-			fid := facilitatorID
-			stages[i].FacilitatorID = &fid
+			stages[i].FacilitatorID = facilitatorID
 			if err := u.sessionRepo.UpdateSessionStage(ctx, &stages[i]); err != nil {
 				return nil, err
 			}
@@ -288,8 +305,10 @@ func (u *SessionUsecase) CreateGroup(ctx context.Context, sessionID, name string
 	return g, nil
 }
 
-// UpdateGroup patches a session group's name/status.
-func (u *SessionUsecase) UpdateGroup(ctx context.Context, groupID, name, status, tenantID string) (*entity.SessionGroup, error) {
+// UpdateGroup patches a session group's name/status/facilitator.
+// A nil facilitatorID clears the facilitator (DB NULL); pass a pointer to a
+// value to set or keep it.
+func (u *SessionUsecase) UpdateGroup(ctx context.Context, groupID, name, status, tenantID string, facilitatorID *string) (*entity.SessionGroup, error) {
 	g, err := u.sessionRepo.GetSessionGroupByID(ctx, groupID, tenantID)
 	if err != nil {
 		return nil, err
@@ -303,6 +322,7 @@ func (u *SessionUsecase) UpdateGroup(ctx context.Context, groupID, name, status,
 		}
 		g.Status = entity.GroupStatus(status)
 	}
+	g.FacilitatorID = facilitatorID
 	if err := u.sessionRepo.UpdateSessionGroup(ctx, g); err != nil {
 		return nil, err
 	}

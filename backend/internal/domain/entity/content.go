@@ -39,7 +39,7 @@ type Recording struct {
 	DurationSeconds int                    `json:"duration_seconds"`
 	FileSizeBytes   int64                  `json:"file_size_bytes,omitempty"`
 	TranscriptText  string                 `json:"transcript_text,omitempty"`
-	EmotionTags     []string               `json:"emotion_tags,omitempty"`
+	EmotionTags     []string               `json:"emotion_tags,omitempty" gorm:"-"`
 	ReviewStatus    RecordingsReviewStatus `json:"review_status"`
 	ReviewedBy      *string                `json:"reviewed_by,omitempty"`
 	ReviewedAt      *time.Time             `json:"reviewed_at,omitempty"`
@@ -101,11 +101,11 @@ type ConsentLog struct {
 // TimelineEvent is a realtime log entry for the live dashboard (replaces frontend simulation).
 type TimelineEvent struct {
 	BaseModel
-	SessionID string           `json:"session_id"`
-	GroupID   string           `json:"group_id"`
+	SessionID string            `json:"session_id"`
+	GroupID   string            `json:"group_id"`
 	Type      TimelineEventType `json:"type"` // enum: group:progress|group:completed|stage:unlock|override
-	Message   string           `json:"message"`
-	UserID    string           `json:"user_id,omitempty"`
+	Message   string            `json:"message"`
+	UserID    string            `json:"user_id,omitempty"`
 }
 
 // MissionBank is a reusable mission template (Home/Parent/School) tied to a program + tenant.
@@ -119,7 +119,7 @@ type MissionBank struct {
 	DescriptionParent string          `json:"description_parent,omitempty"`
 	// RelatedStageIDs is the ordered list of program-stage ids the mission targets.
 	// It is persisted via the mission_bank_stages junction table (1NF).
-	RelatedStageIDs []string `json:"related_stage_ids,omitempty"`
+	RelatedStageIDs []string `json:"related_stage_ids,omitempty" gorm:"-"`
 	IsActive        bool     `json:"is_active"`
 }
 

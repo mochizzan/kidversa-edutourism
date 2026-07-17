@@ -10,15 +10,19 @@ import (
 // RegisterConsentRoutes mounts /api/consent/* on the given echo group.
 func RegisterConsentRoutes(g *echo.Group, h *ConsentHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
+	roleMW := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR")
 	scopeMW := appmiddleware.TenantScope()
 
-	// Issue a single-use consent token (JWT, tenant-scoped).
-	g.POST("/request", h.Request, scopeMW, authMW)
-	// Public consent response by token (no auth — token is the bearer).
-	g.POST("/respond-public", h.RespondPublic)
-
-	// Record a consent decision (JWT, tenant-scoped).
-	g.POST("/respond", h.Respond, scopeMW, authMW)
+	// Send consent via WhatsApp (JWT, tenant-scoped, async batch).
+	g.POST("/send-whatsapp", h.SendWhatsApp, authMW, roleMW, scopeMW)
+	// SSE stream for batch progress (JWT).
+	g.GET("/send-whatsapp/stream", h.SendWhatsAppStream, authMW, roleMW, scopeMW)
+	// Public combined consent response by token (no auth — token is the bearer).
+	g.POST("/respond-combined", h.RespondCombined)
+	// Record a consent decision (JWT, tenant-scoped) — kept for admin manual override.
+	g.POST("/respond", h.Respond, authMW, roleMW, scopeMW)
+	// Batch consent summary: ?session_ids=comma,separated (JWT, tenant-scoped).
+	g.GET("/summary", h.Summary, authMW, roleMW, scopeMW)
 	// List consent rows: ?session_id= → by session, otherwise ?participant_id= → by participant (JWT, tenant-scoped).
-	g.GET("", h.List, scopeMW, authMW)
+	g.GET("", h.List, authMW, roleMW, scopeMW)
 }

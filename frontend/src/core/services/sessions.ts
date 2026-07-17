@@ -9,9 +9,10 @@ import type {
   UpdateSessionDTO,
 } from '../types'
 import { listRequest, itemRequest, voidRequest, arrayRequest, normalizeTenantId } from './apiEnvelope'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 export const sessionService: SessionService = {
-  getAll: (params) => listRequest<Session>('/api/sessions', params),
+  getAll: (params) => listRequest<Session>(API_ROUTES.SESSIONS.BASE, params),
 
   getById: async (id) => {
     try {
@@ -19,7 +20,7 @@ export const sessionService: SessionService = {
         session: Session
         stages: SessionStage[]
         groups: (SessionGroup & { participants: Participant[] })[]
-      }>('GET', `/api/sessions/${id}`)
+      }>('GET', API_ROUTES.SESSIONS.DETAIL(id))
       // EC3: default stages to [] if the backend omits them.
       const session = normalizeTenantId(detail.session)
       return {
@@ -39,60 +40,63 @@ export const sessionService: SessionService = {
   },
 
   create: (data: CreateSessionDTO) =>
-    itemRequest<Session>('POST', '/api/sessions', {
+    itemRequest<Session>('POST', API_ROUTES.SESSIONS.BASE, {
       program_id: data.program_id,
       name: data.name,
       session_date: data.session_date,
+      start_time: data.start_time,
+      end_time: data.end_time,
       location: data.location,
       notes: data.notes,
     }),
 
   update: (id, data: UpdateSessionDTO) =>
-    itemRequest<Session>('PUT', `/api/sessions/${id}`, {
+    itemRequest<Session>('PUT', API_ROUTES.SESSIONS.DETAIL(id), {
       program_id: data.program_id,
       name: data.name,
       session_date: data.session_date,
+      start_time: data.start_time,
+      end_time: data.end_time,
       location: data.location,
       notes: data.notes,
       status: data.status,
     }),
 
-  start: (id) => itemRequest<Session>('POST', `/api/sessions/${id}/start`),
-  complete: (id) => itemRequest<Session>('POST', `/api/sessions/${id}/complete`),
-  cancel: (id) => itemRequest<Session>('POST', `/api/sessions/${id}/cancel`),
+  start: (id) => itemRequest<Session>('POST', API_ROUTES.SESSIONS.START(id)),
+  complete: (id) => itemRequest<Session>('POST', API_ROUTES.SESSIONS.COMPLETE(id)),
+  cancel: (id) => itemRequest<Session>('POST', API_ROUTES.SESSIONS.CANCEL(id)),
 
-  delete: (id) => voidRequest('DELETE', `/api/sessions/${id}`),
+  delete: (id) => voidRequest('DELETE', API_ROUTES.SESSIONS.DETAIL(id)),
 
   assignFacilitator: (sessionId, stageId, userId) =>
-    itemRequest<SessionStage>('POST', `/api/sessions/${sessionId}/stages/${stageId}/assign`, {
-      facilitator_id: userId,
+    itemRequest<SessionStage>('POST', API_ROUTES.SESSIONS.ASSIGN_STAGE(sessionId, stageId), {
+      facilitator_id: userId || null,
     }),
 
   getStages: (sessionId) =>
-    arrayRequest<SessionStage>('GET', `/api/sessions/${sessionId}/stages`),
+    arrayRequest<SessionStage>('GET', API_ROUTES.SESSIONS.STAGES(sessionId)),
 
   getGroups: (sessionId) =>
-    arrayRequest<SessionGroup>('GET', `/api/sessions/${sessionId}/groups`),
+    arrayRequest<SessionGroup>('GET', API_ROUTES.SESSIONS.GROUPS(sessionId)),
 
   createGroup: (sessionId, name) =>
-    itemRequest<SessionGroup>('POST', `/api/sessions/${sessionId}/groups`, { name }),
+    itemRequest<SessionGroup>('POST', API_ROUTES.SESSIONS.GROUPS(sessionId), { name }),
 
-  updateGroup: (sessionId, groupId, name) =>
-    itemRequest<SessionGroup>('PUT', `/api/sessions/${sessionId}/groups/${groupId}`, { name }),
+  updateGroup: (sessionId, groupId, { name, facilitatorId }) =>
+    itemRequest<SessionGroup>('PUT', API_ROUTES.SESSIONS.GROUP_DETAIL(sessionId, groupId), {
+      name,
+      facilitator_id: facilitatorId || null,
+    }),
 
   deleteGroup: (sessionId, groupId) =>
-    voidRequest('DELETE', `/api/sessions/${sessionId}/groups/${groupId}`),
+    voidRequest('DELETE', API_ROUTES.SESSIONS.GROUP_DETAIL(sessionId, groupId)),
 
-  getParticipants: (sessionId, groupId) => {
-    const path = groupId
-      ? `/api/sessions/${sessionId}/participants?group_id=${encodeURIComponent(groupId)}`
-      : `/api/sessions/${sessionId}/participants`
-    return arrayRequest<Participant>('GET', path)
-  },
+  getParticipants: (sessionId, groupId) =>
+    arrayRequest<Participant>('GET', API_ROUTES.SESSIONS.PARTICIPANTS(sessionId, groupId)),
 
   getParticipantById: async (participantId) => {
     try {
-      return await itemRequest<Participant>('GET', `/api/participants/${participantId}`)
+      return await itemRequest<Participant>('GET', API_ROUTES.PARTICIPANTS.DETAIL(participantId))
     } catch (err) {
       if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
         return null
@@ -102,7 +106,7 @@ export const sessionService: SessionService = {
   },
 
   addParticipant: (sessionId, groupId, data: CreateParticipantDTO) =>
-    itemRequest<Participant>('POST', `/api/sessions/${sessionId}/participants`, {
+    itemRequest<Participant>('POST', API_ROUTES.SESSIONS.PARTICIPANTS(sessionId), {
       child_name: data.child_name,
       child_age: data.child_age,
       school_name: data.school_name,
@@ -115,13 +119,13 @@ export const sessionService: SessionService = {
     }),
 
   linkParticipant: (sessionId, groupId, participantId) =>
-    itemRequest<Participant>('POST', `/api/sessions/${sessionId}/participants/link`, {
+    itemRequest<Participant>('POST', API_ROUTES.SESSIONS.LINK_PARTICIPANT(sessionId), {
       participant_id: participantId,
       group_id: groupId,
     }),
 
   updateParticipant: (sessionId, participantId, data: Partial<CreateParticipantDTO>) =>
-    itemRequest<Participant>('PUT', `/api/sessions/${sessionId}/participants/${participantId}`, {
+    itemRequest<Participant>('PUT', API_ROUTES.SESSIONS.PARTICIPANT_DETAIL(sessionId, participantId), {
       child_name: data.child_name,
       child_age: data.child_age,
       school_name: data.school_name,
@@ -134,12 +138,12 @@ export const sessionService: SessionService = {
     }),
 
   removeParticipant: (sessionId, participantId) =>
-    voidRequest('DELETE', `/api/sessions/${sessionId}/participants/${participantId}`),
+    voidRequest('DELETE', API_ROUTES.SESSIONS.PARTICIPANT_DETAIL(sessionId, participantId)),
 
   importParticipants: (sessionId, rows: CreateParticipantDTO[]) =>
     itemRequest<Participant[]>(
       'POST',
-      `/api/sessions/${sessionId}/participants/import`,
+      API_ROUTES.SESSIONS.IMPORT_PARTICIPANTS(sessionId),
       {
         rows: rows.map((r) => ({
           child_name: r.child_name,

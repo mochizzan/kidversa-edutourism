@@ -3,8 +3,8 @@ package reports
 import (
 	"context"
 	"crypto/rand"
-	"log"
 	"encoding/hex"
+	"log"
 	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"

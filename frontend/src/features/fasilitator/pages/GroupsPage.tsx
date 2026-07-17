@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Users, Calendar } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
 import { liveService } from '../../../core/services/live'
@@ -34,6 +34,8 @@ function SkeletonCard() {
 
 const GroupsPage = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const sessionIdFilter = searchParams.get('sessionId')
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -47,9 +49,12 @@ const GroupsPage = () => {
       setError(null)
 
       const res = await sessionService.getAll({ limit: 100 })
-      const activeSessions = res.data.filter(
+      let activeSessions = res.data.filter(
         (s) => s.status === SessionStatus.ACTIVE,
       )
+      if (sessionIdFilter) {
+        activeSessions = activeSessions.filter((s) => s.id === sessionIdFilter)
+      }
       setSessions(activeSessions)
 
       // Fetch groups + stage names per session
@@ -83,7 +88,7 @@ const GroupsPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [sessionIdFilter])
 
   useEffect(() => {
     fetchData()

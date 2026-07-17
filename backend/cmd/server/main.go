@@ -13,6 +13,7 @@ import (
 	httppkg "kidversa-edutourism-backend/internal/delivery/http"
 	"kidversa-edutourism-backend/internal/delivery/http/handler"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
+	"kidversa-edutourism-backend/internal/infrastructure/messaging"
 	"kidversa-edutourism-backend/internal/infrastructure/persistence"
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	"kidversa-edutourism-backend/internal/usecase"
@@ -29,9 +30,18 @@ func main() {
 		log.Fatalf("open db: %v", err)
 	}
 
+	// Keep pooled connections alive and warm the InnoDB buffer pool.
+	// Prevents the cold-start SLOW SQL on the first request after idle.
+	stopKeepalive := persistence.StartKeepalive(db.DB, 30*time.Second)
+	defer stopKeepalive()
+
 	jwt := auth.NewJWTManager(cfg)
 	revoker := auth.NewInMemoryRevoker()
 	refreshStore := persistence.NewGormRefreshRepository(db.DB)
+	// Periodically purge expired refresh tokens. Cleans tokens older than
+	// 2× the refresh TTL (default: 14 days) every 6 hours.
+	stopCleanup := refreshStore.StartCleanup(context.Background(), 6*time.Hour, cfg.JWTRefreshTTL*2)
+	defer stopCleanup()
 	hub := sse.NewHub()
 
 	// Repositories.
@@ -80,7 +90,7 @@ func main() {
 	registry.Report = handler.NewReportHandler(reportsUC, cfg)
 	registry.MissionBank = handler.NewMissionBankHandler(missionBankRepo)
 	registry.ParticipantMission = handler.NewParticipantMissionHandler(participantMissionRepo)
-	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo)
+	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo, messaging.NewWhatsAppGateway(cfg), cfg, hub)
 	registry.Frame = handler.NewFrameHandler(frameRepo)
 	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, recordingRepo, frameRepo, programRepo, userRepo)
 	registry.Media = handler.NewMediaHandler(cfg, photoRepo, recordingRepo, consentRepo, sessionRepo, frameRepo, programRepo, userRepo)

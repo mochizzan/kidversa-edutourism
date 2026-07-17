@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
@@ -12,9 +12,20 @@ import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { SessionCard } from '../components/SessionCard'
 import { GroupCard } from '../components/GroupCard'
+import { cn } from '../../../core/utils'
 import type { Session, SessionStage, ProgramStage } from '../../../core/types'
 import type { LiveGroupWithProgress, GroupStageProgressRow } from '../../../core/services/live'
 import { friendlyError } from '../../../core/utils/errorMessages'
+
+type FilterKey = 'all' | 'today' | 'upcoming' | 'completed' | 'cancelled'
+
+const filterLabels: Record<FilterKey, string> = {
+  all: 'Semua',
+  today: 'Hari Ini',
+  upcoming: 'Mendatang',
+  completed: 'Selesai',
+  cancelled: 'Dibatalkan',
+}
 
 function deriveGroupStatus(progress: GroupStageProgressRow[]): 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' {
   if (progress.length === 0) return 'WAITING'
@@ -51,10 +62,12 @@ const DashboardPage = () => {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [sessions, setSessions] = useState<Session[]>([])
+  const [todaySessions, setTodaySessions] = useState<Session[]>([])
+  const [allSessions, setAllSessions] = useState<Session[]>([])
   const [groups, setGroups] = useState<LiveGroupWithProgress[]>([])
   const [sessionStages, setSessionStages] = useState<SessionStage[]>([])
   const [stageMap, setStageMap] = useState<Record<string, string>>({})
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
 
   const fetchData = useCallback(async () => {
     try {
@@ -63,12 +76,12 @@ const DashboardPage = () => {
 
       const today = new Date().toISOString().split('T')[0]
 
-      // Fetch all sessions and filter for active today
-      const res = await sessionService.getAll({ limit: 100 })
-      const todayActive = res.data.filter(
+      // Fetch today's active sessions (existing behavior)
+      const todayRes = await sessionService.getAll({ limit: 100 })
+      const todayActive = todayRes.data.filter(
         (s) => s.status === SessionStatus.ACTIVE && s.session_date === today,
       )
-      setSessions(todayActive)
+      setTodaySessions(todayActive)
 
       if (todayActive.length > 0) {
         const activeSession = todayActive[0]
@@ -76,11 +89,9 @@ const DashboardPage = () => {
         if (detail) {
           setSessionStages(detail.stages)
 
-          // Get groups with progress
           const groupsWithProgress = await liveService.getGroupsWithProgress(activeSession.id)
           setGroups(groupsWithProgress)
 
-          // Get program stages for stage name lookup
           const programStages = await programService.getStages(detail.program_id)
           const map: Record<string, string> = {}
           programStages.forEach((ps: ProgramStage) => {
@@ -89,16 +100,39 @@ const DashboardPage = () => {
           setStageMap(map)
         }
       }
+
+      // Fetch all sessions assigned to this facilitator
+      const allRes = await sessionService.getAll({
+        limit: 100,
+        filters: { facilitator_id: user?.id },
+      })
+      setAllSessions(allRes.data)
     } catch (err) {
       setError(friendlyError(err))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  const filteredSessions = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0]
+    switch (activeFilter) {
+      case 'today':
+        return allSessions.filter((s) => s.session_date === today)
+      case 'upcoming':
+        return allSessions.filter((s) => s.session_date >= today && s.status !== SessionStatus.COMPLETED && s.status !== SessionStatus.CANCELLED)
+      case 'completed':
+        return allSessions.filter((s) => s.status === SessionStatus.COMPLETED)
+      case 'cancelled':
+        return allSessions.filter((s) => s.status === SessionStatus.CANCELLED)
+      default:
+        return allSessions
+    }
+  }, [allSessions, activeFilter])
 
   const getStageName = (sessionStageId: string): string | undefined => {
     const ss = sessionStages.find((s) => s.id === sessionStageId)
@@ -153,7 +187,7 @@ const DashboardPage = () => {
       <section>
         <h2 className="text-lg font-semibold text-on-surface mb-4">Sesi Hari Ini</h2>
 
-        {sessions.length === 0 ? (
+        {todaySessions.length === 0 ? (
           <EmptyState
             icon={<Calendar className="w-12 h-12" />}
             title="Tidak ada sesi hari ini"
@@ -161,15 +195,15 @@ const DashboardPage = () => {
           />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {sessions.map((session) => (
+            {todaySessions.map((session) => (
               <SessionCard key={session.id} session={session} />
             ))}
           </div>
         )}
       </section>
 
-      {/* Kelompok */}
-      {sessions.length > 0 && groups.length > 0 && (
+      {/* Kelompok (from today's active session) */}
+      {todaySessions.length > 0 && groups.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold text-on-surface mb-4">Kelompok</h2>
           <div className="grid gap-4 md:grid-cols-2">
@@ -190,6 +224,55 @@ const DashboardPage = () => {
           </div>
         </section>
       )}
+
+      {/* Semua Sesi */}
+      <section>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-lg font-semibold text-on-surface">Semua Sesi</h2>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {(Object.keys(filterLabels) as FilterKey[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => setActiveFilter(key)}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors',
+                  activeFilter === key
+                    ? 'bg-primary text-on-primary'
+                    : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high/80',
+                )}
+              >
+                {filterLabels[key]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {filteredSessions.length === 0 ? (
+          <EmptyState
+            icon={<Calendar className="w-12 h-12" />}
+            title="Belum ada sesi"
+            description={
+              activeFilter === 'all'
+                ? 'Anda belum ditugaskan di sesi manapun.'
+                : `Tidak ada sesi untuk filter "${filterLabels[activeFilter]}".`
+            }
+          />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredSessions.map((session) => (
+              <SessionCard
+                key={session.id}
+                session={session}
+                onClick={() => {
+                  if (session.is_my_session) {
+                    navigate(`/fasilitator/groups?sessionId=${session.id}`)
+                  }
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

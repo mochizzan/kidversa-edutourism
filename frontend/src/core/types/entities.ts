@@ -105,18 +105,21 @@ export interface Session {
   program_id: string
   name: string
   session_date: string
+  start_time?: string
+  end_time?: string
   location: string
   status: import('./enums').SessionStatus
   notes?: string
   created_by: string
   created_at: string
+  is_my_session?: boolean
 }
 
 export interface SessionStage {
   id: string
   session_id: string
   program_stage_id: string
-  fasilitator_id?: string
+  facilitator_id?: string
   status: import('./enums').SessionStageStatus
   started_at?: string
   completed_at?: string
@@ -128,6 +131,7 @@ export interface SessionGroup {
   name: string
   status: import('./enums').GroupStatus
   current_stage_id?: string
+  facilitator_id?: string
   created_at: string
 }
 
@@ -187,6 +191,7 @@ export interface SmartPhoto {
 export interface Recording {
   id: string
   participant_id: string
+  session_id: string
   session_stage_id: string
   file_url?: string
   duration_seconds: number

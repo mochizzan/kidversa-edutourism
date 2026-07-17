@@ -14,7 +14,7 @@ type TenantFilter struct {
 // TenantUserCount is the per-tenant user count returned by CountUsers.
 type TenantUserCount struct {
 	TenantID string `json:"tenant_id"`
-	Count     int    `json:"count"`
+	Count    int    `json:"count"`
 }
 
 // TenantRepository is the persistence contract for tenants.

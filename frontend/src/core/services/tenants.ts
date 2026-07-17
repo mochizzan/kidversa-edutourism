@@ -1,6 +1,7 @@
 import type { Tenant, TenantStats } from '../types'
 import { apiRequest } from './backendClient'
 import { itemRequest } from './apiEnvelope'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 interface TenantsEnvelope {
   data: Tenant[]
@@ -17,7 +18,7 @@ export interface TenantService {
 // TenantScope / usecase layer). The endpoint returns a paginated envelope; we
 // unwrap the `data` array.
 const getAll = async (): Promise<Tenant[]> => {
-  const res = await apiRequest<TenantsEnvelope>('GET', '/api/tenants')
+  const res = await apiRequest<TenantsEnvelope>('GET', API_ROUTES.TENANTS.BASE)
   return res.data ?? []
 }
 
@@ -27,7 +28,7 @@ const getAll = async (): Promise<Tenant[]> => {
 // Backend membungkus stats dalam envelope { data: { user_counts: [...] } };
 // itemRequest mengembalikan res.data (TenantStats) secara konsisten.
 const getStats = async (): Promise<TenantStats> => {
-  return itemRequest<TenantStats>('GET', '/api/tenants/stats')
+  return itemRequest<TenantStats>('GET', API_ROUTES.TENANTS.STATS)
 }
 
 export const tenantService: TenantService = {

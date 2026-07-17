@@ -26,14 +26,14 @@ type Config struct {
 	DBLifetime time.Duration
 
 	// JWT / auth
-	JWTSecret      string
-	JWTAccessTTL   time.Duration
-	JWTRefreshTTL  time.Duration
-	BcryptCost     int
-	ReportTokenTTL time.Duration
+	JWTSecret       string
+	JWTAccessTTL    time.Duration
+	JWTRefreshTTL   time.Duration
+	BcryptCost      int
+	ReportTokenTTL  time.Duration
 	ConsentTokenTTL time.Duration
-	CookieSecure   bool
-	CookieSameSite string
+	CookieSecure    bool
+	CookieSameSite  string
 
 	// HTTP / server
 	ServerPort  string
@@ -63,6 +63,12 @@ type Config struct {
 	TestDBUser     string
 	TestDBPassword string
 	TestDBName     string
+
+	// WhatsApp (OpenWA self-hosted gateway) — used by the consent delivery flow.
+	WhatsAppGatewayURL   string
+	WhatsAppAPIKey       string
+	WhatsAppSessionID    string
+	ParentConsentBaseURL string
 }
 
 // Load reads configuration from the environment (optionally via .env) and validates the critical fields.
@@ -81,14 +87,14 @@ func Load() *Config {
 		DBMaxIdle:  getEnvInt("DB_MAX_IDLE", 10),
 		DBLifetime: getEnvDuration("DB_CONN_MAX_LIFETIME", time.Hour),
 
-		JWTSecret:      getEnv("JWT_SECRET", ""),
-		JWTAccessTTL:   getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
-		JWTRefreshTTL:  getEnvDuration("JWT_REFRESH_TTL", 168*time.Hour),
-		BcryptCost:     getEnvInt("BCRYPT_COST", 12),
-		ReportTokenTTL: getEnvDuration("REPORT_TOKEN_TTL_HOURS", 168*time.Hour),
+		JWTSecret:       getEnv("JWT_SECRET", ""),
+		JWTAccessTTL:    getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),
+		JWTRefreshTTL:   getEnvDuration("JWT_REFRESH_TTL", 168*time.Hour),
+		BcryptCost:      getEnvInt("BCRYPT_COST", 12),
+		ReportTokenTTL:  getEnvDuration("REPORT_TOKEN_TTL_HOURS", 168*time.Hour),
 		ConsentTokenTTL: getEnvDuration("CONSENT_TOKEN_TTL_HOURS", 24*time.Hour),
-		CookieSecure:   getEnvBool("COOKIE_SECURE", false),
-		CookieSameSite: getEnv("COOKIE_SAMESITE", "Lax"),
+		CookieSecure:    getEnvBool("COOKIE_SECURE", false),
+		CookieSameSite:  getEnv("COOKIE_SAMESITE", "Lax"),
 
 		ServerPort:  getEnv("SERVER_PORT", "8080"),
 		CORSOrigins: parseOrigins(getEnv("CORS_ORIGINS", "http://localhost:5173")),
@@ -110,6 +116,11 @@ func Load() *Config {
 		TestDBUser:     getEnv("TEST_DB_USER", "root"),
 		TestDBPassword: getEnv("TEST_DB_PASSWORD", ""),
 		TestDBName:     getEnv("TEST_DB_NAME", "kidversa_test"),
+
+		WhatsAppGatewayURL:   getEnv("WHATSAPP_GATEWAY_URL", "http://localhost:2785"),
+		WhatsAppAPIKey:       getEnv("WHATSAPP_API_KEY", ""),
+		WhatsAppSessionID:    getEnv("WHATSAPP_SESSION_ID", "6d2b9940-f055-4f81-93c3-5b4e4f8b574a"),
+		ParentConsentBaseURL: getEnv("PARENT_CONSENT_BASE_URL", "http://localhost:5173/consent/respond"),
 	}
 
 	// Validate critical security field.
@@ -124,13 +135,13 @@ func Load() *Config {
 
 // DSN returns the MySQL/MariaDB data source name (without a specific database) for CREATE DATABASE steps.
 func (c *Config) DSNNoDB() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/?parseTime=true&loc=Local&multiStatements=true",
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/?parseTime=true&loc=Local&multiStatements=true&timeout=5s&readTimeout=10s&writeTimeout=10s",
 		c.DBUser, c.DBPassword, c.DBHost, c.DBPort)
 }
 
 // DSN returns the MySQL/MariaDB data source name bound to the configured database.
 func (c *Config) DSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&multiStatements=true",
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&multiStatements=true&timeout=5s&readTimeout=10s&writeTimeout=10s",
 		c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName)
 }
 
@@ -149,7 +160,7 @@ func (c *Config) RefreshCookieName() string {
 
 // TestDSN returns the DSN for the isolated test database.
 func (c *Config) TestDSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&multiStatements=true",
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&multiStatements=true&timeout=5s&readTimeout=10s&writeTimeout=10s",
 		c.TestDBUser, c.TestDBPassword, c.TestDBHost, c.TestDBPort, c.TestDBName)
 }
 

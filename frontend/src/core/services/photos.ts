@@ -2,6 +2,7 @@ import type { SmartPhoto } from '../types'
 import type { PhotoService } from './types'
 import { itemsRequest, itemRequest, voidRequest } from './apiEnvelope'
 import { uploadMultipart } from './uploadMultipart'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 // Photo service — backed by /api/photos (+ /api/photos/upload multipart) (B5).
 // Replaces the IndexedDB barrel. Preserves the `photoService` export name and
@@ -11,7 +12,7 @@ const getBySession = async (sessionId: string): Promise<SmartPhoto[]> => {
   const qs = new URLSearchParams()
   qs.set('session_id', sessionId)
   qs.set('limit', '100')
-  return itemsRequest<SmartPhoto>('GET', `/api/photos?${qs.toString()}`)
+  return itemsRequest<SmartPhoto>('GET', `${API_ROUTES.PHOTOS.BASE}?${qs.toString()}`)
 }
 
 const getByParticipant = async (
@@ -20,7 +21,7 @@ const getByParticipant = async (
   const qs = new URLSearchParams()
   qs.set('participant_id', participantId)
   qs.set('limit', '100')
-  return itemsRequest<SmartPhoto>('GET', `/api/photos?${qs.toString()}`)
+  return itemsRequest<SmartPhoto>('GET', `${API_ROUTES.PHOTOS.BASE}?${qs.toString()}`)
 }
 
 const upload = async (
@@ -33,7 +34,7 @@ const upload = async (
   form.append('participant_id', participantId)
   form.append('session_id', sessionId)
   form.append('is_report_photo', 'false')
-  return uploadMultipart<SmartPhoto>('/api/photos/upload', form)
+  return uploadMultipart<SmartPhoto>(API_ROUTES.PHOTOS.UPLOAD, form)
 }
 
 const update = async (
@@ -48,11 +49,11 @@ const update = async (
   if (data.taken_by !== undefined) body.taken_by = data.taken_by
   if (data.taken_at !== undefined) body.taken_at = data.taken_at
   if (data.frame_id !== undefined) body.frame_id = data.frame_id
-  return itemRequest<SmartPhoto>('PUT', `/api/photos/${photoId}`, body)
+  return itemRequest<SmartPhoto>('PUT', API_ROUTES.PHOTOS.DETAIL(photoId), body)
 }
 
 const remove = async (id: string): Promise<void> => {
-  await voidRequest('DELETE', `/api/photos/${id}`)
+  await voidRequest('DELETE', API_ROUTES.PHOTOS.DETAIL(id))
 }
 
 export const photoService: PhotoService = {

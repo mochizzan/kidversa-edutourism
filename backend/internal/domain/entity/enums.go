@@ -136,9 +136,9 @@ const (
 type TimelineEventType string
 
 const (
-	TimelineGroupProgress TimelineEventType = "group:progress"
+	TimelineGroupProgress  TimelineEventType = "group:progress"
 	TimelineGroupCompleted TimelineEventType = "group:completed"
-	TimelineStageUnlock   TimelineEventType = "stage:unlock"
+	TimelineStageUnlock    TimelineEventType = "stage:unlock"
 	TimelineOverride       TimelineEventType = "override"
 )
 

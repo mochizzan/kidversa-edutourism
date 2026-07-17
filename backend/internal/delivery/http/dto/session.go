@@ -4,26 +4,31 @@ import "kidversa-edutourism-backend/internal/domain/entity"
 
 // CreateSessionRequest is the payload for POST /api/sessions.
 type CreateSessionRequest struct {
-	ProgramID   string `json:"program_id" validate:"required"`
-	Name        string `json:"name" validate:"required"`
-	SessionDate string `json:"session_date" validate:"required"`
-	Location    string `json:"location" validate:"required"`
-	Notes       string `json:"notes,omitempty"`
+	ProgramID   string  `json:"program_id" validate:"required"`
+	Name        string  `json:"name" validate:"required"`
+	SessionDate string  `json:"session_date" validate:"required"`
+	StartTime   *string `json:"start_time,omitempty"`
+	EndTime     *string `json:"end_time,omitempty"`
+	Location    string  `json:"location" validate:"required"`
+	Notes       string  `json:"notes,omitempty"`
 }
 
 // UpdateSessionRequest is the payload for PUT /api/sessions/:id.
 type UpdateSessionRequest struct {
-	ProgramID   string `json:"program_id,omitempty"`
-	Name        string `json:"name,omitempty"`
-	SessionDate string `json:"session_date,omitempty"`
-	Location    string `json:"location,omitempty"`
-	Notes       string `json:"notes,omitempty"`
-	Status      string `json:"status,omitempty"`
+	ProgramID   string  `json:"program_id,omitempty"`
+	Name        string  `json:"name,omitempty"`
+	SessionDate string  `json:"session_date,omitempty"`
+	StartTime   *string `json:"start_time,omitempty"`
+	EndTime     *string `json:"end_time,omitempty"`
+	Location    string  `json:"location,omitempty"`
+	Notes       string  `json:"notes,omitempty"`
+	Status      string  `json:"status,omitempty"`
 }
 
 // AssignFacilitatorRequest is the payload for POST /api/sessions/:id/stages/:stageId/assign.
+// FacilitatorID is optional: a nil/JSON-null value means "unassign" (set NULL).
 type AssignFacilitatorRequest struct {
-	FacilitatorID string `json:"facilitator_id" validate:"required"`
+	FacilitatorID *string `json:"facilitator_id"`
 }
 
 // CreateGroupRequest is the payload for POST /api/sessions/:id/groups.
@@ -32,9 +37,11 @@ type CreateGroupRequest struct {
 }
 
 // UpdateGroupRequest is the payload for PUT /api/sessions/:id/groups/:groupId.
+// FacilitatorID is optional: a nil/JSON-null value means "unassign" (set NULL).
 type UpdateGroupRequest struct {
-	Name   string `json:"name,omitempty"`
-	Status string `json:"status,omitempty"`
+	Name          string  `json:"name,omitempty"`
+	Status        string  `json:"status,omitempty"`
+	FacilitatorID *string `json:"facilitator_id,omitempty"`
 }
 
 // CreateParticipantRequest is the payload for POST /api/sessions/:id/participants.
@@ -85,4 +92,12 @@ type SessionDetail struct {
 	Session entity.Session          `json:"session"`
 	Stages  []entity.SessionStage   `json:"stages"`
 	Groups  []GroupWithParticipants `json:"groups"`
+}
+
+// SessionListItem is the enriched session returned by GET /api/sessions when
+// a facilitator_id query param is provided. IsMySession is true when the
+// facilitator is assigned to at least one stage or group in the session.
+type SessionListItem struct {
+	entity.Session
+	IsMySession bool `json:"is_my_session"`
 }

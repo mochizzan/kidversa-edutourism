@@ -3,6 +3,7 @@ import type { FrameService } from './types'
 import { apiRequest } from './backendClient'
 import { withTenantHeader, normalizeTenantId, itemRequest } from './apiEnvelope'
 import { uploadMultipart } from './uploadMultipart'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 // Frame service — backed by /api/frames (NOT /api/photo-frames) (C3).
 // Replaces the IndexedDB barrel. Preserves the `frameService` export name and
@@ -57,7 +58,7 @@ const getAll = async (
   if (params?.filters?.program_id)
     extra.program_id = String(params.filters.program_id)
 
-  const all = await fetchAllPages('/api/frames', extra)
+  const all = await fetchAllPages(API_ROUTES.FRAMES.BASE, extra)
 
   const page = params?.page ?? 1
   const limit = params?.limit ?? 10
@@ -73,13 +74,13 @@ const getAll = async (
 }
 
 const getById = async (id: string): Promise<PhotoFrame | null> => {
-  return itemRequest<PhotoFrame>('GET', `/api/frames/${id}`)
+  return itemRequest<PhotoFrame>('GET', API_ROUTES.FRAMES.DETAIL(id))
 }
 
 const create = async (
   data: Omit<PhotoFrame, 'id' | 'created_at'>,
 ): Promise<PhotoFrame> => {
-  return itemRequest<PhotoFrame>('POST', '/api/frames', {
+  return itemRequest<PhotoFrame>('POST', API_ROUTES.FRAMES.BASE, {
     tenant_id: data.tenant_id,
     program_id: data.program_id ?? '',
     name: data.name,
@@ -102,11 +103,11 @@ const update = async (
   if (data.thumbnail_url !== undefined) body.thumbnail_url = data.thumbnail_url
   if (data.is_active !== undefined) body.is_active = data.is_active
   if (data.sort_order !== undefined) body.sort_order = data.sort_order
-  return itemRequest<PhotoFrame>('PUT', `/api/frames/${id}`, body)
+  return itemRequest<PhotoFrame>('PUT', API_ROUTES.FRAMES.DETAIL(id), body)
 }
 
 const deactivate = async (id: string): Promise<PhotoFrame> => {
-  return itemRequest<PhotoFrame>('POST', `/api/frames/${id}/deactivate`)
+  return itemRequest<PhotoFrame>('POST', API_ROUTES.FRAMES.DEACTIVATE(id))
 }
 
 const upload = async (data: {
@@ -118,7 +119,7 @@ const upload = async (data: {
   form.append('file', data.file)
   form.append('name', data.name)
   if (data.programId) form.append('program_id', data.programId)
-  return uploadMultipart<PhotoFrame>('/api/frames/upload', form)
+  return uploadMultipart<PhotoFrame>(API_ROUTES.FRAMES.UPLOAD, form)
 }
 
 export const frameService: FrameService = {

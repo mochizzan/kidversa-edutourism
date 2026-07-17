@@ -20,12 +20,6 @@ type ConsentRequest struct {
 	Value         bool   `json:"value"`
 }
 
-// ConsentPublicRequest is the public token-based response payload.
-type ConsentPublicRequest struct {
-	Token string `json:"token"`
-	Value bool   `json:"value"`
-}
-
 // ConsentListResponse carries a list of consent logs.
 type ConsentListResponse struct {
 	Items []ConsentResponse `json:"items"`
@@ -38,4 +32,50 @@ func NewConsentListResponse(items []entity.ConsentLog) *ConsentListResponse {
 		out = append(out, ConsentResponse{ConsentLog: &items[i]})
 	}
 	return &ConsentListResponse{Items: out}
+}
+
+// ConsentSummaryItem carries consent logs for a single session.
+type ConsentSummaryItem struct {
+	SessionID string            `json:"session_id"`
+	Items     []ConsentResponse `json:"items"`
+}
+
+// ConsentSummaryResponse carries consent logs for multiple sessions.
+type ConsentSummaryResponse struct {
+	Sessions []ConsentSummaryItem `json:"sessions"`
+}
+
+// ConsentSendWhatsAppRequest is the payload for POST /api/consent/send-whatsapp.
+type ConsentSendWhatsAppRequest struct {
+	SessionID string `json:"session_id" validate:"required"`
+}
+
+// ConsentSendWhatsAppResponse is returned immediately (202) when a batch is queued.
+type ConsentSendWhatsAppResponse struct {
+	Status  string `json:"status"` // "queued"
+	BatchID string `json:"batch_id"`
+	Total   int    `json:"total"`
+}
+
+// ConsentParticipantResult is one row of the WhatsApp batch progress stream.
+type ConsentParticipantResult struct {
+	ParticipantID string `json:"participant_id"`
+	ChildName     string `json:"child_name"`
+	ParentPhone   string `json:"parent_phone"`
+	Status        string `json:"status"` // "sent" | "failed" | "skipped"
+	Error         string `json:"error,omitempty"`
+}
+
+// ConsentRespondCombinedRequest is the public combined-consent payload.
+type ConsentRespondCombinedRequest struct {
+	Token     string `json:"token" validate:"required"`
+	Recording bool   `json:"recording"`
+	Photo     bool   `json:"photo"`
+}
+
+// ConsentRespondCombinedResponse is returned after a combined consent is recorded.
+type ConsentRespondCombinedResponse struct {
+	Status     string `json:"status"` // "recorded"
+	ChildName  string `json:"child_name"`
+	ParentName string `json:"parent_name"`
 }

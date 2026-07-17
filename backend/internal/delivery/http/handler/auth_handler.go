@@ -23,12 +23,12 @@ type AuthHandler struct {
 	cookieSameSite    string
 }
 
-	// kioskTokenTTL is the lifetime of an issued kiosk token, shared with the
-	// auth usecase (auth.KioskTokenTTL) so the requested and max-allowed values
-	// stay in sync.
-	const kioskTokenTTL = auth.KioskTokenTTL
+// kioskTokenTTL is the lifetime of an issued kiosk token, shared with the
+// auth usecase (auth.KioskTokenTTL) so the requested and max-allowed values
+// stay in sync.
+const kioskTokenTTL = auth.KioskTokenTTL
 
-	// NewAuthHandler builds the auth handler.
+// NewAuthHandler builds the auth handler.
 func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, refreshCookieName string, cookieSecure bool, cookieSameSite string) *AuthHandler {
 	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, refreshCookieName: refreshCookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
 }

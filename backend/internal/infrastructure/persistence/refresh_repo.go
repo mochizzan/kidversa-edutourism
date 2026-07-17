@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ import (
 type RefreshTokenModel struct {
 	ID        string         `gorm:"type:char(36);primaryKey"`
 	UserID    string         `gorm:"type:char(36);column:user_id;index:idx_refresh_user"`
-	TokenHash string         `gorm:"type:varchar(255);column:token_hash"`
+	TokenHash string         `gorm:"type:varchar(64);column:token_hash"`
 	ExpiresAt time.Time      `gorm:"type:datetime(3);column:expires_at"`
 	RevokedAt *time.Time     `gorm:"type:datetime(3);column:revoked_at"`
 	CreatedAt time.Time      `gorm:"type:datetime(3);column:created_at"`
@@ -90,4 +91,50 @@ func (r *GormRefreshRepository) GetByHash(ctx context.Context, tokenHash string)
 		ExpiresAt: m.ExpiresAt,
 		RevokedAt: m.RevokedAt,
 	}, nil
+}
+
+// CleanExpired hard-deletes refresh tokens that are expired and no longer needed.
+// It removes tokens where expires_at < before AND (revoked_at IS NOT NULL OR created_at < before).
+// Returns the number of rows deleted.
+func (r *GormRefreshRepository) CleanExpired(ctx context.Context, before time.Time) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Where("expires_at < ? AND (revoked_at IS NOT NULL OR created_at < ?)", before, before).
+		Delete(&RefreshTokenModel{})
+	if result.Error != nil {
+		return 0, apperrors.Internal("internal_error", result.Error)
+	}
+	return result.RowsAffected, nil
+}
+
+// StartCleanup spawns a background goroutine that periodically purges expired
+// refresh tokens. Returns a stop function. Runs once immediately on start.
+func (r *GormRefreshRepository) StartCleanup(ctx context.Context, interval, maxAge time.Duration) func() {
+	done := make(chan struct{})
+	// Run once immediately.
+	r.cleanExpired(ctx, maxAge)
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				r.cleanExpired(ctx, maxAge)
+			}
+		}
+	}()
+	return func() { close(done) }
+}
+
+func (r *GormRefreshRepository) cleanExpired(ctx context.Context, maxAge time.Duration) {
+	before := time.Now().Add(-maxAge)
+	n, err := r.CleanExpired(ctx, before)
+	if err != nil {
+		log.Printf("refresh cleanup: %v", err)
+		return
+	}
+	if n > 0 {
+		log.Printf("refresh cleanup: deleted %d expired tokens older than %s", n, maxAge)
+	}
 }

@@ -67,8 +67,9 @@ const UsersPage = () => {
   const { getHighlightClass } = useHighlight()
 
   useEffect(() => {
+    if (!isSuperAdminView) return
     tenantService.getAll().then(setTenants).catch(() => setTenants([]))
-  }, [])
+  }, [isSuperAdminView])
 
   const tenantMap = new Map(tenants.map((t) => [t.id, t]))
 

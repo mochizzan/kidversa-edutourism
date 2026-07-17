@@ -1,5 +1,6 @@
 import type { ParticipantMission } from '../types'
 import { itemsRequest, itemRequest, voidRequest } from './apiEnvelope'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 export interface ParticipantMissionsService {
   getByReport(reportId: string): Promise<ParticipantMission[]>
@@ -12,21 +13,21 @@ export interface ParticipantMissionsService {
 const getByReport = async (reportId: string): Promise<ParticipantMission[]> => {
   return itemsRequest<ParticipantMission>(
     'GET',
-    `/api/participant-missions?report_id=${encodeURIComponent(reportId)}`,
+    API_ROUTES.PARTICIPANT_MISSIONS.BY_REPORT(reportId),
   )
 }
 
 const getByParticipant = async (participantId: string): Promise<ParticipantMission[]> => {
   return itemsRequest<ParticipantMission>(
     'GET',
-    `/api/participant-missions?participant_id=${encodeURIComponent(participantId)}`,
+    API_ROUTES.PARTICIPANT_MISSIONS.BY_PARTICIPANT(participantId),
   )
 }
 
 const toggleComplete = async (missionId: string): Promise<ParticipantMission> => {
   return itemRequest<ParticipantMission>(
     'POST',
-    `/api/participant-missions/${encodeURIComponent(missionId)}/toggle`,
+    API_ROUTES.PARTICIPANT_MISSIONS.TOGGLE(missionId),
   )
 }
 
@@ -35,7 +36,7 @@ const create = async (req: {
   mission_bank_id: string
   is_completed: boolean
 }): Promise<ParticipantMission> => {
-  return itemRequest<ParticipantMission>('POST', '/api/participant-missions', {
+  return itemRequest<ParticipantMission>('POST', API_ROUTES.PARTICIPANT_MISSIONS.BASE, {
     report_id: req.report_id,
     mission_bank_id: req.mission_bank_id,
     is_completed: req.is_completed,
@@ -43,7 +44,7 @@ const create = async (req: {
 }
 
 const deleteMission = async (missionId: string): Promise<void> => {
-  await voidRequest('DELETE', `/api/participant-missions/${encodeURIComponent(missionId)}`)
+  await voidRequest('DELETE', API_ROUTES.PARTICIPANT_MISSIONS.DETAIL(missionId))
 }
 
 export const participantMissionsService: ParticipantMissionsService = {
