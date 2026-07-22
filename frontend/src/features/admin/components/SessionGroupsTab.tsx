@@ -87,7 +87,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
   const loadAvailableParticipants = async () => {
     try {
       const res = await participantService.getAll({ limit: 100 })
-      setAvailableParticipants(res.data.filter((p) => !p.session_id || p.session_id === sessionId))
+      setAvailableParticipants(res.data)
     } catch {
       setAvailableParticipants([])
     }

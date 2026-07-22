@@ -91,7 +91,16 @@ func NewReportTokenResponse(r *entity.Report) *ReportTokenResponse {
 	}
 }
 
-// ReportApproveRequest carries the approver identity.
+// ReportApproveRequest carries the approver identity plus optional finalized
+// narrative and mission selections.
 type ReportApproveRequest struct {
-	ApprovedBy string `json:"approved_by" validate:"required"`
+	ApprovedBy     string   `json:"approved_by" validate:"required"`
+	NarrativeFinal string   `json:"narrative_final"`
+	MissionIDs     []string `json:"mission_ids"`
+}
+
+// ReportGenerateSessionRequest triggers narrative generation for all participants
+// in a session. Creates DRAFT reports for participants that don't have one yet.
+type ReportGenerateSessionRequest struct {
+	SessionID string `json:"session_id" validate:"required,uuid"`
 }

@@ -19,6 +19,11 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { cn } from '../../../core/utils'
 import { formatDate } from '../../../shared/utils'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { apiRequest } from '../../../core/services/backendClient'
+import { API_ROUTES } from '../../../core/constants/apiRoutes'
+import { friendlyError } from '../../../core/utils/errorMessages'
+import { kioskAccessPath } from '../../../core/constants/app'
 import { TimelineFeed } from '../components/TimelineFeed'
 import { ConfirmOverrideModal } from '../components/ConfirmOverrideModal'
 import { LiveGroupCard } from '../components/LiveGroupCard'
@@ -27,9 +32,11 @@ import { useLiveMonitor } from '../hooks/useLiveMonitor'
 const LiveMonitorPage = () => {
   const { user } = useAuth()
   const isKoordinator = user?.role === UserRole.KOORDINATOR || user?.role === UserRole.ADMIN
+  const { addToast } = useGlobalToast()
 
   const { sessionId: urlSessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
+  const [kioskLoading, setKioskLoading] = useState(false)
 
   const {
     activeSession,
@@ -125,6 +132,33 @@ const LiveMonitorPage = () => {
     return (order[sa] ?? 4) - (order[sb] ?? 4)
   })
 
+  const handleOpenKiosk = async () => {
+    if (!activeSession) return
+    const activeGroup = groups.find((g) => {
+      const { status } = getGroupStatus(g)
+      return status === 'IN_PROGRESS' || status === 'UNLOCKED'
+    })
+    const { stageId } = activeGroup ? getGroupStatus(activeGroup) : { stageId: undefined }
+    if (!activeGroup || !stageId) {
+      addToast({ type: 'error', message: 'Belum ada kelompok yang aktif untuk dibuka di kiosk.' })
+      return
+    }
+    setKioskLoading(true)
+    try {
+      const res = await apiRequest<{ data: { token: string } }>(
+        'POST',
+        API_ROUTES.AUTH.KIOSK,
+        { session_id: activeSession.id },
+      )
+      const token = res.data.token
+      window.open(`${kioskAccessPath(activeSession.id, stageId)}?token=${encodeURIComponent(token)}`, '_blank')
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
+    } finally {
+      setKioskLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-4">
@@ -170,20 +204,11 @@ const LiveMonitorPage = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => {
-              const activeGroup = groups.find((g) => {
-                const { status } = getGroupStatus(g)
-                return status === 'IN_PROGRESS' || status === 'UNLOCKED'
-              })
-              if (activeGroup && activeSession) {
-                const { stageId } = getGroupStatus(activeGroup)
-                if (stageId) window.open(`/learner/${activeSession.id}/${stageId}`, '_blank')
-              }
-            }}
-            disabled={!hasActiveGroup}
+            onClick={handleOpenKiosk}
+            disabled={!hasActiveGroup || kioskLoading}
           >
             <Monitor className="w-4 h-4 mr-1" />
-            Buka Kiosk
+            {kioskLoading ? 'Membuka…' : 'Buka Kiosk'}
           </Button>
           <Button variant="ghost" size="sm" onClick={fetchData}>
             <RefreshCw className="w-4 h-4" />

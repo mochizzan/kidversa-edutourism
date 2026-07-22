@@ -87,7 +87,7 @@ func main() {
 	registry.Assessment = handler.NewAssessmentHandler(assessmentUC)
 	registry.Photo = handler.NewPhotoHandler(photoRepo)
 	registry.Recording = handler.NewRecordingHandler(recordingRepo)
-	registry.Report = handler.NewReportHandler(reportsUC, cfg)
+	registry.Report = handler.NewReportHandler(reportsUC, cfg, sessionRepo)
 	registry.MissionBank = handler.NewMissionBankHandler(missionBankRepo)
 	registry.ParticipantMission = handler.NewParticipantMissionHandler(participantMissionRepo)
 	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo, messaging.NewWhatsAppGateway(cfg), cfg, hub)

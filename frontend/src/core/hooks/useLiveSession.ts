@@ -25,8 +25,14 @@ interface SSEEvent {
   data: unknown
 }
 
+interface SnapshotGroupEntry {
+  group: SessionGroup
+  progress: GroupStageProgress[]
+  participants: Participant[]
+}
+
 interface SnapshotData {
-  groups?: SessionGroup[]
+  groups?: SnapshotGroupEntry[]
   progress?: GroupStageProgress[]
   timeline?: TimelineEventRow[]
 }
@@ -79,18 +85,24 @@ export function useLiveSession(sessionId: string | null | undefined) {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )
       seenTimelineIds.current = new Set(timeline.map((t) => t.id))
+
+      const flatGroups: SessionGroup[] = []
+      const flatProgress: GroupStageProgress[] = []
+      const participantMap: Record<string, Participant[]> = {}
+      for (const entry of snap.groups ?? []) {
+        flatGroups.push(entry.group)
+        flatProgress.push(...(entry.progress ?? []))
+        participantMap[entry.group.id] = entry.participants ?? []
+      }
+
       setState((prev) => ({
         ...prev,
-        groups: snap.groups ?? prev.groups,
-        progress: snap.progress ?? prev.progress,
+        groups: flatGroups,
+        progress: snap.progress ?? flatProgress,
         timeline,
-        loading: false,
+        participantsByGroup: participantMap,
       }))
-      if (snap.groups && snap.groups.length > 0 && snap.groups[0].session_id) {
-        void loadParticipantsByGroup(snap.groups[0].session_id).then((map) => {
-          setState((prev) => ({ ...prev, participantsByGroup: map }))
-        })
-      }
+      setLoading(false)
       return
     }
 
@@ -181,7 +193,9 @@ export function useLiveSession(sessionId: string | null | undefined) {
 
     source.onerror = () => {
       // EventSource auto-reconnects; reflect reconnecting state until the
-      // connection store reports otherwise.
+      // connection store reports otherwise. Always clear the skeleton so a
+      // failed connection (e.g. 401/400/CORS/offline) doesn't spin forever.
+      setLoading(false)
       setState((prev) => ({ ...prev, connectionStatus: 'reconnecting' }))
     }
 

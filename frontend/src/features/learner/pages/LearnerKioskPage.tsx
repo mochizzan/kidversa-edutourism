@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Play, Pause, Volume2, VolumeX, SkipForward, AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
-import { apiRequest } from '../../../core/services/backendClient'
+import { ApiError, getApiBaseUrl } from '../../../core/services/backendClient'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { API_ROUTES } from '../../../core/constants/apiRoutes'
+import { kioskSessionPath } from '../../../core/constants/app'
 import type { Session, SessionStage, StageContent } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
 import { resolveStoredUpload } from '../../../core/utils/media'
@@ -50,10 +52,14 @@ const LearnerKioskPage = () => {
     const loadData = async () => {
       try {
         // PUBLIC endpoint — the kiosk token (not a JWT) is the sole auth.
-        const env = await apiRequest<{ data: KioskResponse }>(
-          'GET',
-          `/api/sessions/${encodeURIComponent(sessionId)}/kiosk?token=${encodeURIComponent(token)}`,
-        )
+        const url = `${getApiBaseUrl()}${API_ROUTES.SESSIONS.KIOSK_ACCESS(sessionId)}?token=${encodeURIComponent(token)}`
+        const res = await fetch(url, { credentials: 'omit' })
+        if (!res.ok) {
+          const body = await res.json().catch(() => null)
+          const code = body?.error?.code ?? 'internal_error'
+          throw new ApiError(body?.error?.message ?? 'Terjadi kesalahan', code, res.status)
+        }
+        const env = (await res.json()) as { data: KioskResponse }
         const kiosk = env.data
         // No stageId in the URL (e.g. /kiosk/session/:id) → jump to the first stage.
         if (!stageId) {
@@ -62,7 +68,7 @@ const LearnerKioskPage = () => {
             setError('Sesi ini belum memiliki konten.')
             return
           }
-          navigate(`/kiosk/session/${sessionId}/${first.stage.id}${token ? `?token=${encodeURIComponent(token)}` : ''}`, { replace: true })
+          navigate(`${kioskSessionPath(sessionId, first.stage.id)}?token=${encodeURIComponent(token)}`, { replace: true })
           return
         }
 

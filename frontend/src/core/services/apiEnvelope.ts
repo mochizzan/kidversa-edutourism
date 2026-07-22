@@ -11,12 +11,9 @@
 //  - normalize `tenant_id` null/undefined → '' (C7),
 //  - attach the `X-Tenant-Id` header for SUPER_ADMIN (backend TenantScope requires it).
 
-import { ApiError, apiRequest, getStoredUser } from './backendClient'
+import { ApiError, apiRequest } from './backendClient'
 import type { ListParams, PaginatedResponse } from '../types'
-import { STORAGE_KEYS } from '../constants/storage'
-import { UserRole } from '../types/enums'
-
-const ACTIVE_TENANT_KEY = STORAGE_KEYS.ACTIVE_TENANT_ID
+import { getActiveTenantId } from '../utils/tenant'
 
 interface ListEnvelope<T> {
   data: T[]
@@ -38,12 +35,8 @@ interface ItemsEnvelope<T> {
 // (the middleware rejects it). The active tenant lives in localStorage (set by
 // tenantStore); the current role comes from the persisted auth user.
 export function withTenantHeader(headers: Record<string, string> = {}): Record<string, string> {
-  const user = getStoredUser<{ role?: string }>()
-  if (user?.role === UserRole.SUPER_ADMIN) {
-    const tid =
-      typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_TENANT_KEY) : null
-    if (tid) return { ...headers, 'X-Tenant-Id': tid }
-  }
+  const tid = getActiveTenantId()
+  if (tid) return { ...headers, 'X-Tenant-Id': tid }
   return headers
 }
 

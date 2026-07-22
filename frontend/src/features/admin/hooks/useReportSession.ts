@@ -77,25 +77,25 @@ export function useReportSession(sessionId: string | undefined) {
     return missing
   }, [participants, assessments])
 
-  const handleGenerateAll = useCallback(async (): Promise<boolean> => {
-    if (!sessionId) return false
+  const handleGenerateAll = useCallback(async (): Promise<{ ok: boolean; missingCount: number }> => {
+    if (!sessionId) return { ok: false, missingCount: 0 }
     setGenError(null)
     setMissingParticipants([])
 
     const missing = validateAssessments()
     if (missing.length > 0) {
       setMissingParticipants(missing)
-      return false
+      return { ok: false, missingCount: missing.length }
     }
 
     setGenerating(true)
     try {
       await reportService.generate(sessionId)
       await loadData()
-      return true
+      return { ok: true, missingCount: 0 }
     } catch {
       setGenError('Gagal generate laporan.')
-      return false
+      return { ok: false, missingCount: 0 }
     } finally {
       setGenerating(false)
     }

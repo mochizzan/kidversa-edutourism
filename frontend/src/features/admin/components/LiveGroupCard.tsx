@@ -1,4 +1,4 @@
-import { SkipForward, RotateCcw, CheckCircle2, AlertTriangle, Users } from 'lucide-react'
+import { SkipForward, RotateCcw, CheckCircle2, AlertTriangle, Users, Unlock } from 'lucide-react'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Button } from '../../../shared/components/ui/Button'
 import { cn } from '../../../core/utils'
@@ -109,6 +109,12 @@ export const LiveGroupCard = ({
       </div>
 
       <div className="flex items-center gap-2 mt-4 flex-wrap">
+        {status === 'LOCKED' && nextLockedStageId && (
+          <Button variant="primary" size="sm" onClick={() => onUnlock(g.group.id, nextLockedStageId)}>
+            <Unlock className="w-4 h-4 mr-1" />
+            Buka Stage
+          </Button>
+        )}
         {status === 'IN_PROGRESS' && (
           <Button variant="primary" size="sm" onClick={() => onComplete(g.group.id, stageId!)}>
             <CheckCircle2 className="w-4 h-4 mr-1" />

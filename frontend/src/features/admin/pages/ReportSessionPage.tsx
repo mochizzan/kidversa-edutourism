@@ -49,12 +49,21 @@ const ReportSessionPage = () => {
     handleSendAll,
   } = useReportSession(sessionId)
 
+  // Allow regeneration: Generate is only blocked once every report is finalized
+  // (APPROVED or SENT). DRAFT reports can be (re)generated to (re)fill their
+  // narrative — the backend re-streams the narrative for existing drafts.
+  const allFinalized =
+    reports.length > 0 &&
+    reports.every(
+      (r) => r.report.status === ReportStatus.APPROVED || r.report.status === ReportStatus.SENT,
+    )
+
   const [showMissingModal, setShowMissingModal] = useState(false)
   const [showConfirmSend, setShowConfirmSend] = useState(false)
 
   const onGenerate = async () => {
-    const ok = await handleGenerateAll()
-    if (!ok && missingParticipants.length > 0) setShowMissingModal(true)
+    const result = await handleGenerateAll()
+    if (!result.ok && result.missingCount > 0) setShowMissingModal(true)
   }
 
   const onSend = async () => {
@@ -142,14 +151,18 @@ const ReportSessionPage = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={onGenerate} disabled={generating || reports.length === participants.length}>
+        <Button
+          onClick={onGenerate}
+          disabled={generating || reports.length === 0 || participants.length === 0 || allFinalized}
+        >
           {generating ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Mengenerate...
             </>
           ) : (
             <>
-              <FileText className="w-4 h-4 mr-2" /> Generate Laporan
+              <FileText className="w-4 h-4 mr-2" />
+              {reports.length === 0 ? 'Generate Laporan' : 'Generate Ulang'}
             </>
           )}
         </Button>

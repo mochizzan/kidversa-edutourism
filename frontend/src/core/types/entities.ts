@@ -130,7 +130,7 @@ export interface SessionGroup {
   session_id: string
   name: string
   status: import('./enums').GroupStatus
-  current_stage_id?: string
+  current_session_stage_id?: string
   facilitator_id?: string
   created_at: string
 }

@@ -87,11 +87,18 @@ function App() {
   const [splashDone, setSplashDone] = useState(false)
   const [backendDown, setBackendDown] = useState(false)
 
+  // Public kiosk routes bypass auth + splash entirely — participants access
+  // these directly via URL without logging in.
+  const isPublicKiosk =
+    window.location.pathname.startsWith(ROUTES.LEARNER.BASE) ||
+    window.location.pathname.startsWith(ROUTES.KIOSK.BASE)
+
   // Route any caught 401 (refresh already failed in backendClient) to login.
   // `App` renders <RouterProvider> below, so it lives *outside* the router
   // context and cannot use useNavigate(). The router instance itself exposes
   // an imperative navigate() that works from anywhere.
   useEffect(() => {
+    if (isPublicKiosk) return
     registerUnauthorizedHandler(() =>
       router.navigate(ROUTES.AUTH.LOGIN, { replace: true }),
     )
@@ -107,7 +114,7 @@ function App() {
     }
     window.addEventListener('unhandledrejection', onReject)
     return () => window.removeEventListener('unhandledrejection', onReject)
-  }, [])
+  }, [isPublicKiosk])
 
   const runStartup = async () => {
     try {
@@ -142,8 +149,13 @@ function App() {
   }
 
   useEffect(() => {
+    if (isPublicKiosk) {
+      setSplashDone(true)
+      useAuthStore.setState({ isLoading: false })
+      return
+    }
     void runStartup()
-  }, [checkSession])
+  }, [checkSession, isPublicKiosk])
 
   // ── Backend unavailable panel ──
   if (backendDown) {

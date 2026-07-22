@@ -34,7 +34,7 @@ async function findChildInSessions(childId: string): Promise<ChildDetail | null>
     const group = detail.groups.find((g) => g.participants.some((p) => p.id === childId))
     if (!group) continue
 
-    let currentStage = detail.stages.find((s) => s.id === group.current_stage_id)
+    let currentStage = detail.stages.find((s) => s.id === group.current_session_stage_id)
 
     if (!currentStage && detail.stages.length > 0) {
       const allProgress = await liveService.getProgress(detail.id)
@@ -49,6 +49,11 @@ async function findChildInSessions(childId: string): Promise<ChildDetail | null>
       if (groupProg.length > 0) {
         currentStage = detail.stages.find((s) => s.id === groupProg[0].session_stage_id)
       }
+    }
+
+    if (!currentStage && detail.stages.length > 0) {
+      currentStage =
+        detail.stages.find((s) => s.status === 'ACTIVE') ?? detail.stages[0]
     }
 
     const programStages = await programService.getStages(detail.program_id)

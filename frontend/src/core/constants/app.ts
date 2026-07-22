@@ -59,6 +59,12 @@ export const ROUTES = {
     CONSENT: '/parent/consent',
     MISSIONS: '/parent/missions',
   },
+  LEARNER: {
+    BASE: '/learner',
+  },
+  KIOSK: {
+    BASE: '/kiosk',
+  },
 } as const
 
 // Parameterized path builders (backward-compatible)
@@ -84,6 +90,12 @@ export const contentEditPath = (contentId: string, params?: { programId?: string
   if (params.stageId) q.set('stageId', params.stageId)
   return `${base}?${q.toString()}`
 }
+
+export const kioskAccessPath = (sessionId: string, stageId: string) =>
+  `${ROUTES.LEARNER.BASE}/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
+
+export const kioskSessionPath = (sessionId: string, stageId: string) =>
+  `${ROUTES.KIOSK.BASE}/session/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
 
 // API
 // NOTE: API_BASE_URL was removed — all callers must use getApiBaseUrl() from

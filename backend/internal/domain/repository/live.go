@@ -25,6 +25,10 @@ type LiveRepository interface {
 	ListGroups(ctx context.Context, sessionID string) ([]entity.SessionGroup, error)
 	UpdateGroup(ctx context.Context, g *entity.SessionGroup) error
 
+	// Participants returns the participants of a session (optionally narrowed to
+	// a single group). Used to assemble per-group live snapshots.
+	ListParticipants(ctx context.Context, sessionID, groupID string) ([]entity.Participant, error)
+
 	// TenantIDForSession resolves the owning tenant of a session (for SSE scope checks).
 	TenantIDForSession(ctx context.Context, sessionID string) (string, error)
 

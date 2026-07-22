@@ -17,6 +17,7 @@
 //   an Authorization header, so openSSE relies on `withCredentials: true`.
 
 import { API_ROUTES } from '../constants/apiRoutes'
+import { getActiveTenantId } from '../utils/tenant'
 
 export type ConnectionState = 'online' | 'degraded' | 'reconnecting'
 
@@ -306,6 +307,13 @@ export async function apiRequest<T>(
       'Content-Type': 'application/json',
       ...(opts?.headers ?? {}),
     }
+    // SUPER_ADMIN JWT carries no tenant; the backend TenantScope requires an
+    // explicit X-Tenant-Id (or ?tenant_id= for SSE). Attach it here so every
+    // request — including direct apiRequest callers like liveService — is
+    // correctly scoped. Non-SA roles must NOT send this header (rejected by
+    // the middleware), so getActiveTenantId() returns null for them.
+    const tid = getActiveTenantId()
+    if (tid) headers['X-Tenant-Id'] = tid
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`
     }
@@ -384,9 +392,23 @@ export function openSSE(
   // the access token as a query parameter — the backend's JWTAuth middleware
   // checks the cookie first, then falls back to ?token=.
   const separator = path.includes('?') ? '&' : '?'
-  const url = accessToken
+  let url = accessToken
     ? `${base}${separator}token=${encodeURIComponent(accessToken)}`
     : base
+  // SUPER_ADMIN: the JWT has empty tid, and EventSource cannot send custom
+  // headers (X-Tenant-Id). Pass the active tenant as a query param so
+  // TenantScope can resolve it. Non-SA roles have tid in the JWT.
+  const tid = getActiveTenantId()
+  if (tid) {
+    url += `${url.includes('?') ? '&' : '?'}tenant_id=${encodeURIComponent(tid)}`
+  } else {
+    // SUPER_ADMIN without an active tenant → the SSE request will get 400
+    // "tenant_required". Warn so the silent infinite skeleton is diagnosable.
+    const user = getStoredUser<{ role?: string }>()
+    if (user?.role === 'SUPER_ADMIN') {
+      console.warn('[SSE] SUPER_ADMIN without active tenant — SSE will not connect until a tenant is selected')
+    }
+  }
   const source = new EventSource(url, { withCredentials: true })
   source.onmessage = onEvent
   source.onerror = (ev) => {

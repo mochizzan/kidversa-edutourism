@@ -41,11 +41,11 @@ export interface LiveGroupWithProgress {
 }
 
 interface GroupsEnvelope {
-  groups: LiveGroupWithProgress[]
+  data?: { groups: LiveGroupWithProgress[] }
 }
 
 interface TimelineEnvelope {
-  timeline: TimelineEventRow[]
+  data?: { timeline: TimelineEventRow[] }
 }
 
 interface LiveSnapshot {
@@ -62,7 +62,9 @@ async function fetchSnapshot(sessionId: string): Promise<LiveSnapshot> {
     apiRequest<TimelineEnvelope>('GET', API_ROUTES.LIVE.TIMELINE(sessionId)),
   ])
 
-  const groupsWithProgress = groupsRes.groups ?? []
+  // apiRequest returns the full backend envelope { data: {...} } (it does not
+  // unwrap `data` like itemRequest/listRequest do), so unwrap here.
+  const groupsWithProgress = groupsRes.data?.groups ?? []
   // Build a flat progress list from the nested groups.
   const progress: GroupStageProgressRow[] = []
   for (const g of groupsWithProgress) {
@@ -72,7 +74,7 @@ async function fetchSnapshot(sessionId: string): Promise<LiveSnapshot> {
   return {
     groupsWithProgress,
     progress,
-    timeline: (timelineRes.timeline ?? []).sort(
+    timeline: (timelineRes.data?.timeline ?? []).sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     ),
   }

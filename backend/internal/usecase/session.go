@@ -182,10 +182,34 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) 
 			}
 		}
 	}
+	// Seed a LOCKED progress row for every (group, session_stage) pair so the
+	// live monitor renders real per-stage state instead of treating every group
+	// as locked. Skip entirely if progress was already seeded (idempotent).
+	if len(stages) > 0 {
+		existing, eerr := u.sessionRepo.ListGroupStageProgress(ctx, stages[0].ID)
+		if eerr != nil {
+			return nil, eerr
+		}
+		if len(existing) == 0 {
+			groups, gerr := u.sessionRepo.ListSessionGroups(ctx, id)
+			if gerr != nil {
+				return nil, gerr
+			}
+			for i := range groups {
+				for j := range stages {
+					if cerr := u.sessionRepo.CreateGroupStageProgress(ctx, &entity.GroupStageProgress{
+						GroupID:        groups[i].ID,
+						SessionStageID: stages[j].ID,
+						Status:         entity.ProgressLocked,
+					}); cerr != nil {
+						return nil, cerr
+					}
+				}
+			}
+		}
+	}
 	return s, nil
 }
-
-// CompleteSession transitions ACTIVE -> COMPLETED (cascades stages/groups to COMPLETED).
 func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
 	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {

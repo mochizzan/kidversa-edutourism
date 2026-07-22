@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
@@ -96,6 +97,15 @@ func TenantScope() echo.MiddlewareFunc {
 			if role == "SUPER_ADMIN" {
 				if headerTenant != "" {
 					(*c).Set(CtxTenantID, headerTenant)
+					return next(c)
+				}
+				// Fallback: EventSource (SSE) cannot send custom headers; read from
+				// the ?tenant_id= query param so SUPER_ADMIN SSE streams work.
+				if qtid := (*c).QueryParam("tenant_id"); qtid != "" {
+					if uuid.Validate(qtid) != nil {
+						return appresp.Fail(c, http.StatusBadRequest, "bad_request")
+					}
+					(*c).Set(CtxTenantID, qtid)
 					return next(c)
 				}
 				// SUPER_ADMIN without a selected tenant cannot access scoped data.

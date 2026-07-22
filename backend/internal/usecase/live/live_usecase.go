@@ -24,14 +24,25 @@ func NewService(repo repository.LiveRepository, notif repository.NotificationRep
 	return &Service{repo: repo, notif: notif, hub: hub}
 }
 
+// GroupWithProgress bundles a session group with its live progress and
+// participants for the live snapshot. Field names match the frontend
+// LiveGroupWithProgress contract ({ group, progress, participants }).
+type GroupWithProgress struct {
+	Group        entity.SessionGroup         `json:"group"`
+	Progress     []entity.GroupStageProgress `json:"progress"`
+	Participants []entity.Participant        `json:"participants"`
+}
+
 // LiveSnapshot is the one-shot DB read sent to SSE clients on connect.
 type LiveSnapshot struct {
-	Groups   []entity.SessionGroup       `json:"groups"`
+	Groups   []GroupWithProgress         `json:"groups"`
 	Progress []entity.GroupStageProgress `json:"progress"`
 	Timeline []entity.TimelineEvent      `json:"timeline"`
 }
 
 // Snapshot reads the current live state of a session from the DB, tenant-scoped.
+// Groups are assembled with their per-group progress and participants so the
+// frontend receives the wrapped LiveGroupWithProgress shape it expects.
 func (s *Service) Snapshot(ctx context.Context, sessionID, callerTenant string) (*LiveSnapshot, error) {
 	if err := s.assertTenant(ctx, sessionID, callerTenant); err != nil {
 		return nil, err
@@ -48,7 +59,24 @@ func (s *Service) Snapshot(ctx context.Context, sessionID, callerTenant string) 
 	if err != nil {
 		return nil, err
 	}
-	return &LiveSnapshot{Groups: groups, Progress: progress, Timeline: timeline}, nil
+	wrapped := make([]GroupWithProgress, 0, len(groups))
+	for i := range groups {
+		g := groups[i]
+		gp, gerr := s.repo.GetProgressByGroup(ctx, g.ID)
+		if gerr != nil {
+			return nil, gerr
+		}
+		parts, perr := s.repo.ListParticipants(ctx, sessionID, g.ID)
+		if perr != nil {
+			return nil, perr
+		}
+		wrapped = append(wrapped, GroupWithProgress{
+			Group:        g,
+			Progress:     gp,
+			Participants: parts,
+		})
+	}
+	return &LiveSnapshot{Groups: wrapped, Progress: progress, Timeline: timeline}, nil
 }
 
 // OverrideAction is a facilitator override on a group-stage.

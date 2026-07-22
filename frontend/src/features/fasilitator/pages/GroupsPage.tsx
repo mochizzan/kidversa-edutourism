@@ -158,8 +158,8 @@ const GroupsPage = () => {
                     name={item.group.name}
                     childCount={item.participants.length}
                     currentStage={
-                      item.group.current_stage_id
-                        ? stageNameCache[session.id]?.[item.group.current_stage_id]
+                      item.group.current_session_stage_id
+                        ? stageNameCache[session.id]?.[item.group.current_session_stage_id]
                         : undefined
                     }
                     status={deriveGroupStatus(item.progress)}

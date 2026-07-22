@@ -47,13 +47,19 @@ func generateToken() (string, error) {
 }
 
 // Approve marks a report approved and persists the approver.
-func (u *Usecase) Approve(ctx context.Context, reportID, approvedBy string) (*entity.Report, error) {
+func (u *Usecase) Approve(ctx context.Context, reportID, approvedBy string, narrativeFinal string, missionIDs []string) (*entity.Report, error) {
 	r, err := u.repo.GetByID(ctx, reportID, "")
 	if err != nil {
 		return nil, err
 	}
 	r.Status = entity.ReportApproved
 	r.ApprovedBy = &approvedBy
+	if narrativeFinal != "" {
+		r.AINarrativeFinal = narrativeFinal
+	}
+	if missionIDs != nil {
+		r.MissionIDs = missionIDs
+	}
 	now := time.Now().UTC()
 	r.GeneratedAt = &now
 	if err := u.repo.Update(ctx, r); err != nil {
@@ -103,10 +109,13 @@ func (u *Usecase) RevokeToken(ctx context.Context, reportID string) (*entity.Rep
 // StreamNarrative runs the narrative generator and publishes each chunk to the
 // report's SSE channel so connected parents receive progressive text.
 func (u *Usecase) StreamNarrative(ctx context.Context, reportID string) error {
-	if _, err := u.repo.GetByID(ctx, reportID, ""); err != nil {
+	r, err := u.repo.GetByID(ctx, reportID, "")
+	if err != nil {
 		return err
 	}
-	return u.gen.Generate(ctx, reportID, func(seq int, chunk string) {
+	var accumulated string
+	err = u.gen.Generate(ctx, reportID, func(seq int, chunk string) {
+		accumulated += chunk
 		if err := u.hub.Publish(ctx, sse.NarrativeChannel(reportID), sse.Event{
 			Type: "narrative.chunk",
 			Data: map[string]any{"seq": seq, "text": chunk},
@@ -114,4 +123,54 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID string) error {
 			log.Printf("reports: narrative SSE publish failed for report %s: %v", reportID, err)
 		}
 	})
+	if err != nil {
+		return err
+	}
+	r.AINarrativeDraft = accumulated
+	return u.repo.Update(ctx, r)
+}
+
+// maxSessionReports is the upper bound for listing reports in a single
+// session during batch generation. A session with more participants than
+// this would require paginated processing.
+const maxSessionReports = 1000
+
+// GenerateForSession creates a DRAFT report for each participant that does not
+// already have one, then runs the narrative generator for all reports in the
+// session. Returns the full list of reports after generation.
+func (u *Usecase) GenerateForSession(ctx context.Context, sessionID string, participants []entity.Participant) ([]entity.Report, error) {
+	existing, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, maxSessionReports)
+	if err != nil {
+		return nil, err
+	}
+
+	existingByParticipant := make(map[string]bool, len(existing.Items))
+	for _, r := range existing.Items {
+		existingByParticipant[r.ParticipantID] = true
+	}
+
+	for _, p := range participants {
+		if existingByParticipant[p.ID] {
+			continue
+		}
+		rep := &entity.Report{
+			ParticipantID: p.ID,
+			SessionID:     sessionID,
+			Status:        entity.ReportDraft,
+		}
+		if err := u.repo.Create(ctx, rep); err != nil {
+			return nil, err
+		}
+	}
+
+	all, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, maxSessionReports)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range all.Items {
+		_ = u.StreamNarrative(ctx, r.ID)
+	}
+
+	return all.Items, nil
 }

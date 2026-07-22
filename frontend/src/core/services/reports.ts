@@ -1,13 +1,9 @@
 import type { Report } from '../types'
 import type { ReportService } from './types'
 import { apiRequest, getApiBaseUrl } from './backendClient'
-import { itemsRequest, itemRequest, nullableItemRequest, voidRequest } from './apiEnvelope'
+import { itemsRequest, itemRequest, nullableItemRequest } from './apiEnvelope'
 import { useAuthStore } from '../stores/authStore'
 import { API_ROUTES } from '../constants/apiRoutes'
-
-interface ReportApproveRequest {
-  approved_by: string
-}
 
 interface ReportTokenResponse {
   id: string
@@ -34,28 +30,21 @@ const getById = async (id: string): Promise<Report | null> => {
   return nullableItemRequest<Report>('GET', API_ROUTES.REPORTS.DETAIL(id))
 }
 
-// generate triggers narrative generation on the backend. The backend generates
-// a single report by id (POST /api/reports/:id/generate); the frontend calls
-// this with a sessionId, so we lazily generate each report for the session and
-// return the refreshed list. The per-report-id generation is a no-op if the
-// narrative is already present (backend handles idempotency).
 const generate = async (sessionId: string): Promise<Report[]> => {
-  const reports = await getBySession(sessionId)
-  await Promise.all(
-    reports.map((r) =>
-      voidRequest('POST', API_ROUTES.REPORTS.GENERATE(r.id)).catch(() => undefined),
-    ),
-  )
-  return getBySession(sessionId)
+  return itemsRequest<Report>('POST', API_ROUTES.REPORTS.GENERATE_SESSION, {
+    session_id: sessionId,
+  })
 }
 
 const approve = async (
   reportId: string,
-  _data?: { narrative_final?: string; mission_ids?: string[] },
+  data?: { narrative_final?: string; mission_ids?: string[] },
 ): Promise<Report> => {
   return itemRequest<Report>('POST', API_ROUTES.REPORTS.APPROVE(reportId), {
     approved_by: useAuthStore.getState().user?.id ?? '',
-  } as ReportApproveRequest)
+    narrative_final: data?.narrative_final ?? '',
+    mission_ids: data?.mission_ids ?? [],
+  })
 }
 
 const send = async (reportId: string): Promise<Report> => {

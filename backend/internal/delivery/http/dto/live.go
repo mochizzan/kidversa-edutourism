@@ -13,9 +13,10 @@ type LiveJumpRequest struct {
 
 // LiveEventRequest is the payload for POST /events.
 type LiveEventRequest struct {
-	GroupID string `json:"group_id" validate:"required"`
-	Type    string `json:"type" validate:"required"`
-	Message string `json:"message,omitempty"`
+	SessionID string `json:"session_id" validate:"required"`
+	GroupID   string `json:"group_id" validate:"required"`
+	Type      string `json:"type" validate:"required"`
+	Message   string `json:"message,omitempty"`
 }
 
 // LiveGroupsResponse wraps a session's groups for the live dashboard.

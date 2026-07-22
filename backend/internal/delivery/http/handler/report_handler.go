@@ -18,13 +18,14 @@ import (
 // access endpoint. Parent access tokens are anti-IDOR: unguessable 64hex,
 // single-report scope, expiry, revocation.
 type ReportHandler struct {
-	uc  *reportsuc.Usecase
-	cfg *config.Config
+	uc          *reportsuc.Usecase
+	cfg         *config.Config
+	sessionRepo repository.SessionRepository
 }
 
 // NewReportHandler builds the report handler.
-func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config) *ReportHandler {
-	return &ReportHandler{uc: uc, cfg: cfg}
+func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository) *ReportHandler {
+	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo}
 }
 
 // GetByAccessToken handles GET /api/reports/access?token=... (PUBLIC).
@@ -54,6 +55,26 @@ func (h *ReportHandler) Generate(c *echo.Context) error {
 	return appresp.Accepted(c)
 }
 
+// GenerateForSession handles POST /api/reports/generate.
+// Creates DRAFT reports for all participants in the session that don't have one
+// yet, then triggers narrative generation for every report.
+func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
+	var req dto.ReportGenerateSessionRequest
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	participants, err := h.sessionRepo.ListParticipants((*c).Request().Context(), req.SessionID, "", tenantID)
+	if err != nil {
+		return err
+	}
+	reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, participants)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewReportListResponse(reports))
+}
+
 // Approve handles POST /api/reports/:id/approve.
 func (h *ReportHandler) Approve(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
@@ -64,7 +85,7 @@ func (h *ReportHandler) Approve(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	r, err := h.uc.Approve((*c).Request().Context(), id, req.ApprovedBy)
+	r, err := h.uc.Approve((*c).Request().Context(), id, req.ApprovedBy, req.NarrativeFinal, req.MissionIDs)
 	if err != nil {
 		return err
 	}

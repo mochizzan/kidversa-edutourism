@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"log"
+
 	"github.com/labstack/echo/v5"
 
 	"github.com/google/uuid"
@@ -87,7 +89,7 @@ func (h *LiveHandler) PublishEvent(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	sessionID := (*c).Param("sessionId")
+	sessionID := req.SessionID
 	e := &entity.TimelineEvent{
 		BaseModel: entity.BaseModel{ID: uuid.NewString()}, SessionID: sessionID, GroupID: req.GroupID,
 		Type: entity.TimelineEventType(req.Type), Message: req.Message, UserID: appmiddleware.GetUserID(c),
@@ -105,7 +107,14 @@ func (h *LiveHandler) Stream(c *echo.Context) error {
 
 	// Initial snapshot is sent as the first event before streaming live deltas.
 	var initial *sse.Event
-	if snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID, appmiddleware.GetTenantID(c)); err == nil {
+	callerTenant := appmiddleware.GetTenantID(c)
+	snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID, callerTenant)
+	if err != nil {
+		log.Printf("live: snapshot failed for session %s (tenant=%s): %v", sessionID, callerTenant, err)
+		// Send an empty snapshot so the frontend clears its skeleton instead
+		// of waiting forever for a snapshot event that will never arrive.
+		initial = &sse.Event{Type: "snapshot", Data: &live.LiveSnapshot{}}
+	} else {
 		initial = &sse.Event{Type: "snapshot", Data: snap}
 	}
 

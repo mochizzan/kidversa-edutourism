@@ -110,7 +110,7 @@ const GroupPage = () => {
       const stageNameMap = new Map(programStages.map((ps) => [ps.id, ps.name]))
 
       // Find current session stage
-      let currentStage = detail.stages.find((s) => s.id === group.current_stage_id)
+      let currentStage = detail.stages.find((s) => s.id === group.current_session_stage_id)
 
       if (!currentStage && detail.stages.length > 0) {
         const groupsData = await liveService.getGroupsWithProgress(detail.id)
@@ -125,6 +125,11 @@ const GroupPage = () => {
         if (latest) {
           currentStage = detail.stages.find((s) => s.id === latest.session_stage_id)
         }
+      }
+
+      if (!currentStage && detail.stages.length > 0) {
+        currentStage =
+          detail.stages.find((s) => s.status === 'ACTIVE') ?? detail.stages[0]
       }
       const programStage = currentStage
         ? programStages.find((ps) => ps.id === currentStage.program_stage_id)

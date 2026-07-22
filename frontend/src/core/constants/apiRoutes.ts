@@ -13,6 +13,7 @@ export const API_ROUTES = {
     LOGIN: '/api/auth/login',
     REGISTER: '/api/auth/register',
     REFRESH: '/api/auth/refresh',
+    KIOSK: '/api/auth/kiosk',
   },
 
   CONSENT: {
@@ -53,6 +54,8 @@ export const API_ROUTES = {
       `/api/sessions/${encodeURIComponent(sessionId)}/participants/link`,
     IMPORT_PARTICIPANTS: (sessionId: string) =>
       `/api/sessions/${encodeURIComponent(sessionId)}/participants/import`,
+    KIOSK_ACCESS: (sessionId: string) =>
+      `/api/sessions/${encodeURIComponent(sessionId)}/kiosk`,
   },
 
   PARTICIPANTS: {
@@ -126,6 +129,7 @@ export const API_ROUTES = {
     BY_SESSION: (sessionId: string) =>
       `/api/reports?session_id=${encodeURIComponent(sessionId)}`,
     GENERATE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate`,
+    GENERATE_SESSION: '/api/reports/generate',
     APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
     SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
     REVOKE_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-token`,
