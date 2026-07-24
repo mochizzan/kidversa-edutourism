@@ -9,6 +9,7 @@ import {
   Printer,
   Loader2,
   FileText,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Card } from '../../../shared/components/ui/Card'
@@ -17,7 +18,7 @@ import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { ReportStatus } from '../../../core/types/enums'
 import { formatDate } from '../../../core/utils'
-import { resolveStoredUpload } from '../../../core/utils/media'
+import { getMediaUrl } from '../../../core/utils/media'
 import { useReportReview } from '../hooks/useReportReview'
 import { ReportStatusBanner } from '../components/ReportStatusBanner'
 import { ReportAssessmentScores } from '../components/ReportAssessmentScores'
@@ -47,6 +48,7 @@ const ReportReviewPage = () => {
     handleCetak,
     handleDownloadPdf,
     handleDownloadPng,
+    hasNoAssessment,
   } = useReportReview(sessionId, reportId)
 
   const [showApproveConfirm, setShowApproveConfirm] = useState(false)
@@ -132,6 +134,19 @@ const ReportReviewPage = () => {
 
       <ReportStatusBanner report={report} copiedLink={copiedLink} onCopyLink={handleCopyLink} />
 
+      {hasNoAssessment && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-sm flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-yellow-800">Belum ada data penilaian</p>
+            <p className="text-yellow-700 mt-1">
+              Laporan ini belum dapat disetujui atau dikirim karena peserta belum memiliki data
+              penilaian. Lengkapi penilaian terlebih dahulu di halaman Assessment.
+            </p>
+          </div>
+        </div>
+      )}
+
       {report.status === ReportStatus.SENT && (
         <Card title="Ringkasan yang Dikirim" subtitle="Konten yang telah dikirim ke orang tua">
           <div className="space-y-4">
@@ -166,10 +181,7 @@ const ReportReviewPage = () => {
                   Foto
                 </p>
                 <img
-                  src={
-                    resolveStoredUpload(photo.framed_file_url || photo.original_file_url, 'photo') ??
-                    (photo.framed_file_url || photo.original_file_url)
-                  }
+                  src={getMediaUrl('photo', photo.id)}
                   alt={participant.child_name}
                   className="w-24 h-24 object-cover rounded-xl"
                 />
@@ -188,10 +200,7 @@ const ReportReviewPage = () => {
             <div className="w-20 h-20 rounded-2xl bg-surface-variant flex items-center justify-center shrink-0 overflow-hidden">
               {photo ? (
                 <img
-                  src={
-                    resolveStoredUpload(photo.framed_file_url || photo.original_file_url, 'photo') ??
-                    (photo.framed_file_url || photo.original_file_url)
-                  }
+                  src={getMediaUrl('photo', photo.id)}
                   alt={participant.child_name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
@@ -240,7 +249,7 @@ const ReportReviewPage = () => {
 
         <ReportAssessmentScores stageInfos={stageInfos} />
 
-        {report.status !== ReportStatus.SENT && (
+        {report.status !== ReportStatus.SENT && !hasNoAssessment && (
           <Card title="Narasi AI" subtitle="Draft narasi yang akan dikirim ke orang tua">
             <textarea
               value={narrativeText}
@@ -261,7 +270,7 @@ const ReportReviewPage = () => {
           </Card>
         )}
 
-        {report.status !== ReportStatus.SENT && (
+        {report.status !== ReportStatus.SENT && !hasNoAssessment && (
           <ReportMissionSelector
             missions={missions}
             assignedMissionIds={assignedMissionIds}
@@ -270,71 +279,73 @@ const ReportReviewPage = () => {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 bg-surface rounded-2xl p-4 border border-outline-variant sticky bottom-4 shadow-lg no-print">
-        <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/reports/${sessionId}`)}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
-        </Button>
-        <div className="flex-1" />
-        <Button variant="secondary" size="sm" onClick={handleCetak} disabled={!!actionLoading}>
-          <Printer className="w-4 h-4 mr-1" /> Cetak
-        </Button>
-        <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={!!actionLoading}>
-          {actionLoading === 'pdf' ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
-            </>
-          ) : (
-            <>
-              <FileText className="w-4 h-4 mr-1" /> Unduh PDF
-            </>
-          )}
-        </Button>
-        <Button variant="secondary" size="sm" onClick={handleDownloadPng} disabled={!!actionLoading}>
-          {actionLoading === 'png' ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
-            </>
-          ) : (
-            <>
-              <Camera className="w-4 h-4 mr-1" /> Unduh PNG
-            </>
-          )}
-        </Button>
-        {canApprove && (
-          <Button
-            size="sm"
-            onClick={() => setShowApproveConfirm(true)}
-            disabled={actionLoading === 'approve'}
-          >
-            {actionLoading === 'approve' ? (
+      {!hasNoAssessment && (
+        <div className="flex flex-wrap items-center gap-3 bg-surface rounded-2xl p-4 border border-outline-variant sticky bottom-4 shadow-lg no-print">
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/reports/${sessionId}`)}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
+          </Button>
+          <div className="flex-1" />
+          <Button variant="secondary" size="sm" onClick={handleCetak} disabled={!!actionLoading}>
+            <Printer className="w-4 h-4 mr-1" /> Cetak
+          </Button>
+          <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={!!actionLoading}>
+            {actionLoading === 'pdf' ? (
               <>
                 <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
               </>
             ) : (
               <>
-                <CheckCircle className="w-4 h-4 mr-1" /> Setujui
+                <FileText className="w-4 h-4 mr-1" /> Unduh PDF
               </>
             )}
           </Button>
-        )}
-        {canSend && (
-          <Button
-            size="sm"
-            onClick={() => setShowSendConfirm(true)}
-            disabled={actionLoading === 'send'}
-          >
-            {actionLoading === 'send' ? (
+          <Button variant="secondary" size="sm" onClick={handleDownloadPng} disabled={!!actionLoading}>
+            {actionLoading === 'png' ? (
               <>
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Mengirim...
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
               </>
             ) : (
               <>
-                <Send className="w-4 h-4 mr-1" /> Kirim ke Orang Tua
+                <Camera className="w-4 h-4 mr-1" /> Unduh PNG
               </>
             )}
           </Button>
-        )}
-      </div>
+          {canApprove && (
+            <Button
+              size="sm"
+              onClick={() => setShowApproveConfirm(true)}
+              disabled={actionLoading === 'approve'}
+            >
+              {actionLoading === 'approve' ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-1" /> Setujui
+                </>
+              )}
+            </Button>
+          )}
+          {canSend && (
+            <Button
+              size="sm"
+              onClick={() => setShowSendConfirm(true)}
+              disabled={actionLoading === 'send'}
+            >
+              {actionLoading === 'send' ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Mengirim...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-1" /> Kirim ke Orang Tua
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      )}
 
       <Modal
         open={showApproveConfirm}

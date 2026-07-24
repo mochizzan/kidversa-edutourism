@@ -51,6 +51,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [narrativeText, setNarrativeText] = useState('')
+  const [hasNoAssessment, setHasNoAssessment] = useState(false)
 
   const loadData = useCallback(async () => {
     if (!sessionId || !reportId) return
@@ -83,6 +84,11 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
 
       const participants = await sessionService.getParticipants(sessionId)
       const part = participants.find((p) => p.id === rpt.participant_id) || null
+      if (!part) {
+        setError('Peserta tidak ditemukan untuk laporan ini.')
+        setLoading(false)
+        return
+      }
       setParticipant(part)
 
       const partAssessments = stageAssessments.filter((a) => a.participant_id === rpt.participant_id)
@@ -97,6 +103,9 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
         })
         .filter((s): s is NonNullable<typeof s> => s !== null) as StageInfo[]
       setStageInfos(builtStageInfos)
+
+      const hasNoAssessment = builtStageInfos.every((si) => !si.assessment)
+      setHasNoAssessment(hasNoAssessment)
 
       const reportPhoto =
         partPhotos.find((p) => p.participant_id === rpt.participant_id && p.is_report_photo) || null
@@ -253,5 +262,6 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     handleCetak,
     handleDownloadPdf,
     handleDownloadPng,
+    hasNoAssessment,
   }
 }
