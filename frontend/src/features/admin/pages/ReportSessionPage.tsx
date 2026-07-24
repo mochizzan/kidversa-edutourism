@@ -12,6 +12,7 @@ import {
   Star,
   Loader2,
   ChevronRight,
+  CheckCircle,
 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -20,10 +21,17 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Modal } from '../../../shared/components/ui/Modal'
+import { Tooltip } from '../../../shared/components/ui/Tooltip'
 import { ReportStatus } from '../../../core/types/enums'
-import { formatDate } from '../../../core/utils'
-import { reportStatusBadge, reportStatusLabel } from '../../../core/constants/reportStatus'
+import { formatDate, cn } from '../../../core/utils'
+import {
+  reportStatusBadge,
+  reportStatusLabel,
+  NO_ASSESSMENT_LABEL,
+  NO_REPORT_LABEL,
+} from '../../../core/constants/reportStatus'
 import { useReportSession } from '../hooks/useReportSession'
+import type { Participant } from '../../../core/types'
 
 const ReportSessionPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -32,7 +40,6 @@ const ReportSessionPage = () => {
   const {
     session,
     reports,
-    participants,
     loading,
     error,
     search,
@@ -40,36 +47,50 @@ const ReportSessionPage = () => {
     generating,
     sending,
     genError,
-    missingParticipants,
-    setMissingParticipants,
     filteredReports,
     approvedCount,
     loadData,
     handleGenerateAll,
+    handleGenerateOne,
     handleSendAll,
   } = useReportSession(sessionId)
 
-  // Allow regeneration: Generate is only blocked once every report is finalized
-  // (APPROVED or SENT). DRAFT reports can be (re)generated to (re)fill their
-  // narrative — the backend re-streams the narrative for existing drafts.
   const allFinalized =
     reports.length > 0 &&
     reports.every(
-      (r) => r.report.status === ReportStatus.APPROVED || r.report.status === ReportStatus.SENT,
+      (r) =>
+        r.report &&
+        (r.report.status === ReportStatus.APPROVED || r.report.status === ReportStatus.SENT),
     )
 
-  const [showMissingModal, setShowMissingModal] = useState(false)
+  const [generateResult, setGenerateResult] = useState<{
+    generatedCount: number
+    skippedParticipants: Participant[]
+  } | null>(null)
   const [showConfirmSend, setShowConfirmSend] = useState(false)
 
   const onGenerate = async () => {
     const result = await handleGenerateAll()
-    if (!result.ok && result.missingCount > 0) setShowMissingModal(true)
+    if (result.generatedCount > 0 || result.skippedParticipants.length > 0) {
+      setGenerateResult({
+        generatedCount: result.generatedCount,
+        skippedParticipants: result.skippedParticipants,
+      })
+    }
+  }
+
+  const onGenerateOne = async (participantId: string) => {
+    const item = reports.find((r) => r.participant.id === participantId)
+    if (!item || item.report || item.status !== 'ready_to_generate') return
+    await handleGenerateOne()
   }
 
   const onSend = async () => {
     const ok = await handleSendAll()
     if (ok) setShowConfirmSend(false)
   }
+
+  const hasEligibleParticipants = reports.some((r) => r.status === 'ready_to_generate')
 
   if (loading) {
     return (
@@ -122,7 +143,7 @@ const ReportSessionPage = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
-            Total Laporan
+            Total Peserta
           </p>
           <p className="text-2xl font-bold text-on-surface mt-1">{reports.length}</p>
         </Card>
@@ -131,7 +152,7 @@ const ReportSessionPage = () => {
             Draft
           </p>
           <p className="text-2xl font-bold text-on-surface mt-1">
-            {reports.filter((r) => r.report.status === ReportStatus.DRAFT).length}
+            {reports.filter((r) => r.report?.status === ReportStatus.DRAFT).length}
           </p>
         </Card>
         <Card className="!p-4">
@@ -145,7 +166,7 @@ const ReportSessionPage = () => {
             Terkirim
           </p>
           <p className="text-2xl font-bold text-primary mt-1">
-            {reports.filter((r) => r.report.status === ReportStatus.SENT).length}
+            {reports.filter((r) => r.report?.status === ReportStatus.SENT).length}
           </p>
         </Card>
       </div>
@@ -153,7 +174,7 @@ const ReportSessionPage = () => {
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={onGenerate}
-          disabled={generating || reports.length === 0 || participants.length === 0 || allFinalized}
+          disabled={generating || !hasEligibleParticipants || allFinalized}
         >
           {generating ? (
             <>
@@ -207,98 +228,177 @@ const ReportSessionPage = () => {
       {filteredReports.length === 0 ? (
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
-          title={search ? 'Peserta tidak ditemukan' : 'Belum ada laporan'}
+          title={search ? 'Peserta tidak ditemukan' : 'Belum ada peserta'}
           description={
-            search ? 'Coba gunakan kata kunci lain.' : 'Generate laporan untuk peserta sesi ini.'
+            search ? 'Coba gunakan kata kunci lain.' : 'Peserta akan muncul setelah ditambahkan ke sesi.'
           }
         />
       ) : (
         <div className="grid gap-3">
-          {filteredReports.map((item) => (
-            <Link
-              key={item.report.id}
-              to={`/admin/reports/${sessionId}/review/${item.report.id}`}
-              className="block bg-surface rounded-2xl border border-outline-variant hover:shadow-md hover:border-primary-container transition-all duration-200 p-4"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5" />
-                </div>
+          {filteredReports.map((item) => {
+            const isClickable = item.status === 'has_report'
+            const showGenerateBtn = item.status === 'ready_to_generate'
+            const isIncomplete = item.status === 'incomplete'
+            const isNoAssessment = item.status === 'no_assessment'
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-on-surface truncate">
-                      {item.participant.child_name}
-                    </p>
-                    <Badge variant={reportStatusBadge[item.report.status]} size="sm">
-                      {reportStatusLabel[item.report.status]}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-on-surface-variant mt-0.5">
-                    {item.avgRating > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Star className="w-3.5 h-3.5 text-accent fill-accent" />
-                        {item.avgRating.toFixed(1)}
-                      </span>
+            const cardContent = (
+              <div
+                className={cn(
+                  'rounded-2xl border p-4 transition-all duration-200',
+                  isClickable
+                    ? 'bg-surface border-outline-variant hover:shadow-md hover:border-primary-container cursor-pointer'
+                    : 'bg-surface border-outline-variant/50',
+                  (isIncomplete || isNoAssessment) && 'opacity-75',
+                )}
+              >
+                <div className="flex items-center gap-4">
+                  <div
+                    className={cn(
+                      'w-10 h-10 rounded-full flex items-center justify-center shrink-0',
+                      isClickable
+                        ? 'bg-primary-container text-on-primary-container'
+                        : 'bg-surface-variant text-on-surface-variant',
                     )}
-                    {item.participant.school_name && <span>{item.participant.school_name}</span>}
+                  >
+                    <User className="w-5 h-5" />
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {item.report.status === ReportStatus.APPROVED && (
-                    <span className="text-xs text-green-600 font-medium">Siap kirim</span>
-                  )}
-                  <ChevronRight className="w-4 h-4 text-on-surface-variant" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-on-surface truncate">
+                        {item.participant.child_name}
+                      </p>
+                      {item.report && (
+                        <Badge variant={reportStatusBadge[item.report.status]} size="sm">
+                          {reportStatusLabel[item.report.status]}
+                        </Badge>
+                      )}
+                      {showGenerateBtn && (
+                        <Badge variant="success" size="sm">
+                          Siap Generate
+                        </Badge>
+                      )}
+                      {isNoAssessment && (
+                        <Tooltip content="Lengkapi penilaian terlebih dahulu di halaman Assessment">
+                          <Badge variant="warning" size="sm">
+                            {NO_ASSESSMENT_LABEL}
+                          </Badge>
+                        </Tooltip>
+                      )}
+                      {isIncomplete && (
+                        <Tooltip content="Peserta belum memiliki penilaian. Lengkapi penilaian terlebih dahulu.">
+                          <Badge variant="neutral" size="sm">
+                            {NO_REPORT_LABEL}
+                          </Badge>
+                        </Tooltip>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-on-surface-variant mt-0.5">
+                      {item.avgRating > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-accent fill-accent" />
+                          {item.avgRating.toFixed(1)}
+                        </span>
+                      )}
+                      {item.participant.school_name && (
+                        <span>{item.participant.school_name}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {showGenerateBtn && (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        disabled={generating}
+                        onClick={(e) => {
+                          e?.preventDefault()
+                          e?.stopPropagation()
+                          onGenerateOne(item.participant.id)
+                        }}
+                      >
+                        <FileText className="w-3.5 h-3.5 mr-1" /> Generate
+                      </Button>
+                    )}
+                    {item.report?.status === ReportStatus.APPROVED && (
+                      <span className="text-xs text-green-600 font-medium">Siap kirim</span>
+                    )}
+                    {isClickable && <ChevronRight className="w-4 h-4 text-on-surface-variant" />}
+                  </div>
                 </div>
               </div>
-            </Link>
-          ))}
+            )
+
+            if (isClickable && item.report) {
+              return (
+                <Link
+                  key={item.participant.id}
+                  to={`/admin/reports/${sessionId}/review/${item.report.id}`}
+                  className="block"
+                >
+                  {cardContent}
+                </Link>
+              )
+            }
+
+            return (
+              <div key={item.participant.id}>{cardContent}</div>
+            )
+          })}
         </div>
       )}
 
       <Modal
-        open={showMissingModal}
-        onClose={() => {
-          setShowMissingModal(false)
-          setMissingParticipants([])
-        }}
-        title="Data Penilaian Belum Lengkap"
+        open={!!generateResult}
+        onClose={() => setGenerateResult(null)}
+        title="Hasil Generate Laporan"
         size="md"
         footer={
           <div className="flex justify-end">
-            <Button
-              onClick={() => {
-                setShowMissingModal(false)
-                setMissingParticipants([])
-              }}
-            >
-              Mengerti
-            </Button>
+            <Button onClick={() => setGenerateResult(null)}>Mengerti</Button>
           </div>
         }
       >
-        <div className="space-y-3">
-          <div className="flex items-start gap-2 text-sm text-on-surface-variant">
-            <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
-            <p>
-              Peserta berikut belum memiliki data penilaian. Silakan lengkapi penilaian terlebih
-              dahulu sebelum generate laporan.
-            </p>
+        {generateResult && (
+          <div className="space-y-3">
+            {generateResult.generatedCount > 0 && (
+              <div className="flex items-start gap-2 text-sm text-on-surface-variant">
+                <CheckCircle className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                <p>
+                  Berhasil generate <strong>{generateResult.generatedCount} laporan</strong> untuk
+                  peserta yang sudah memiliki penilaian.
+                </p>
+              </div>
+            )}
+            {generateResult.skippedParticipants.length > 0 && (
+              <>
+                <div className="flex items-start gap-2 text-sm text-on-surface-variant">
+                  <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+                  <p>
+                    Peserta berikut <strong>tidak dapat digenerate</strong> karena belum memiliki data
+                    penilaian:
+                  </p>
+                </div>
+                <ul className="space-y-2">
+                  {generateResult.skippedParticipants.map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-surface-variant text-sm"
+                    >
+                      <User className="w-4 h-4 text-on-surface-variant" />
+                      <span className="font-medium text-on-surface">{p.child_name}</span>
+                      <span className="text-on-surface-variant">({p.school_name || '-'})</span>
+                      <Badge variant="warning" size="sm">
+                        Belum Dinilai
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
-          <ul className="space-y-2">
-            {missingParticipants.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center gap-3 p-3 rounded-xl bg-surface-variant text-sm"
-              >
-                <User className="w-4 h-4 text-on-surface-variant" />
-                <span className="font-medium text-on-surface">{p.child_name}</span>
-                <span className="text-on-surface-variant">({p.school_name || '-'})</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        )}
       </Modal>
 
       <Modal
