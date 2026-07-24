@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react'
 import { cn } from '../../../core/utils'
-import { resolveStoredUpload } from '../../../core/utils/media'
+import { getMediaUrl } from '../../../core/utils/media'
 import type { PhotoFrame } from '../../../core/types'
 
 const FALLBACK_SVG =
@@ -43,7 +43,7 @@ export const FramePicker = ({ frames, selectedFrameId, onSelect }: FramePickerPr
       >
         {frame.thumbnail_url || frame.file_url ? (
           <img
-            src={resolveStoredUpload(frame.thumbnail_url || frame.file_url, 'frame') ?? frame.file_url}
+            src={getMediaUrl('frame', frame.id)}
             alt={frame.name}
             className="w-full h-full object-cover"
             onError={(e) => {

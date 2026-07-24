@@ -398,8 +398,13 @@ func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessio
 }
 
 // ImportParticipants bulk-creates participants inside a single transaction.
-func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessionID string, rows []repository.ParticipantInput) ([]entity.Participant, error) {
-	out := make([]entity.Participant, 0, len(rows))
+// Duplicate participants (same child_name + parent_phone within the same program)
+// are skipped and reported in the result.
+func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessionID string, rows []repository.ParticipantInput) (*repository.ImportResult, error) {
+	result := &repository.ImportResult{
+		Created: make([]entity.Participant, 0, len(rows)),
+		Skipped: make([]repository.DuplicateParticipantInfo, 0),
+	}
 	err := u.sessionRepo.Transaction(ctx, func(tx repository.SessionRepository) error {
 		tp := &tenantID
 		if tenantID == "" {
@@ -409,8 +414,46 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 		if sessionID == "" {
 			sid = nil
 		}
+
+		// Resolve the program_id for duplicate detection.
+		var programID string
+		if sessionID != "" {
+			s, serr := tx.GetSessionByID(ctx, sessionID, "")
+			if serr == nil {
+				programID = s.ProgramID
+			}
+		}
+
+		// Check for duplicates before creating.
+		var dups []repository.DuplicateParticipantInfo
+		if programID != "" {
+			d, derr := tx.FindDuplicateParticipants(ctx, programID, tenantID, rows)
+			if derr != nil {
+				return derr
+			}
+			dups = d
+		}
+
+		// Build a set of duplicate keys for O(1) lookup.
+		dupKeys := make(map[string]bool, len(dups))
+		for _, d := range dups {
+			key := d.ChildName + "|" + d.ParentPhone
+			dupKeys[key] = true
+		}
+
 		for _, r := range rows {
-			gid := r.GroupID // already *string (nil = no group)
+			key := r.ChildName + "|" + r.ParentPhone
+			if dupKeys[key] {
+				// Find the matching dup info to include in skipped.
+				for _, d := range dups {
+					if (d.ChildName + "|" + d.ParentPhone) == key {
+						result.Skipped = append(result.Skipped, d)
+						break
+					}
+				}
+				continue
+			}
+			gid := r.GroupID
 			p := &entity.Participant{
 				TenantID:         tp,
 				SessionID:        sid,
@@ -427,22 +470,36 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 			if err := tx.CreateParticipant(ctx, p); err != nil {
 				return err
 			}
-			out = append(out, *p)
+			result.Created = append(result.Created, *p)
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	return result, nil
 }
 
 // LinkParticipant attaches an existing participant to a session (and optional group).
-func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, participantID, groupID, tenantID string) (*entity.Participant, error) {
+// If the participant was already linked to another session, the previous session info
+// is returned so the caller can display migration context.
+func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, participantID, groupID, tenantID string) (*repository.LinkParticipantResult, error) {
 	p, err := u.sessionRepo.GetParticipantByID(ctx, participantID, tenantID)
 	if err != nil {
 		return nil, err
 	}
+
+	// Capture previous session info before overwrite.
+	var prevSessionID, prevSessionName, prevProgramID string
+	if p.SessionID != nil && *p.SessionID != "" {
+		prevSessionID = *p.SessionID
+		prevS, serr := u.sessionRepo.GetSessionByID(ctx, prevSessionID, "")
+		if serr == nil {
+			prevSessionName = prevS.Name
+			prevProgramID = prevS.ProgramID
+		}
+	}
+
 	sid := sessionID
 	p.SessionID = &sid
 	if groupID != "" {
@@ -452,7 +509,23 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	if err := u.sessionRepo.UpdateParticipant(ctx, p); err != nil {
 		return nil, err
 	}
-	return p, nil
+	return &repository.LinkParticipantResult{
+		Participant:         *p,
+		PreviousSessionID:   prevSessionID,
+		PreviousSessionName: prevSessionName,
+		PreviousProgramID:   prevProgramID,
+	}, nil
+}
+
+// GetParticipantsForProgram returns all participants linked to sessions of the
+// given program, enriched with session context.
+func (u *SessionUsecase) GetParticipantsForProgram(ctx context.Context, programID, tenantID string) ([]repository.ParticipantSessionInfo, error) {
+	return u.sessionRepo.ListParticipantsForProgram(ctx, programID, tenantID)
+}
+
+// FindParticipantSessionInfo returns session context for a batch of participant IDs.
+func (u *SessionUsecase) FindParticipantSessionInfo(ctx context.Context, participantIDs []string, tenantID string) ([]repository.ParticipantSessionInfo, error) {
+	return u.sessionRepo.FindParticipantSessionInfo(ctx, participantIDs, tenantID)
 }
 
 // UpdateParticipant patches a participant's fields.

@@ -77,10 +77,11 @@ export interface SessionService {
   getParticipants(sessionId: string, groupId?: string): Promise<Participant[]>
   getParticipantById(participantId: string): Promise<Participant | null>
   addParticipant(sessionId: string, groupId: string, data: CreateParticipantDTO): Promise<Participant>
-  linkParticipant(sessionId: string, groupId: string, participantId: string): Promise<Participant>
+  linkParticipant(sessionId: string, groupId: string, participantId: string): Promise<import('../types').LinkParticipantResponse>
   updateParticipant(sessionId: string, participantId: string, data: Partial<CreateParticipantDTO>): Promise<Participant>
   removeParticipant(sessionId: string, participantId: string): Promise<void>
-  importParticipants(sessionId: string, rows: CreateParticipantDTO[]): Promise<Participant[]>
+  importParticipants(sessionId: string, rows: CreateParticipantDTO[]): Promise<import('../types').ImportResult>
+  getLinkableParticipants(sessionId: string): Promise<import('../types').ParticipantSessionInfo[]>
 }
 
 // Participants

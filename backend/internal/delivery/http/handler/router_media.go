@@ -15,8 +15,15 @@ import (
 // on-disk security checks live in the handler.
 func RegisterMediaRoutes(g *echo.Group, h *MediaHandler, jm *auth.JWTManager, cfg *config.Config, revoker auth.TokenRevoker) {
 	sseCookie := cfg.SSECookieName()
-	g.GET("/media/:kind/:id", h.Get,
+	g.GET("/:kind/:id", h.Get,
 		appmiddleware.JWTAuth(jm, sseCookie, revoker),
 		appmiddleware.TenantScope(),
 	)
+}
+
+// RegisterKioskMediaRoutes mounts a PUBLIC content-serving endpoint for the
+// learner kiosk — no JWT or session cookie required. Only stage content files
+// are served; photos/recordings/frames/avatars remain authenticated.
+func RegisterKioskMediaRoutes(g *echo.Group, h *MediaHandler) {
+	g.GET("/content/:id", h.GetContent)
 }

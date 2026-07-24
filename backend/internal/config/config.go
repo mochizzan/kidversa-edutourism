@@ -69,6 +69,12 @@ type Config struct {
 	WhatsAppAPIKey       string
 	WhatsAppSessionID    string
 	ParentConsentBaseURL string
+
+	// OpenRouter AI (narrative generation)
+	OpenRouterAPIKey    string
+	OpenRouterModel     string
+	OpenRouterBaseURL   string
+	OpenRouterMaxTokens int
 }
 
 // Load reads configuration from the environment (optionally via .env) and validates the critical fields.
@@ -121,6 +127,16 @@ func Load() *Config {
 		WhatsAppAPIKey:       getEnv("WHATSAPP_API_KEY", ""),
 		WhatsAppSessionID:    getEnv("WHATSAPP_SESSION_ID", "6d2b9940-f055-4f81-93c3-5b4e4f8b574a"),
 		ParentConsentBaseURL: getEnv("PARENT_CONSENT_BASE_URL", "http://localhost:5173/consent/respond"),
+
+		OpenRouterAPIKey:    getEnv("OPENROUTER_API_KEY", ""),
+		OpenRouterModel:     getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
+		OpenRouterBaseURL:   getEnv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+		OpenRouterMaxTokens: getEnvInt("OPENROUTER_MAX_TOKENS", 1024),
+	}
+
+	// Warn if OpenRouter API key is not set — server starts but AI features will fail.
+	if c.OpenRouterAPIKey == "" {
+		log.Printf("config: OPENROUTER_API_KEY is not set; AI narrative generation will be unavailable")
 	}
 
 	// Validate critical security field.

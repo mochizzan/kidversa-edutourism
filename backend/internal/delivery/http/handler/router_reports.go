@@ -9,11 +9,10 @@ import (
 
 // RegisterReportsRoutes mounts /api/reports/* on the given echo group.
 //   - GET  /api/reports/access?token=...   PUBLIC (anti-IDOR parent access)
-//   - POST /api/reports/:id/generate        (async narrative placeholder)
+//   - POST /api/reports/:id/generate        (full AI narrative generation)
 //   - POST /api/reports/:id/approve
 //   - POST /api/reports/:id/send            (generates parent token)
 //   - POST /api/reports/:id/revoke-token
-//   - GET  /api/reports/:id/narrative-stream (SSE)
 //
 // The public access endpoint is intentionally OUTSIDE JWTAuth; the token itself
 // is the authorization mechanism.
@@ -30,5 +29,4 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	g.POST("/:id/approve", h.Approve, authMW, scopeMW)
 	g.POST("/:id/send", h.Send, authMW, scopeMW)
 	g.POST("/:id/revoke-token", h.RevokeToken, authMW, scopeMW)
-	g.GET("/:id/narrative-stream", h.NarrativeStream, authMW, scopeMW)
 }

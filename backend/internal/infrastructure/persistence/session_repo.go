@@ -442,3 +442,113 @@ func tableExists(ctx context.Context, db *gorm.DB, name string) (bool, error) {
 	}
 	return cnt > 0, nil
 }
+
+func (r *GormSessionRepository) FindParticipantSessionInfo(ctx context.Context, participantIDs []string, tenantID string) ([]repository.ParticipantSessionInfo, error) {
+	if len(participantIDs) == 0 {
+		return nil, nil
+	}
+
+	type resultRow struct {
+		entity.Participant
+		SessionName string `gorm:"column:session_name"`
+		ProgramID   string `gorm:"column:program_id"`
+	}
+
+	var rows []resultRow
+	q := r.db.WithContext(ctx).
+		Table("participants AS p").
+		Select("p.*, s.name AS session_name, s.program_id AS program_id").
+		Joins("LEFT JOIN sessions AS s ON s.id = p.session_id AND s.deleted_at IS NULL").
+		Where("p.id IN ?", participantIDs)
+	if tenantID != "" {
+		q = q.Where("p.tenant_id = ?", tenantID)
+	}
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+
+	out := make([]repository.ParticipantSessionInfo, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, repository.ParticipantSessionInfo{
+			Participant: r.Participant,
+			SessionName: r.SessionName,
+			SessionID:   r.Participant.SessionIDValue(),
+			ProgramID:   r.ProgramID,
+		})
+	}
+	return out, nil
+}
+
+func (r *GormSessionRepository) ListParticipantsForProgram(ctx context.Context, programID, tenantID string) ([]repository.ParticipantSessionInfo, error) {
+	type resultRow struct {
+		entity.Participant
+		SessionName string `gorm:"column:session_name"`
+		ProgramID   string `gorm:"column:program_id"`
+	}
+
+	var rows []resultRow
+	q := r.db.WithContext(ctx).
+		Table("participants AS p").
+		Select("p.*, s.name AS session_name, s.program_id AS program_id").
+		Joins("INNER JOIN sessions AS s ON s.id = p.session_id AND s.deleted_at IS NULL").
+		Where("s.program_id = ?", programID)
+	if tenantID != "" {
+		q = q.Where("p.tenant_id = ?", tenantID)
+	}
+	if err := q.Order("p.created_at ASC").Find(&rows).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+
+	out := make([]repository.ParticipantSessionInfo, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, repository.ParticipantSessionInfo{
+			Participant: r.Participant,
+			SessionName: r.SessionName,
+			SessionID:   r.Participant.SessionIDValue(),
+			ProgramID:   r.ProgramID,
+		})
+	}
+	return out, nil
+}
+
+func (r *GormSessionRepository) FindDuplicateParticipants(ctx context.Context, programID, tenantID string, rows []repository.ParticipantInput) ([]repository.DuplicateParticipantInfo, error) {
+	if len(rows) == 0 || programID == "" {
+		return nil, nil
+	}
+
+	type dupRow struct {
+		ParticipantID string `gorm:"column:participant_id"`
+		ChildName     string `gorm:"column:child_name"`
+		ParentPhone   string `gorm:"column:parent_phone"`
+		SessionName   string `gorm:"column:session_name"`
+	}
+
+	var dupRows []dupRow
+	for _, row := range rows {
+		var found []dupRow
+		q := r.db.WithContext(ctx).
+			Table("participants AS p").
+			Select("p.id AS participant_id, p.child_name, p.parent_phone, s.name AS session_name").
+			Joins("INNER JOIN sessions AS s ON s.id = p.session_id AND s.deleted_at IS NULL").
+			Where("s.program_id = ? AND s.deleted_at IS NULL", programID).
+			Where("LOWER(p.child_name) = LOWER(?) AND LOWER(p.parent_phone) = LOWER(?)", row.ChildName, row.ParentPhone)
+		if tenantID != "" {
+			q = q.Where("p.tenant_id = ?", tenantID)
+		}
+		if err := q.Find(&found).Error; err != nil {
+			return nil, apperrors.Internal("internal_error", err)
+		}
+		dupRows = append(dupRows, found...)
+	}
+
+	out := make([]repository.DuplicateParticipantInfo, 0, len(dupRows))
+	for _, d := range dupRows {
+		out = append(out, repository.DuplicateParticipantInfo{
+			ParticipantID:   d.ParticipantID,
+			ChildName:       d.ChildName,
+			ParentPhone:     d.ParentPhone,
+			ExistingSession: d.SessionName,
+		})
+	}
+	return out, nil
+}

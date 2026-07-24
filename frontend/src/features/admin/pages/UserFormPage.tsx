@@ -16,7 +16,7 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { redirectToLogin } from '../../../core/stores/authStore'
-import { resolveStoredUpload } from '../../../core/utils/media'
+import { getMediaUrl } from '../../../core/utils/media'
 import { ApiError } from '../../../core/services/backendClient'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { UpdateUserDTO } from '../../../core/types'
@@ -94,7 +94,7 @@ const UserFormPage = () => {
             phone: foundUser.phone || '',
             role: foundUser.role,
           } as UpdateFormData)
-          setAvatarPreview(foundUser.avatar_url ? resolveStoredUpload(foundUser.avatar_url, 'avatar') ?? foundUser.avatar_url : null)
+          setAvatarPreview(foundUser.avatar_url ? getMediaUrl('avatar', foundUser.id) : null)
         } else {
           addToast({ type: 'error', message: 'User tidak ditemukan' })
           navigate(ROUTES.ADMIN.USERS)

@@ -16,6 +16,8 @@ import type { StageContent, Program, ProgramStage } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
 import { YOUTUBE_LABEL } from '../../../core/constants/labels'
 import { contentEditPath } from '../../../core/constants/app'
+import { getContentThumbnailSrc } from '../../../core/utils/content'
+import { getActiveTenantId } from '../../../core/utils/tenant'
 
 // ── File type helpers ──
 
@@ -193,19 +195,42 @@ const ContentPage = () => {
           {contents.map((item) => {
             const meta = FILE_TYPE_META[item.file_type] || FILE_TYPE_META.VIDEO
             const isYouTube = item.file_type === StageContentFileType.VIDEO && !!item.youtube_url
+            const thumbnail = getContentThumbnailSrc(item, getActiveTenantId() ?? undefined)
             return (
-              <Card key={item.id} padding="sm" className="hover:shadow-md transition-shadow flex flex-col">
-                <div className="flex items-center justify-between mb-3">
-                  <div className={cn('flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ring-1', meta.bg, meta.fg, meta.ring)}>
+              <Card key={item.id} padding="none" className="hover:shadow-md transition-shadow flex flex-col overflow-hidden">
+                <div className="relative aspect-video bg-surface-container-high flex items-center justify-center overflow-hidden">
+                  {thumbnail.type === 'image' && thumbnail.src ? (
+                    <img
+                      src={thumbnail.src}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : thumbnail.type === 'video' && thumbnail.src ? (
+                    <video
+                      src={thumbnail.src}
+                      className="w-full h-full object-cover"
+                      preload="metadata"
+                      muted
+                    />
+                  ) : (
+                    <div className={cn('flex items-center justify-center w-12 h-12 rounded-full', meta.bg)}>
+                      <span className={meta.fg}>{meta.icon}</span>
+                    </div>
+                  )}
+                  <div className={cn('absolute top-2 left-2 flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ring-1', meta.bg, meta.fg, meta.ring)}>
                     {meta.icon}
                     {isYouTube ? YOUTUBE_LABEL : meta.label}
                   </div>
-                  <Badge variant={item.is_active ? 'success' : 'neutral'} size="sm">
+                  <Badge
+                    variant={item.is_active ? 'success' : 'neutral'}
+                    size="sm"
+                    className="absolute top-2 right-2 !text-[10px] !px-1.5"
+                  >
                     {item.is_active ? 'Aktif' : 'Nonaktif'}
                   </Badge>
                 </div>
 
-                <div className="flex-1 min-w-0">
+                <div className="p-4 flex flex-col flex-1 min-w-0">
                   <p className="font-medium text-on-surface truncate" title={item.title}>{item.title}</p>
                   <p className="text-xs text-on-surface-variant mt-0.5 truncate">
                     Stage: {item.stageName}
@@ -213,22 +238,22 @@ const ContentPage = () => {
                   <p className="text-xs text-on-surface-variant/60 mt-0.5">
                     {isYouTube ? YOUTUBE_LABEL : formatDuration(item.duration_seconds)}
                   </p>
-                </div>
 
-                <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-outline-variant/20">
-                  <Link to={contentEditPath(item.id)}>
+                  <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-outline-variant/20">
+                    <Link to={contentEditPath(item.id)}>
+                      <Button
+                        variant="ghost" size="sm"
+                        icon={<Pencil className="w-3.5 h-3.5" />}
+                        tooltip="Edit"
+                      />
+                    </Link>
                     <Button
                       variant="ghost" size="sm"
-                      icon={<Pencil className="w-3.5 h-3.5" />}
-                      tooltip="Edit"
+                      icon={<Trash2 className="w-3.5 h-3.5 text-error" />}
+                      tooltip="Hapus"
+                      onClick={() => setDeleteContent({ id: item.id, stageId: item.program_stage_id })}
                     />
-                  </Link>
-                  <Button
-                    variant="ghost" size="sm"
-                    icon={<Trash2 className="w-3.5 h-3.5 text-error" />}
-                    tooltip="Hapus"
-                    onClick={() => setDeleteContent({ id: item.id, stageId: item.program_stage_id })}
-                  />
+                  </div>
                 </div>
               </Card>
             )

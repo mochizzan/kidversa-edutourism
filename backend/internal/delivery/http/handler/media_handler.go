@@ -162,6 +162,10 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		owningTenant = derefTenant(u.TenantID)
 	}
 
+	if relPath == "" {
+		return appresp.Fail(c, http.StatusNotFound, "not_found")
+	}
+
 	// Tenant scope check.
 	if owningTenant != callerTenant {
 		return appresp.Fail(c, http.StatusForbidden, "forbidden")
@@ -192,6 +196,47 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusForbidden, "file_type_blocked")
 	}
 	return (*c).Blob(http.StatusOK, ct, data)
+}
+
+// GetContent serves stage content files without authentication — used by the
+// public learner kiosk where no JWT is available. Only content files are
+// served; photos, recordings, frames, and avatars remain JWT-gated.
+func (h *MediaHandler) GetContent(c *echo.Context) error {
+	id := (*c).Param("id")
+	if _, err := uuid.Parse(id); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
+	}
+
+	ct, err := h.programs.GetContentByID((*c).Request().Context(), id)
+	if err != nil {
+		return err
+	}
+	relPath := ct.FileURL
+	if relPath == "" {
+		return appresp.Fail(c, http.StatusNotFound, "not_found")
+	}
+
+	dest := filepath.Join(h.cfg.UploadDir, filepath.FromSlash(relPath))
+	if !withinDir(h.cfg.UploadDir, dest) {
+		return appresp.Fail(c, http.StatusNotFound, "not_found")
+	}
+	if strings.EqualFold(filepath.Ext(dest), ".html") {
+		return appresp.Fail(c, http.StatusForbidden, "file_type_blocked")
+	}
+
+	data, err := os.ReadFile(dest)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return appresp.Fail(c, http.StatusNotFound, "not_found")
+		}
+		return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
+	}
+
+	safeCt := safeContentType(filepath.Ext(dest))
+	if safeCt == "" {
+		return appresp.Fail(c, http.StatusForbidden, "file_type_blocked")
+	}
+	return (*c).Blob(http.StatusOK, safeCt, data)
 }
 
 // derefTenant normalizes a nullable tenant pointer into an empty-or-value string.

@@ -1,6 +1,8 @@
 import { StageContentFileType, ContentType } from '../types/enums'
 import type { StageContent } from '../types'
 import type { ProgramService } from '../services/types'
+import { getMediaUrl } from './media'
+import { extractYouTubeID } from './youtube'
 
 export function autoDetectFileType(file: File): StageContentFileType {
   if (file.type.startsWith('video/')) return StageContentFileType.VIDEO
@@ -57,4 +59,27 @@ export async function syncStageMeta(
     content_type: detectContentType(contents),
     duration_minutes: computeDurationMinutes(contents),
   })
+}
+
+export type ContentThumbnail = { type: 'image'; src: string } | { type: 'video'; src: string } | { type: 'icon'; src: null }
+
+export function getContentThumbnailSrc(content: StageContent, tenantId?: string): ContentThumbnail {
+  const suffix = tenantId ? `?tenant_id=${tenantId}` : ''
+
+  if (content.file_type === StageContentFileType.VIDEO && content.youtube_url) {
+    const videoId = extractYouTubeID(content.youtube_url)
+    if (videoId) {
+      return { type: 'image', src: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` }
+    }
+  }
+
+  if (content.file_type === StageContentFileType.IMAGE && content.file_url) {
+    return { type: 'image', src: `${getMediaUrl('content', content.id)}${suffix}` }
+  }
+
+  if (content.file_type === StageContentFileType.VIDEO && content.file_url) {
+    return { type: 'video', src: `${getMediaUrl('content', content.id)}${suffix}` }
+  }
+
+  return { type: 'icon', src: null }
 }

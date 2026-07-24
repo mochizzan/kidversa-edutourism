@@ -11,7 +11,7 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { frameService } from '../../../core/services/frames'
 import { programService } from '../../../core/services/programs'
-import { resolveStoredUpload } from '../../../core/utils/media'
+import { getMediaUrl } from '../../../core/utils/media'
 import { formatDate } from '../../../shared/utils'
 import type { PhotoFrame, Program } from '../../../core/types'
 
@@ -91,7 +91,7 @@ const FramesPage = () => {
                 <div className="relative w-20 h-16 shrink-0 rounded-xl bg-surface-container-high overflow-hidden flex items-center justify-center">
                   {frame.thumbnail_url || frame.file_url ? (
                     <img
-                      src={resolveStoredUpload(frame.thumbnail_url || frame.file_url, 'frame') ?? frame.file_url}
+                      src={getMediaUrl('frame', frame.id)}
                       alt={frame.name}
                       className="w-full h-full object-cover"
                     />

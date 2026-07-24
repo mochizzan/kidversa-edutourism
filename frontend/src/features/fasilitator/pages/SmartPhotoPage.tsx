@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Camera, AlertTriangle, ChevronLeft } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
-import { resolveStoredUpload } from '../../../core/utils/media'
+import { getMediaUrl } from '../../../core/utils/media'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { frameService } from '../../../core/services/frames'
@@ -135,7 +135,7 @@ const SmartPhotoPage = () => {
         if (frame?.file_url) {
           try {
             const frameImg = await loadImage(
-              resolveStoredUpload(frame.file_url, 'frame') ?? frame.file_url,
+              getMediaUrl('frame', frame.id),
             )
             if (!cancelled) ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height)
           } catch {

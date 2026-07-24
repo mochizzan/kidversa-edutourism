@@ -54,6 +54,8 @@ export const API_ROUTES = {
       `/api/sessions/${encodeURIComponent(sessionId)}/participants/link`,
     IMPORT_PARTICIPANTS: (sessionId: string) =>
       `/api/sessions/${encodeURIComponent(sessionId)}/participants/import`,
+    LINKABLE_PARTICIPANTS: (sessionId: string) =>
+      `/api/sessions/${encodeURIComponent(sessionId)}/participants/linkable`,
     KIOSK_ACCESS: (sessionId: string) =>
       `/api/sessions/${encodeURIComponent(sessionId)}/kiosk`,
   },
@@ -133,7 +135,6 @@ export const API_ROUTES = {
     APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
     SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
     REVOKE_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-token`,
-    NARRATIVE_STREAM: (id: string) => `/api/reports/${encodeURIComponent(id)}/narrative-stream`,
     ACCESS: '/api/reports/access',
   },
 

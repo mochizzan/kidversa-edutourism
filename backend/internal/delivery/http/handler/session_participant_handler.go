@@ -72,11 +72,16 @@ func (h *SessionParticipantHandler) LinkParticipant(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	p, err := h.uc.LinkParticipant((*c).Request().Context(), id, req.ParticipantID, req.GroupID, appmiddleware.GetTenantID(c))
+	result, err := h.uc.LinkParticipant((*c).Request().Context(), id, req.ParticipantID, req.GroupID, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
-	return appresp.OK(c, p)
+	return appresp.OK(c, dto.LinkParticipantResponse{
+		Participant:         result.Participant,
+		PreviousSessionID:   result.PreviousSessionID,
+		PreviousSessionName: result.PreviousSessionName,
+		PreviousProgramID:   result.PreviousProgramID,
+	})
 }
 
 // GetParticipantGlobal handles the global GET /api/participants/:id (tenant-scoped
@@ -131,4 +136,29 @@ func (h *SessionParticipantHandler) DeleteParticipant(c *echo.Context) error {
 		return err
 	}
 	return appresp.NoContent(c)
+}
+
+// ListLinkableParticipants returns participants linked to sessions of the same
+// program as the target session, enriched with session context. Used by the
+// "Tambah Peserta" modal to show migration badges.
+func (h *SessionParticipantHandler) ListLinkableParticipants(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	ctx := (*c).Request().Context()
+
+	// Resolve the program_id from the target session.
+	session, err := h.uc.GetSession(ctx, id, tenantID)
+	if err != nil {
+		return err
+	}
+	programID := session.Session.ProgramID
+
+	ps, err := h.uc.GetParticipantsForProgram(ctx, programID, tenantID)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, ps)
 }

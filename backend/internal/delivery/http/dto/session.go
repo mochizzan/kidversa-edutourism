@@ -81,6 +81,14 @@ type LinkParticipantRequest struct {
 	GroupID       string `json:"group_id,omitempty"`
 }
 
+// LinkParticipantResponse wraps the migrated participant with previous session context.
+type LinkParticipantResponse struct {
+	entity.Participant
+	PreviousSessionID   string `json:"previous_session_id,omitempty"`
+	PreviousSessionName string `json:"previous_session_name,omitempty"`
+	PreviousProgramID   string `json:"previous_program_id,omitempty"`
+}
+
 // GroupWithParticipants groups a session group with its participants (GET detail).
 type GroupWithParticipants struct {
 	entity.SessionGroup

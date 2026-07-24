@@ -28,11 +28,6 @@ type KioskTokenRequest struct {
 	SessionID string `json:"session_id" validate:"required"`
 }
 
-// ParentTokenRequest requests a parent report token.
-type ParentTokenRequest struct {
-	ReportID string `json:"report_id" validate:"required"`
-}
-
 // LoginResponse is returned by login/refresh.
 type LoginResponse struct {
 	AccessToken  string       `json:"access_token"`

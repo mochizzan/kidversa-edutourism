@@ -7,6 +7,9 @@ import type {
   CreateParticipantDTO,
   CreateSessionDTO,
   UpdateSessionDTO,
+  ParticipantSessionInfo,
+  LinkParticipantResponse,
+  ImportResult,
 } from '../types'
 import { listRequest, itemRequest, voidRequest, arrayRequest, normalizeTenantId } from './apiEnvelope'
 import { API_ROUTES } from '../constants/apiRoutes'
@@ -119,7 +122,7 @@ export const sessionService: SessionService = {
     }),
 
   linkParticipant: (sessionId, groupId, participantId) =>
-    itemRequest<Participant>('POST', API_ROUTES.SESSIONS.LINK_PARTICIPANT(sessionId), {
+    itemRequest<LinkParticipantResponse>('POST', API_ROUTES.SESSIONS.LINK_PARTICIPANT(sessionId), {
       participant_id: participantId,
       group_id: groupId,
     }),
@@ -141,7 +144,7 @@ export const sessionService: SessionService = {
     voidRequest('DELETE', API_ROUTES.SESSIONS.PARTICIPANT_DETAIL(sessionId, participantId)),
 
   importParticipants: (sessionId, rows: CreateParticipantDTO[]) =>
-    itemRequest<Participant[]>(
+    itemRequest<ImportResult>(
       'POST',
       API_ROUTES.SESSIONS.IMPORT_PARTICIPANTS(sessionId),
       {
@@ -158,4 +161,7 @@ export const sessionService: SessionService = {
         })),
       },
     ),
+
+  getLinkableParticipants: (sessionId) =>
+    arrayRequest<ParticipantSessionInfo>('GET', API_ROUTES.SESSIONS.LINKABLE_PARTICIPANTS(sessionId)),
 }

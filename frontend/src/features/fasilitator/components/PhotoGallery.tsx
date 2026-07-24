@@ -1,5 +1,5 @@
 import { Camera, Award, X, Trash2 } from 'lucide-react'
-import { resolveStoredUpload } from '../../../core/utils/media'
+import { getMediaUrl } from '../../../core/utils/media'
 import type { SmartPhoto, Participant } from '../../../core/types'
 
 interface PhotoGridProps {
@@ -24,10 +24,7 @@ export const PhotoGallery = ({ photos, participant, onPhotoClick }: PhotoGridPro
             className="aspect-[3/4] overflow-hidden rounded-2xl bg-surface-container-low relative group border border-surface-container-highest shadow-sm"
           >
             <img
-              src={
-                resolveStoredUpload(photo.framed_file_url || photo.original_file_url, 'photo') ??
-                (photo.framed_file_url || photo.original_file_url)
-              }
+              src={getMediaUrl('photo', photo.id)}
               alt=""
               className="w-full h-full object-cover"
             />
@@ -56,10 +53,7 @@ export const FullscreenPhoto = ({ photo, onClose, onDelete }: FullscreenPhotoPro
     onClick={onClose}
   >
     <img
-      src={
-        resolveStoredUpload(photo.framed_file_url || photo.original_file_url, 'photo') ??
-        (photo.framed_file_url || photo.original_file_url)
-      }
+      src={getMediaUrl('photo', photo.id)}
       alt=""
       className="max-w-full max-h-[85vh] object-contain rounded-lg"
     />

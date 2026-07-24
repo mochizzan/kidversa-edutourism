@@ -25,7 +25,7 @@ import type { User as UserType } from '../../../core/types'
 import { AvatarUploadModal } from '../../../shared/components/ui/AvatarUploadModal'
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
 import { cn } from '../../../core/utils'
-import { resolveStoredUpload } from '../../../core/utils/media'
+import { getMediaUrl } from '../../../core/utils/media'
 
 const roleLabel: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
@@ -121,7 +121,7 @@ const ProfilePage = () => {
               avatarDragOver && 'ring-2 ring-primary'
             )}>
               {user.avatar_url ? (
-                <img src={resolveStoredUpload(user.avatar_url, 'avatar') ?? user.avatar_url} alt={user.name} className='w-full h-full object-cover rounded-full' />
+                <img src={getMediaUrl('avatar', user.id)} alt={user.name} className='w-full h-full object-cover rounded-full' />
               ) : (
                 <span className='text-[36px] md:text-[42px] lg:text-[48px] font-bold text-[#6D28D9]'>
                   {user.name?.charAt(0)?.toUpperCase() || '?'}
@@ -287,7 +287,7 @@ const ProfilePage = () => {
       <AvatarUploadModal
         open={showAvatarModal}
         onClose={() => { setShowAvatarModal(false); setPendingDragFile(null) }}
-        currentAvatarUrl={resolveStoredUpload(user.avatar_url, 'avatar') ?? user.avatar_url}
+        currentAvatarUrl={getMediaUrl('avatar', user.id)}
         initialFile={pendingDragFile}
         onUpload={handleAvatarUpload}
       />

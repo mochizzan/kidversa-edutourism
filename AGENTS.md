@@ -4,9 +4,9 @@
 
 Kidversa Edutourism — interactive digital storytelling platform for children (ages 5–7). Indonesian-language UI.
 
-**Monorepo structure:**
+**Monorepo structure (pnpm workspace):**
 - `frontend/` — React 19 + TypeScript + Vite + Tailwind CSS v4 + PWA
-- `backend/` — Go + Echo **v5** + GORM + **MariaDB 12** (full implementation; migrations in `backend/migrations/`, Docker `mariadb-12`)
+- `backend/` — Go + Echo **v5** + GORM + MariaDB 12 (full implementation; migrations in `backend/migrations/`)
 
 > `README.md` is stale. Trust this file and the source over README.
 
@@ -24,12 +24,33 @@ pnpm preview          # preview production build
 
 - `pnpm build` is the only CI-equivalent check. Run it after any change.
 - `build` first runs `build:raport-css` (`@tailwindcss/cli` compiles `shared/templates/miniRaport.tailwind.css` → `miniRaport.styles.css`, an inlined stylesheet for the printable mini-raport). Edit the `.tailwind.css` source, not the generated `.styles.css`.
-- `tsconfig.json` enables `strict`, `noUnusedLocals`, `noUnusedParameters`, `noUncheckedSideEffectImports` — every unused import/var is a build error.
+- `tsconfig.json` enables `strict`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`, `noUncheckedSideEffectImports` — every unused import/var is a build error.
 - Vite proxies `/api` → `http://localhost:8080`.
 
 ### Backend (`backend/`)
 
-- Full Go backend: Echo v5 handlers, GORM models, MariaDB 12 (`mariadb-12` container).
+### Backend (`backend/`)
+
+### Backend Structure (`backend/`)
+
+```
+cmd/           # Entry points: server/ (main), migrate/
+internal/
+  config/      # Config loading from env
+  delivery/    # HTTP layer: handler/ (per-domain routers + handlers), middleware/, dto/
+  domain/      # Entity types + repository interfaces
+  infrastructure/
+    auth/      # JWT, hashing, revoker
+    messaging/ # WhatsApp gateway
+    migration/ # Golang-migrate runner
+    persistence/ # GORM models + repository impls
+  pkg/         # Shared: errors, response, SSE hub, util
+  usecase/     # Business logic (assessment, live, reports, session)
+migrations/    # SQL migration files (golang-migrate format)
+```
+
+**Layered architecture**: Handler → UseCase → Repository Interface → GORM Persistence.
+All entities use GORM with MariaDB 12 (MySQL driver). The DB uses `gorm.io/driver/mysql` with `go-sql-driver/mysql`.
 - Build/verify: `cd backend && go build ./... && go vet ./...`. Migrations: `go run ./cmd/migrate` (needs `APP_ENV=dev` in `backend/.env` + running MariaDB). Tests: `TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3306 TEST_DB_USER=root TEST_DB_PASSWORD=admin TEST_DB_NAME=kidversa_test go test ./...`.
 - Echo **v5** is in `go.mod` (not v4, despite README).
 - **CI (`backend/.github/workflows/ci.yml`)** is the source of truth for verification order: `gofmt -l` (fails if non-empty) → `go vet ./...` → `go build ./...` → `go test ./...`. Frontend job: `pnpm install` → `pnpm build`.
@@ -87,7 +108,7 @@ All domain data lives in the **backend** (Go + Echo v5 + GORM + MariaDB 12). The
 - **Tailwind CSS v4** — configured via `@theme` in `frontend/src/index.css`. **No `tailwind.config.js`.**
 - Brand: primary `#5B2C8D` (purple), accent `#F5A623` (amber) — as CSS custom properties; JS colors in `core/constants/app.ts` → `COLORS`.
 - Use `cn()` from `core/utils/cn.ts` (clsx + tailwind-merge) for all conditional classNames — never raw template strings.
-- Custom animations in `index.css`: splash, toast, fade, float, etc. Font: Poppins (from `index.html`).
+- Custom animations in `index.css`: splash, toast, fade, float, etc. Font: Inter (from Google Fonts in `index.html`).
 
 ### App Entry Flow
 
@@ -133,7 +154,17 @@ Always check existing components before creating new ones.
 | `frontend/src/core/types/entities.ts` | Entity/DTO types |
 | `frontend/src/core/types/enums.ts` | All enums incl. `UserRole` |
 | `frontend/src/index.css` | Tailwind v4 theme + M3 tokens + animations |
+| `frontend/index.html` | HTML entry point — loads Inter font, mounts React app |
 | `frontend/vite.config.ts` | Vite + PWA + `/api` proxy |
+| `frontend/pnpm-lock.yaml` | Lockfile for reproducible frontend installs |
+| `frontend/pnpm-workspace.yaml` | pnpm workspace config (root monorepo) |
+| `backend/go.mod` | Go module definition + dependencies |
+| `backend/go.sum` | Go module checksums |
+| `backend/.env.example` | Template for all backend env vars |
+| `backend/docker-compose.yml` | Docker Compose for local backend dev |
+| `backend/Dockerfile` | Multi-stage Docker build (golang:1.26 → debian:slim) |
+| `backend/.github/workflows/ci.yml` | CI pipeline: gofmt → go vet → go build → go test |
+| `backend/.dockerignore` | Excludes uploads, .env, and .exe from Docker context |
 
 ## Conventions
 
@@ -146,7 +177,7 @@ Always check existing components before creating new ones.
 
 ## Gotchas
 
-- Frontend has **no `.env`** — `VITE_API_BASE_URL` is hardcoded to `http://localhost:8080` in `core/constants/app.ts` and `backendClient.ts`. The backend **does** use `backend/.env` (gitignored) — backend/.env.example documents every var.
-- Gitignored (root `.gitignore`): `node_modules/`, `vendor/`, `dist/`, `*.exe`, `*.db/*.sqlite*`, `.env`, `CLAUDE.md`, `.claude/`, `.codegraph/`, `.kilo/`, `.serena/`. (`docs/` and `img/` are tracked, not ignored.)
+- Frontend has **no `.env`** — `VITE_API_BASE_URL` is hardcoded to `http://localhost:8080` in `core/services/backendClient.ts`. The backend **does** use `backend/.env` (gitignored) — backend/.env.example documents every var.
+- Gitignored (root `.gitignore`): `node_modules/`, `vendor/`, `dist/`, `*.exe`, `*.db/*.sqlite*`, `.env`, `CLAUDE.md`, `.claude/`, `.codegraph/`, `.kilo/`, `.serena/`, `.hermes/`, `.docs/`, `.img/`, `.plans/`, `docs/`, `img/`. (`docs/` and `img/` are tracked, not ignored.)
 - `noUnusedLocals`/`noUnusedParameters` are enabled — every unused import breaks the build.
 - TanStack React Query installed but no `QueryClientProvider` — don't use `useQuery` hooks yet.

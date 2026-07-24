@@ -163,6 +163,43 @@ export interface Participant {
   created_at: string
 }
 
+export interface ParticipantSessionInfo {
+  participant: Participant
+  session_name: string
+  session_id: string
+  program_id: string
+}
+
+export interface LinkParticipantResponse {
+  id: string
+  tenant_id?: string
+  session_id?: string
+  group_id?: string
+  child_name: string
+  child_age: number
+  school_name?: string
+  parent_name: string
+  parent_phone: string
+  parent_email?: string
+  consent_recording: boolean
+  consent_photo: boolean
+  consent_at?: string
+  created_at: string
+  previous_session_id?: string
+  previous_session_name?: string
+  previous_program_id?: string
+}
+
+export interface ImportResult {
+  created: Participant[]
+  skipped: Array<{
+    participant_id: string
+    child_name: string
+    parent_phone: string
+    existing_session: string
+  }>
+}
+
 export interface Assessment {
   id: string
   participant_id: string

@@ -28,6 +28,37 @@ type SessionDetail struct {
 	Groups  []GroupWithParticipants
 }
 
+// ParticipantSessionInfo enriches a participant with their current session context.
+type ParticipantSessionInfo struct {
+	Participant entity.Participant `json:"participant"`
+	SessionName string             `json:"session_name"`
+	SessionID   string             `json:"session_id"`
+	ProgramID   string             `json:"program_id"`
+}
+
+// DuplicateParticipantInfo describes a participant that already exists
+// within the same program (matched by child_name + parent_phone).
+type DuplicateParticipantInfo struct {
+	ParticipantID   string `json:"participant_id"`
+	ChildName       string `json:"child_name"`
+	ParentPhone     string `json:"parent_phone"`
+	ExistingSession string `json:"existing_session"`
+}
+
+// ImportResult bundles created participants with skipped duplicates.
+type ImportResult struct {
+	Created []entity.Participant       `json:"created"`
+	Skipped []DuplicateParticipantInfo `json:"skipped"`
+}
+
+// LinkParticipantResult wraps the migrated participant with previous session info.
+type LinkParticipantResult struct {
+	Participant         entity.Participant `json:"participant"`
+	PreviousSessionID   string             `json:"previous_session_id"`
+	PreviousSessionName string             `json:"previous_session_name"`
+	PreviousProgramID   string             `json:"previous_program_id"`
+}
+
 // ParticipantInput is the payload for creating/importing a participant.
 type ParticipantInput struct {
 	ChildName        string  `json:"child_name"`
@@ -86,6 +117,21 @@ type SessionRepository interface {
 	// session's participants (force-resend recovery). Tokens are set to NULL so
 	// the eligibility filter re-includes those participants on the next send.
 	ClearParticipantTokens(ctx context.Context, sessionID, tenantID string) error
+
+	// FindParticipantSessionInfo returns session context for a batch of participant IDs.
+	// Used by the "add participant" modal to show which session/program a participant
+	// is currently linked to.
+	FindParticipantSessionInfo(ctx context.Context, participantIDs []string, tenantID string) ([]ParticipantSessionInfo, error)
+
+	// ListParticipantsForProgram returns all participants linked to sessions of the
+	// given program, enriched with session name and program_id. Used by the linkable
+	// participants endpoint.
+	ListParticipantsForProgram(ctx context.Context, programID, tenantID string) ([]ParticipantSessionInfo, error)
+
+	// FindDuplicateParticipants checks a batch of participant inputs against existing
+	// participants in the same program (matched by child_name + parent_phone).
+	// Returns info about any duplicates found.
+	FindDuplicateParticipants(ctx context.Context, programID, tenantID string, rows []ParticipantInput) ([]DuplicateParticipantInfo, error)
 
 	// Transaction helper: run fn inside a DB transaction (GORM-backed repos provide this).
 	Transaction(ctx context.Context, fn func(tx SessionRepository) error) error

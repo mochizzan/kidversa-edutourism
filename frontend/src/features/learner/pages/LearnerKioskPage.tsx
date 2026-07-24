@@ -8,7 +8,6 @@ import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { kioskSessionPath } from '../../../core/constants/app'
 import type { Session, SessionStage, StageContent } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
-import { resolveStoredUpload } from '../../../core/utils/media'
 import { extractYouTubeEmbedUrl } from '../../../core/utils/youtube'
 
 /* ── Public kiosk payload (GET /api/sessions/:id/kiosk?token=) ──
@@ -177,7 +176,7 @@ const LearnerKioskPage = () => {
             // Uploaded video: native player.
             <video
               key={currentContent.id}
-              src={resolveStoredUpload(currentContent.file_url, 'content') ?? currentContent.file_url}
+              src={`/api/media/kiosk/content/${currentContent.id}`}
               className="max-w-full max-h-full"
               autoPlay={isPlaying}
               muted={isMuted}
@@ -189,7 +188,7 @@ const LearnerKioskPage = () => {
         {currentContent?.file_type === StageContentFileType.IMAGE && (
           <img
             key={currentContent.id}
-            src={resolveStoredUpload(currentContent.file_url, 'content') ?? currentContent.file_url}
+            src={`/api/media/kiosk/content/${currentContent.id}`}
             alt={currentContent.title}
             className="max-w-full max-h-full object-contain"
           />
@@ -201,7 +200,7 @@ const LearnerKioskPage = () => {
             </div>
             <audio
               key={currentContent.id}
-              src={resolveStoredUpload(currentContent.file_url, 'content') ?? currentContent.file_url}
+              src={`/api/media/kiosk/content/${currentContent.id}`}
               autoPlay={isPlaying}
               muted={isMuted}
               controls

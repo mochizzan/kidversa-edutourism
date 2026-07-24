@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Search, User } from 'lucide-react'
+import { Search, User, ArrowRightLeft } from 'lucide-react'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
@@ -7,7 +7,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { cn } from '../../../core/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
-import type { Participant } from '../../../core/types'
+import type { Participant, ParticipantSessionInfo } from '../../../core/types'
 import { isValidEmail } from '../../../core/utils/validation'
 
 type ParticipantFormData = {
@@ -29,6 +29,8 @@ interface ParticipantFormModalProps {
   availableParticipants?: Participant[]
   onLinkExisting?: (participantId: string) => Promise<void>
   linkedParticipantIds?: string[]
+  currentSessionId?: string
+  participantSessionInfos?: ParticipantSessionInfo[]
 }
 
 interface FormErrors {
@@ -49,6 +51,8 @@ export function ParticipantFormModal({
   availableParticipants,
   onLinkExisting,
   linkedParticipantIds,
+  currentSessionId,
+  participantSessionInfos,
 }: ParticipantFormModalProps) {
   const [formData, setFormData] = useState<ParticipantFormData>({
     child_name: '',
@@ -63,12 +67,14 @@ export function ParticipantFormModal({
   const [selectError, setSelectError] = useState('')
   const [errors, setErrors] = useState<FormErrors>({})
   const [submitting, setSubmitting] = useState(false)
+  const [migrateConfirm, setMigrateConfirm] = useState<ParticipantSessionInfo | null>(null)
 
   useEffect(() => {
     if (open) {
       setSelectedParticipantId('')
       setSearchQuery('')
       setSelectError('')
+      setMigrateConfirm(null)
       setFormData(
         initialData || {
           child_name: '',
@@ -82,6 +88,16 @@ export function ParticipantFormModal({
       setErrors({})
     }
   }, [open, initialData])
+
+  const sessionInfoMap = useMemo(() => {
+    const map = new Map<string, ParticipantSessionInfo>()
+    if (participantSessionInfos) {
+      for (const info of participantSessionInfos) {
+        map.set(info.participant.id, info)
+      }
+    }
+    return map
+  }, [participantSessionInfos])
 
   const filteredParticipants = useMemo(() => {
     if (!availableParticipants) return []
@@ -108,6 +124,64 @@ export function ParticipantFormModal({
     }
   }
 
+  const handleParticipantClick = (participant: Participant) => {
+    const isLinked = linkedParticipantIds?.includes(participant.id) ?? false
+    if (isLinked) return
+
+    const info = sessionInfoMap.get(participant.id)
+    if (info && info.session_id && info.session_id !== currentSessionId) {
+      setMigrateConfirm(info)
+      setSelectedParticipantId(participant.id)
+    } else {
+      setSelectedParticipantId(participant.id)
+      setSelectError('')
+    }
+  }
+
+  const handleMigrateConfirm = async () => {
+    if (!migrateConfirm || !selectedParticipantId || !onLinkExisting) return
+    setMigrateConfirm(null)
+    setSubmitting(true)
+    setSelectError('')
+    try {
+      await onLinkExisting(selectedParticipantId)
+      onClose()
+    } catch (err) {
+      setSelectError(friendlyError(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleMigrateCancel = () => {
+    setMigrateConfirm(null)
+    setSelectedParticipantId('')
+  }
+
+  const getParticipantBadge = (participant: Participant) => {
+    const isLinked = linkedParticipantIds?.includes(participant.id) ?? false
+    if (isLinked) {
+      return <Badge variant="primary" size="sm">Sudah Ditambahkan</Badge>
+    }
+
+    const info = sessionInfoMap.get(participant.id)
+    if (info && info.session_id && info.session_id !== currentSessionId) {
+      return (
+        <Badge variant="warning" size="sm">
+          <ArrowRightLeft className="w-3 h-3 mr-1" />
+          Migrasi dari {info.session_name}
+        </Badge>
+      )
+    }
+
+    return (
+      <div className="flex gap-1">
+        <Badge variant={participant.consent_recording ? 'success' : 'danger'} size="sm">Recording</Badge>
+        <Badge variant={participant.consent_photo ? 'success' : 'danger'} size="sm">Photo</Badge>
+      </div>
+    )
+  }
+
   const validate = (): boolean => {
     const newErrors: FormErrors = {}
 
@@ -127,7 +201,6 @@ export function ParticipantFormModal({
       newErrors.parent_phone = 'No. HP orang tua harus diisi'
     }
 
-    // Email validation - optional but must be valid if filled
     if (formData.parent_email && formData.parent_email.trim()) {
       if (!isValidEmail(formData.parent_email.trim())) {
         newErrors.parent_email = 'Format email tidak valid'
@@ -167,75 +240,94 @@ export function ParticipantFormModal({
 
   if (selectOnly && mode === 'create') {
     return (
-      <Modal open={open} onClose={onClose} title="Tambah Peserta" size="lg">
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
-          <input
-            type="text"
-            placeholder="Cari nama peserta..."
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setSelectError('') }}
-            className="w-full rounded-xl border border-outline-variant bg-surface pl-10 pr-3 py-2 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
-            autoFocus
-          />
-        </div>
-
-        {selectError && (
-          <div className="mb-3 p-3 rounded-xl bg-error-container/30 text-on-error-container text-sm">{selectError}</div>
-        )}
-
-        {!availableParticipants || availableParticipants.length === 0 ? (
-          <EmptyState icon={<User className="w-12 h-12" />} title="Belum ada peserta yang tersedia" description="Buat data peserta terlebih dahulu dari menu Peserta." />
-        ) : filteredParticipants.length === 0 ? (
-          <p className="text-center py-8 text-on-surface-variant text-sm">Peserta tidak ditemukan</p>
-        ) : (
-          <div className="max-h-96 overflow-y-auto space-y-2">
-            {filteredParticipants.map(p => {
-              const isLinked = linkedParticipantIds?.includes(p.id) ?? false
-              return (
-                <div
-                  key={p.id}
-                  onClick={isLinked ? undefined : () => { setSelectedParticipantId(p.id); setSelectError('') }}
-                  className={cn(
-                    'p-4 rounded-xl border transition-colors',
-                    isLinked
-                      ? 'border-outline-variant/50 opacity-60 cursor-not-allowed'
-                      : 'cursor-pointer',
-                    !isLinked && selectedParticipantId === p.id
-                      ? 'border-primary bg-primary-container/20'
-                      : !isLinked && 'border-outline-variant hover:bg-surface-container-low'
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-on-surface">{p.child_name}</span>
-                        <Badge variant="neutral" size="sm">{p.child_age} th</Badge>
-                      </div>
-                      {p.school_name && <p className="text-sm text-on-surface-variant mt-0.5">{p.school_name}</p>}
-                      <p className="text-sm text-on-surface-variant">{p.parent_name} · {p.parent_phone}</p>
-                      {p.parent_email && <p className="text-xs text-on-surface-variant">{p.parent_email}</p>}
-                    </div>
-                    {isLinked ? (
-                      <Badge variant="primary" size="sm">Sudah Ditambahkan</Badge>
-                    ) : (
-                      <div className="flex gap-1">
-                        <Badge variant={p.consent_recording ? 'success' : 'danger'} size="sm">Recording</Badge>
-                        <Badge variant={p.consent_photo ? 'success' : 'danger'} size="sm">Photo</Badge>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+      <>
+        <Modal open={open} onClose={onClose} title="Tambah Peserta" size="lg">
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+            <input
+              type="text"
+              placeholder="Cari nama peserta..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setSelectError('') }}
+              className="w-full rounded-xl border border-outline-variant bg-surface pl-10 pr-3 py-2 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
+              autoFocus
+            />
           </div>
-        )}
 
-        <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-outline-variant">
-          <Button variant="secondary" onClick={onClose} disabled={submitting}>Batal</Button>
-          <Button onClick={handleSelectConfirm} disabled={!selectedParticipantId || submitting} loading={submitting}>Tambahkan</Button>
-        </div>
-      </Modal>
+          {selectError && (
+            <div className="mb-3 p-3 rounded-xl bg-error-container/30 text-on-error-container text-sm">{selectError}</div>
+          )}
+
+          {!availableParticipants || availableParticipants.length === 0 ? (
+            <EmptyState icon={<User className="w-12 h-12" />} title="Belum ada peserta yang tersedia" description="Buat data peserta terlebih dahulu dari menu Peserta." />
+          ) : filteredParticipants.length === 0 ? (
+            <p className="text-center py-8 text-on-surface-variant text-sm">Peserta tidak ditemukan</p>
+          ) : (
+            <div className="max-h-96 overflow-y-auto space-y-2">
+              {filteredParticipants.map(p => {
+                const isLinked = linkedParticipantIds?.includes(p.id) ?? false
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => handleParticipantClick(p)}
+                    className={cn(
+                      'p-4 rounded-xl border transition-colors',
+                      isLinked
+                        ? 'border-outline-variant/50 opacity-60 cursor-not-allowed'
+                        : 'cursor-pointer',
+                      !isLinked && selectedParticipantId === p.id
+                        ? 'border-primary bg-primary-container/20'
+                        : !isLinked && 'border-outline-variant hover:bg-surface-container-low'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-on-surface">{p.child_name}</span>
+                          <Badge variant="neutral" size="sm">{p.child_age} th</Badge>
+                        </div>
+                        {p.school_name && <p className="text-sm text-on-surface-variant mt-0.5">{p.school_name}</p>}
+                        <p className="text-sm text-on-surface-variant">{p.parent_name} · {p.parent_phone}</p>
+                        {p.parent_email && <p className="text-xs text-on-surface-variant">{p.parent_email}</p>}
+                      </div>
+                      {getParticipantBadge(p)}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-outline-variant">
+            <Button variant="secondary" onClick={onClose} disabled={submitting}>Batal</Button>
+            <Button onClick={handleSelectConfirm} disabled={!selectedParticipantId || submitting} loading={submitting}>Tambahkan</Button>
+          </div>
+        </Modal>
+
+        <Modal
+          open={!!migrateConfirm}
+          onClose={handleMigrateCancel}
+          title="Pindahkan Peserta"
+          size="md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-on-surface">
+              Peserta <span className="font-semibold">{migrateConfirm?.participant.child_name}</span> sudah terdaftar di
+              sesi <span className="font-semibold">{migrateConfirm?.session_name}</span>.
+            </p>
+            <p className="text-sm text-on-surface-variant">
+              Pindahkan ke sesi ini? Data di sesi lama akan tetap tersimpan sebagai riwayat.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
+              <Button variant="secondary" onClick={handleMigrateCancel} disabled={submitting}>Batal</Button>
+              <Button onClick={handleMigrateConfirm} loading={submitting}>
+                <ArrowRightLeft className="w-4 h-4 mr-1" />
+                Pindahkan
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      </>
     )
   }
 

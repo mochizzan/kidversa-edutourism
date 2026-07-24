@@ -1,6 +1,6 @@
 import type { Report } from '../types'
 import type { ReportService } from './types'
-import { apiRequest, getApiBaseUrl } from './backendClient'
+import { apiRequest } from './backendClient'
 import { itemsRequest, itemRequest, nullableItemRequest } from './apiEnvelope'
 import { useAuthStore } from '../stores/authStore'
 import { API_ROUTES } from '../constants/apiRoutes'
@@ -65,49 +65,6 @@ const getPublicReport = async (token: string): Promise<PublicReportResponse | nu
   return res.data ?? null
 }
 
-// streamNarrative opens the SSE narrative stream for a report and invokes
-// onChunk for each `data:` frame. Uses fetch + ReadableStream because
-// apiRequest expects a single JSON response and cannot stream.
-const streamNarrative = (
-  reportId: string,
-  onChunk: (chunk: unknown) => void,
-  signal?: AbortSignal,
-): Promise<void> => {
-  const url = `${getApiBaseUrl()}${API_ROUTES.REPORTS.NARRATIVE_STREAM(reportId)}`
-  return fetch(url, { method: 'GET', credentials: 'include', signal })
-    .then((response) => {
-      if (!response.ok || !response.body) {
-        throw new Error(`narrative stream failed: ${response.status}`)
-      }
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      const read = (): Promise<void> =>
-        reader.read().then(({ done, value }) => {
-          if (done) return
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() ?? ''
-          for (const line of lines) {
-            const trimmed = line.trim()
-            if (trimmed.startsWith('data:')) {
-              const payload = trimmed.slice(5).trim()
-              if (payload) {
-                try {
-                  onChunk(JSON.parse(payload))
-                } catch {
-                  // Ignore non-JSON keepalive/comment frames.
-                }
-              }
-            }
-          }
-          return read()
-        })
-      return read()
-    })
-    .then(() => undefined)
-}
-
 export const reportService: ReportService = {
   getBySession,
   getById,
@@ -120,5 +77,4 @@ export const reportService: ReportService = {
 // here so the endpoint map matches the backend).
 export const reportPublicService = {
   getByToken: getPublicReport,
-  streamNarrative,
 }

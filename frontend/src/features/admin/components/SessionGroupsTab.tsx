@@ -13,7 +13,7 @@ import { GroupFormModal } from './GroupFormModal'
 import { ParticipantFormModal } from './ParticipantFormModal'
 import { CsvImportModal } from './CsvImportModal'
 import { ROUTES } from '../../../core/constants/app'
-import type { SessionGroup, Participant, CreateParticipantDTO, User } from '../../../core/types'
+import type { SessionGroup, Participant, CreateParticipantDTO, User, ParticipantSessionInfo } from '../../../core/types'
 import type { ImportRow } from '../utils/csvParser'
 import { friendlyError } from '../../../core/utils/errorMessages'
 
@@ -62,6 +62,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
   const [confirmParticipant, setConfirmParticipant] = useState<Participant | null>(null)
 
   const [availableParticipants, setAvailableParticipants] = useState<Participant[]>([])
+  const [linkableParticipantInfos, setLinkableParticipantInfos] = useState<ParticipantSessionInfo[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -86,10 +87,15 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
 
   const loadAvailableParticipants = async () => {
     try {
-      const res = await participantService.getAll({ limit: 100 })
-      setAvailableParticipants(res.data)
+      const [allRes, linkableRes] = await Promise.all([
+        participantService.getAll({ limit: 100 }),
+        sessionService.getLinkableParticipants(sessionId),
+      ])
+      setAvailableParticipants(allRes.data)
+      setLinkableParticipantInfos(linkableRes)
     } catch {
       setAvailableParticipants([])
+      setLinkableParticipantInfos([])
     }
   }
 
@@ -173,8 +179,12 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
 
   const handleLinkParticipant = async (participantId: string) => {
     if (!selectedGroupId) return
-    await sessionService.linkParticipant(sessionId, selectedGroupId, participantId)
-    addToast({ type: 'success', message: 'Peserta berhasil ditambahkan ke kelompok' })
+    const result = await sessionService.linkParticipant(sessionId, selectedGroupId, participantId)
+    if (result.previous_session_name) {
+      addToast({ type: 'success', message: `Peserta dipindahkan dari sesi "${result.previous_session_name}"` })
+    } else {
+      addToast({ type: 'success', message: 'Peserta berhasil ditambahkan ke kelompok' })
+    }
     onRefresh()
     setRefreshKey((k) => k + 1)
   }
@@ -221,7 +231,17 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
         group_id: groupMap.get(row.group_name.toLowerCase())!,
       }))
 
-      await sessionService.importParticipants(sessionId, participantDTOs)
+      const result = await sessionService.importParticipants(sessionId, participantDTOs)
+      const createdCount = result.created.length
+      const skippedCount = result.skipped.length
+      if (skippedCount > 0) {
+        addToast({
+          type: 'warning',
+          message: `${createdCount} peserta ditambahkan, ${skippedCount} dilewati (duplikat)`,
+        })
+      } else {
+        addToast({ type: 'success', message: `${createdCount} peserta berhasil diimport` })
+      }
     } catch (err) {
       for (const g of newGroups) {
         await sessionService.deleteGroup(g.sessionId, g.groupId).catch(() => {})
@@ -459,6 +479,8 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
         availableParticipants={availableParticipants}
         onLinkExisting={handleLinkParticipant}
         linkedParticipantIds={linkedParticipantIds}
+        currentSessionId={sessionId}
+        participantSessionInfos={linkableParticipantInfos}
       />
 
       <CsvImportModal open={csvImportOpen} onClose={() => setCsvImportOpen(false)} onImport={handleCsvImport} />

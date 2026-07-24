@@ -54,10 +54,7 @@ export const ROUTES = {
     PROFILE: '/fasilitator/profile',
   },
   PARENT: {
-    BASE: '/parent',
     REPORT: '/parent/report',
-    CONSENT: '/parent/consent',
-    MISSIONS: '/parent/missions',
   },
   LEARNER: {
     BASE: '/learner',

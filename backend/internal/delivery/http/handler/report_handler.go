@@ -43,16 +43,17 @@ func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 	return appresp.OK(c, dto.NewPublicReportDTO(r))
 }
 
-// Generate handles POST /api/reports/:id/generate (async narrative placeholder).
+// Generate handles POST /api/reports/:id/generate.
 func (h *ReportHandler) Generate(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
 		return nil
 	}
-	if err := h.uc.StreamNarrative((*c).Request().Context(), id); err != nil {
+	r, err := h.uc.GenerateNarrative((*c).Request().Context(), id)
+	if err != nil {
 		return err
 	}
-	return appresp.Accepted(c)
+	return appresp.OK(c, dto.NewReportResponse(r))
 }
 
 // GenerateForSession handles POST /api/reports/generate.

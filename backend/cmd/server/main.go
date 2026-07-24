@@ -12,6 +12,7 @@ import (
 	"kidversa-edutourism-backend/internal/config"
 	httppkg "kidversa-edutourism-backend/internal/delivery/http"
 	"kidversa-edutourism-backend/internal/delivery/http/handler"
+	"kidversa-edutourism-backend/internal/infrastructure/ai"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	"kidversa-edutourism-backend/internal/infrastructure/messaging"
 	"kidversa-edutourism-backend/internal/infrastructure/persistence"
@@ -60,6 +61,10 @@ func main() {
 	consentRepo := persistence.NewConsentRepository(db.DB, cfg.ConsentTokenTTL)
 	frameRepo := persistence.NewFrameRepository(db.DB)
 
+	// AI clients.
+	openRouterClient := ai.NewOpenRouterClient(cfg.OpenRouterAPIKey, cfg.OpenRouterModel, cfg.OpenRouterBaseURL)
+	narrativeGen := ai.NewOpenRouterNarrativeGenerator(openRouterClient, reportRepo, sessionRepo, assessmentRepo, programRepo)
+
 	// Usecases.
 	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, auth.NewKioskStore(db.DB), cfg.BcryptCost)
 	userUC := auth.NewUserUsecase(userRepo, notifRepo, hub, cfg.BcryptCost)
@@ -67,7 +72,7 @@ func main() {
 	sessionUC := usecase.NewSessionUsecase(sessionRepo, programRepo)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo)
-	reportsUC := reportsuc.NewUsecase(reportRepo, hub, reportsuc.NewPlaceholderNarrative())
+	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen)
 
 	// Handlers.
 	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite)

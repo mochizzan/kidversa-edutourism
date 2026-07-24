@@ -1,5 +1,3 @@
-import { getApiBaseUrl } from '../services/backendClient'
-
 // A stored upload path is a relative path on disk (e.g. "frames/uuid.jpg") as
 // persisted by the backend's persistFile(). These are never served as static
 // files; they are streamed through the authenticated, tenant-scoped media
@@ -11,14 +9,20 @@ import { getApiBaseUrl } from '../services/backendClient'
 export type MediaKind = 'photo' | 'recording' | 'frame' | 'content' | 'avatar'
 
 // Resolve an entity-relative media id into a streamable URL.
+// Returns a relative path so the request goes through the Vite dev proxy
+// (same-origin from the browser's perspective), ensuring the httpOnly
+// session cookie is automatically attached.  Absolute URLs bypass the
+// proxy and may lose the cookie on cross-origin requests.
 export function getMediaUrl(kind: MediaKind, id: string): string {
-  return `${getApiBaseUrl()}/api/media/${kind}/${id}`
+  return `/api/media/${kind}/${id}`
 }
 
-// Resolve a stored upload path (frames/uuid.jpg) back to its entity id + kind.
-// persistFile names files as "<uuid>.<ext>" inside a subdir; the entity id is
-// the uuid portion. If the path doesn't match the expected shape we return null
-// so callers can fall back to a local blob/placeholder.
+/**
+ * @deprecated This function is broken — it extracts a UUID from the filename
+ * path and uses it as the entity ID, but persistFile() generates a random UUID
+ * for the filename that differs from the entity's DB row ID. Use
+ * `getMediaUrl(kind, entity.id)` directly instead.
+ */
 export function resolveStoredUpload(
   storedPath: string | undefined | null,
   kind: MediaKind,

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -43,6 +44,29 @@ func ErrorHandler(c *echo.Context, err error) {
 			status = ae.StatusCode()
 			code = ae.CodeName()
 			msg = appresp.MessageForCode(code)
+		} else {
+			type statusCoder interface {
+				StatusCode() int
+			}
+			var sc statusCoder
+			if errors.As(err, &sc) {
+				status = sc.StatusCode()
+				switch status {
+				case http.StatusNotFound:
+					code = "not_found"
+				case http.StatusMethodNotAllowed:
+					code = "bad_request"
+				case http.StatusUnauthorized:
+					code = "unauthorized"
+				case http.StatusForbidden:
+					code = "forbidden"
+				case http.StatusBadRequest:
+					code = "bad_request"
+				default:
+					code = "internal_error"
+				}
+				msg = appresp.MessageForCode(code)
+			}
 		}
 	}
 	if err := appresp.FailMsg(c, status, code, msg); err != nil {

@@ -72,3 +72,11 @@ type Participant struct {
 	// ConsentCombinedTokenExpiresAt is the RFC3339 expiry of the combined token.
 	ConsentCombinedTokenExpiresAt *time.Time `json:"consent_combined_token_expires_at,omitempty"`
 }
+
+// SessionIDValue returns the session_id as a string (empty if nil).
+func (p *Participant) SessionIDValue() string {
+	if p.SessionID != nil {
+		return *p.SessionID
+	}
+	return ""
+}
