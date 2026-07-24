@@ -22,3 +22,8 @@ export const reportStatusBg: Record<ReportStatus, string> = {
   [ReportStatus.APPROVED]: 'bg-green-100 text-green-700',
   [ReportStatus.SENT]: 'bg-primary-container text-on-primary-container',
 }
+
+export const NO_ASSESSMENT_LABEL = 'Belum Dinilai'
+export const NO_ASSESSMENT_BADGE: ReportStatusBadge = 'warning'
+export const NO_REPORT_LABEL = 'Belum Ada Laporan'
+export const NO_REPORT_BADGE: ReportStatusBadge = 'neutral'
