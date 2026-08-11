@@ -61,6 +61,7 @@ const MissionBankPage = () => {
     loadMissions,
     handleToggleActive,
     confirmToggle,
+    stageMap,
   } = useMissionBank()
 
   const currentAction = deactivateTarget?.is_active ? 'Nonaktifkan' : 'Aktifkan'
@@ -178,6 +179,7 @@ const MissionBankPage = () => {
             <MissionCard
               key={mission.id}
               mission={mission}
+              stageMap={stageMap}
               onEdit={(m) => navigate(`/admin/missions/${m.id}/edit`)}
               onToggleActive={handleToggleActive}
               onActivate={setDeactivateTarget}

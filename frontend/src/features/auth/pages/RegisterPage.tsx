@@ -62,8 +62,8 @@ const RegisterPage = () => {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: '', email: '', password: '', confirmPassword: '',
-      tenant_id: '', role: UserRole.FASILITATOR, terms: undefined as unknown as true, honeypot: '',
-    },
+      tenant_id: '', role: UserRole.FASILITATOR, terms: undefined, honeypot: '',
+    } as unknown as RegisterFormData,
   })
 
   useEffect(() => {

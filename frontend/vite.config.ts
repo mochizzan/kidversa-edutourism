@@ -48,7 +48,9 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        // In Docker Compose, set VITE_API_TARGET=http://backend:8080
+        // Locally (no Docker), defaults to http://localhost:8080
+        target: process.env.VITE_API_TARGET || 'http://localhost:8080',
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {

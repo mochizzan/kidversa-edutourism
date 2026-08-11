@@ -52,10 +52,9 @@ const TenantsPage = () => {
       setTenants(tenantList)
       setTenantUserCounts(counts)
       setStoreTenants(tenantList)
-    } catch (error) {
+    } catch {
       // Surface the error instead of silently rendering empty counts.
       addToast({ type: 'error', message: 'Gagal memuat data tenant.' })
-      console.error('Failed to load tenants:', error)
     } finally {
       setLoading(false)
     }

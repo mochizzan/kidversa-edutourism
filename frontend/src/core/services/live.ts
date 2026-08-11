@@ -158,16 +158,7 @@ export const liveService = {
     invalidateSnapshot(sessionId)
   },
 
-  // Live progress is driven by the backend + SSE; the frontend no longer
-  // fabricates progress locally. Kept as a no-op so existing call sites
-  // (LiveMonitorPage) keep working without a rewrite.
-  simulateProgress: async (_sessionId: string): Promise<void> => {
-    // no-op: backend owns live state
-  },
 
-  initGroupProgress: async (_sessionId: string): Promise<void> => {
-    // no-op: backend initializes progress on session start
-  },
 }
 
 export type { GroupStageProgressRow as GroupStageProgress, TimelineEventRow as TimelineEvent }

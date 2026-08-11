@@ -1,31 +1,30 @@
 import { useState, useEffect } from 'react'
+import { STORAGE_KEYS } from '../../../core/constants/storage'
 
 const MAX_ATTEMPTS = 5
 const LOCKOUT_DURATION = 5 * 60 * 1000
-const ATTEMPTS_KEY = 'kidversa_login_attempts'
-const LOCKOUT_KEY = 'kidversa_lockout_until'
 
 function getLoginAttempts(): number {
-  const v = sessionStorage.getItem(ATTEMPTS_KEY)
+  const v = sessionStorage.getItem(STORAGE_KEYS.LOGIN_ATTEMPTS)
   return v ? parseInt(v, 10) : 0
 }
 
 function setLoginAttempts(c: number) {
-  sessionStorage.setItem(ATTEMPTS_KEY, String(c))
+  sessionStorage.setItem(STORAGE_KEYS.LOGIN_ATTEMPTS, String(c))
 }
 
 function getLockoutUntil(): number {
-  const v = sessionStorage.getItem(LOCKOUT_KEY)
+  const v = sessionStorage.getItem(STORAGE_KEYS.LOCKOUT_UNTIL)
   return v ? parseInt(v, 10) : 0
 }
 
 function setLockoutUntil(ts: number) {
-  sessionStorage.setItem(LOCKOUT_KEY, String(ts))
+  sessionStorage.setItem(STORAGE_KEYS.LOCKOUT_UNTIL, String(ts))
 }
 
 function clearRateLimit() {
-  sessionStorage.removeItem(ATTEMPTS_KEY)
-  sessionStorage.removeItem(LOCKOUT_KEY)
+  sessionStorage.removeItem(STORAGE_KEYS.LOGIN_ATTEMPTS)
+  sessionStorage.removeItem(STORAGE_KEYS.LOCKOUT_UNTIL)
 }
 
 interface UseRateLimitResult {

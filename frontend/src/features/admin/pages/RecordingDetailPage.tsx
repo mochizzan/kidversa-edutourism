@@ -88,7 +88,7 @@ const RecordingDetailPage = () => {
           setChildName(participant.child_name)
         }
       } catch {
-        // Non-critical, continue
+        console.error('[Recording] Failed to load session detail')
       }
     } catch {
       setError('Gagal memuat data rekaman')

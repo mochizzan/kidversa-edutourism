@@ -54,7 +54,7 @@ export async function uploadMultipart<T>(
         // keep defaults
       }
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve((parsed.data ?? (parsed as unknown as T)) as T)
+        resolve((parsed.data ?? parsed) as T)
         return
       }
       const message =

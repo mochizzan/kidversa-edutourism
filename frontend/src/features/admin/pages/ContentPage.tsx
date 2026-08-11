@@ -103,8 +103,7 @@ const ContentPage = () => {
         }
 
         setContents(allContents)
-      } catch (error) {
-        console.error('Failed to load contents', error)
+      } catch {
         if (!cancelled) addToast({ type: 'error', message: 'Gagal memuat konten' })
       } finally {
         if (!cancelled) setLoading(false)

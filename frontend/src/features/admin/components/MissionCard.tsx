@@ -1,7 +1,7 @@
 import { Pencil, Power, PowerOff } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
-import type { MissionBank } from '../../../core/types'
+import type { MissionBank, ProgramStage } from '../../../core/types'
 
 const CATEGORY_META: Record<string, { icon: string; color: string }> = {
   HOME: { icon: '🏠', color: 'bg-blue-100 text-blue-700' },
@@ -11,13 +11,19 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
 
 interface MissionCardProps {
   mission: MissionBank
+  stageMap?: Record<string, ProgramStage>
   onEdit: (mission: MissionBank) => void
   onToggleActive: (mission: MissionBank) => void
   onActivate: (mission: MissionBank) => void
 }
 
-export const MissionCard = ({ mission, onEdit, onToggleActive, onActivate }: MissionCardProps) => {
+export const MissionCard = ({ mission, stageMap, onEdit, onToggleActive, onActivate }: MissionCardProps) => {
   const meta = CATEGORY_META[mission.category] || CATEGORY_META.HOME
+
+  const stageLabel = (stageId: string) => {
+    const stage = stageMap?.[stageId]
+    return stage?.name ?? stageId.slice(-4)
+  }
 
   return (
     <div className="bg-surface rounded-2xl border border-outline-variant p-5 hover:shadow-sm transition-shadow">
@@ -51,7 +57,7 @@ export const MissionCard = ({ mission, onEdit, onToggleActive, onActivate }: Mis
         <div className="flex flex-wrap gap-1.5 mt-3">
           {mission.related_stage_ids.map((stageId) => (
             <Badge key={stageId} variant="accent" size="sm">
-              {`Stage ${stageId.slice(-4)}`}
+              {stageLabel(stageId)}
             </Badge>
           ))}
         </div>

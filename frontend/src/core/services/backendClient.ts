@@ -18,10 +18,10 @@
 
 import { API_ROUTES } from '../constants/apiRoutes'
 import { getActiveTenantId } from '../utils/tenant'
+import { STORAGE_KEYS } from '../constants/storage'
 
 export type ConnectionState = 'online' | 'degraded' | 'reconnecting'
 
-const USER_STORAGE_KEY = 'kidversa_user'
 const AUTH_CHANNEL = 'kidversa-auth'
 
 // ---------------------------------------------------------------------------
@@ -48,7 +48,7 @@ export function clearTokens(): void {
 
 export function setStoredUser(user: unknown): void {
   try {
-    sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user))
+    sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user))
   } catch {
     // sessionStorage may be unavailable (e.g. private mode); ignore.
   }
@@ -56,7 +56,7 @@ export function setStoredUser(user: unknown): void {
 
 export function getStoredUser<T = unknown>(): T | null {
   try {
-    const raw = sessionStorage.getItem(USER_STORAGE_KEY)
+    const raw = sessionStorage.getItem(STORAGE_KEYS.USER)
     return raw ? (JSON.parse(raw) as T) : null
   } catch {
     return null
@@ -64,7 +64,7 @@ export function getStoredUser<T = unknown>(): T | null {
 }
 
 export function clearStoredUser(): void {
-  sessionStorage.removeItem(USER_STORAGE_KEY)
+  sessionStorage.removeItem(STORAGE_KEYS.USER)
 }
 
 // ---------------------------------------------------------------------------

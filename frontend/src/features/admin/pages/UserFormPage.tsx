@@ -19,15 +19,16 @@ import { redirectToLogin } from '../../../core/stores/authStore'
 import { getMediaUrl } from '../../../core/utils/media'
 import { ApiError } from '../../../core/services/backendClient'
 import { friendlyError } from '../../../core/utils/errorMessages'
-import type { UpdateUserDTO } from '../../../core/types'
 import { UserRole } from '../../../core/types'
+import type { UpdateUserDTO } from '../../../core/types'
 import { PasswordStrengthBar } from '../../auth/components/PasswordStrengthBar'
 
-const roleOptions = [
-  { value: UserRole.ADMIN, label: 'Admin' },
-  { value: UserRole.KOORDINATOR, label: 'Koordinator Program' },
-  { value: UserRole.FASILITATOR, label: 'Fasilitator' },
-]
+// zodResolver returns a schema-specific resolver; when isEdit is true the
+// update schema lacks password/confirmPassword, so the types don't overlap.
+// This helper bridges the mismatch safely.
+function toCreateResolver(r: Resolver<CreateFormData | UpdateFormData>): Resolver<CreateFormData> {
+  return r as Resolver<CreateFormData>
+}
 
 const createUserSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
@@ -56,6 +57,12 @@ const updateUserSchema = z.object({
 type CreateFormData = z.infer<typeof createUserSchema>
 type UpdateFormData = z.infer<typeof updateUserSchema>
 
+const roleOptions = [
+  { value: UserRole.ADMIN, label: 'Admin' },
+  { value: UserRole.KOORDINATOR, label: 'Koordinator Program' },
+  { value: UserRole.FASILITATOR, label: 'Fasilitator' },
+]
+
 const UserFormPage = () => {
   const navigate = useNavigate()
   const { userId } = useParams()
@@ -71,7 +78,7 @@ const UserFormPage = () => {
   const avatarFileRef = useRef<File | null>(null)
 
   const form = useForm<CreateFormData>({
-    resolver: zodResolver(isEdit ? updateUserSchema : createUserSchema) as unknown as Resolver<CreateFormData>,
+    resolver: toCreateResolver(zodResolver(isEdit ? updateUserSchema : createUserSchema)),
     defaultValues: {
       name: '',
       email: '',

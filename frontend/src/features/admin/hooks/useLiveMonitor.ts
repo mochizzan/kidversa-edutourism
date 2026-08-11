@@ -87,12 +87,11 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlSessionId])
+  }, [urlSessionId, navigate])
 
   useEffect(() => {
     fetchData()
-  }, [fetchData, urlSessionId])
+  }, [fetchData])
 
   const getGroupStatus = useCallback(
     (g: LiveGroupWithProgress): { status: GroupStatus; stageId?: string } => {

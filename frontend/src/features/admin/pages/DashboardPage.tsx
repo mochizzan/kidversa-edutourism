@@ -1,18 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { FolderOpen, Calendar, Users, FileText, Play, BarChart3 } from 'lucide-react'
+import { FolderOpen, Calendar, Users, FileText, Play, BarChart3, Star } from 'lucide-react'
 import { Tabs } from '../../../shared/components/ui/Tabs'
 import { CategoryCard } from '../../../shared/components/ui/CategoryCard'
 import { SessionCarousel } from '../../../shared/components/data/SessionCarousel'
 import { DonutStat } from '../../../shared/components/charts/DonutStat'
 import { TeamList } from '../../../shared/components/data/TeamList'
 import { ActivityBarChart } from '../../../shared/components/charts/ActivityBarChart'
+import { KpiCard } from '../../../shared/components/charts/KpiCard'
+import { RatingDistribution } from '../../../shared/components/charts/RatingDistribution'
+import { ReportPipeline } from '../../../shared/components/charts/ReportPipeline'
+import { ConsentOverview } from '../../../shared/components/charts/ConsentOverview'
+import { TopSessions } from '../../../shared/components/charts/TopSessions'
+import { AnalyticsFilters } from '../components/AnalyticsFilters'
 import { programService } from '../../../core/services/programs'
 import { sessionService } from '../../../core/services/sessions'
 import { participantService } from '../../../core/services/participants'
 import { userService } from '../../../core/services/users'
 import { reportService } from '../../../core/services/reports'
+import { assessmentService } from '../../../core/services/assessments'
 import type { Participant, Session, User } from '../../../core/types'
 import { SessionStatus, ReportStatus, UserRole } from '../../../core/types'
 
@@ -66,6 +73,13 @@ const DashboardPage = () => {
   const [programNames, setProgramNames] = useState<Record<string, string>>({})
   const [participantCounts, setParticipantCounts] = useState<Record<string, number>>({})
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [allSessions, setAllSessions] = useState<Session[]>([])
+  const [allReports, setAllReports] = useState<Array<{ status: string }>>([])
+  const [allAssessments, setAllAssessments] = useState<Array<{ star_rating: number }>>([])
+  const [allPrograms, setAllPrograms] = useState<Array<{ id: string; name: string }>>([])
+  const [dateRange, setDateRange] = useState('30')
+  const [selectedProgram, setSelectedProgram] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -83,14 +97,19 @@ const DashboardPage = () => {
 
         if (cancelled) return
 
-        const allSessions = sessionsRes.data
-        const active = allSessions.filter((s) => s.status === SessionStatus.ACTIVE)
+        const sessions = sessionsRes.data
+        const active = sessions.filter((s) => s.status === SessionStatus.ACTIVE)
 
         const [allParticipants, allReports] = await Promise.all([
-          Promise.all(allSessions.map((s) => sessionService.getParticipants(s.id).catch(() => []))),
-          Promise.all(allSessions.map((s) => reportService.getBySession(s.id).catch(() => []))),
+          Promise.all(sessions.map((s) => sessionService.getParticipants(s.id).catch(() => []))),
+          Promise.all(sessions.map((s) => reportService.getBySession(s.id).catch(() => []))),
         ])
 
+        if (cancelled) return
+
+        const allAssessments = await Promise.all(
+          sessions.map((s) => assessmentService.getBySession(s.id).catch(() => [])),
+        )
         if (cancelled) return
 
         const participantList = await participantService.getAll({ limit: 1000 }).catch(() => ({ data: [] as Participant[] }))
@@ -99,6 +118,7 @@ const DashboardPage = () => {
         const totalParticipants = participantsRes.total
 
         let pendingReportsCount = 0
+        const reportsFlat = allReports.flat()
         for (const reports of allReports) {
           pendingReportsCount += reports.filter((r) => r.status === ReportStatus.PENDING_REVIEW).length
         }
@@ -110,6 +130,8 @@ const DashboardPage = () => {
           pendingReports: pendingReportsCount,
         })
 
+        setAllPrograms(programsRes.data.map((p) => ({ id: p.id, name: p.name })))
+
         setProgramNames(
           programsRes.data.reduce<Record<string, string>>((acc, program) => {
             acc[program.id] = program.name
@@ -119,7 +141,7 @@ const DashboardPage = () => {
 
         setParticipantCounts(
           allParticipants.reduce<Record<string, number>>((acc, participants, index) => {
-            const session = allSessions[index]
+            const session = sessions[index]
             if (session) {
               acc[session.id] = participants.length
             }
@@ -127,16 +149,20 @@ const DashboardPage = () => {
           }, {}),
         )
 
+        setAllSessions(sessions)
+        setAllReports(reportsFlat)
+        setAllAssessments(allAssessments.flat())
+
         setActiveSessions(active.slice(0, 6))
 
         const facilitatorsAndCoordinators = usersRes.data.filter(
-          (u) => u.role === UserRole.FASILITATOR || u.role === UserRole.KOORDINATOR
+          (u) => u.role === UserRole.FASILITATOR || u.role === UserRole.KOORDINATOR,
         )
         setTeamMembers(facilitatorsAndCoordinators.slice(0, 5))
 
         const activityList: ActivityItem[] = []
 
-        const recentSessions = allSessions
+        const recentSessions = sessions
           .filter((s) => s.created_at)
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .slice(0, 3)
@@ -182,8 +208,7 @@ const DashboardPage = () => {
 
         activityList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         setActivities(activityList.slice(0, 8))
-      } catch (error) {
-        console.error('Failed to load dashboard:', error)
+      } catch {
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -203,12 +228,6 @@ const DashboardPage = () => {
     }
   })
 
-  const sessionParticipation = activeSessions.map((session) => ({
-    id: session.id,
-    name: session.name,
-    count: participantCounts[session.id] ?? 0,
-  }))
-
   const sessionCards = activeSessions.map((session) => ({
     id: session.id,
     name: session.name,
@@ -227,10 +246,80 @@ const DashboardPage = () => {
     avatar: user.avatar_url,
   }))
 
+  const now = new Date()
+
+  const filteredSessions = allSessions.filter((s: Session) => {
+    if (selectedProgram && s.program_id !== selectedProgram) return false
+    if (statusFilter.length > 0 && !statusFilter.includes(s.status)) return false
+    if (dateRange !== 'all') {
+      const daysAgo = new Date(now)
+      daysAgo.setDate(daysAgo.getDate() - parseInt(dateRange, 10))
+      if (s.session_date && s.session_date < daysAgo.toISOString().slice(0, 10)) return false
+    }
+    return true
+  })
+
+  const filteredSessionIds = new Set(filteredSessions.map((s) => s.id))
+
+  const filteredParticipants = participants.filter(
+    (p) => p.session_id && filteredSessionIds.has(p.session_id),
+  )
+
+  const totalParticipantsInFiltered = filteredParticipants.length
+  const activeInFiltered = filteredSessions.filter((s) => s.status === SessionStatus.ACTIVE).length
+
+  const avgRating =
+    allAssessments.length > 0
+      ? (allAssessments.reduce((sum, a) => sum + a.star_rating, 0) / allAssessments.length).toFixed(1)
+      : '-'
+
+  const ratingDistribution = [1, 2, 3, 4, 5].map((rating) => ({
+    rating,
+    count: allAssessments.filter((a) => a.star_rating === rating).length,
+  }))
+
+  const reportCountsByStatus = (Object.values(ReportStatus) as ReportStatus[]).map((status) => ({
+    status,
+    count: allReports.filter((r) => r.status === status).length,
+  }))
+
+  const recordingConsented = filteredParticipants.filter((p) => p.consent_recording).length
+  const photoConsented = filteredParticipants.filter((p) => p.consent_photo).length
+
+  const filteredParticipantCounts = filteredSessions.reduce<Record<string, number>>(
+    (acc, session) => {
+      acc[session.id] = participants.filter((p) => p.session_id === session.id).length
+      return acc
+    },
+    {},
+  )
+
+  const topSessions = filteredSessions
+    .map((session) => ({
+      name: session.name,
+      count: filteredParticipantCounts[session.id] ?? 0,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+
+  const reportPipelineData = reportCountsByStatus.map((item) => {
+    const colorMap: Record<ReportStatus, string> = {
+      [ReportStatus.DRAFT]: 'bg-surface-variant',
+      [ReportStatus.PENDING_REVIEW]: 'bg-yellow-100',
+      [ReportStatus.APPROVED]: 'bg-green-100',
+      [ReportStatus.SENT]: 'bg-primary-container',
+    }
+    return {
+      status: item.status,
+      count: item.count,
+      color: colorMap[item.status],
+    }
+  })
+
   const formatTimeAgo = (timestamp: string) => {
-    const now = new Date()
+    const nowDate = new Date()
     const date = new Date(timestamp)
-    const diffMs = now.getTime() - date.getTime()
+    const diffMs = nowDate.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMins / 60)
     const diffDays = Math.floor(diffHours / 24)
@@ -324,7 +413,9 @@ const DashboardPage = () => {
                           <p className="text-sm font-medium text-on-surface">{activity.title}</p>
                           <p className="text-xs text-on-surface-variant">{activity.description}</p>
                         </div>
-                        <span className="text-xs text-on-surface-variant whitespace-nowrap">{formatTimeAgo(activity.timestamp)}</span>
+                        <span className="text-xs text-on-surface-variant whitespace-nowrap">
+                          {formatTimeAgo(activity.timestamp)}
+                        </span>
                       </button>
                     )
                   })}
@@ -335,39 +426,62 @@ const DashboardPage = () => {
         </div>
       ) : (
         <div className="space-y-6">
+          <AnalyticsFilters
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            programs={allPrograms}
+            selectedProgram={selectedProgram}
+            onProgramChange={setSelectedProgram}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+          />
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard
+              icon={<Users className="w-5 h-5" />}
+              value={totalParticipantsInFiltered}
+              label="Total Peserta"
+              subtitle="Dalam sesi terfilter"
+              accent="purple"
+            />
+            <KpiCard
+              icon={<Calendar className="w-5 h-5" />}
+              value={activeInFiltered}
+              label="Sesi Aktif"
+              subtitle="Sesi aktif dalam rentang"
+              accent="amber"
+            />
+            <KpiCard
+              icon={<Star className="w-5 h-5" />}
+              value={avgRating}
+              label="Rata-rata Penilaian"
+              subtitle="Dari seluruh penilaian"
+              accent="green"
+            />
+            <KpiCard
+              icon={<FileText className="w-5 h-5" />}
+              value={reportCountsByStatus.find((r) => r.status === ReportStatus.SENT)?.count ?? 0}
+              label="Laporan Terkirim"
+              subtitle={`${allReports.length} total laporan`}
+              accent="purple"
+            />
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ActivityBarChart title="Pendaftaran Peserta Mingguan" data={weeklyRegistrations} />
-
-            <div className="bg-surface rounded-3xl p-6 shadow-sm space-y-4">
-              <h2 className="text-lg font-bold text-on-surface">Status Peserta</h2>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-2xl bg-surface-container-low p-4">
-                  <p className="text-on-surface-variant">Belum masuk sesi</p>
-                  <p className="text-2xl font-bold text-on-surface">{participants.filter((p) => !p.session_id).length}</p>
-                </div>
-                <div className="rounded-2xl bg-surface-container-low p-4">
-                  <p className="text-on-surface-variant">Dalam sesi</p>
-                  <p className="text-2xl font-bold text-on-surface">{participants.filter((p) => p.session_id).length}</p>
-                </div>
-              </div>
-            </div>
+            <ActivityBarChart title="Pendaftaran Peserta" data={weeklyRegistrations} />
+            <RatingDistribution data={ratingDistribution} />
           </div>
 
-          <div className="bg-surface rounded-3xl p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-on-surface mb-4">Partisipasi Sesi</h2>
-            <div className="space-y-3">
-              {sessionParticipation.length === 0 ? (
-                <p className="text-sm text-on-surface-variant">Belum ada sesi aktif.</p>
-              ) : (
-                sessionParticipation.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between rounded-2xl bg-surface-container-low p-4">
-                    <span className="text-sm font-medium text-on-surface">{item.name}</span>
-                    <span className="text-sm text-on-surface-variant">{item.count} peserta</span>
-                  </div>
-                ))
-              )}
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ReportPipeline data={reportPipelineData} />
+            <ConsentOverview
+              recordingConsented={recordingConsented}
+              photoConsented={photoConsented}
+              total={filteredParticipants.length || 1}
+            />
           </div>
+
+          <TopSessions data={topSessions} />
         </div>
       )}
     </div>

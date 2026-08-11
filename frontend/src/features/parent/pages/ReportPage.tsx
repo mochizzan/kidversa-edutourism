@@ -65,8 +65,7 @@ function ReportView() {
 
     try {
       setRaportHtml(buildHtml())
-    } catch (err) {
-      console.error('Failed to build parent report:', err)
+    } catch {
       setError('Gagal memuat laporan.')
     } finally {
       setLoading(false)
@@ -84,8 +83,7 @@ function ReportView() {
     setActionLoading('pdf')
     try {
       await captureRaportAsPdf(raportHtml, 'raport.pdf')
-    } catch (err) {
-      console.error('Failed to generate PDF:', err)
+    } catch {
       setDownloadError('Gagal menghasilkan file PDF.')
     } finally {
       setActionLoading(null)
@@ -99,8 +97,7 @@ function ReportView() {
     try {
       const blob = await captureRaportAsBlob(raportHtml)
       downloadBlob(blob, 'raport.png')
-    } catch (err) {
-      console.error('Failed to generate PNG:', err)
+    } catch {
       setDownloadError('Gagal menghasilkan gambar raport.')
     } finally {
       setActionLoading(null)

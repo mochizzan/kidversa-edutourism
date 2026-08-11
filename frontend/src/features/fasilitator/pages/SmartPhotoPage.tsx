@@ -115,8 +115,7 @@ const SmartPhotoPage = () => {
 
   useEffect(() => {
     loadInitialData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [childId])
+  }, [childId, loadInitialData])
 
   useEffect(() => {
     if (phase !== 'editor' || !capturedPhotoDataUrl || !editorCanvasRef.current) return

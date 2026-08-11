@@ -20,6 +20,11 @@ export interface LiveSessionState {
   connectionStatus: ConnectionState
 }
 
+interface SSEPayload {
+  type?: string
+  data?: unknown
+}
+
 interface SSEEvent {
   type: string
   data: unknown
@@ -160,7 +165,7 @@ export function useLiveSession(sessionId: string | null | undefined) {
       // back to a synthetic 'message' type.
       const parsed = (() => {
         try {
-          return JSON.parse((event as MessageEvent).data) as unknown
+          return JSON.parse((event as MessageEvent).data) as SSEPayload
         } catch {
           return null
         }
@@ -207,9 +212,7 @@ export function useLiveSession(sessionId: string | null | undefined) {
       source.close()
       unsub()
     }
-    // handleEvent is stable (useCallback deps []).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId])
+  }, [sessionId, handleEvent])
 
   // Pull participants when the session changes (SSE snapshot omits them).
   useEffect(() => {

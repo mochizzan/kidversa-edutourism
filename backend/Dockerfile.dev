@@ -1,0 +1,16 @@
+FROM golang:1.26
+
+# Install air for Go live-reload + wget for healthcheck
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/* && \
+    go install github.com/air-verse/air@latest
+
+WORKDIR /src
+
+# Download dependencies first (Docker layer cache)
+COPY go.mod go.sum ./
+RUN go mod download
+
+EXPOSE 8080
+
+# Run migrations once, then start air (watches .go files, recompiles on change)
+CMD ["sh", "-c", "go run ./cmd/migrate && air"]

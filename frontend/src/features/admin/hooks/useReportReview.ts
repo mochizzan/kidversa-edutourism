@@ -115,8 +115,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       const programMissions = missionResult.data.filter((m) => m.program_id === sess.program_id)
       setMissions(programMissions)
       setAssignedMissionIds(rpt.mission_ids || [])
-    } catch (err) {
-      console.error('Failed to load report data:', err)
+    } catch {
       setError('Gagal memuat data laporan.')
     } finally {
       setLoading(false)
@@ -144,8 +143,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       await loadData()
       addToast({ type: 'success', message: 'Laporan berhasil disetujui' })
       return true
-    } catch (err) {
-      console.error('Failed to approve report:', err)
+    } catch {
       setError('Gagal menyetujui laporan.')
       return false
     } finally {
@@ -161,8 +159,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       await loadData()
       addToast({ type: 'success', message: 'Laporan berhasil dikirim ke orang tua' })
       return true
-    } catch (err) {
-      console.error('Failed to send report:', err)
+    } catch {
       setError('Gagal mengirim laporan.')
       return false
     } finally {
@@ -218,8 +215,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       const html = buildRaportHtml()
       if (!html) return
       await captureRaportAsPdf(html, `raport-${participant.child_name}.pdf`)
-    } catch (err) {
-      console.error('Failed to generate PDF:', err)
+    } catch {
       addToast({ type: 'error', message: 'Gagal menghasilkan file PDF.' })
     } finally {
       setActionLoading(null)
@@ -234,8 +230,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       if (!html) return
       const blob = await captureRaportAsBlob(html)
       downloadBlob(blob, `raport-${participant.child_name}.png`)
-    } catch (err) {
-      console.error('Failed to generate PNG:', err)
+    } catch {
       addToast({ type: 'error', message: 'Gagal menghasilkan gambar raport.' })
     } finally {
       setActionLoading(null)

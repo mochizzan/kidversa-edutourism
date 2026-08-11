@@ -1,0 +1,128 @@
+# Kidversa Edutourism — Single compose, two profiles
+#
+#   docker compose --profile dev up --build     ← development (live-reload + HMR)
+#   docker compose --profile prod up --build    ← production  (optimized images)
+#   docker compose --profile dev down           ← stop dev
+#   docker compose --profile prod down          ← stop prod
+#   docker compose --profile dev logs -f backend
+
+services:
+  # ═══════════════════════════════════════════════════════════════
+  #  BASE — always runs regardless of profile
+  # ═══════════════════════════════════════════════════════════════
+
+  mariadb:
+    image: mariadb:12
+    environment:
+      MARIADB_ROOT_PASSWORD: admin
+    ports:
+      - "3307:3306"
+    volumes:
+      # Bind mount — data langsung terlihat di File Explorer
+      - ./data/mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════════════════════════════
+  #  DEV PROFILE — live-reload, HMR, bind mounts
+  # ═══════════════════════════════════════════════════════════════
+
+  backend:
+    profiles: ["dev"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    env_file: ./backend/.env
+    environment:
+      # Override: di Docker, DB_HOST = nama service mariadb (bukan localhost)
+      DB_HOST: mariadb
+      TEST_DB_HOST: mariadb
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/cmd:/src/cmd
+      - ./backend/internal:/src/internal
+      - ./backend/migrations:/src/migrations
+      - ./backend/go.mod:/src/go.mod
+      - ./backend/go.sum:/src/go.sum
+      - ./backend/.air.toml:/src/.air.toml
+      - ./backend/uploads:/src/uploads
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      # GET request (bukan HEAD/--spider) — lebih kompatibel
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  frontend:
+    profiles: ["dev"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_TARGET: http://backend:8080
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/public:/app/public
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════════════════════════════
+  #  PROD PROFILE — optimized images, no source mounts
+  # ═══════════════════════════════════════════════════════════════
+
+  backend-prod:
+    profiles: ["prod"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: ./backend/.env
+    environment:
+      # Override: di Docker, DB_HOST = nama service mariadb
+      DB_HOST: mariadb
+      TEST_DB_HOST: mariadb
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  frontend-prod:
+    profiles: ["prod"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "80:80"
+    depends_on:
+      backend-prod:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend_uploads:

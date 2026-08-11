@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { missionService } from '../../../core/services/missions'
 import { programService } from '../../../core/services/programs'
-import type { MissionBank, Program } from '../../../core/types'
+import type { MissionBank, Program, ProgramStage } from '../../../core/types'
 
 const PAGE_SIZE = 10
 
@@ -22,6 +22,8 @@ export function useMissionBank() {
 
   const [programs, setPrograms] = useState<Program[]>([])
   const [stats, setStats] = useState<Record<string, number>>({ HOME: 0, PARENT: 0, SCHOOL: 0 })
+
+  const [stageMap, setStageMap] = useState<Record<string, ProgramStage>>({})
 
   const [deactivateTarget, setDeactivateTarget] = useState<MissionBank | null>(null)
   const [deactivating, setDeactivating] = useState(false)
@@ -53,6 +55,25 @@ export function useMissionBank() {
       })
       setMissions(res.data)
       setTotal(res.total)
+
+      // Build stage lookup from unique program_ids in displayed missions
+      const programIds = [
+        ...new Set(res.data.map((m) => m.program_id).filter(Boolean)),
+      ]
+      if (programIds.length > 0) {
+        const stageLookup: Record<string, ProgramStage> = {}
+        await Promise.all(
+          programIds.map(async (pid) => {
+            try {
+              const stages = await programService.getStages(pid)
+              stages.forEach((s) => { stageLookup[s.id] = s })
+            } catch {
+              /* ignore per-program stage fetch errors */
+            }
+          }),
+        )
+        setStageMap(stageLookup)
+      }
     } catch {
       setError('Gagal memuat data misi')
     } finally {
@@ -167,5 +188,6 @@ export function useMissionBank() {
     loadMissions,
     handleToggleActive,
     confirmToggle,
+    stageMap,
   }
 }

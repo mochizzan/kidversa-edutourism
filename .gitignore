@@ -18,6 +18,7 @@ build/
 *.db
 *.sqlite
 *.sqlite3
+data/
 
 # Environment
 .env
@@ -51,6 +52,7 @@ CLAUDE.md
 .hermes/
 .docs/
 .img/
+.superpowers/
 
 # Docs & plans (not for version control)
 docs/
@@ -64,3 +66,11 @@ kidversa-server
 backend/.env
 backend/uploads/
 backend/cmd/server/uploads/
+
+# Backups
+backups/
+
+# Temporary planning docs (not for version control)
+findings.md
+progress.md
+task_plan.md

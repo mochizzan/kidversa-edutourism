@@ -155,6 +155,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const token = await refreshAccessToken()
           set({ token, isAuthenticated: true })
         } catch {
+          console.error('[Auth] Refresh failed, logging out')
           // Refresh gagal (cookie tidak valid/kadaluarsa) ⇒ sesi mati.
           await get().logout()
           return
@@ -174,6 +175,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         }
       } catch {
+        console.error('[Auth] checkSession failed')
         set({
           user: null,
           token: null,

@@ -369,8 +369,12 @@ function ToastItem({
   const startTsRef = useRef<number>(Date.now())
   const remainingRef = useRef<number | null>(null)
   const pauseBeginRef = useRef<number | null>(null)
+  const onRemoveRef = useRef(onRemove)
+  const durationRef = useRef(toast.duration)
+  onRemoveRef.current = onRemove
+  durationRef.current = toast.duration
   const isPersistent = toast.duration === 0 || toast.duration == null
-  const effectiveDuration = toast.duration ?? DEFAULT_DURATION
+  const effectiveDuration = durationRef.current ?? DEFAULT_DURATION
   const config = TOAST_CONFIG[toast.type]
   const Icon = config.icon
 
@@ -412,7 +416,7 @@ function ToastItem({
           }
           if (remaining <= 0) {
             onStartExit(toast.id)
-            setTimeout(() => onRemove(toast.id), EXIT_TOTAL_MS)
+            setTimeout(() => onRemoveRef.current(toast.id), EXIT_TOTAL_MS)
             return
           }
         }
@@ -426,7 +430,6 @@ function ToastItem({
       clearTimeout(delayTimer)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast.id, isPersistent, isExiting, paused])
 
   // ── Track remaining on pause/resume ─────────────────────────────────────────

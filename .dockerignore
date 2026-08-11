@@ -1,0 +1,43 @@
+# Dependencies
+frontend/node_modules
+backend/vendor
+node_modules
+
+# Build outputs
+frontend/dist
+backend/bin
+*.exe
+
+# IDE / tools
+.vscode
+.idea
+.codegraph
+.kilo
+.serena
+.hermes
+*.swp
+*.swo
+
+# Environment (secrets never in image)
+backend/.env
+
+# Git
+.git
+.gitignore
+
+# Docs & plans
+docs/
+.plans/
+.superpowers/
+.kilo/
+
+# Uploads & DB data (bind mounted, not baked in)
+backend/uploads
+data
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript cache
+*.tsbuildinfo
