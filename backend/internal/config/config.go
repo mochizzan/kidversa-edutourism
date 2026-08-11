@@ -103,7 +103,7 @@ func Load() *Config {
 		CookieSameSite:  getEnv("COOKIE_SAMESITE", "Lax"),
 
 		ServerPort:  getEnv("SERVER_PORT", "8080"),
-		CORSOrigins: parseOrigins(getEnv("CORS_ORIGINS", "http://localhost:5173")),
+		CORSOrigins: parseOrigins(getEnv("CORS_ORIGINS", "")),
 		UploadDir:   getEnv("UPLOAD_DIR", "./uploads"),
 
 		CookieName: getEnv("COOKIE_NAME", "kidversa_session"),
@@ -123,10 +123,10 @@ func Load() *Config {
 		TestDBPassword: getEnv("TEST_DB_PASSWORD", ""),
 		TestDBName:     getEnv("TEST_DB_NAME", "kidversa_test"),
 
-		WhatsAppGatewayURL:   getEnv("WHATSAPP_GATEWAY_URL", "http://localhost:2785"),
+		WhatsAppGatewayURL:   getEnv("WHATSAPP_GATEWAY_URL", ""),
 		WhatsAppAPIKey:       getEnv("WHATSAPP_API_KEY", ""),
-		WhatsAppSessionID:    getEnv("WHATSAPP_SESSION_ID", "6d2b9940-f055-4f81-93c3-5b4e4f8b574a"),
-		ParentConsentBaseURL: getEnv("PARENT_CONSENT_BASE_URL", "http://localhost:5173/consent/respond"),
+		WhatsAppSessionID:    getEnv("WHATSAPP_SESSION_ID", ""),
+		ParentConsentBaseURL: getEnv("PARENT_CONSENT_BASE_URL", ""),
 
 		OpenRouterAPIKey:    getEnv("OPENROUTER_API_KEY", ""),
 		OpenRouterModel:     getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
@@ -144,8 +144,18 @@ func Load() *Config {
 		log.Fatalf("config: JWT_SECRET must be at least 32 bytes (got %d); refusing to start", len(c.JWTSecret))
 	}
 	if c.BcryptCost < 10 || c.BcryptCost > 14 {
+		log.Printf("config: BCRYPT_COST %d di luar range 10-14, menggunakan default 12", c.BcryptCost)
 		c.BcryptCost = 12
 	}
+
+	// DB security warnings — visible di log agar developer tahu konfigurasi tidak aman.
+	if c.DBUser == "root" && c.DBPassword == "" {
+		log.Println("config: WARNING — DB_USER=root dengan DB_PASSWORD kosong, tidak aman untuk production")
+	}
+	if c.TestDBName == c.DBName && c.DBName != "" {
+		log.Println("config: WARNING — TestDBName sama dengan DBName, pastikan database terpisah")
+	}
+
 	return c
 }
 
@@ -164,6 +174,7 @@ func (c *Config) DSN() string {
 // SSECookieName returns the configured SSE session cookie name.
 func (c *Config) SSECookieName() string {
 	if c.CookieName == "" {
+		log.Println("config: COOKIE_NAME kosong, menggunakan default 'kidversa_session'")
 		return "kidversa_session"
 	}
 	return c.CookieName

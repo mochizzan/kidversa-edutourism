@@ -80,12 +80,13 @@ func bootstrap(cfg *config.Config) error {
 		}
 	}
 
-	// SUPER_ADMIN (global, no tenant). Default ke "Password123" bila env kosong
-	// atau terlalu pendek (mis. "123456" lama yang ditolak validasi FE min=8).
+	// SUPER_ADMIN (global, no tenant). Password wajib di-set via env.
 	pw := cfg.BootstrapSuperadminPassword
-	if pw == "" || len(pw) < 8 {
-		pw = "Password123"
-		log.Println("BOOTSTRAP: BOOTSTRAP_SUPERADMIN_PASSWORD kosong/pendek, menggunakan default 'Password123'")
+	if pw == "" {
+		log.Fatal("BOOTSTRAP: BOOTSTRAP_SUPERADMIN_PASSWORD wajib di-set (minimal 8 karakter)")
+	}
+	if len(pw) < 8 {
+		log.Fatalf("BOOTSTRAP: BOOTSTRAP_SUPERADMIN_PASSWORD terlalu pendek (%d char, minimal 8)", len(pw))
 	}
 	superHash, err := auth.BcryptHash(pw, cfg.BcryptCost)
 	if err != nil {
