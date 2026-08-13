@@ -337,7 +337,7 @@ func (h *ConsentHandler) Info(c *echo.Context) error {
 func (h *ConsentHandler) Summary(c *echo.Context) error {
 	idsRaw := (*c).QueryParam("session_ids")
 	if idsRaw == "" {
-		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+		return appresp.OK(c, dto.ConsentSummaryResponse{Sessions: []dto.ConsentSummaryItem{}})
 	}
 	ids := strings.Split(idsRaw, ",")
 	grouped, err := h.consent.ListBySessionIDs((*c).Request().Context(), ids)

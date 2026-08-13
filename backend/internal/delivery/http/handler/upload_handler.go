@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -89,7 +90,10 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 	}
 	if err := h.photos.Create((*c).Request().Context(), rec); err != nil {
 		// Roll back the stored file so we don't leave orphans.
-		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
+			// Log cleanup failure but don't change the return value.
+			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
+		}
 		return err
 	}
 	return appresp.Created(c, rec)
@@ -130,7 +134,10 @@ func (h *UploadHandler) UploadRecording(c *echo.Context) error {
 		SyncStatus:      entity.SyncLocal,
 	}
 	if err := h.recordings.Create((*c).Request().Context(), rec); err != nil {
-		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		// Roll back the stored file so we don't leave orphans.
+		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
+			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
+		}
 		return err
 	}
 	return appresp.Created(c, rec)
@@ -169,7 +176,10 @@ func (h *UploadHandler) UploadFrame(c *echo.Context) error {
 		}
 	}
 	if err := h.frames.Create((*c).Request().Context(), f); err != nil {
-		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		// Roll back the stored file so we don't leave orphans.
+		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
+			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
+		}
 		return err
 	}
 	return appresp.Created(c, dto.NewFrameResponse(f))
@@ -223,7 +233,10 @@ func (h *UploadHandler) UploadContent(c *echo.Context) error {
 		}
 	}
 	if err := h.programs.CreateContent((*c).Request().Context(), ct); err != nil {
-		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		// Roll back the stored file so we don't leave orphans.
+		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
+			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
+		}
 		return err
 	}
 	return appresp.Created(c, ct)
@@ -258,12 +271,18 @@ func (h *UploadHandler) UploadAvatar(c *echo.Context) error {
 
 	user, err := h.users.GetByID((*c).Request().Context(), id)
 	if err != nil {
-		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		// Roll back the stored file so we don't leave orphans.
+		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
+			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
+		}
 		return err
 	}
 	user.AvatarURL = storedRel
 	if err := h.users.Update((*c).Request().Context(), user); err != nil {
-		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		// Roll back the stored file so we don't leave orphans.
+		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
+			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
+		}
 		return err
 	}
 	return appresp.OK(c, user)

@@ -70,11 +70,14 @@ func (r *GormReportRepository) loadMissionIDs(ctx context.Context, reports []ent
 func (r *GormReportRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.Report, error) {
 	var m ReportModel
 	q := r.db.WithContext(ctx).Where("id = ?", id)
-	// Tenant scoping: restrict to the report's owning session's tenant (joined
-	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
-	if tenantID != "" {
-		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	// Tenant scoping: SUPER_ADMIN tanpa active tenant (tenantID == "") TIDAK BOLEH
+	// mengakses report dari tenant manapun. Ini mencegah IDOR.
+	// Request dengan tenantID kosong akan ditolak di middleware layer (TenantScope)
+	// sebelum mencapai repository, tapi kita tetap validate di sini sebagai defense-in-depth.
+	if tenantID == "" {
+		return nil, apperrors.BadRequest("tenant_required", errors.New("tenant ID is required"))
 	}
+	q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
 	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)

@@ -32,6 +32,23 @@ type tokenBucket struct {
 func RateLimit(perMin int) echo.MiddlewareFunc {
 	var mu sync.Mutex
 	buckets := make(map[string]*tokenBucket)
+
+	// Evict idle buckets every 5 minutes to prevent unbounded memory growth.
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now()
+			mu.Lock()
+			for ip, b := range buckets {
+				if now.Sub(b.lastRefill) > 5*time.Minute {
+					delete(buckets, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			ip := c.RealIP()
@@ -42,7 +59,6 @@ func RateLimit(perMin int) echo.MiddlewareFunc {
 				b = &tokenBucket{tokens: perMin, lastRefill: now}
 				buckets[ip] = b
 			}
-			mu.Unlock()
 
 			elapsed := now.Sub(b.lastRefill).Minutes()
 			if elapsed > 0 {
@@ -53,10 +69,12 @@ func RateLimit(perMin int) echo.MiddlewareFunc {
 				b.lastRefill = now
 			}
 			if b.tokens <= 0 {
+				mu.Unlock()
 				c.Response().Header().Set("Retry-After", "60")
 				return echo.NewHTTPError(429, "too_many_requests")
 			}
 			b.tokens--
+			mu.Unlock()
 			return next(c)
 		}
 	}

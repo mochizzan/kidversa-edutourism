@@ -55,8 +55,7 @@ func (h *UserHandler) dismissApproval(c *echo.Context, targetUserID string) {
 // List handles GET /api/users (paginated + filtered).
 func (h *UserHandler) List(c *echo.Context) error {
 	role, tid := actor(c)
-	page, _ := strconv.Atoi((*c).QueryParam("page"))
-	limit, _ := strconv.Atoi((*c).QueryParam("limit"))
+	page, limit := pagination(c)
 	f := repository.UserFilter{
 		Search:         (*c).QueryParam("search"),
 		Role:           (*c).QueryParam("role"),

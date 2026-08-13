@@ -76,6 +76,19 @@ func (h *Hub) getOrCreate(ch string) *perChannelState {
 	return pc
 }
 
+func (h *Hub) cleanupEmptyChannels() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for ch, pc := range h.channels {
+		pc.mu.RLock()
+		empty := len(pc.clients) == 0
+		pc.mu.RUnlock()
+		if empty {
+			delete(h.channels, ch)
+		}
+	}
+}
+
 // Subscribe joins a channel; returns an event channel and an unsubscribe func.
 func (h *Hub) Subscribe(_ context.Context, ch string) (<-chan Event, func(), error) {
 	pc := h.getOrCreate(ch)
@@ -89,8 +102,12 @@ func (h *Hub) Subscribe(_ context.Context, ch string) (<-chan Event, func(), err
 	unsub := func() {
 		pc.mu.Lock()
 		delete(pc.clients, cid)
+		empty := len(pc.clients) == 0
 		pc.mu.Unlock()
 		atomic.AddInt64(&h.connected, -1)
+		if empty {
+			h.cleanupEmptyChannels()
+		}
 	}
 	return ec, unsub, nil
 }

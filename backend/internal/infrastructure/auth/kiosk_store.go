@@ -32,6 +32,7 @@ type KioskRecord struct {
 	SessionID string
 	TenantID  string
 	ExpiresAt time.Time
+	Consumed  bool
 }
 
 // KioskTokenStore issues, validates, and consumes single-use kiosk tokens.
@@ -87,6 +88,7 @@ func (s *DBKioskStore) Issue(ctx context.Context, sessionID, tenantID string, tt
 		SessionID: sessionID,
 		TenantID:  tenantID,
 		ExpiresAt: rec.ExpiresAt,
+		Consumed:  false,
 	}
 	s.mu.Unlock()
 	return token, nil
@@ -94,7 +96,8 @@ func (s *DBKioskStore) Issue(ctx context.Context, sessionID, tenantID string, tt
 
 // Validate returns the session/tenant binding for a live (unconsumed, unexpired) token.
 func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, string, error) {
-	// Read-through cache first.
+	// Double-checked locking pattern for cache population.
+	// Step 1: Try read lock first (fast path for cache hit).
 	s.mu.RLock()
 	cached, ok := s.cache[token]
 	s.mu.RUnlock()
@@ -103,9 +106,30 @@ func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, stri
 			s.invalidate(token)
 			return "", "", apperrors.NotFound("kiosk_token_expired", nil)
 		}
+		if cached.Consumed {
+			return "", "", apperrors.NotFound("kiosk_token_consumed", nil)
+		}
 		return cached.SessionID, cached.TenantID, nil
 	}
 
+	// Step 2: Cache miss - acquire write lock to populate cache.
+	s.mu.Lock()
+	// Re-check cache under write lock (double-check).
+	// Another goroutine might have populated it while we waited for the lock.
+	cached, ok = s.cache[token]
+	s.mu.Unlock()
+	if ok {
+		if s.nowFn().After(cached.ExpiresAt) {
+			s.invalidate(token)
+			return "", "", apperrors.NotFound("kiosk_token_expired", nil)
+		}
+		if cached.Consumed {
+			return "", "", apperrors.NotFound("kiosk_token_consumed", nil)
+		}
+		return cached.SessionID, cached.TenantID, nil
+	}
+
+	// Step 3: Still no cache entry - query DB and populate.
 	var rec KioskToken
 	if err := s.db.WithContext(ctx).Where("token = ?", token).First(&rec).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -135,6 +159,7 @@ func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, stri
 		SessionID: rec.SessionID,
 		TenantID:  tenantID,
 		ExpiresAt: rec.ExpiresAt,
+		Consumed:  false,
 	}
 	s.mu.Unlock()
 	return rec.SessionID, tenantID, nil
@@ -149,7 +174,11 @@ func (s *DBKioskStore) Consume(ctx context.Context, token string) error {
 		Update("consumed_at", &now).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
-	s.invalidate(token)
+	s.mu.Lock()
+	if rec, ok := s.cache[token]; ok {
+		rec.Consumed = true
+	}
+	s.mu.Unlock()
 	return nil
 }
 

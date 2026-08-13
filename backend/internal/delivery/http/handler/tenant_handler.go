@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/labstack/echo/v5"
 
@@ -29,8 +28,7 @@ func validateTenantID(c *echo.Context) (string, bool) {
 
 // List handles GET /api/tenants.
 func (h *TenantHandler) List(c *echo.Context) error {
-	page, _ := strconv.Atoi((*c).QueryParam("page"))
-	limit, _ := strconv.Atoi((*c).QueryParam("limit"))
+	page, limit := pagination(c)
 	f := repository.TenantFilter{Search: (*c).QueryParam("search")}
 	res, err := h.tenantUC.ListTenants((*c).Request().Context(), f, page, limit)
 	if err != nil {

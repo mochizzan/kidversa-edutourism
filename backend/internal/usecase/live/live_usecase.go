@@ -159,7 +159,12 @@ func (s *Service) Reset(ctx context.Context, groupID, actorID, callerTenant stri
 }
 
 // PublishEvent records + broadcasts an arbitrary live event for a session.
-func (s *Service) PublishEvent(ctx context.Context, sessionID string, e *entity.TimelineEvent) error {
+// callerTenant is the resolved tenant from the JWT/scope; an owning-tenant
+// mismatch is rejected (consistent with Override/Jump/Reset).
+func (s *Service) PublishEvent(ctx context.Context, sessionID string, e *entity.TimelineEvent, callerTenant string) error {
+	if err := s.assertTenant(ctx, sessionID, callerTenant); err != nil {
+		return err
+	}
 	if err := s.repo.CreateTimeline(ctx, e); err != nil {
 		return err
 	}

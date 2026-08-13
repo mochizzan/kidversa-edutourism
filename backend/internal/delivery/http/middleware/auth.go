@@ -59,11 +59,6 @@ func extractToken(c *echo.Context, sseCookieName string) string {
 			return ck.Value
 		}
 	}
-	// Fallback: query parameter (for environments where the cookie is blocked,
-	// e.g. cross-origin EventSource where the Set-Cookie was dropped).
-	if tok := (*c).QueryParam("token"); tok != "" {
-		return tok
-	}
 	return ""
 }
 

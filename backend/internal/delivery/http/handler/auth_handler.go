@@ -198,14 +198,3 @@ func clearRefreshCookie(c *echo.Context, name string) {
 		MaxAge:   -1,
 	})
 }
-
-func parseSameSite(s string) http.SameSite {
-	switch s {
-	case "None":
-		return http.SameSiteNoneMode
-	case "Strict":
-		return http.SameSiteStrictMode
-	default:
-		return http.SameSiteLaxMode
-	}
-}
