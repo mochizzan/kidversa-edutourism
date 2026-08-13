@@ -88,18 +88,25 @@ export async function listRequest<T>(
   if (limit >= 100 && first.meta && first.meta.total > first.data.length) {
     const totalPages = Math.ceil(first.meta.total / first.meta.limit)
     const rest: T[] = []
-    for (let p = page + 1; p <= totalPages; p++) {
-      const q = new URLSearchParams(
-        url.includes('?') ? url.slice(url.indexOf('?') + 1) : '',
-      )
-      q.set('page', String(p))
-      const r = await apiRequest<ListEnvelope<T>>(
-        'GET',
-        `${path}?${q.toString()}`,
-        undefined,
-        { headers: withTenantHeader() },
-      )
-      rest.push(...r.data)
+    const BATCH = 5
+    for (let batch = page + 1; batch <= totalPages; batch += BATCH) {
+      const end = Math.min(batch + BATCH - 1, totalPages)
+      const promises: Promise<ListEnvelope<T>>[] = []
+      for (let p = batch; p <= end; p++) {
+        const q = new URLSearchParams(
+          url.includes('?') ? url.slice(url.indexOf('?') + 1) : '',
+        )
+        q.set('page', String(p))
+        promises.push(
+          apiRequest<ListEnvelope<T>>('GET', `${path}?${q.toString()}`, undefined, {
+            headers: withTenantHeader(),
+          }),
+        )
+      }
+      const results = await Promise.all(promises)
+      for (const r of results) {
+        rest.push(...r.data)
+      }
     }
     const all = [...first.data, ...rest].map(normalizeTenantId)
     return { data: all, total: first.meta.total, page: 1, limit: all.length, totalPages: 1 }

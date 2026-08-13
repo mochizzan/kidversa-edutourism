@@ -44,6 +44,11 @@ export function useConsentMonitor() {
       const loadedSessions = res.data
       setSessions(loadedSessions)
 
+      if (loadedSessions.length === 0) {
+        setConsentData({})
+        return
+      }
+
       const consentMap = await consentService.getSummary(loadedSessions.map((s) => s.id))
 
       const participantResults = await Promise.all(

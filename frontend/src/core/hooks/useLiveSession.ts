@@ -20,11 +20,6 @@ export interface LiveSessionState {
   connectionStatus: ConnectionState
 }
 
-interface SSEPayload {
-  type?: string
-  data?: unknown
-}
-
 interface SSEEvent {
   type: string
   data: unknown
@@ -160,17 +155,8 @@ export function useLiveSession(sessionId: string | null | undefined) {
     setLoading(true)
     seenTimelineIds.current = new Set()
 
-    const source = openSSE(`/api/live/${sessionId}/stream`, (event) => {
-      // Named events are delivered with `event.type` set; unnamed events fall
-      // back to a synthetic 'message' type.
-      const parsed = (() => {
-        try {
-          return JSON.parse((event as MessageEvent).data) as SSEPayload
-        } catch {
-          return null
-        }
-      })()
-      handleEvent({ type: event.type || 'message', data: parsed })
+    const source = openSSE(`/api/live/${sessionId}/stream`, () => {
+      // onMessage tidak dipakai — semua event ditangani oleh addEventListener di bawah
     })
 
     source.addEventListener('snapshot', (e) => {

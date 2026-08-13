@@ -29,6 +29,12 @@ const AUTH_CHANNEL = 'kidversa-auth'
 // ---------------------------------------------------------------------------
 
 let accessToken: string | null = null
+let tokenSetAt = 0 // timestamp (Date.now) when accessToken was last set
+
+// Access token TTL on the backend is 15 minutes (JWT_ACCESS_TTL). We refresh
+// proactively 2 minutes before expiry so the in-memory token is always fresh
+// when apiRequest fires — preventing the 401→refresh→retry cycle entirely.
+const TOKEN_STALE_MS = 13 * 60 * 1000 // 13 minutes
 
 export function getTokens(): { accessToken: string | null } {
   return { accessToken }
@@ -39,10 +45,12 @@ export function setTokens(access: string | null, _refresh?: string): void {
   // backend; we intentionally do not store it here. We keep the parameter for
   // API compatibility with callers that pass both tokens.
   accessToken = access
+  if (access) tokenSetAt = Date.now()
 }
 
 export function clearTokens(): void {
   accessToken = null
+  tokenSetAt = 0
   clearStoredUser()
 }
 
@@ -273,6 +281,7 @@ export async function refreshAccessToken(): Promise<string> {
         throw new ApiError('No access token returned', 'refresh_failed', res.status)
       }
       accessToken = newToken
+      tokenSetAt = Date.now()
       return newToken
     } finally {
       authChannel?.postMessage({ type: 'refresh:end', token: accessToken })
@@ -324,6 +333,18 @@ export async function apiRequest<T>(
       credentials: 'include',
       signal: opts?.signal,
     })
+  }
+
+  // Proactive refresh: if the in-memory token is stale (>13 min old),
+  // refresh BEFORE sending the request so the server never sees a 401.
+  // This eliminates the console error noise and the refresh-retry cycle.
+  // Only applies when a stored user exists (authenticated session).
+  if (accessToken && getStoredUser() && Date.now() - tokenSetAt > TOKEN_STALE_MS) {
+    const ok = await refreshAccessToken().then(() => true, () => false)
+    if (!ok) {
+      fireUnauthorized()
+      throw new ApiError('Session expired', 'refresh_failed', 401)
+    }
   }
 
   while (true) {
@@ -387,14 +408,8 @@ export function openSSE(
 ): EventSource {
   const base = `${getApiBaseUrl()}${path}`
   // EventSource cannot send an Authorization header; it relies on the
-  // `kidversa_session` cookie being sent via withCredentials. As a fallback
-  // for cross-origin environments where that cookie may be dropped, append
-  // the access token as a query parameter — the backend's JWTAuth middleware
-  // checks the cookie first, then falls back to ?token=.
-  const separator = path.includes('?') ? '&' : '?'
-  let url = accessToken
-    ? `${base}${separator}token=${encodeURIComponent(accessToken)}`
-    : base
+  // `kidversa_session` cookie being sent via withCredentials.
+  let url = base
   // SUPER_ADMIN: the JWT has empty tid, and EventSource cannot send custom
   // headers (X-Tenant-Id). Pass the active tenant as a query param so
   // TenantScope can resolve it. Non-SA roles have tid in the JWT.

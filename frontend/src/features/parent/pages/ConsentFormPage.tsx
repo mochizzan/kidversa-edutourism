@@ -141,6 +141,10 @@ function ConsentForm() {
     consentService
       .getInfo(token)
       .then((res) => {
+        if (!res) {
+          setInfo({ status: 'ok' })
+          return
+        }
         if (res.status === 'invalid') {
           setLockedError(
             'Tautan persetujuan tidak valid atau sudah digunakan. Silakan hubungi koordinator untuk tautan baru.',

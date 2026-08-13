@@ -46,6 +46,12 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: true,
+    hmr: {
+      // Explicit WebSocket config for Docker environment
+      host: 'localhost',
+      port: 5173,
+      protocol: 'ws',
+    },
     proxy: {
       '/api': {
         // In Docker Compose, set VITE_API_TARGET=http://backend:8080
