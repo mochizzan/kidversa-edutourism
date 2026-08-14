@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Users, Target } from 'lucide-react'
+import { Users, Target, Monitor } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
 import { liveService } from '../../../core/services/live'
 import { ROUTES } from '../../../core/constants/app'
+import { kioskAccessPath } from '../../../core/constants/app'
+import { apiRequest } from '../../../core/services/backendClient'
+import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { useConfirmDialog } from '../../../shared/hooks/useConfirmDialog'
@@ -82,6 +85,7 @@ const GroupPage = () => {
   const [groupDetail, setGroupDetail] = useState<GroupDetail | null>(null)
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [completing, setCompleting] = useState(false)
+  const [kioskLoading, setKioskLoading] = useState(false)
 
   const fetchData = useCallback(async () => {
     if (!groupId) return
@@ -206,6 +210,47 @@ const GroupPage = () => {
     navigate(`/fasilitator/groups/${groupId}/children/${participantId}`)
   }
 
+  const handleOpenKiosk = async () => {
+    if (!groupDetail || !groupDetail.session.id) return
+    const sessionId = groupDetail.session.id
+    const stageId = groupDetail.group.current_session_stage_id
+    if (!stageId) {
+      addToast({ type: 'error', message: 'Kelompok belum memiliki stage aktif untuk dibuka di kiosk.' })
+      return
+    }
+    // Edge case: kiosk token single-use. Jika sesi belum ACTIVE, konten mungkin
+    // kosong — beri peringatan, tapi tetap izinkan (backend tidak memblokir).
+    if (groupDetail.session.status !== 'ACTIVE') {
+      addToast({ type: 'info', message: 'Sesi belum aktif — kiosk mungkin menampilkan konten kosong.' })
+    }
+    setKioskLoading(true)
+    // Buka jendela SEBELUM await agar tidak terblokir popup blocker
+    // (browser hanya mengizinkan window.open dalam user-gesture sync).
+    const kioskUrl = `${kioskAccessPath(sessionId, stageId)}?token=`
+    const popup = window.open(kioskUrl, '_blank')
+    try {
+      const res = await apiRequest<{ data: { token: string } }>(
+        'POST',
+        API_ROUTES.AUTH.KIOSK,
+        { session_id: sessionId },
+      )
+      const token = res.data.token
+      const finalUrl = `${kioskAccessPath(sessionId, stageId)}?token=${encodeURIComponent(token)}`
+      if (popup) {
+        popup.location.href = finalUrl
+        popup.focus()
+      } else {
+        // Popup diblokir: fallback buka lewat anchor (user-gesture sudah lewat).
+        window.open(finalUrl, '_blank')
+      }
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
+      popup?.close()
+    } finally {
+      setKioskLoading(false)
+    }
+  }
+
   // ── Loading state ──
   if (loading) {
     return (
@@ -253,9 +298,21 @@ const GroupPage = () => {
           { label: group.name },
         ]}
         actions={
-          <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-            <Target className="w-4 h-4" />
-            <span>{programStageName ?? 'Stage'}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+              <Target className="w-4 h-4" />
+              <span>{programStageName ?? 'Stage'}</span>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleOpenKiosk}
+              loading={kioskLoading}
+              disabled={!groupDetail?.group.current_session_stage_id}
+              icon={<Monitor className="w-4 h-4" />}
+            >
+              Buka Kiosk
+            </Button>
           </div>
         }
       />
@@ -293,6 +350,19 @@ const GroupPage = () => {
           loading={completing}
         />
       )}
+
+      {/* Open kiosk (public display) */}
+      <div className="flex justify-center pt-2">
+        <Button
+          variant="secondary"
+          onClick={handleOpenKiosk}
+          loading={kioskLoading}
+          disabled={!groupDetail?.group.current_session_stage_id}
+          icon={<Monitor className="w-4 h-4" />}
+        >
+          Buka Kiosk (Tampilan Peserta)
+        </Button>
+      </div>
 
       {/* Confirmation Modal */}
       <Modal
