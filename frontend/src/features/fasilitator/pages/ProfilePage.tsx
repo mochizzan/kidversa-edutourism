@@ -224,9 +224,11 @@ const ProfilePage = () => {
             </div>
             <div className='flex items-center justify-between pl-0 md:pl-4 pt-3 md:pt-0 pb-2 md:pb-0'>
               <span className='text-sm font-semibold text-slate-500'>Mode</span>
-              <span className='inline-flex px-3 py-1 rounded-full bg-[#F4EBFF] text-[#6D28D9] text-[11px] font-bold border border-purple-100'>
-                Demo
-              </span>
+              {import.meta.env.VITE_DEMO_MODE === 'true' && (
+                <span className='inline-flex px-3 py-1 rounded-full bg-[#F4EBFF] text-[#6D28D9] text-[11px] font-bold border border-purple-100'>
+                  Demo
+                </span>
+              )}
             </div>
           </div>
         </Card>

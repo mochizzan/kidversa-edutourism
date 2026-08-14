@@ -116,14 +116,18 @@ const LoginPage = () => {
         />
       </form>
 
-      {/* ── Divider ── */}
-      <div className="flex items-center gap-3 my-5">
-        <span className="flex-1 h-px bg-outline-variant/40" />
-        <span className="text-[11px] text-on-surface-variant/40 font-medium tracking-wider uppercase">Info Demo</span>
-        <span className="flex-1 h-px bg-outline-variant/40" />
-      </div>
+      {import.meta.env.VITE_DEMO_MODE === 'true' && (
+        <>
+          {/* ── Divider ── */}
+          <div className="flex items-center gap-3 my-5">
+            <span className="flex-1 h-px bg-outline-variant/40" />
+            <span className="text-[11px] text-on-surface-variant/40 font-medium tracking-wider uppercase">Info Demo</span>
+            <span className="flex-1 h-px bg-outline-variant/40" />
+          </div>
 
-      <DemoHint />
+          <DemoHint />
+        </>
+      )}
 
       {/* ── Register link ── */}
       <p className="mt-6 text-center text-sm text-on-surface-variant/50">
