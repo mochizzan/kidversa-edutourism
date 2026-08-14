@@ -36,6 +36,11 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     )
   }
 
+  // Force password change for bootstrap/demo accounts before any other route.
+  if (user?.must_change_password && location.pathname !== ROUTES.AUTH.CHANGE_PASSWORD) {
+    return <Navigate to={ROUTES.AUTH.CHANGE_PASSWORD} replace />
+  }
+
   // Role-based access control
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return (

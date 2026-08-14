@@ -15,6 +15,7 @@ export interface User {
   rejected_by?: string
   rejection_reason?: string
   created_at: string
+  must_change_password?: boolean
 }
 
 export interface Tenant {

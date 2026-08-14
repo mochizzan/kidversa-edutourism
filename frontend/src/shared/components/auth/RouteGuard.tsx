@@ -20,6 +20,11 @@ export function RouteGuard({ segment, children }: RouteGuardProps) {
     return <Navigate to={`${ROUTES.AUTH.LOGIN}?returnUrl=${encodeURIComponent(location.pathname)}`} replace />
   }
 
+  // Force password change for bootstrap/demo accounts before any other route.
+  if (user?.must_change_password && location.pathname !== ROUTES.AUTH.CHANGE_PASSWORD) {
+    return <Navigate to={ROUTES.AUTH.CHANGE_PASSWORD} replace />
+  }
+
   if (!access) {
     return <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />
   }

@@ -1,3 +1,4 @@
+import { apiRequest } from './backendClient'
 import type { UserService } from './types'
 import type { User, CreateUserDTO, UpdateUserDTO } from '../types'
 import { listRequest, itemRequest, voidRequest } from './apiEnvelope'
@@ -56,3 +57,11 @@ export const userService: UserService = {
     return uploadMultipart<User>(API_ROUTES.USERS.AVATAR(id), form)
   },
 }
+
+// Self-service password change — used by the force-change-password flow for
+// seeded/bootstrap demo accounts flagged `must_change_password`.
+export const changePassword = (oldPassword: string, newPassword: string) =>
+  apiRequest('POST', '/api/auth/change-password', {
+    old_password: oldPassword,
+    new_password: newPassword,
+  })
