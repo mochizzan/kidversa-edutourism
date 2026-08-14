@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Play, Pause, Volume2, VolumeX, SkipForward, AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -6,7 +6,7 @@ import { ApiError, getApiBaseUrl } from '../../../core/services/backendClient'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { kioskSessionPath } from '../../../core/constants/app'
-import type { Session, SessionStage, StageContent } from '../../../core/types'
+import type { SessionStage, StageContent } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
 import { extractYouTubeEmbedUrl } from '../../../core/utils/youtube'
 
@@ -18,7 +18,7 @@ interface KioskStageContent {
   contents: StageContent[]
 }
 interface KioskResponse {
-  session: Session
+  session: { id: string; name: string; session_date: string; location: string; status: string }
   stages: KioskStageContent[]
 }
 
@@ -36,6 +36,36 @@ const LearnerKioskPage = () => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
 
+  const kioskRef = useRef<KioskResponse | null>(null)
+
+  const applyKiosk = (kiosk: KioskResponse) => {
+    if (!sessionId) return
+    // No stageId in the URL (e.g. /kiosk/session/:id) → jump to the first stage.
+    if (!stageId) {
+      const first = kiosk.stages[0]
+      if (!first) {
+        setError('Sesi ini belum memiliki konten.')
+        return
+      }
+      navigate(`${kioskSessionPath(sessionId, first.stage.id)}?token=${encodeURIComponent(token)}`, { replace: true })
+      return
+    }
+
+    const found = kiosk.stages.find((s) => s.stage.id === stageId)
+
+    if (!found) {
+      setError('Stage tidak ditemukan pada sesi ini.')
+      setLoading(false)
+      return
+    }
+
+    setStage(found.stage)
+    const active = (found.contents ?? [])
+      .filter((c) => c.is_active)
+      .sort((a, b) => a.sort_order - b.sort_order)
+    setContents(active)
+  }
+
   useEffect(() => {
     if (!sessionId) {
       setError('Parameter tidak lengkap')
@@ -50,6 +80,12 @@ const LearnerKioskPage = () => {
 
     const loadData = async () => {
       try {
+        // Guard: if we already fetched this kiosk payload, reuse it instead of
+        // re-fetching (the backend consumes the single-use token on first fetch).
+        if (kioskRef.current) {
+          applyKiosk(kioskRef.current)
+          return
+        }
         // PUBLIC endpoint — the kiosk token (not a JWT) is the sole auth.
         const url = `${getApiBaseUrl()}${API_ROUTES.SESSIONS.KIOSK_ACCESS(sessionId)}?token=${encodeURIComponent(token)}`
         const res = await fetch(url, { credentials: 'omit' })
@@ -60,30 +96,8 @@ const LearnerKioskPage = () => {
         }
         const env = (await res.json()) as { data: KioskResponse }
         const kiosk = env.data
-        // No stageId in the URL (e.g. /kiosk/session/:id) → jump to the first stage.
-        if (!stageId) {
-          const first = kiosk.stages[0]
-          if (!first) {
-            setError('Sesi ini belum memiliki konten.')
-            return
-          }
-          navigate(`${kioskSessionPath(sessionId, first.stage.id)}?token=${encodeURIComponent(token)}`, { replace: true })
-          return
-        }
-
-        const found = kiosk.stages.find((s) => s.stage.id === stageId)
-
-        if (!found) {
-          setError('Stage tidak ditemukan pada sesi ini.')
-          setLoading(false)
-          return
-        }
-
-        setStage(found.stage)
-        const active = (found.contents ?? [])
-          .filter((c) => c.is_active)
-          .sort((a, b) => a.sort_order - b.sort_order)
-        setContents(active)
+        kioskRef.current = kiosk
+        applyKiosk(kiosk)
       } catch (err) {
         setError(friendlyError(err))
       } finally {

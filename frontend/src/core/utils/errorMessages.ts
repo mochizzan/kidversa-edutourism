@@ -13,6 +13,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   tenant_required: 'Silakan pilih tenant terlebih dahulu.',
   internal_error: 'Terjadi kesalahan pada server. Silakan coba lagi.',
   kiosk_invalid: 'Sesi berakhir atau tautan tidak valid.',
+  kiosk_forbidden: 'Anda tidak memiliki akses ke sesi tersebut.',
+  session_not_found: 'Sesi tidak ditemukan.',
   session_not_deletable: 'Sesi ini tidak dapat dihapus.',
   participant_not_deletable: 'Peserta ini tidak dapat dihapus.',
   bad_request: 'Permintaan tidak dapat diproses.',

@@ -30,10 +30,29 @@ type kioskStageContent struct {
 	Contents []entity.StageContent `json:"contents"`
 }
 
+// kioskSessionDTO is the minimal, PII-free session view returned to the public kiosk.
+type kioskSessionDTO struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	SessionDate string `json:"session_date"`
+	Location    string `json:"location"`
+	Status      string `json:"status"`
+}
+
 // kioskResponse is the public payload returned to the learner kiosk.
 type kioskResponse struct {
-	Session entity.Session      `json:"session"`
+	Session kioskSessionDTO     `json:"session"`
 	Stages  []kioskStageContent `json:"stages"`
+}
+
+func toKioskSessionDTO(s entity.Session) kioskSessionDTO {
+	return kioskSessionDTO{
+		ID:          s.ID,
+		Name:        s.Name,
+		SessionDate: s.SessionDate,
+		Location:    s.Location,
+		Status:      string(s.Status),
+	}
 }
 
 // KioskAccess handles the PUBLIC GET /api/sessions/:id/kiosk?token=...
@@ -83,5 +102,10 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 		stages = append(stages, kioskStageContent{Stage: s.Stages[i], Contents: contents})
 	}
 
-	return appresp.OK(c, &kioskResponse{Session: s.Session, Stages: stages})
+	// Consume the single-use kiosk token so it cannot be reused.
+	if err := h.authUC.ConsumeKioskToken((*c).Request().Context(), token); err != nil {
+		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_invalid")
+	}
+
+	return appresp.OK(c, &kioskResponse{Session: toKioskSessionDTO(s.Session), Stages: stages})
 }

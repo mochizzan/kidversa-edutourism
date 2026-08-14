@@ -9,6 +9,7 @@ import (
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
+	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
@@ -21,6 +22,7 @@ type AuthHandler struct {
 	refreshCookieName string
 	cookieSecure      bool
 	cookieSameSite    string
+	sessionRepo       repository.SessionRepository
 }
 
 // kioskTokenTTL is the lifetime of an issued kiosk token, shared with the
@@ -29,8 +31,8 @@ type AuthHandler struct {
 const kioskTokenTTL = auth.KioskTokenTTL
 
 // NewAuthHandler builds the auth handler.
-func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, refreshCookieName string, cookieSecure bool, cookieSameSite string) *AuthHandler {
-	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, refreshCookieName: refreshCookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
+func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, refreshCookieName string, cookieSecure bool, cookieSameSite string, sessionRepo repository.SessionRepository) *AuthHandler {
+	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, refreshCookieName: refreshCookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite, sessionRepo: sessionRepo}
 }
 
 // Login handles POST /api/auth/login and sets the SSE session cookie.
@@ -135,6 +137,16 @@ func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
 	if tenantID == "" {
 		return appresp.Fail(c, http.StatusBadRequest, "tenant_required")
 	}
+
+	// Prevent cross-tenant kiosk token issuance (IDOR guard).
+	sessTenant, err := h.sessionRepo.TenantIDForSession((*c).Request().Context(), req.SessionID)
+	if err != nil {
+		return appresp.Fail(c, http.StatusNotFound, "session_not_found")
+	}
+	if sessTenant != tenantID {
+		return appresp.Fail(c, http.StatusForbidden, "kiosk_forbidden")
+	}
+
 	token, err := h.authUC.IssueKioskToken((*c).Request().Context(), req.SessionID, tenantID, kioskTokenTTL)
 	if err != nil {
 		return err
