@@ -69,13 +69,6 @@ func (u *Usecase) Login(ctx context.Context, email, password string) (*LoginResu
 	if err := BcryptCompare(user.PasswordHash, password); err != nil {
 		return nil, apperrors.Unauthorized("invalid_credentials", err)
 	}
-	// Enforce password change: do not issue a token while the user is still
-	// required to change their password (e.g. the bootstrapped super-admin on
-	// first login). The client redirects to the change-password screen.
-	if user.MustChangePassword {
-		return nil, apperrors.Forbidden("password_change_required",
-			errors.New("password change required"))
-	}
 
 	access, refreshTok, err := u.jwt.Generate(user.ID, user.TenantID, string(user.Role))
 	if err != nil {
