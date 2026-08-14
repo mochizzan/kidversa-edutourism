@@ -20,9 +20,7 @@ import (
 // the seed logic and by operations tooling.
 const (
 	bootstrapSuperadminEmail   = "superadmin@kidversa.id"
-	bootstrapAdminBandungEmail = "admin.bandung@kidversa.id"
 	bootstrapTenantBandungSlug = "tenant-bandung"
-	bootstrapTenantSubangSlug  = "tenant-subang"
 )
 
 func main() {
@@ -55,10 +53,8 @@ func bootstrap(cfg *config.Config) error {
 	g := db.DB
 
 	// Tenants (idempotent by slug).
-	bandungID := ""
 	tenants := []entity.Tenant{
 		{BaseModel: entity.BaseModel{ID: uuid.NewString()}, Name: "Tenant Bandung", Slug: bootstrapTenantBandungSlug},
-		{BaseModel: entity.BaseModel{ID: uuid.NewString()}, Name: "Tenant Subang", Slug: bootstrapTenantSubangSlug},
 	}
 	for _, t := range tenants {
 		var cnt int64
@@ -67,20 +63,11 @@ func bootstrap(cfg *config.Config) error {
 			if err := g.Create(&t).Error; err != nil {
 				return err
 			}
-		} else {
-			var existing entity.Tenant
-			g.Where("slug = ?", t.Slug).First(&existing)
-			if t.Slug == bootstrapTenantBandungSlug {
-				bandungID = existing.ID
-			}
-			continue
-		}
-		if t.Slug == bootstrapTenantBandungSlug {
-			bandungID = t.ID
 		}
 	}
 
-	// SUPER_ADMIN (global, no tenant). Password wajib di-set via env.
+	// SUPER_ADMIN (global, no tenant). Password SELALU wajib di-set via env
+	// (crash kalau kosong), tapi penimpaan DB hanya saat SUPERADMIN_FORCE_RESET=true.
 	pw := cfg.BootstrapSuperadminPassword
 	if pw == "" {
 		log.Fatal("BOOTSTRAP: BOOTSTRAP_SUPERADMIN_PASSWORD wajib di-set (minimal 8 karakter)")
@@ -101,48 +88,26 @@ func bootstrap(cfg *config.Config) error {
 		Role:               entity.RoleSuperAdmin,
 		IsActive:           true,
 		ApprovalStatus:     entity.ApprovalApproved,
-		MustChangePassword: false,
+		MustChangePassword: true, // dipaksa ganti saat login pertama
 	}
-	if err := upsertUser(g, super); err != nil {
-		return err
-	}
-
-	// ADMIN for tenant-bandung.
-	adminHash, err := auth.BcryptHash(pw, cfg.BcryptCost)
-	if err != nil {
-		return err
-	}
-	admin := entity.User{
-		BaseModel:          entity.BaseModel{ID: uuid.NewString()},
-		TenantID:           &bandungID,
-		Email:              bootstrapAdminBandungEmail,
-		PasswordHash:       adminHash,
-		Name:               "Admin Bandung",
-		Role:               entity.RoleAdmin,
-		IsActive:           true,
-		ApprovalStatus:     entity.ApprovalApproved,
-		MustChangePassword: false,
-	}
-	if err := upsertUser(g, admin); err != nil {
+	if err := upsertUser(g, super, cfg.SuperadminForceReset); err != nil {
 		return err
 	}
 	return nil
 }
 
-// upsertUser creates the user if absent, or updates the password + core
-// identity fields when a row with the same email already exists — so a
-// changed bootstrap password takes effect on re-run without dropping the row.
-func upsertUser(g *gorm.DB, u entity.User) error {
+// upsertUser creates the user if absent. When a row with the same email already
+// exists, it honors the DB state and does NOT overwrite the password — unless
+// forceReset is true (recovery / forgotten-password flow). This prevents a
+// routine re-migration from reverting an admin-changed password back to the env
+// value.
+func upsertUser(g *gorm.DB, u entity.User, forceReset bool) error {
 	var existing entity.User
 	if err := g.Where("email = ?", u.Email).First(&existing).Error; err == nil {
-		return g.Model(&existing).Updates(map[string]interface{}{
-			"password_hash":        u.PasswordHash,
-			"name":                 u.Name,
-			"is_active":            u.IsActive,
-			"approval_status":      u.ApprovalStatus,
-			"role":                 u.Role,
-			"must_change_password": u.MustChangePassword,
-		}).Error
+		if !forceReset {
+			return nil
+		}
+		return g.Model(&existing).Update("password_hash", u.PasswordHash).Error
 	}
 	return g.Create(&u).Error
 }

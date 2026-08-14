@@ -56,6 +56,7 @@ type Config struct {
 
 	// Bootstrap
 	BootstrapSuperadminPassword string
+	SuperadminForceReset        bool
 
 	// Test database (separate from dev/prod)
 	TestDBHost     string
@@ -116,6 +117,7 @@ func Load() *Config {
 		RevokerBackend:  getEnv("REVOKER_BACKEND", "memory"),
 
 		BootstrapSuperadminPassword: getEnv("BOOTSTRAP_SUPERADMIN_PASSWORD", ""),
+		SuperadminForceReset:        getEnvBool("SUPERADMIN_FORCE_RESET", false),
 
 		TestDBHost:     getEnv("TEST_DB_HOST", "127.0.0.1"),
 		TestDBPort:     getEnv("TEST_DB_PORT", "3306"),
