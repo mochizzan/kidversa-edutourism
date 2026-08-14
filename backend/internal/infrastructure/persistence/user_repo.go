@@ -210,3 +210,21 @@ func (r *GormUserRepository) Deactivate(ctx context.Context, id string) (*entity
 	}
 	return m.ToEntity(), nil
 }
+
+// UpdatePassword sets a new bcrypt password hash for the user.
+func (r *GormUserRepository) UpdatePassword(ctx context.Context, id, hash string) error {
+	if err := r.db.WithContext(ctx).Model(&UserModel{}).
+		Where("id = ?", id).Update("password_hash", hash).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// ClearMustChangePassword turns off the forced password-change flag.
+func (r *GormUserRepository) ClearMustChangePassword(ctx context.Context, id string) error {
+	if err := r.db.WithContext(ctx).Model(&UserModel{}).
+		Where("id = ?", id).Update("must_change_password", false).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}

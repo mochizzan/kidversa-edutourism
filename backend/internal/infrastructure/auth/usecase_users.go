@@ -174,8 +174,12 @@ func (u *UserUsecase) DeleteUser(ctx context.Context, id, actorRole, actorTenant
 	return u.users.HardDelete(ctx, id)
 }
 
-// ApproveUser approves + activates a user (SUPER_ADMIN only at the handler layer).
-func (u *UserUsecase) ApproveUser(ctx context.Context, id, approverID string) (*entity.User, error) {
+// ApproveUser approves + activates a user. Only SUPER_ADMIN may approve,
+// enforced here (the route is also middleware-gated, but this is the authority).
+func (u *UserUsecase) ApproveUser(ctx context.Context, id, approverID, approverRole string) (*entity.User, error) {
+	if approverRole != string(entity.RoleSuperAdmin) {
+		return nil, apperrors.Forbidden("forbidden", errors.New("hanya SUPER_ADMIN yang dapat approve"))
+	}
 	user, err := u.users.Approve(ctx, id, approverID)
 	if err != nil {
 		return nil, err

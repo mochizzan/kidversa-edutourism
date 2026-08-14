@@ -41,6 +41,11 @@ type UserRepository interface {
 	// Deactivate flips a user's is_active to false (no approval change).
 	Deactivate(ctx context.Context, id string) (*entity.User, error)
 
+	// UpdatePassword sets a new bcrypt password hash for the user.
+	UpdatePassword(ctx context.Context, id, hash string) error
+	// ClearMustChangePassword turns off the forced password-change flag.
+	ClearMustChangePassword(ctx context.Context, id string) error
+
 	// ListApproversForTenant returns active, approved users who can approve
 	// registrations for tenantID. Super-admins always qualify globally; when
 	// tenantID is non-empty the tenant's ADMINs also qualify.

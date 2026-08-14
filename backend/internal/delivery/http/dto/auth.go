@@ -39,3 +39,9 @@ type LoginResponse struct {
 type MeResponse struct {
 	User *entity.User `json:"user"`
 }
+
+// ChangePasswordRequest is the payload for POST /api/auth/change-password.
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
+}

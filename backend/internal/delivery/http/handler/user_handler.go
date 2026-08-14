@@ -128,7 +128,8 @@ func (h *UserHandler) Approve(c *echo.Context) error {
 		return nil
 	}
 	uid := appmiddleware.GetUserID(c)
-	user, err := h.userUC.ApproveUser((*c).Request().Context(), id, uid)
+	role, _ := actor(c)
+	user, err := h.userUC.ApproveUser((*c).Request().Context(), id, uid, role)
 	if err != nil {
 		return err
 	}

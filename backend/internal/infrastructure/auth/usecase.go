@@ -69,6 +69,13 @@ func (u *Usecase) Login(ctx context.Context, email, password string) (*LoginResu
 	if err := BcryptCompare(user.PasswordHash, password); err != nil {
 		return nil, apperrors.Unauthorized("invalid_credentials", err)
 	}
+	// Enforce password change: do not issue a token while the user is still
+	// required to change their password (e.g. the bootstrapped super-admin on
+	// first login). The client redirects to the change-password screen.
+	if user.MustChangePassword {
+		return nil, apperrors.Forbidden("password_change_required",
+			errors.New("password change required"))
+	}
 
 	access, refreshTok, err := u.jwt.Generate(user.ID, user.TenantID, string(user.Role))
 	if err != nil {
@@ -181,6 +188,12 @@ func (u *Usecase) Register(ctx context.Context, name, email, phone string, tenan
 	if role == "" {
 		role = entity.RoleFasilitator
 	}
+	// Privilege-escalation guard: SUPER_ADMIN may only be created via the env
+	// bootstrap, never through self-registration.
+	if role == entity.RoleSuperAdmin {
+		return nil, apperrors.BadRequest("invalid_role",
+			errors.New("superadmin tidak boleh self-register"))
+	}
 	user := &entity.User{
 		BaseModel:      entity.BaseModel{ID: uuid.NewString()},
 		TenantID:       tenantID,
@@ -196,4 +209,28 @@ func (u *Usecase) Register(ctx context.Context, name, email, phone string, tenan
 		return nil, err
 	}
 	return user, nil
+}
+
+// ChangePassword lets an authenticated user change their own password.
+// oldPassword must match the current hash; newPassword must be >= 8 chars.
+func (u *Usecase) ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error {
+	if len(newPassword) < 8 {
+		return apperrors.BadRequest("weak_password", errors.New("password minimal 8 karakter"))
+	}
+	user, err := u.users.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if err := BcryptCompare(user.PasswordHash, oldPassword); err != nil {
+		return apperrors.Unauthorized("invalid_credentials", err)
+	}
+	hash, err := BcryptHash(newPassword, u.cost)
+	if err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	if err := u.users.UpdatePassword(ctx, userID, hash); err != nil {
+		return err
+	}
+	// Clear the forced-change flag now that the user owns their password.
+	return u.users.ClearMustChangePassword(ctx, userID)
 }

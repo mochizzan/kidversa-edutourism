@@ -126,6 +126,22 @@ func (h *AuthHandler) Logout(c *echo.Context) error {
 	return appresp.NoContent(c)
 }
 
+// ChangePassword handles POST /api/auth/change-password (auth required).
+func (h *AuthHandler) ChangePassword(c *echo.Context) error {
+	var req dto.ChangePasswordRequest
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	uid := appmiddleware.GetUserID(c)
+	if uid == "" {
+		return appresp.Fail(c, http.StatusUnauthorized, "unauthorized")
+	}
+	if err := h.authUC.ChangePassword((*c).Request().Context(), uid, req.OldPassword, req.NewPassword); err != nil {
+		return err
+	}
+	return appresp.OK(c, map[string]string{"status": "ok"})
+}
+
 // IssueKiosk handles POST /api/auth/kiosk (JWT-protected). It issues a single-use
 // kiosk token bound to the requested session (within the caller's tenant scope).
 func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
