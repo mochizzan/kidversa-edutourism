@@ -74,3 +74,5 @@ backups/
 findings.md
 progress.md
 task_plan.md
+.planning/
+.codebase-memory/

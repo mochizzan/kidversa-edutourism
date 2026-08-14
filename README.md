@@ -4,115 +4,141 @@
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Build%20Tool-Vite-646CFF?logo=vite)](https://vitejs.dev/)
 [![pnpm](https://img.shields.io/badge/Package%20Manager-pnpm-F69220?logo=pnpm)](https://pnpm.io/)
-[![Go](https://img.shields.io/badge/Backend-Go%20(Ready)-00ADD8?logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Backend-Go%201.26-00ADD8?logo=go)](https://go.dev/)
+[![MariaDB](https://img.shields.io/badge/Database-MariaDB%2012-003545?logo=mariadb)](https://mariadb.org/)
 
-**Kidversa Edutourism** adalah ekosistem edukasi digital dan sistem asesmen modern untuk sekolah berbasis wisata edukasi. Aplikasi ini dirancang dengan pendekatan *Offline-First* dan *Local-First Persistence* untuk memastikan fungsionalitas penuh di lapangan tanpa ketergantungan konstan pada koneksi internet.
+**Kidversa Edutourism** adalah ekosistem edukasi digital dan sistem asesmen untuk sekolah
+berbasis wisata edukasi. Aplikasi multi-role (Super Admin, Admin Tenant, Fasilitator,
+Orang Tua, Learner/Kiosk) dengan arsitektur client-server: frontend React menembak REST API
+Go yang mempersist ke MariaDB, plus lapisan PWA + caching lokal (IndexedDB) untuk aset/media.
 
 ---
 
 ## 📌 Status Proyek & Arsitektur Saat Ini
 
-Aplikasi saat ini berjalan **penuh di sisi Frontend** dengan data statis/mock yang sudah mulai ditinggalkan. Fokus pengembangan saat ini adalah optimalisasi **Browser-Side Persistence** dan alur kerja integrasi data lokal sebelum dihubungkan ke backend.
+Backend (Go + Echo + GORM) **sudah terintegrasi penuh** — bukan lagi "siap disambungkan".
+Seluruh domain (auth multi-tenant, program/session, asesmen, live monitoring via SSE,
+laporan + narasi AI, consent WhatsApp) sudah punya handler, usecase, dan repository.
+Frontend mengonsumsi API tersebut melalui `core/services/*` (wrapper `backendClient` +
+`apiEnvelope`).
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │                      FRONTEND UI                       │
 │   (Admin, Fasilitator, Parent, Learner Kiosk Layouts)  │
+│   React 19 · TS · Vite · Tailwind v4 · Zustand · PWA   │
 └───────────────────────────┬────────────────────────────┘
-                           ▼
+                            │  REST + SSE (JWT Bearer / HttpOnly cookie)
+                            ▼
 ┌────────────────────────────────────────────────────────┐
-│               CORE STORES & HOOKS (State)              │
-│       (Auth Store, Tenant Store, useLiveSession)       │
+│                 GO BACKEND (Echo v5)                   │
+│  handler → middleware (JWT/TenantScope) → usecase       │
+│  → repository interface → GORM persistence              │
+│  + SSE hub · OpenRouter AI · WhatsApp messaging         │
 └───────────────────────────┬────────────────────────────┘
-                           ▼
+                            ▼
 ┌────────────────────────────────────────────────────────┐
-│                 CORE SERVICES (Wrapper)                │
-└─────────────┬────────────────────────────┬─────────────┘
-              ▼                            ▼
-┌──────────────────────────┐  ┌──────────────────────────┐
-│      LOCAL STORAGE       │  │        INDEXEDDB         │
-│  (Session & Auth State)  │  │ (Assessments, Sessions,  │
-└──────────────────────────┘  │  Missions, & SMART Photo)│
-                              └────────────┬─────────────┘
-                                           ▼
-                              ┌──────────────────────────┐
-                              │    SYNC MANAGER (WIP)    │
-                              └────────────┬─────────────┘
-                                           ▼
-                              ┌──────────────────────────┐
-                              │     GO BACKEND CLIENT    │
-                              │     (Ready to Connect)   │
-                              └──────────────────────────┘
+│                 MariaDB 12 (via Docker)                 │
+│        migrations/000001_init_schema.up.sql             │
+└────────────────────────────────────────────────────────┘
+
+  Local caching (IndexedDB via idb, bukan primary store):
+  • media/asset offline • PWA service worker (installable, offline shell)
 ```
+
+> Catatan: `docs/` memuat BRD, ERD, dan FSD sebagai sumber kebenaran produk.
 
 ---
 
 ## 🌟 Fitur Utama (Berdasarkan Role)
 
-Aplikasi ini mengintegrasikan empat ekosistem pengguna yang saling terhubung di dalam satu platform:
+Aplikasi mengintegrasikan empat ekosistem pengguna yang saling terhubung dalam satu platform:
 
 ### 🏢 1. Panel Admin (Manajemen & Monitoring)
-*   **Tenant & User Scoping:** Manajemen multi-sekolah/tenant secara terisolasi.
+*   **Tenant & User Scoping:** Multi-sekolah/tenant terisolasi (SUPER_ADMIN mengelola tenant; non-SA di-scope dari JWT).
 *   **Program & Session Scheduler:** Pembuatan program edutourism, tahapan (*stages*), dan sesi perjalanan.
-*   **Media Review & Reporting:** Pemantauan unggahan foto/rekaman lapangan dan pembuatan narasi laporan otomatis.
+*   **Media Review & Reporting:** Pemantauan unggahan foto/rekaman lapangan dan pembuatan narasi laporan otomatis (OpenRouter AI).
 
 ### 🧑‍🏫 2. Modul Fasilitator (Aktivitas Lapangan)
-*   **Smart Photo & Camera:** Pengambilan foto dokumentasi yang terintegrasi secara pintar di lapangan.
-*   **Child Assessment:** Pengisian instrumen asesmen perkembangan anak secara langsung dan cepat.
-*   **Offline Recording:** Perekaman aktivitas anak yang disimpan secara aman di penyimpanan lokal web.
+*   **Smart Photo & Camera:** Pengambilan foto dokumentasi lapangan.
+*   **Child Assessment:** Pengisian instrumen asesmen perkembangan anak.
+*   **Offline Recording:** Perekaman aktivitas anak (berkas di-upload ke backend).
 
 ### 👪 3. Modul Orang Tua (Parent Portal)
-*   **Consent Gate:** Manajemen persetujuan digital untuk partisipasi aktivitas anak.
-*   **Daily Stories & Feed:** Pemantauan dokumentasi foto dan cerita perjalanan anak secara *real-time*.
-*   **Report Page:** Akses hasil akhir asesmen anak dalam bentuk grafik dan narasi yang mudah dipahami.
+*   **Consent Gate:** Persetujuan digital (link dikirim via WhatsApp) untuk partisipasi anak.
+*   **Daily Stories & Feed:** Pemantauan dokumentasi foto & cerita perjalanan anak (*real-time* via SSE).
+*   **Report Page:** Hasil akhir asesmen dalam grafik & narasi.
 
 ### 👶 4. Learner Kiosk (Interaksi Anak)
-*   **Kid-Friendly Interface:** Antarmuka interaktif khusus anak untuk melihat misi harian dan petualangan mereka.
+*   **Kid-Friendly Interface:** Antarmuka interaktif khusus anak (akses via single-use kiosk token).
 
 ---
 
 ## 🛠️ Spesifikasi Teknologi
 
 ### Frontend (`/frontend`)
-*   **Framework & Language:** React 19 dengan TypeScript.
+*   **Framework & Language:** React 19 dengan TypeScript 6 (strict).
 *   **Build Tool & Dev Server:** Vite 8.
-*   **Styling:** Tailwind CSS v4 (konfigurasi via `@theme` directive, tanpa config file).
-*   **State Management:** Zustand (auth & tenant state).
-*   **Penyimpanan Lokal:** IndexedDB (Data transaksional), LocalStorage/SessionStorage (Sesi autentikasi & tenant).
-*   **Fitur Progresif:** PWA (Progressive Web App) dengan Service Worker aktif untuk kapabilitas offline.
+*   **Styling:** Tailwind CSS v4 (konfigurasi via `@theme`, tanpa config file).
+*   **State Management:** Zustand (`authStore`, `tenantStore`).
+*   **Data Access:** `core/services/*` → REST ke Go backend; caching lokal IndexedDB (`idb`) untuk aset/media.
+*   **Fitur Progresif:** PWA (`vite-plugin-pwa`, service worker aktif) — installable + offline shell.
 
-### Backend (`/backend` - Siap Diintegrasikan)
-*   **Language:** Go 1.26 (Golang) dengan framework Echo v5.
-*   **ORM & Database:** GORM + SQLite (development).
+### Backend (`/backend`)
+*   **Language:** Go 1.26 dengan framework Echo v5.
+*   **ORM & Database:** GORM + **MariaDB 12** (driver `gorm.io/driver/mysql`; migrasi via `golang-migrate`).
+*   **Auth:** JWT access (15m) + refresh (HttpOnly cookie, 7d), bcrypt, revocation (jti denylist).
+*   **Realtime:** SSE hub (live monitoring).
+*   **AI:** OpenRouter narrative generation untuk laporan.
+*   **Messaging:** WhatsApp gateway (consent link orang tua).
+
+### Infrastruktur
+*   **Orchestration:** Docker Compose (profile `dev` & `prod`) — `mariadb:12`, `backend`, `frontend`.
+*   **CI:** GitHub Actions (`backend/.github/workflows/ci.yml`) — gofmt → go vet → go build → go test (backend); pnpm build (frontend).
 
 ---
 
 ## 🚀 Panduan Memulai (Development Setup)
 
 ### Prasyarat
-*   [Node.js](https://nodejs.org/) (Versi LTS direkomendasikan)
-*   [pnpm](https://pnpm.io/) (`npm install -g pnpm`)
+*   [Node.js](https://nodejs.org/) LTS + [pnpm](https://pnpm.io/) (`npm install -g pnpm`)
+*   [Go 1.26](https://go.dev/dl/)
+*   Docker Desktop (untuk MariaDB + full stack) — atau MariaDB 12 lokal
 
-### Langkah Instalasi
+### Opsi A — Docker Compose (paling mudah)
+```bash
+# dari root repo
+docker compose --profile dev up --build
+# frontend  → http://localhost:5173
+# backend   → http://localhost:8080  (MariaDB di host port 3307)
+```
+Hentikan dengan `docker compose --profile dev down`.
 
-1. **Clone Repositori**
-   ```bash
-   git clone https://github.com/mochizzan/kidversa-edutourism.git
-   cd kidversa-edutourism
-   ```
+### Opsi B — Jalankan terpisah (frontend + backend lokal)
+```bash
+# 1) Backend
+cd backend
+cp .env.example .env          # isi JWT_SECRET (>=32 byte) & BOOTSTRAP_SUPERADMIN_PASSWORD
+go run ./cmd/migrate          # jalankan migrasi + bootstrap superadmin (butuh MariaDB)
+go run ./cmd/server           # API di :8080
 
-2. **Setup Frontend**
-   ```bash
-   cd frontend
-   pnpm install
-   ```
+# 2) Frontend (terminal lain)
+cd frontend
+pnpm install
+pnpm dev                      # http://localhost:5173 (Vite proxy /api → :8080)
+```
+> `pnpm build` adalah satu-satunya verification setara-CI untuk frontend — jalankan
+> setelah perubahan. Tidak ada script test/lint/format di frontend.
 
-3. **Menjalankan Server Pengembangan**
-   ```bash
-   pnpm dev
-   ```
-
-Buka [http://localhost:5173](http://localhost:5173) pada browser Anda.
+### Perintah Backend (verification)
+```bash
+cd backend
+gofmt -w .          # format (di-enforce di CI)
+go vet ./...        # static analysis
+go build ./...      # compilation check
+go test ./...       # integration test (BUTUH MariaDB 12 jalan)
+```
+> `go test ./...` saat ini lolos vacuous — **belum ada file `*_test.go`**.
 
 ---
 
@@ -120,29 +146,39 @@ Buka [http://localhost:5173](http://localhost:5173) pada browser Anda.
 
 ```text
 kidversa-edutourism/
-├── backend/                  # REST API built with Go (Echo v5 + GORM + SQLite)
-└── frontend/                 # React SPA Application
-    ├── public/               # PWA Assets, Webmanifest, & Service Worker
-    └── src/
-        ├── app/              # Aplikasi Routing
-        ├── core/             # Fondasi Aplikasi (Services, Stores, Hooks, Types)
-        │   ├── services/     # API Client & Local Storage Managers
-        │   │   ├── local/    # IndexedDB & Local Auth Engine
-        │   │   └── storage/  # Skema Database idb.ts
-        │   └── stores/       # Global State (Zustand/Context/Custom Stores)
-        ├── features/         # Modul Fitur Berdasarkan Pengguna (Admin, Fasilitator, Parent)
-        └── shared/           # reusable UI Components, Layouts, & Global Hooks
+├── backend/                  # REST API Go (Echo v5 + GORM + MariaDB)
+│   ├── cmd/
+│   │   ├── server/           # entrypoint API server
+│   │   └── migrate/          # runner migrasi + bootstrap superadmin
+│   ├── internal/
+│   │   ├── config/           # load env (godotenv)
+│   │   ├── delivery/http/    # handler, middleware, dto
+│   │   ├── domain/           # entity + repository interface
+│   │   ├── infrastructure/   # persistence(GORM), auth, ai, messaging
+│   │   ├── pkg/              # errors, response, sse, util
+│   │   └── usecase/          # business logic
+│   └── migrations/           # SQL golang-migrate (000001_init_schema)
+├── frontend/                 # React SPA
+│   ├── public/               # PWA assets, webmanifest, service worker
+│   └── src/
+│       ├── app/              # router.tsx + routes/ (per-feature)
+│       ├── core/             # services (API client), stores, hooks, types, utils
+│       ├── features/         # per-role: admin, auth, fasilitator, learner, parent
+│       └── shared/           # komponen UI, layouts, templates, hooks
+├── compose.yml               # Docker Compose (profile dev/prod)
+└── docs/                     # BRD, ERD, FSD, template mini-raport
 ```
 
 ---
 
-## ⚙️ Workflow Pengujian Data Lokal
+## 🔐 Konvensi Multi-Tenancy (Penting)
 
-Untuk memastikan pengujian IndexedDB berjalan murni tanpa tercampur data mock lama:
-
-1. Pastikan proses *seeding* awal di `src/core/services/local/bootstrap.ts` hanya berjalan **sekali** saat database kosong.
-2. Lakukan pengecekan melalui **DevTools Browser -> Application -> IndexedDB** untuk memvalidasi persistensi data setelah melakukan operasi CRUD pada aplikasi.
-3. Seluruh komponen fitur wajib menggunakan fungsi dari folder `services/` (bukan mengimpor langsung dari `services/mock/`).
+*   Setiap request melewati middleware `JWTAuth` → `RequireRole` → `TenantScope`.
+*   `TenantScope`: SUPER_ADMIN **wajib** mengirim header `X-Tenant-Id` (atau `?tenant_id=` untuk SSE);
+    role lain di-scope **hanya** dari JWT dan header `X-Tenant-Id` akan **ditolak**.
+*   Jangan hardcode tenant. Di frontend, `X-Tenant-Id` hanya dikirim untuk SUPER_ADMIN
+    (lihat `core/services/apiEnvelope.ts` → `withTenantHeader`).
+*   Response backend selalu dibungkus envelope `{ data, meta?, error? }`.
 
 ---
 
