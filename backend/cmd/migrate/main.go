@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -28,7 +29,7 @@ func main() {
 
 	migrationsDir := migrationsPath()
 	if err := migration.Run(cfg, migrationsDir); err != nil {
-		log.Fatalf("migration failed: %v", err)
+		logMigrationFailure(err)
 	}
 	log.Println("schema migrated")
 
@@ -36,6 +37,24 @@ func main() {
 		log.Fatalf("bootstrap failed: %v", err)
 	}
 	log.Println("bootstrap complete")
+}
+
+// logMigrationFailure logs the migration error with an actionable recovery hint
+// when the failure is a dirty schema version (which otherwise loops forever).
+func logMigrationFailure(err error) {
+	if err == nil {
+		return
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "Dirty database") {
+		log.Printf("migration failed: %v", err)
+		log.Printf("RECOVERY: connect to the database and run: " +
+			"UPDATE schema_migrations SET version=<completed_version>, dirty=false; " +
+			"(or use `migrate force <version>`), then restart. " +
+			"The hardened runner now also self-heals dirty state automatically.")
+		log.Fatalf("migration failed (dirty database)")
+	}
+	log.Fatalf("migration failed: %v", err)
 }
 
 func migrationsPath() string {
