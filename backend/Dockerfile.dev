@@ -12,5 +12,7 @@ RUN go mod download
 
 EXPOSE 8080
 
-# Run migrations once, then start air (watches .go files, recompiles on change)
-CMD ["sh", "-c", "go run ./cmd/migrate && air"]
+# Run migrations with a bounded retry (handles cold-start MariaDB), then start
+# air (watches .go files, recompiles on change). The migration runner also has
+# its own internal retry/self-heal for dirty schema state.
+CMD ["sh", "-c", "for i in 1 2 3 4 5; do go run ./cmd/migrate && break; echo \"migrate attempt $i failed, retrying in 3s...\"; sleep 3; done && exec air"]
