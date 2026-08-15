@@ -1,177 +1,128 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ROUTES, programStagePath } from '../../../core/constants/app'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { useState, useEffect, type ChangeEvent } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { ROUTES } from '../../../core/constants/app'
+import { ArrowLeft, Loader2, Upload, Link2, Video } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Select } from '../../../shared/components/ui/Select'
+import { Input } from '../../../shared/components/ui/Input'
 import { Card } from '../../../shared/components/ui/Card'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
-import { programService } from '../../../core/services/programs'
-import type { Program, ProgramStage, StageContent } from '../../../core/types'
-import { StageContentFileType as StageContentFileTypeEnum } from '../../../core/types/enums'
-import { syncStageMeta } from '../../../core/utils/content'
-import { StageContentForm, type StageContentFormValues } from '../components/StageContentForm'
+import { contentService } from '../../../core/services'
+import { StageContentFileType } from '../../../core/types/enums'
+
+const FILE_TYPE_OPTIONS = [
+  { value: StageContentFileType.VIDEO, label: 'Video' },
+  { value: StageContentFileType.IMAGE, label: 'Gambar' },
+  { value: StageContentFileType.AUDIO, label: 'Audio' },
+  { value: StageContentFileType.GAME_BUNDLE, label: 'Game' },
+]
+
+const SOURCE_OPTIONS = [
+  { value: 'file', label: 'Unggah File' },
+  { value: 'url', label: 'URL / YouTube' },
+]
 
 const ContentFormPage = () => {
   const navigate = useNavigate()
   const { contentId } = useParams()
-  const [searchParams] = useSearchParams()
-  const queryProgramId = searchParams.get('programId')
-  const queryStageId = searchParams.get('stageId')
-  const isContextual = Boolean(queryProgramId && queryStageId)
   const isEdit = Boolean(contentId)
   const { addToast } = useGlobalToast()
 
   const [loading, setLoading] = useState(isEdit)
-  const [programs, setPrograms] = useState<Program[]>([])
-  const [stages, setStages] = useState<ProgramStage[]>([])
-  const [selectedProgram, setSelectedProgram] = useState(queryProgramId || '')
-  const [stageId, setStageId] = useState(queryStageId || '')
-  const [initialContent, setInitialContent] = useState<StageContent | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  const goBack = useCallback(() => {
-    if (isContextual && queryProgramId && queryStageId) {
-      navigate(programStagePath(queryProgramId, queryStageId))
-    } else {
-      navigate(ROUTES.ADMIN.CONTENT)
-    }
-  }, [isContextual, queryProgramId, queryStageId, navigate])
+  const [title, setTitle] = useState('')
+  const [fileType, setFileType] = useState<StageContentFileType>(StageContentFileType.VIDEO)
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [durationSeconds, setDurationSeconds] = useState('')
+  const [sourceMode, setSourceMode] = useState<'file' | 'url'>('file')
+  const [file, setFile] = useState<File | null>(null)
+  const [fileUrl, setFileUrl] = useState('')
 
   useEffect(() => {
+    if (!isEdit || !contentId) return
     let cancelled = false
-    programService.getAll({ limit: 100 }).then(async (res) => {
-      if (cancelled) return
-      setPrograms(res.data)
-
-      // Load stages when navigated with pre-selected program (contextual, non-edit).
-      if (!isEdit && isContextual && queryProgramId) {
-        const stgs = await programService.getStages(queryProgramId)
-        if (!cancelled) {
-          setStages(stgs)
-          setStageId(queryStageId || '')
+    setLoading(true)
+    contentService
+      .getById(contentId)
+      .then((c) => {
+        if (cancelled) return
+        if (!c) {
+          addToast({ type: 'error', message: 'Konten tidak ditemukan' })
+          navigate(ROUTES.ADMIN.CONTENT)
+          return
         }
-      }
+        setTitle(c.title)
+        setFileType(c.file_type as StageContentFileType)
+        setYoutubeUrl(c.youtube_url ?? '')
+        setDurationSeconds(c.duration_seconds != null ? String(c.duration_seconds) : '')
+        setFileUrl(c.file_url ?? '')
+        setSourceMode(c.file_url ? 'url' : 'file')
+      })
+      .catch(() => {
+        if (!cancelled) addToast({ type: 'error', message: 'Gagal memuat konten' })
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isEdit, contentId, addToast, navigate])
 
-      if (isEdit && contentId) {
-        let foundContent: StageContent | null = null
-        let foundStage: ProgramStage | null = null
-        let foundProgram: Program | null = null
-
-        for (const p of res.data) {
-          const stgs = await programService.getStages(p.id)
-          if (cancelled) return
-          for (const s of stgs) {
-            const contents = await programService.getContents(s.id)
-            if (cancelled) return
-            const c = contents.find((x) => x.id === contentId)
-            if (c) {
-              foundContent = c
-              foundStage = s
-              foundProgram = p
-              break
-            }
-          }
-          if (foundContent) break
-        }
-
-        if (foundContent && foundProgram && foundStage && !cancelled) {
-          setSelectedProgram(foundProgram.id)
-          const pStages = await programService.getStages(foundProgram.id)
-          if (!cancelled) {
-            setStages(pStages)
-            setStageId(foundStage.id)
-            setInitialContent(foundContent)
-          }
-        }
-      }
-      if (!cancelled) setLoading(false)
-    })
-    return () => { cancelled = true }
-  }, [isEdit, contentId, isContextual, queryProgramId, queryStageId])
-
-  const loadStages = useCallback(async (programId: string) => {
-    if (!programId) { setStages([]); return }
-    const res = await programService.getStages(programId)
-    setStages(res)
-    setStageId('')
-  }, [])
-
-  const handleProgramChange = (programId: string) => {
-    setSelectedProgram(programId)
-    loadStages(programId)
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null
+    setFile(f)
   }
 
-  const handleContentSubmit = async (data: StageContentFormValues, file: File | null) => {
-    if (!stageId) {
-      addToast({ type: 'error', message: 'Pilih stage terlebih dahulu' })
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      addToast({ type: 'error', message: 'Judul wajib diisi' })
       return
     }
-    try {
-      const isGameBundle = data.file_type === StageContentFileTypeEnum.GAME_BUNDLE
-      // VIDEO sourced from YouTube: no file upload, sent as a URL payload.
-      const isYouTubeVideo =
-        data.file_type === StageContentFileTypeEnum.VIDEO && data.source_mode === 'youtube'
+    const duration = durationSeconds ? Number(durationSeconds) : undefined
+    const youtube = youtubeUrl.trim() || undefined
 
+    try {
+      setSaving(true)
       if (isEdit && contentId) {
-        if (isYouTubeVideo) {
-          // Switch (or keep) the content as a YouTube video — pure update, no upload.
-          await programService.updateContent(stageId, contentId, {
-            ...data,
-            file_url: '',
-            youtube_url: data.youtube_url,
-            duration_seconds: 0,
-          })
-        } else if (file && !isGameBundle) {
-          // Re-upload replaces the existing content (upload then delete old).
-          await programService.uploadContent(stageId, {
-            file,
-            title: data.title,
-            file_type: data.file_type,
-            duration_seconds: data.duration_seconds,
-          })
-          await programService.deleteContent(stageId, contentId)
-        } else {
-          await programService.updateContent(stageId, contentId, data)
-        }
+        await contentService.update(contentId, {
+          title: title.trim(),
+          file_url: fileUrl.trim(),
+          youtube_url: youtube,
+          file_type: fileType,
+          duration_seconds: duration,
+        })
         addToast({ type: 'success', message: 'Konten berhasil diperbarui' })
-      } else {
-        const existing = await programService.getContents(stageId)
-        const sortOrder = existing.length
-        if (isYouTubeVideo) {
-          // YouTube video: create via the JSON endpoint with youtube_url.
-          await programService.createContent(stageId, {
-            ...data,
-            file_url: '',
-            youtube_url: data.youtube_url,
-            duration_seconds: 0,
-            sort_order: sortOrder,
-          })
-        } else if (data.file_url && isGameBundle) {
-          // Game bundles use a URL, not a file upload.
-          await programService.createContent(stageId, { ...data, sort_order: sortOrder })
-        } else if (file) {
-          await programService.uploadContent(stageId, {
-            file,
-            title: data.title,
-            file_type: data.file_type,
-            duration_seconds: data.duration_seconds,
-          })
-        } else {
+      } else if (sourceMode === 'file') {
+        if (!file) {
           addToast({ type: 'error', message: 'Pilih file terlebih dahulu' })
           return
         }
+        await contentService.upload({
+          file,
+          title: title.trim(),
+          file_type: fileType,
+          duration_seconds: duration,
+          youtube_url: youtube,
+        })
+        addToast({ type: 'success', message: 'Konten baru berhasil ditambahkan' })
+      } else {
+        await contentService.create({
+          title: title.trim(),
+          file_url: fileUrl.trim(),
+          youtube_url: youtube,
+          file_type: fileType,
+          duration_seconds: duration,
+        })
         addToast({ type: 'success', message: 'Konten baru berhasil ditambahkan' })
       }
-
-      const effectiveProgramId = selectedProgram || queryProgramId
-      if (effectiveProgramId) {
-        await syncStageMeta(programService, effectiveProgramId, stageId)
-      }
-
-      goBack()
+      navigate(ROUTES.ADMIN.CONTENT)
     } catch {
       addToast({ type: 'error', message: 'Gagal menyimpan konten' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -187,45 +138,97 @@ const ContentFormPage = () => {
     <div className="space-y-6">
       <PageHeader
         title={isEdit ? 'Edit Konten' : 'Tambah Konten Baru'}
-        subtitle={isEdit ? 'Perbarui detail konten stage' : 'Buat konten baru untuk stage'}
+        subtitle={isEdit ? 'Perbarui detail konten' : 'Buat konten baru untuk perpustakaan tenant'}
         breadcrumbs={[
           { label: 'Content Manager', href: ROUTES.ADMIN.CONTENT },
           { label: isEdit ? 'Edit' : 'Tambah' },
         ]}
         actions={
-          <Button variant="secondary" icon={<ArrowLeft className="w-4 h-4" />} onClick={goBack}>
+          <Button variant="secondary" icon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.CONTENT)}>
             Kembali
           </Button>
         }
       />
 
-      <Card>
-        <Select
-          label="Program"
+      <Card className="space-y-4">
+        <Input
+          label="Judul"
           required
-          options={programs.map((p) => ({ value: p.id, label: p.name }))}
-          value={selectedProgram}
-          onChange={(e) => handleProgramChange(e.target.value)}
-          placeholder="Pilih Program"
-          disabled={isContextual}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Masukkan judul konten"
         />
+
         <Select
-          label="Stage"
+          label="Tipe File"
           required
-          options={stages.map((s) => ({ value: s.id, label: s.name }))}
-          value={stageId}
-          onChange={(e) => setStageId(e.target.value)}
-          placeholder="Pilih Stage"
-          disabled={isContextual || !selectedProgram}
-          hint={!selectedProgram ? 'Pilih program terlebih dahulu' : undefined}
+          options={FILE_TYPE_OPTIONS}
+          value={fileType}
+          onChange={(e) => setFileType(e.target.value as StageContentFileType)}
         />
+
+        <Input
+          label="Durasi (detik)"
+          type="number"
+          min={0}
+          value={durationSeconds}
+          onChange={(e) => setDurationSeconds(e.target.value)}
+          placeholder="Opsional, mis. 120"
+        />
+
+        {!isEdit && (
+          <Select
+            label="Sumber Konten"
+            required
+            options={SOURCE_OPTIONS}
+            value={sourceMode}
+            onChange={(e) => setSourceMode(e.target.value as 'file' | 'url')}
+          />
+        )}
+
+        {sourceMode === 'file' ? (
+          <div className="w-full">
+            <label className="block text-sm font-medium text-on-surface mb-1">File</label>
+            <input
+              type="file"
+              onChange={handleFileChange}
+              className="w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
+            />
+            {file && (
+              <p className="mt-1 text-xs text-on-surface-variant flex items-center gap-1">
+                <Upload className="w-3.5 h-3.5" /> {file.name}
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <Input
+              label="URL File"
+              value={fileUrl}
+              onChange={(e) => setFileUrl(e.target.value)}
+              placeholder="https://..."
+              leftIcon={<Link2 className="w-4 h-4" />}
+            />
+            <Input
+              label="YouTube URL"
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              placeholder="https://youtube.com/watch?v=..."
+              leftIcon={<Video className="w-4 h-4" />}
+              hint="Isi jika konten video berasal dari YouTube."
+            />
+          </>
+        )}
       </Card>
 
-      <StageContentForm
-        initial={initialContent}
-        onSubmit={handleContentSubmit}
-        onCancel={goBack}
-      />
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={() => navigate(ROUTES.ADMIN.CONTENT)} disabled={saving}>
+          Batal
+        </Button>
+        <Button onClick={handleSubmit} loading={saving}>
+          {isEdit ? 'Simpan Perubahan' : 'Simpan Konten'}
+        </Button>
+      </div>
     </div>
   )
 }

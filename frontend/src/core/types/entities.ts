@@ -321,3 +321,26 @@ export interface Notification {
   is_read: boolean
   created_at?: string
 }
+
+// Standalone, tenant-scoped content entity (Content Single-Source model).
+// A Content is independent of any stage and is attached to stages via the
+// stage_contents junction (see StageContent for the JOIN shape).
+export interface Content {
+  id: string
+  tenant_id: string
+  title: string
+  file_url: string
+  youtube_url?: string
+  file_type: import('./enums').StageContentFileType
+  duration_seconds?: number
+  created_at: string
+  updated_at: string
+}
+
+// Where a Content is currently referenced (used by the delete-confirm dialog).
+export interface ContentUsage {
+  program_id: string
+  program_name: string
+  stage_id: string
+  stage_name: string
+}

@@ -84,11 +84,6 @@ export const API_ROUTES = {
       `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/reorder`,
   },
 
-  PROGRAM_STAGES: {
-    CONTENTS_UPLOAD: (stageId: string) =>
-      `/api/program-stages/${encodeURIComponent(stageId)}/contents/upload`,
-  },
-
   USERS: {
     BASE: '/api/users',
     DETAIL: (id: string) => `/api/users/${encodeURIComponent(id)}`,
@@ -102,6 +97,12 @@ export const API_ROUTES = {
     BASE: '/api/tenants',
     STATS: '/api/tenants/stats',
     DETAIL: (id: string) => `/api/tenants/${encodeURIComponent(id)}`,
+  },
+
+  // Public tenant list — anonymous, used by the self-service register form to
+  // populate the tenant selector. Exposes only id/name/slug.
+  PUBLIC: {
+    TENANTS: '/api/public/tenants',
   },
 
   PHOTOS: {
@@ -184,11 +185,22 @@ export const API_ROUTES = {
     EVENTS: '/api/live/events',
   },
 
-  UPLOAD: {
-    CONTENT: '/api/program-stages',
-  },
-
   MEDIA: {
     BASE: '/api/media',
+  },
+
+  CONTENTS: {
+    BASE: '/api/contents',
+    DETAIL: (id: string) => `/api/contents/${encodeURIComponent(id)}`,
+    UPLOAD: '/api/contents/upload',
+    USAGE: (id: string) => `/api/contents/${encodeURIComponent(id)}/usage`,
+    ASSIGN: (stageId: string) =>
+      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/assign`,
+    UNASSIGN: (stageId: string, contentId: string) =>
+      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/${encodeURIComponent(contentId)}`,
+    STAGE_CONTENTS: (stageId: string) =>
+      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents`,
+    REORDER_CONTENTS: (stageId: string) =>
+      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/reorder`,
   },
 } as const

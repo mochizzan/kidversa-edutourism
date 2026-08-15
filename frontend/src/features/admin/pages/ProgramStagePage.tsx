@@ -22,6 +22,7 @@ import { STAGE_CONTENT_FILE_TYPE_LABELS, STAGE_CONTENT_FILE_TYPE_ICONS, YOUTUBE_
 import { computeDurationMinutes, syncStageMeta } from '../../../core/utils/content'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { StageForm } from '../components/StageForm'
+import { ContentPickerModal } from '../components/ContentPickerModal'
 import { Plus, FileText } from 'lucide-react'
 
 const ProgramStagePage = () => {
@@ -41,6 +42,7 @@ const ProgramStagePage = () => {
   const [contents, setContents] = useState<StageContent[]>([])
   const [deleteTargetContent, setDeleteTargetContent] = useState<StageContent | null>(null)
   const [contentDeleting, setContentDeleting] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   useEffect(() => {
     if (!programId) return
@@ -122,7 +124,8 @@ const ProgramStagePage = () => {
     if (!stageId || !deleteTargetContent || !programId) return
     setContentDeleting(true)
     try {
-      await programService.deleteContent(stageId, deleteTargetContent.id)
+      // Detach the junction only — the standalone Content itself is untouched.
+      await programService.unassignContent(stageId, deleteTargetContent.id)
       setDeleteTargetContent(null)
       const updatedContents = await programService.getContents(stageId)
       setContents(updatedContents)
@@ -177,14 +180,23 @@ const ProgramStagePage = () => {
 
       {!isNew && activeTab === 'konten' && (
         <>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-2">
             <h4 className="text-lg font-semibold text-on-surface">Daftar Konten</h4>
-            <Button
-              icon={<Plus className="w-4 h-4" />}
-              onClick={() => navigate(contentNewPath({ programId, stageId }))}
-            >
-              Tambah Konten
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                icon={<Plus className="w-4 h-4" />}
+                onClick={() => setPickerOpen(true)}
+              >
+                Tambah dari Perpustakaan
+              </Button>
+              <Button
+                icon={<Plus className="w-4 h-4" />}
+                onClick={() => navigate(contentNewPath({ programId, stageId }))}
+              >
+                Upload Konten Baru
+              </Button>
+            </div>
           </div>
 
           {contents.length === 0 ? (
@@ -192,7 +204,7 @@ const ProgramStagePage = () => {
               <EmptyState
                 icon={<FileText className="w-12 h-12" />}
                 title="Belum ada konten"
-                description="Klik 'Tambah Konten' untuk menambahkan konten ke stage ini."
+                description="Tambahkan konten dari perpustakaan atau unggah konten baru ke stage ini."
               />
             </Card>
           ) : (
@@ -214,7 +226,7 @@ const ProgramStagePage = () => {
                     {!content.is_active && <Badge variant="neutral">Nonaktif</Badge>}
                     <Button
                       variant="ghost" size="sm"
-                      onClick={() => navigate(contentEditPath(content.id, { programId, stageId }))}
+                      onClick={() => navigate(contentEditPath(content.id))}
                     >
                       Edit
                     </Button>
@@ -230,6 +242,24 @@ const ProgramStagePage = () => {
               ))}
             </div>
           )}
+
+          <ContentPickerModal
+            open={pickerOpen}
+            stageId={stageId!}
+            onClose={() => setPickerOpen(false)}
+            onPicked={async (picked) => {
+              if (!stageId) return
+              try {
+                await programService.assignContent(stageId, picked.id)
+                await loadContents()
+                addToast({ type: 'success', message: 'Konten ditambahkan ke stage' })
+              } catch (err) {
+                addToast({ type: 'error', message: friendlyError(err) })
+              } finally {
+                setPickerOpen(false)
+              }
+            }}
+          />
         </>
       )}
 

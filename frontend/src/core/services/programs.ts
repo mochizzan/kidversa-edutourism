@@ -10,7 +10,6 @@ import type {
   ToggleActiveResult,
 } from '../types'
 import { listRequest, itemRequest, voidRequest, arrayRequest } from './apiEnvelope'
-import { uploadMultipart } from './uploadMultipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 // Program stages are ordered by sequence_order. The list endpoint returns them
@@ -99,50 +98,15 @@ export const programService: ProgramService = {
   getContents: (stageId) =>
     arrayRequest<StageContent>('GET', API_ROUTES.PROGRAMS.CONTENTS(stageId)),
 
-  createContent: (stageId, data) =>
-    itemRequest<StageContent>('POST', API_ROUTES.PROGRAMS.CONTENTS(stageId), {
-      title: data.title,
-      file_url: data.file_url,
-      youtube_url: data.youtube_url,
-      file_type: data.file_type,
-      duration_seconds: data.duration_seconds,
-      sort_order: data.sort_order,
-      is_active: data.is_active,
-    }),
-
-  uploadContent: (stageId, data) => {
-    const form = new FormData()
-    form.append('file', data.file)
-    form.append('title', data.title)
-    form.append('file_type', data.file_type)
-    if (data.duration_seconds !== undefined) {
-      form.append('duration_seconds', String(data.duration_seconds))
-    }
-    if (data.youtube_url !== undefined && data.youtube_url !== '') {
-      form.append('youtube_url', data.youtube_url)
-    }
-    return uploadMultipart<StageContent>(
-      API_ROUTES.PROGRAM_STAGES.CONTENTS_UPLOAD(stageId),
-      form,
-    )
-  },
-
-  updateContent: (stageId, contentId, data) =>
-    itemRequest<StageContent>('PUT', API_ROUTES.PROGRAMS.CONTENT_DETAIL(stageId, contentId), {
-      title: data.title,
-      file_url: data.file_url,
-      youtube_url: data.youtube_url,
-      file_type: data.file_type,
-      duration_seconds: data.duration_seconds,
-      sort_order: data.sort_order,
-      is_active: data.is_active,
-    }),
-
-  deleteContent: (stageId, contentId) =>
-    voidRequest('DELETE', API_ROUTES.PROGRAMS.CONTENT_DETAIL(stageId, contentId)),
-
   reorderContents: (stageId, contentIds) =>
     voidRequest('POST', API_ROUTES.PROGRAMS.REORDER_CONTENTS(stageId), {
       ordered_ids: contentIds,
     }),
+
+  // Junction assignment: attach/detach an existing standalone Content to a stage.
+  assignContent: (stageId, contentId) =>
+    voidRequest('POST', API_ROUTES.CONTENTS.ASSIGN(stageId), { content_id: contentId }),
+
+  unassignContent: (stageId, contentId) =>
+    voidRequest('DELETE', API_ROUTES.CONTENTS.UNASSIGN(stageId, contentId)),
 }

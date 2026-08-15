@@ -9,6 +9,8 @@ import type {
   UpdateStageDTO,
   StageContent,
   StageContentFileType,
+  Content,
+  ContentUsage,
   Session,
   SessionStage,
   CreateSessionDTO,
@@ -48,11 +50,20 @@ export interface ProgramService {
   reorderStages(programId: string, stageIds: string[]): Promise<void>
 
   getContents(stageId: string): Promise<StageContent[]>
-  createContent(stageId: string, data: Omit<StageContent, 'id' | 'program_stage_id' | 'created_at'>): Promise<StageContent>
-  uploadContent(stageId: string, data: { file: File; title: string; file_type: StageContentFileType; duration_seconds?: number; youtube_url?: string }): Promise<StageContent>
-  updateContent(stageId: string, contentId: string, data: Partial<Omit<StageContent, 'id' | 'program_stage_id' | 'created_at'>>): Promise<StageContent>
-  deleteContent(stageId: string, contentId: string): Promise<void>
   reorderContents(stageId: string, contentIds: string[]): Promise<void>
+  assignContent(stageId: string, contentId: string): Promise<void>
+  unassignContent(stageId: string, contentId: string): Promise<void>
+}
+
+// Standalone, tenant-scoped content CRUD + usage/assign (Content Single-Source).
+export interface ContentService {
+  getAll(params?: ListParams): Promise<PaginatedResponse<Content>>
+  getById(id: string): Promise<Content | null>
+  create(data: { title: string; file_url: string; youtube_url?: string; file_type: StageContentFileType; duration_seconds?: number }): Promise<Content>
+  update(id: string, data: Partial<{ title: string; file_url: string; youtube_url?: string; file_type: StageContentFileType; duration_seconds?: number }>): Promise<Content>
+  remove(id: string): Promise<void>
+  getUsage(id: string): Promise<ContentUsage[]>
+  upload(data: { file: File; title: string; file_type: StageContentFileType; duration_seconds?: number; youtube_url?: string }): Promise<Content>
 }
 
 // Sessions
