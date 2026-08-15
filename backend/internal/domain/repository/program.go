@@ -29,10 +29,8 @@ type ProgramRepository interface {
 	DeleteStage(ctx context.Context, id string) error
 	ReorderStages(ctx context.Context, programID string, orderedIDs []string) error
 
-	CreateContent(ctx context.Context, c *entity.StageContent) error
-	GetContentByID(ctx context.Context, id string) (*entity.StageContent, error)
-	ListContents(ctx context.Context, stageID string) ([]entity.StageContent, error)
-	UpdateContent(ctx context.Context, c *entity.StageContent) error
-	DeleteContent(ctx context.Context, id string) error
-	ReorderContents(ctx context.Context, stageID string, orderedIDs []string) error
+	// ListStageContents returns the JOIN-shaped StageContent list for a stage
+	// (kiosk/learner path, E22/CRIT-7). Content ownership now lives in
+	// ContentRepository; this method is the read-only stage-scoped projection.
+	ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error)
 }

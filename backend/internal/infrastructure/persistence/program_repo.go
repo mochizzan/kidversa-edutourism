@@ -169,66 +169,49 @@ func (r *GormProgramRepository) ReorderStages(ctx context.Context, _ string, ord
 	return r.reorder(ctx, &ProgramStageModel{}, "sequence_order", orderedIDs)
 }
 
-// --- Contents ---
-
-func (r *GormProgramRepository) CreateContent(ctx context.Context, c *entity.StageContent) error {
-	m := stageContentModelFromEntity(c)
-	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
-		if isDuplicate(err) {
-			return apperrors.Conflict("conflict", err)
-		}
-		return apperrors.Internal("internal_error", err)
+// ListStageContents returns the JOIN-shaped StageContent list for a stage
+// (read-only kiosk/learner projection). Content ownership lives in
+// ContentRepository; this delegates to the dedicated content repo via the
+// shared DB by reusing the stage_contents + contents JOIN logic.
+func (r *GormProgramRepository) ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error) {
+	type joinRow struct {
+		ContentID       string
+		ProgramStageID  string
+		SortOrder       int
+		IsActive        bool
+		Title           string
+		FileURL         string
+		YouTubeURL      string
+		FileType        entity.StageContentFileType
+		DurationSeconds int
 	}
-	*c = *m.ToEntity()
-	return nil
-}
-
-func (r *GormProgramRepository) GetContentByID(ctx context.Context, id string) (*entity.StageContent, error) {
-	var m StageContentModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.NotFound("not_found", err)
-		}
+	var rows []joinRow
+	err := r.db.WithContext(ctx).
+		Table("stage_contents sc").
+		Select("sc.content_id, sc.program_stage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds").
+		Joins("JOIN contents c ON c.id = sc.content_id").
+		Where("sc.program_stage_id = ?", stageID).
+		Order("sc.sort_order ASC").
+		Find(&rows).Error
+	if err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	return m.ToEntity(), nil
-}
-
-func (r *GormProgramRepository) ListContents(ctx context.Context, stageID string) ([]entity.StageContent, error) {
-	var models []StageContentModel
-	if err := r.db.WithContext(ctx).Where("program_stage_id = ?", stageID).Order("sort_order ASC").Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	items := make([]entity.StageContent, 0, len(models))
-	for i := range models {
-		items = append(items, *models[i].ToEntity())
+	items := make([]entity.StageContent, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, entity.StageContent{
+			ID:              row.ContentID,
+			ProgramStageID:  row.ProgramStageID,
+			Title:           row.Title,
+			FileURL:         row.FileURL,
+			YouTubeURL:      row.YouTubeURL,
+			FileType:        row.FileType,
+			DurationSeconds: row.DurationSeconds,
+			SortOrder:       row.SortOrder,
+			IsActive:        row.IsActive,
+		})
 	}
 	return items, nil
 }
-
-func (r *GormProgramRepository) UpdateContent(ctx context.Context, c *entity.StageContent) error {
-	m := stageContentModelFromEntity(c)
-	if err := r.db.WithContext(ctx).Model(&StageContentModel{}).Where("id = ?", c.ID).Updates(m).Error; err != nil {
-		if isDuplicate(err) {
-			return apperrors.Conflict("conflict", err)
-		}
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-func (r *GormProgramRepository) DeleteContent(ctx context.Context, id string) error {
-	if err := r.db.WithContext(ctx).Delete(&StageContentModel{}, "id = ?", id).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-func (r *GormProgramRepository) ReorderContents(ctx context.Context, _ string, orderedIDs []string) error {
-	return r.reorder(ctx, &StageContentModel{}, "sort_order", orderedIDs)
-}
-
-// reorder updates the ordering column of rows to match orderedIDs (1-based sequence).
 func (r *GormProgramRepository) reorder(ctx context.Context, model interface{}, column string, orderedIDs []string) error {
 	tx := r.db.WithContext(ctx).Begin()
 	if tx.Error != nil {

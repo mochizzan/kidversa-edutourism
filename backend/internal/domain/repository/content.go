@@ -6,69 +6,34 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 )
 
-// PhotoRepository is the persistence contract for SmartPhoto records.
-type PhotoRepository interface {
-	Create(ctx context.Context, p *entity.SmartPhoto) error
-	GetByID(ctx context.Context, id, tenantID string) (*entity.SmartPhoto, error)
-	List(ctx context.Context, f PhotoFilter, page, limit int) (*Paginated[entity.SmartPhoto], error)
-	Update(ctx context.Context, p *entity.SmartPhoto) error
-	// UpdateFields applies a partial (map) update to a photo. Use this instead of
-	// Update(struct) so zero/false values are persisted (GORM zero-value bug, C2).
-	UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error
-	// SetReportPhoto marks photoID as the exclusive report photo for the given
-	// participant+session, clearing is_report_photo on all others in that scope.
-	SetReportPhoto(ctx context.Context, participantID, sessionID, photoID string) error
-	Delete(ctx context.Context, id string) error
+// ContentFilter narrows a tenant-wide Content list query.
+type ContentFilter struct {
+	TenantID string
+	Search   string
+	FileType string
 }
 
-// PhotoFilter narrows a photo list query.
-type PhotoFilter struct {
-	ParticipantID string
-	SessionID     string
-	FrameID       string
-	IsReportPhoto *bool
-}
+// ContentRepository is the persistence contract for the standalone contents table
+// and the stage_contents junction (Model A / single-source refactor).
+//
+// It was EXTRACTED out of ProgramRepository (CRIT-9, breaking change): content is
+// no longer owned by a stage. The same instance is injected into ProgramHandler,
+// MediaHandler, ContentHandler, and UploadHandler.
+type ContentRepository interface {
+	// Content (standalone, tenant-scoped).
+	CreateContent(ctx context.Context, c *entity.Content) error
+	GetContentByID(ctx context.Context, id string) (*entity.Content, error)
+	ListContents(ctx context.Context, f ContentFilter, page, limit int) (*Paginated[entity.Content], error)
+	UpdateContent(ctx context.Context, c *entity.Content) error
+	// DeleteContent atomically drops the junctions then the content row, and
+	// returns the stored file_url so the handler can remove the orphan file (D10a/E24).
+	DeleteContent(ctx context.Context, id string) (string, error)
 
-// RecordingRepository is the persistence contract for Recording records.
-type RecordingRepository interface {
-	Create(ctx context.Context, r *entity.Recording) error
-	GetByID(ctx context.Context, id, tenantID string) (*entity.Recording, error)
-	List(ctx context.Context, f RecordingFilter, page, limit int) (*Paginated[entity.Recording], error)
-	Update(ctx context.Context, r *entity.Recording) error
-	// UpdateFields applies a partial (map) update to a recording. Use this instead
-	// of Update(struct) so zero/false values are persisted (GORM zero-value bug, C2).
-	UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error
-	Delete(ctx context.Context, id string) error
-}
-
-// RecordingFilter narrows a recording list query.
-type RecordingFilter struct {
-	ParticipantID  string
-	SessionID      string
-	SessionStageID string
-	ReviewStatus   string
-}
-
-// ConsentRepository manages consent decisions (read for media scoping, write for responses).
-type ConsentRepository interface {
-	// GetValue returns the current consent value (true=granted) for a participant in a
-	// session for the given consent type. Returns false when no record exists.
-	GetValue(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) (bool, error)
-	// Create persists a new consent log row (initial send).
-	Create(ctx context.Context, log *entity.ConsentLog) error
-	// Respond records a parent's consent decision, upserting the latest value.
-	Respond(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType, value bool, ip, ua string) error
-	// ListByParticipant returns all consent rows for a participant.
-	ListByParticipant(ctx context.Context, participantID string) ([]entity.ConsentLog, error)
-	// ListBySession returns all consent rows for a session.
-	ListBySession(ctx context.Context, sessionID string) ([]entity.ConsentLog, error)
-	// ListBySessionIDs returns all consent rows for multiple sessions in a single query, grouped by session_id.
-	ListBySessionIDs(ctx context.Context, sessionIDs []string) (map[string][]entity.ConsentLog, error)
-	// GetByCombinedToken resolves a participant by their active combined consent
-	// token (WhatsApp delivery flow). Returns nil when not found.
-	GetByCombinedToken(ctx context.Context, token string) (*entity.Participant, error)
-	// SendRequest records that a consent request was sent (audit trail).
-	// Creates a consent_logs row with sent_at=now and responded_at=NULL.
-	// If a row already exists for this (participant, session, type), it updates sent_at.
-	SendRequest(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) error
+	// Junction (content <-> stage).
+	AssignContentToStage(ctx context.Context, stageID, contentID string) error
+	UnassignContentFromStage(ctx context.Context, stageID, contentID string) error
+	ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error)
+	GetContentUsage(ctx context.Context, contentID string) ([]entity.ContentUsage, error)
+	GetContentProgramTenant(ctx context.Context, contentID string) (string, error)
+	ReorderStageContents(ctx context.Context, stageID string, orderedContentIDs []string) error
 }

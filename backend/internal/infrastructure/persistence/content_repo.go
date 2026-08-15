@@ -2,10 +2,8 @@ package persistence
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"time"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -14,37 +12,33 @@ import (
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
-// GormPhotoRepository implements repository.PhotoRepository.
-type GormPhotoRepository struct {
+// GormContentRepository implements repository.ContentRepository (Model A).
+type GormContentRepository struct {
 	db *gorm.DB
 }
 
-// NewPhotoRepository builds a GORM-backed photo repository.
-func NewPhotoRepository(db *gorm.DB) repository.PhotoRepository {
-	return &GormPhotoRepository{db: db}
+// NewContentRepository builds a GORM-backed content repository.
+func NewContentRepository(db *gorm.DB) repository.ContentRepository {
+	return &GormContentRepository{db: db}
 }
 
-func (r *GormPhotoRepository) Create(ctx context.Context, p *entity.SmartPhoto) error {
-	m := smartPhotoModelFromEntity(p)
+// --- Content (standalone, tenant-scoped) ---
+
+func (r *GormContentRepository) CreateContent(ctx context.Context, c *entity.Content) error {
+	m := contentModelFromEntity(c)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		if isDuplicate(err) {
 			return apperrors.Conflict("conflict", err)
 		}
 		return apperrors.Internal("internal_error", err)
 	}
-	*p = *m.ToEntity()
+	*c = *m.ToEntity()
 	return nil
 }
 
-func (r *GormPhotoRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.SmartPhoto, error) {
-	var m SmartPhotoModel
-	q := r.db.WithContext(ctx).Where("id = ?", id)
-	// Tenant scoping: restrict to the photo's owning session's tenant (joined via
-	// sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
-	if tenantID != "" {
-		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
-	}
-	if err := q.First(&m).Error; err != nil {
+func (r *GormContentRepository) GetContentByID(ctx context.Context, id string) (*entity.Content, error) {
+	var m ContentModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
 		}
@@ -53,453 +47,236 @@ func (r *GormPhotoRepository) GetByID(ctx context.Context, id, tenantID string) 
 	return m.ToEntity(), nil
 }
 
-func (r *GormPhotoRepository) Update(ctx context.Context, p *entity.SmartPhoto) error {
-	m := smartPhotoModelFromEntity(p)
-	if err := r.db.WithContext(ctx).Model(&SmartPhotoModel{}).Where("id = ?", p.ID).Updates(m).Error; err != nil {
-		if isDuplicate(err) {
-			return apperrors.Conflict("conflict", err)
-		}
-		return apperrors.Internal("internal_error", err)
+func (r *GormContentRepository) ListContents(ctx context.Context, f repository.ContentFilter, page, limit int) (*repository.Paginated[entity.Content], error) {
+	q := r.db.WithContext(ctx).Model(&ContentModel{})
+	if f.TenantID != "" {
+		q = q.Where("tenant_id = ?", f.TenantID)
 	}
-	return nil
-}
+	if f.FileType != "" {
+		q = q.Where("file_type = ?", f.FileType)
+	}
+	if f.Search != "" {
+		like := "%" + strings.ToLower(f.Search) + "%"
+		q = q.Where("LOWER(title) LIKE ?", like)
+	}
 
-// UpdateFields applies a partial (map) update, so zero/false values persist (C2).
-func (r *GormPhotoRepository) UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error {
-	if err := r.db.WithContext(ctx).Model(&SmartPhotoModel{}).Where("id = ?", id).Updates(fields).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-// SetReportPhoto marks photoID as the exclusive is_report_photo for its
-// participant+session scope, clearing the flag on all other photos in scope.
-func (r *GormPhotoRepository) SetReportPhoto(ctx context.Context, participantID, sessionID, photoID string) error {
-	if err := r.db.WithContext(ctx).
-		Model(&SmartPhotoModel{}).
-		Where("participant_id = ? AND session_id = ?", participantID, sessionID).
-		Where("is_report_photo = ?", true).
-		Update("is_report_photo", false).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	if err := r.db.WithContext(ctx).
-		Model(&SmartPhotoModel{}).
-		Where("id = ?", photoID).
-		Update("is_report_photo", true).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-func (r *GormPhotoRepository) Delete(ctx context.Context, id string) error {
-	if err := r.db.WithContext(ctx).Delete(&SmartPhotoModel{}, "id = ?", id).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-// List returns photos matching the filter (paginated).
-func (r *GormPhotoRepository) List(ctx context.Context, f repository.PhotoFilter, page, limit int) (*repository.Paginated[entity.SmartPhoto], error) {
-	q := r.db.WithContext(ctx).Model(&SmartPhotoModel{})
-	if f.ParticipantID != "" {
-		q = q.Where("participant_id = ?", f.ParticipantID)
-	}
-	if f.SessionID != "" {
-		q = q.Where("session_id = ?", f.SessionID)
-	}
-	if f.FrameID != "" {
-		q = q.Where("frame_id = ?", f.FrameID)
-	}
-	if f.IsReportPhoto != nil {
-		q = q.Where("is_report_photo = ?", *f.IsReportPhoto)
-	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	var models []SmartPhotoModel
+
+	var models []ContentModel
 	offset := (page - 1) * limit
 	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	items := make([]entity.SmartPhoto, 0, len(models))
+	items := make([]entity.Content, 0, len(models))
 	for i := range models {
 		items = append(items, *models[i].ToEntity())
 	}
-	return &repository.Paginated[entity.SmartPhoto]{Items: items, Total: int(total)}, nil
+	return &repository.Paginated[entity.Content]{Items: items, Total: int(total)}, nil
 }
 
-// GormRecordingRepository implements repository.RecordingRepository.
-type GormRecordingRepository struct {
-	db *gorm.DB
-}
-
-// NewRecordingRepository builds a GORM-backed recording repository.
-func NewRecordingRepository(db *gorm.DB) repository.RecordingRepository {
-	return &GormRecordingRepository{db: db}
-}
-
-func (r *GormRecordingRepository) loadEmotionTags(ctx context.Context, recordings []entity.Recording) error {
-	if len(recordings) == 0 {
-		return nil
-	}
-	ids := make([]string, 0, len(recordings))
-	for i := range recordings {
-		ids = append(ids, recordings[i].ID)
-	}
-	var rows []RecordingEmotionTagModel
-	if err := r.db.WithContext(ctx).Where("recording_id IN ?", ids).Find(&rows).Error; err != nil {
-		return err
-	}
-	byRec := make(map[string][]string, len(recordings))
-	for _, row := range rows {
-		byRec[row.RecordingID] = append(byRec[row.RecordingID], row.EmotionTag)
-	}
-	for i := range recordings {
-		recordings[i].EmotionTags = byRec[recordings[i].ID]
-	}
-	return nil
-}
-
-func (r *GormRecordingRepository) saveEmotionTags(ctx context.Context, recordingID string, tags []string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("recording_id = ?", recordingID).Delete(&RecordingEmotionTagModel{}).Error; err != nil {
-			return err
-		}
-		if len(tags) == 0 {
-			return nil
-		}
-		rows := make([]RecordingEmotionTagModel, 0, len(tags))
-		for _, tag := range tags {
-			rows = append(rows, RecordingEmotionTagModel{RecordingID: recordingID, EmotionTag: tag})
-		}
-		return tx.Create(&rows).Error
-	})
-}
-
-func (r *GormRecordingRepository) Create(ctx context.Context, rec *entity.Recording) error {
-	m := recordingModelFromEntity(rec)
-	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+func (r *GormContentRepository) UpdateContent(ctx context.Context, c *entity.Content) error {
+	m := contentModelFromEntity(c)
+	// Update only the global content fields (per-stage state lives on the junction).
+	if err := r.db.WithContext(ctx).Model(&ContentModel{}).Where("id = ?", c.ID).Updates(map[string]interface{}{
+		"title":            m.Title,
+		"file_url":         m.FileURL,
+		"youtube_url":      m.YouTubeURL,
+		"file_type":        m.FileType,
+		"duration_seconds": m.DurationSeconds,
+		"tenant_id":        m.TenantID,
+	}).Error; err != nil {
 		if isDuplicate(err) {
 			return apperrors.Conflict("conflict", err)
 		}
 		return apperrors.Internal("internal_error", err)
 	}
-	*rec = *m.ToEntity()
-	if err := r.saveEmotionTags(ctx, rec.ID, rec.EmotionTags); err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
 	return nil
 }
 
-func (r *GormRecordingRepository) GetByID(ctx context.Context, id, tenantID string) (*entity.Recording, error) {
-	var m RecordingModel
-	q := r.db.WithContext(ctx).Where("id = ?", id)
-	// Tenant scoping: restrict to the recording's owning session's tenant (joined
-	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
-	if tenantID != "" {
-		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
-	}
-	if err := q.First(&m).Error; err != nil {
+// DeleteContent atomically removes the stage_contents junctions for the content
+// (or relies on the FK cascade) and then the contents row, returning the stored
+// file_url so the caller can remove the orphan file (D10a/E24). YouTube contents
+// have an empty file_url, so the caller skips removal.
+func (r *GormContentRepository) DeleteContent(ctx context.Context, id string) (string, error) {
+	var m ContentModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.NotFound("not_found", err)
+			return "", apperrors.NotFound("not_found", err)
 		}
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	e := m.ToEntity()
-	recs := []entity.Recording{*e}
-	if err := r.loadEmotionTags(ctx, recs); err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	*e = recs[0]
-	return e, nil
-}
-
-func (r *GormRecordingRepository) Update(ctx context.Context, rec *entity.Recording) error {
-	m := recordingModelFromEntity(rec)
-	if err := r.db.WithContext(ctx).Model(&RecordingModel{}).Where("id = ?", rec.ID).Updates(m).Error; err != nil {
-		if isDuplicate(err) {
-			return apperrors.Conflict("conflict", err)
-		}
-		return apperrors.Internal("internal_error", err)
-	}
-	if err := r.saveEmotionTags(ctx, rec.ID, rec.EmotionTags); err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-// UpdateFields applies a partial (map) update, so zero/false values persist (C2).
-func (r *GormRecordingRepository) UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error {
-	if err := r.db.WithContext(ctx).Model(&RecordingModel{}).Where("id = ?", id).Updates(fields).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-func (r *GormRecordingRepository) Delete(ctx context.Context, id string) error {
-	if err := r.db.WithContext(ctx).Delete(&RecordingModel{}, "id = ?", id).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-// List returns recordings matching the filter (paginated).
-func (r *GormRecordingRepository) List(ctx context.Context, f repository.RecordingFilter, page, limit int) (*repository.Paginated[entity.Recording], error) {
-	q := r.db.WithContext(ctx).Model(&RecordingModel{})
-	if f.ParticipantID != "" {
-		q = q.Where("participant_id = ?", f.ParticipantID)
-	}
-	if f.SessionID != "" {
-		q = q.Where("session_id = ?", f.SessionID)
-	}
-	if f.SessionStageID != "" {
-		q = q.Where("session_stage_id = ?", f.SessionStageID)
-	}
-	if f.ReviewStatus != "" {
-		q = q.Where("review_status = ?", f.ReviewStatus)
-	}
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	var models []RecordingModel
-	offset := (page - 1) * limit
-	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	items := make([]entity.Recording, 0, len(models))
-	for i := range models {
-		items = append(items, *models[i].ToEntity())
-	}
-	if err := r.loadEmotionTags(ctx, items); err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	return &repository.Paginated[entity.Recording]{Items: items, Total: int(total)}, nil
-}
-
-// GormConsentRepository implements repository.ConsentRepository.
-type GormConsentRepository struct {
-	db              *gorm.DB
-	consentTokenTTL time.Duration
-}
-
-// NewConsentRepository builds a GORM-backed consent repository. consentTokenTTL
-// is the lifetime of a single-use consent token (from config).
-func NewConsentRepository(db *gorm.DB, consentTokenTTL time.Duration) repository.ConsentRepository {
-	return &GormConsentRepository{db: db, consentTokenTTL: consentTokenTTL}
-}
-
-// Create persists a new consent log row (initial send).
-func (r *GormConsentRepository) Create(ctx context.Context, log *entity.ConsentLog) error {
-	m := ConsentLogModel{ConsentLog: *log}
-	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-		if isDuplicate(err) {
-			return apperrors.Conflict("conflict", err)
-		}
-		return apperrors.Internal("internal_error", err)
-	}
-	*log = m.ConsentLog
-	return nil
-}
-
-// GetValue returns the latest consent value for the participant/session/type.
-// A participant may have multiple consent log rows (re-consents); the most
-// recent responded value wins. Returns false when no record exists.
-func (r *GormConsentRepository) GetValue(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) (bool, error) {
-	var m ConsentLogModel
-	err := r.db.WithContext(ctx).
-		Where("participant_id = ? AND session_id = ? AND consent_type = ?", participantID, sessionID, string(consentType)).
-		Order("created_at DESC, id DESC").
-		First(&m).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil
-		}
-		return false, apperrors.Internal("internal_error", err)
-	}
-	return m.Value, nil
-}
-
-// Respond records a parent's consent decision. It upserts the latest value for
-// the (participant, session, type) tuple: updates existing row or creates new.
-func (r *GormConsentRepository) Respond(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType, value bool, ip, ua string) error {
-	now := time.Now().UTC()
-	log := &entity.ConsentLog{
-		ParticipantID: participantID,
-		SessionID:     sessionID,
-		ConsentType:   consentType,
-		Value:         value,
-		SentAt:        now,
-		RespondedAt:   &now,
-		IPAddress:     ip,
-		UserAgent:     ua,
-	}
-	// Upsert: try to find existing row first.
-	existing := ConsentLogModel{}
-	err := r.db.WithContext(ctx).
-		Where("participant_id = ? AND session_id = ? AND consent_type = ?", participantID, sessionID, string(consentType)).
-		First(&existing).Error
-	if err == nil {
-		// Row exists — update with new consent decision.
-		return r.db.WithContext(ctx).
-			Model(&existing).
-			Updates(map[string]interface{}{
-				"value":        value,
-				"sent_at":      now,
-				"responded_at": &now,
-				"ip_address":   ip,
-				"user_agent":   ua,
-			}).Error
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return apperrors.Internal("internal_error", err)
-	}
-	// No existing row — create new.
-	m := ConsentLogModel{ConsentLog: *log}
-	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	*log = m.ConsentLog
-	return nil
-}
-
-// ListByParticipant returns all consent rows for a participant.
-func (r *GormConsentRepository) ListByParticipant(ctx context.Context, participantID string) ([]entity.ConsentLog, error) {
-	var models []ConsentLogModel
-	if err := r.db.WithContext(ctx).
-		Where("participant_id = ?", participantID).
-		Order("created_at DESC").
-		Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	out := make([]entity.ConsentLog, 0, len(models))
-	for i := range models {
-		out = append(out, *models[i].ToEntity())
-	}
-	return out, nil
-}
-
-// ListBySession returns all consent rows for a session.
-func (r *GormConsentRepository) ListBySession(ctx context.Context, sessionID string) ([]entity.ConsentLog, error) {
-	var models []ConsentLogModel
-	if err := r.db.WithContext(ctx).
-		Where("session_id = ?", sessionID).
-		Order("created_at DESC").
-		Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	out := make([]entity.ConsentLog, 0, len(models))
-	for i := range models {
-		out = append(out, *models[i].ToEntity())
-	}
-	return out, nil
-}
-
-// ListBySessionIDs returns all consent rows for multiple sessions in one query.
-func (r *GormConsentRepository) ListBySessionIDs(ctx context.Context, sessionIDs []string) (map[string][]entity.ConsentLog, error) {
-	if len(sessionIDs) == 0 {
-		return make(map[string][]entity.ConsentLog), nil
-	}
-	var models []ConsentLogModel
-	if err := r.db.WithContext(ctx).
-		Where("session_id IN ?", sessionIDs).
-		Order("created_at DESC").
-		Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	grouped := make(map[string][]entity.ConsentLog)
-	for i := range models {
-		e := models[i].ToEntity()
-		grouped[e.SessionID] = append(grouped[e.SessionID], *e)
-	}
-	return grouped, nil
-}
-
-// SendRequest records that a consent request was sent. It upserts the
-// (participant, session, type) row: if a row already exists, updates sent_at
-// and clears responded_at (re-send scenario). Otherwise creates a new row.
-func (r *GormConsentRepository) SendRequest(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) error {
-	now := time.Now().UTC()
-	m := ConsentLogModel{
-		ConsentLog: entity.ConsentLog{
-			ParticipantID: participantID,
-			SessionID:     sessionID,
-			ConsentType:   consentType,
-			SentAt:        now,
-		},
-	}
-	// Upsert: if row exists for this (participant, session, type), update sent_at.
-	existing := ConsentLogModel{}
-	err := r.db.WithContext(ctx).
-		Where("participant_id = ? AND session_id = ? AND consent_type = ?", participantID, sessionID, string(consentType)).
-		First(&existing).Error
-	if err == nil {
-		// Row exists — update sent_at, clear responded_at (re-send).
-		return r.db.WithContext(ctx).
-			Model(&existing).
-			Updates(map[string]interface{}{
-				"sent_at":      now,
-				"responded_at": nil,
-				"value":        false,
-			}).Error
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return apperrors.Internal("internal_error", err)
-	}
-	// No existing row — create new.
-	return r.db.WithContext(ctx).Create(&m).Error
-}
-
-// GetByCombinedToken resolves a participant by their active combined consent
-// token (WhatsApp delivery flow). Queries the participants table directly.
-func (r *GormConsentRepository) GetByCombinedToken(ctx context.Context, token string) (*entity.Participant, error) {
-	if token == "" {
-		return nil, apperrors.NotFound("token_invalid", errors.New("token required"))
-	}
-	var m ParticipantModel
-	if err := r.db.WithContext(ctx).
-		Where("consent_combined_token = ?", token).
-		First(&m).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.NotFound("token_invalid", err)
-		}
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	return m.ToEntity(), nil
-}
-
-// generateConsentToken returns a cryptographically-random hex token (32 bytes → 64 hex chars).
-func generateConsentToken() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
-}
-
-// TenantIDForSession returns the owning tenant of the given session.
-func (r *GormSessionRepository) TenantIDForSession(ctx context.Context, sessionID string) (string, error) {
-	var tenantID string
-	err := r.db.WithContext(ctx).
-		Model(&sessionTenantView{}).
-		Where("id = ?", sessionID).
-		Limit(1).
-		Pluck("tenant_id", &tenantID).Error
-	if err != nil {
 		return "", apperrors.Internal("internal_error", err)
 	}
-	if tenantID == "" {
-		return "", apperrors.NotFound("not_found", errors.New("session not found"))
+	fileURL := m.FileURL
+
+	tx := r.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return "", apperrors.Internal("internal_error", tx.Error)
+	}
+	// Drop junctions first (also covered by FK ON DELETE CASCADE, but explicit for clarity/ordering).
+	if err := tx.Where("content_id = ?", id).Delete(&StageContentRefModel{}).Error; err != nil {
+		tx.Rollback()
+		return "", apperrors.Internal("internal_error", err)
+	}
+	if err := tx.Where("id = ?", id).Delete(&ContentModel{}).Error; err != nil {
+		tx.Rollback()
+		return "", apperrors.Internal("internal_error", err)
+	}
+	if err := tx.Commit().Error; err != nil {
+		return "", apperrors.Internal("internal_error", err)
+	}
+	return fileURL, nil
+}
+
+// --- Junction (content <-> stage) ---
+
+func (r *GormContentRepository) AssignContentToStage(ctx context.Context, stageID, contentID string) error {
+	ref := &entity.StageContentRef{
+		ContentID:      contentID,
+		ProgramStageID: stageID,
+		SortOrder:      0,
+		IsActive:       true,
+	}
+	m := stageContentRefModelFromEntity(ref)
+	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
+		if isDuplicate(err) {
+			// A6a: one content at most once per stage. Idempotent: already added.
+			return apperrors.Conflict("content_already_assigned", err)
+		}
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+func (r *GormContentRepository) UnassignContentFromStage(ctx context.Context, stageID, contentID string) error {
+	res := r.db.WithContext(ctx).
+		Where("content_id = ? AND program_stage_id = ?", contentID, stageID).
+		Delete(&StageContentRefModel{})
+	if res.Error != nil {
+		return apperrors.Internal("internal_error", res.Error)
+	}
+	// E12: idempotent — no-op if nothing matched.
+	return nil
+}
+
+// ListStageContents returns the JOIN-shaped StageContent list for a stage,
+// ordered by sort_order, filtering soft-deleted junctions (E22/CRIT-7).
+func (r *GormContentRepository) ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error) {
+	type joinRow struct {
+		ContentID      string
+		ProgramStageID string
+		SortOrder      int
+		IsActive       bool
+		Title          string
+		FileURL        string
+		YouTubeURL     string
+		FileType       entity.StageContentFileType
+		DurationSeconds int
+		CreatedAt      interface{}
+	}
+	var rows []joinRow
+	err := r.db.WithContext(ctx).
+		Table("stage_contents sc").
+		Select("sc.content_id, sc.program_stage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds, c.created_at").
+		Joins("JOIN contents c ON c.id = sc.content_id").
+		Where("sc.program_stage_id = ?", stageID).
+		Order("sc.sort_order ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.StageContent, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, entity.StageContent{
+			ID:             row.ContentID,
+			ProgramStageID: row.ProgramStageID,
+			Title:          row.Title,
+			FileURL:        row.FileURL,
+			YouTubeURL:     row.YouTubeURL,
+			FileType:       row.FileType,
+			DurationSeconds: row.DurationSeconds,
+			SortOrder:      row.SortOrder,
+			IsActive:       row.IsActive,
+		})
+	}
+	return items, nil
+}
+
+// GetContentUsage returns every (program, stage) that references the content,
+// for the Manager delete-confirm dialog (A3a).
+func (r *GormContentRepository) GetContentUsage(ctx context.Context, contentID string) ([]entity.ContentUsage, error) {
+	type usageRow struct {
+		ProgramID   string
+		ProgramName string
+		StageID     string
+		StageName   string
+	}
+	var rows []usageRow
+	err := r.db.WithContext(ctx).
+		Table("stage_contents sc").
+		Select("p.id AS program_id, p.name AS program_name, ps.id AS stage_id, ps.name AS stage_name").
+		Joins("JOIN program_stages ps ON ps.id = sc.program_stage_id").
+		Joins("JOIN programs p ON p.id = ps.program_id").
+		Where("sc.content_id = ?", contentID).
+		Order("p.name ASC, ps.name ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.ContentUsage, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, entity.ContentUsage{
+			ProgramID:   row.ProgramID,
+			ProgramName: row.ProgramName,
+			StageID:     row.StageID,
+			StageName:   row.StageName,
+		})
+	}
+	return items, nil
+}
+
+// GetContentProgramTenant resolves the owning tenant of a content via its stage's
+// program. Empty string if the content is unassigned (no stage) — CRIT-6: an
+// unassigned content has no tenant to scope and is not playable.
+func (r *GormContentRepository) GetContentProgramTenant(ctx context.Context, contentID string) (string, error) {
+	var tenantID string
+	err := r.db.WithContext(ctx).
+		Table("contents c").
+		Select("COALESCE(p.tenant_id, '')").
+		Joins("JOIN stage_contents sc ON sc.content_id = c.id").
+		Joins("JOIN program_stages ps ON ps.id = sc.program_stage_id").
+		Joins("JOIN programs p ON p.id = ps.program_id").
+		Where("c.id = ?", contentID).
+		Limit(1).
+		Scan(&tenantID).Error
+	if err != nil {
+		return "", apperrors.Internal("internal_error", err)
 	}
 	return tenantID, nil
 }
 
-// sessionTenantView is a minimal struct mapping to the sessions table for tenant lookup.
-type sessionTenantView struct {
-	ID       string `gorm:"column:id"`
-	TenantID string `gorm:"column:tenant_id"`
+// ReorderStageContents renumbers sort_order 1..n for the given content ids,
+// matching on content_id (the junction PK — CRIT-11), not a separate id column.
+func (r *GormContentRepository) ReorderStageContents(ctx context.Context, _ string, orderedContentIDs []string) error {
+	return r.reorderByContentID(ctx, orderedContentIDs)
 }
 
-// TableName pins the table name.
-func (sessionTenantView) TableName() string { return "sessions" }
+// reorderByContentID updates sort_order of junction rows to match orderedContentIDs
+// (1-based sequence), keyed on content_id (the PK).
+func (r *GormContentRepository) reorderByContentID(ctx context.Context, orderedContentIDs []string) error {
+	tx := r.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return apperrors.Internal("internal_error", tx.Error)
+	}
+	for i, id := range orderedContentIDs {
+		if err := tx.Model(&StageContentRefModel{}).Where("content_id = ?", id).Update("sort_order", i+1).Error; err != nil {
+			tx.Rollback()
+			return apperrors.Internal("internal_error", err)
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}

@@ -72,34 +72,5 @@ func programStageModelFromEntity(e *entity.ProgramStage) *ProgramStageModel {
 	return &ProgramStageModel{ProgramStage: *e}
 }
 
-// StageContentModel is the GORM persistence model for stage contents.
-type StageContentModel struct {
-	entity.StageContent
-	DeletedAt gorm.DeletedAt `gorm:"type:datetime(3);index" json:"-"`
-}
-
-// TableName pins the table name.
-func (StageContentModel) TableName() string { return "stage_contents" }
-
-// BeforeCreate generates a UUID if missing.
-func (m *StageContentModel) BeforeCreate(*gorm.DB) error {
-	if m.ID == "" {
-		m.ID = newUUID()
-	}
-	if m.CreatedAt.IsZero() {
-		m.CreatedAt = time.Now()
-	}
-	m.UpdatedAt = m.CreatedAt
-	return nil
-}
-
-// ToEntity maps the model back to the domain entity.
-func (m *StageContentModel) ToEntity() *entity.StageContent {
-	e := m.StageContent
-	return &e
-}
-
-// stageContentModelFromEntity builds a model from a domain entity.
-func stageContentModelFromEntity(e *entity.StageContent) *StageContentModel {
-	return &StageContentModel{StageContent: *e}
-}
+// NOTE: the stage_contents model is now StageContentRefModel in content_model.go
+// (repurposed as a junction). StageContentModel is removed.
