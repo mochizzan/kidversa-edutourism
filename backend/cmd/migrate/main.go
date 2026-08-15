@@ -71,15 +71,32 @@ func bootstrap(cfg *config.Config) error {
 	}
 	g := db.DB
 
-	// Tenants (idempotent by slug).
+	// Tenants (idempotent by slug). Seed in a single batch instead of one
+	// query per item to avoid an N+1 pattern.
 	tenants := []entity.Tenant{
 		{BaseModel: entity.BaseModel{ID: uuid.NewString()}, Name: "Tenant Bandung", Slug: bootstrapTenantBandungSlug},
 	}
-	for _, t := range tenants {
-		var cnt int64
-		g.Model(&entity.Tenant{}).Where("slug = ?", t.Slug).Count(&cnt)
-		if cnt == 0 {
-			if err := g.Create(&t).Error; err != nil {
+	if len(tenants) > 0 {
+		var existing []entity.Tenant
+		slugs := make([]string, 0, len(tenants))
+		for _, t := range tenants {
+			slugs = append(slugs, t.Slug)
+		}
+		if err := g.Where("slug IN ?", slugs).Find(&existing).Error; err != nil {
+			return err
+		}
+		present := make(map[string]bool, len(existing))
+		for _, e := range existing {
+			present[e.Slug] = true
+		}
+		toCreate := make([]entity.Tenant, 0, len(tenants))
+		for _, t := range tenants {
+			if !present[t.Slug] {
+				toCreate = append(toCreate, t)
+			}
+		}
+		if len(toCreate) > 0 {
+			if err := g.Create(&toCreate).Error; err != nil {
 				return err
 			}
 		}

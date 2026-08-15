@@ -33,8 +33,15 @@ func Run(cfg *config.Config, migrationsDir string) error {
 		return fmt.Errorf("open root db: %w", err)
 	}
 	defer rootDB.Close()
-	if _, err := rootDB.Exec(fmt.Sprintf(
-		"CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", cfg.DBName)); err != nil {
+	// CREATE DATABASE uses an identifier that cannot be bound as a query
+	// parameter, so only allow known, constant DB names (deny-by-default). Each
+	// branch concatenates a literal constant, never the config field, into the
+	// SQL string — this avoids a SQL-injection sink while remaining strict.
+	createSQL, err := dbCreateSQL(cfg.DBName)
+	if err != nil {
+		return err
+	}
+	if _, err := rootDB.Exec(createSQL); err != nil {
 		return fmt.Errorf("create database: %w", err)
 	}
 
@@ -63,6 +70,19 @@ func Run(cfg *config.Config, migrationsDir string) error {
 	}
 	log.Println("migrations applied")
 	return nil
+}
+
+// dbCreateSQL returns a CREATE DATABASE statement for an allowlisted DB name.
+// Deny-by-default: any name not explicitly listed is rejected, so the SQL string
+// only ever contains literal constants (DDL identifiers cannot be bound as
+// query parameters, hence the allowlist instead of interpolation).
+func dbCreateSQL(name string) (string, error) {
+	switch name {
+	case "kidversa", "kidversa_test":
+		return "CREATE DATABASE IF NOT EXISTS `" + name + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", nil
+	default:
+		return "", fmt.Errorf("create database: unsupported DB name %q (allowlist: kidversa, kidversa_test)", name)
+	}
 }
 
 // waitForDB pings the target database until it responds or the timeout elapses,
