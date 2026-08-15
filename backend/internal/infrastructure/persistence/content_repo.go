@@ -164,16 +164,16 @@ func (r *GormContentRepository) UnassignContentFromStage(ctx context.Context, st
 // ordered by sort_order, filtering soft-deleted junctions (E22/CRIT-7).
 func (r *GormContentRepository) ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error) {
 	type joinRow struct {
-		ContentID      string
-		ProgramStageID string
-		SortOrder      int
-		IsActive       bool
-		Title          string
-		FileURL        string
-		YouTubeURL     string
-		FileType       entity.StageContentFileType
+		ContentID       string
+		ProgramStageID  string
+		SortOrder       int
+		IsActive        bool
+		Title           string
+		FileURL         string
+		YouTubeURL      string
+		FileType        entity.StageContentFileType
 		DurationSeconds int
-		CreatedAt      interface{}
+		CreatedAt       interface{}
 	}
 	var rows []joinRow
 	err := r.db.WithContext(ctx).
@@ -189,15 +189,15 @@ func (r *GormContentRepository) ListStageContents(ctx context.Context, stageID s
 	items := make([]entity.StageContent, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, entity.StageContent{
-			ID:             row.ContentID,
-			ProgramStageID: row.ProgramStageID,
-			Title:          row.Title,
-			FileURL:        row.FileURL,
-			YouTubeURL:     row.YouTubeURL,
-			FileType:       row.FileType,
+			ID:              row.ContentID,
+			ProgramStageID:  row.ProgramStageID,
+			Title:           row.Title,
+			FileURL:         row.FileURL,
+			YouTubeURL:      row.YouTubeURL,
+			FileType:        row.FileType,
 			DurationSeconds: row.DurationSeconds,
-			SortOrder:      row.SortOrder,
-			IsActive:       row.IsActive,
+			SortOrder:       row.SortOrder,
+			IsActive:        row.IsActive,
 		})
 	}
 	return items, nil

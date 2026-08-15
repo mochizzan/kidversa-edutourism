@@ -61,7 +61,7 @@ type Report struct {
 	GeneratedAt          *time.Time   `json:"generated_at,omitempty"`
 	SentAt               *time.Time   `json:"sent_at,omitempty"`
 	ApprovedBy           *string      `json:"approved_by,omitempty"`
-	MissionIDs []string `json:"mission_ids,omitempty" gorm:"-"`
+	MissionIDs           []string     `json:"mission_ids,omitempty" gorm:"-"`
 }
 
 // ParticipantMission links a report to a completed mission from the mission bank.
@@ -140,12 +140,12 @@ type Content struct {
 // StageContentRef is one row of the stage_contents junction: a Content assigned
 // to a Stage with per-stage ordering + activation.
 type StageContentRef struct {
-	ContentID       string    `json:"content_id"`
-	ProgramStageID  string    `json:"program_stage_id"`
-	SortOrder       int       `json:"sort_order"`
-	IsActive        bool      `json:"is_active"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ContentID      string    `json:"content_id"`
+	ProgramStageID string    `json:"program_stage_id"`
+	SortOrder      int       `json:"sort_order"`
+	IsActive       bool      `json:"is_active"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // ContentUsage describes a single (program, stage) where a Content is used.

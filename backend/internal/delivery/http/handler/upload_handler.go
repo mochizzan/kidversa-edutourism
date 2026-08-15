@@ -30,12 +30,12 @@ import (
 // Served media is later retrieved via the authenticated media handler (never
 // e.Static).
 type UploadHandler struct {
-	cfg        *config.Config
-	photos     repository.PhotoRepository
-	recordings repository.RecordingRepository
-	frames     repository.FrameRepository
+	cfg         *config.Config
+	photos      repository.PhotoRepository
+	recordings  repository.RecordingRepository
+	frames      repository.FrameRepository
 	contentRepo repository.ContentRepository
-	users      repository.UserRepository
+	users       repository.UserRepository
 }
 
 // NewUploadHandler builds the upload handler.
