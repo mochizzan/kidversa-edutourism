@@ -22,14 +22,14 @@ import (
 // gated by JWT auth, tenant scope, and (for photos/recordings) a consent log
 // check. HTML / SVG content is refused to prevent stored-XSS.
 type MediaHandler struct {
-	cfg        *config.Config
-	photos     repository.PhotoRepository
-	recordings repository.RecordingRepository
-	consent    repository.ConsentRepository
-	sessions   repository.SessionRepository
-	frames     repository.FrameRepository
-	programs   repository.ProgramRepository
-	users      repository.UserRepository
+	cfg         *config.Config
+	photos      repository.PhotoRepository
+	recordings  repository.RecordingRepository
+	consent     repository.ConsentRepository
+	sessions    repository.SessionRepository
+	frames      repository.FrameRepository
+	contentRepo repository.ContentRepository
+	users       repository.UserRepository
 }
 
 // NewMediaHandler builds the media handler.
@@ -40,10 +40,10 @@ func NewMediaHandler(
 	consent repository.ConsentRepository,
 	sessions repository.SessionRepository,
 	frames repository.FrameRepository,
-	programs repository.ProgramRepository,
+	contentRepo repository.ContentRepository,
 	users repository.UserRepository,
 ) *MediaHandler {
-	return &MediaHandler{cfg: cfg, photos: photos, recordings: recordings, consent: consent, sessions: sessions, frames: frames, programs: programs, users: users}
+	return &MediaHandler{cfg: cfg, photos: photos, recordings: recordings, consent: consent, sessions: sessions, frames: frames, contentRepo: contentRepo, users: users}
 }
 
 // mediaKind enumerates the served asset kinds.
@@ -137,21 +137,20 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		owningTenant = rec.TenantID
 	case kindContent:
 		// Stage content is curriculum media; no consent gate. Tenant scope is
-		// resolved through the content's program.
-		ct, err := h.programs.GetContentByID(ctx, id)
+		// resolved through the content's owning stage's program (CRIT-6).
+		ct, err := h.contentRepo.GetContentByID(ctx, id)
 		if err != nil {
 			return err
 		}
 		relPath = ct.FileURL
-		stage, serr := h.programs.GetStageByID(ctx, ct.ProgramStageID)
-		if serr != nil {
-			return serr
+		owningTenant, terr := h.contentRepo.GetContentProgramTenant(ctx, id)
+		if terr != nil {
+			return terr
 		}
-		program, perr := h.programs.GetProgramByID(ctx, stage.ProgramID)
-		if perr != nil {
-			return perr
+		// Unassigned content (no stage) has no tenant to scope -> not playable.
+		if owningTenant == "" {
+			return appresp.Fail(c, http.StatusNotFound, "not_found")
 		}
-		owningTenant = derefTenant(program.TenantID)
 	case kindAvatar:
 		// Avatars are user profile images; tenant scope via the user's tenant.
 		u, err := h.users.GetByID(ctx, id)
@@ -207,7 +206,7 @@ func (h *MediaHandler) GetContent(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
 
-	ct, err := h.programs.GetContentByID((*c).Request().Context(), id)
+	ct, err := h.contentRepo.GetContentByID((*c).Request().Context(), id)
 	if err != nil {
 		return err
 	}

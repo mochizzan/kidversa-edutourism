@@ -32,10 +32,8 @@ func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManage
 	g.DELETE("/:id/stages/:stageId", h.DeleteStage, authMW, roleMWAdmin, scopeMW)
 	g.POST("/:id/stages/reorder", h.ReorderStages, authMW, roleMWAdmin, scopeMW)
 
-	// Contents keyed directly by stage (separate base path).
+	// Contents keyed directly by stage (read-only list for kiosk/learner; assign/
+	// unassign live under /api/contents in router_contents.go).
 	g.GET("/program-stages/:stageId/contents", h.ListContents, authMW, roleMWAdmin, scopeMW)
-	g.POST("/program-stages/:stageId/contents", h.CreateContent, authMW, roleMWAdmin, scopeMW)
-	g.PUT("/program-stages/:stageId/contents/:contentId", h.UpdateContent, authMW, roleMWAdmin, scopeMW)
-	g.DELETE("/program-stages/:stageId/contents/:contentId", h.DeleteContent, authMW, roleMWAdmin, scopeMW)
 	g.POST("/program-stages/:stageId/contents/reorder", h.ReorderContents, authMW, roleMWAdmin, scopeMW)
 }

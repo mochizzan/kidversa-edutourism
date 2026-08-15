@@ -46,6 +46,9 @@ func NewRouter(d Deps) *echo.Echo {
 	// Tenants (SUPER_ADMIN).
 	handler.RegisterTenantsRoutes(api.Group("/tenants"), h.Tenant, d.JWT, d.Revoker)
 
+	// Public tenant list (anonymous) — used by the self-service register form.
+	handler.RegisterPublicRoutes(api.Group("/public"), h.Tenant)
+
 	// Users.
 	handler.RegisterUsersRoutes(api.Group("/users"), h.User, d.JWT, d.Revoker)
 
@@ -73,6 +76,9 @@ func NewRouter(d Deps) *echo.Echo {
 	handler.RegisterParticipantMissionsRoutes(api.Group("/participant-missions"), h.ParticipantMission, d.JWT, d.Revoker)
 	handler.RegisterConsentRoutes(api.Group("/consent"), h.Consent, d.JWT, d.Revoker)
 	handler.RegisterFramesRoutes(api.Group("/frames"), h.Frame, d.JWT, d.Revoker)
+
+	// Contents (standalone, single-source) + stage assign/unassign.
+	handler.RegisterContentsRoutes(api.Group(""), h.Content, h.Upload, h.Program, d.JWT, d.Revoker)
 
 	// File upload + authenticated media.
 	handler.RegisterUploadRoutes(api.Group(""), h.Upload, d.JWT, d.Config, d.Revoker)

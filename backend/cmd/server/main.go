@@ -49,6 +49,7 @@ func main() {
 	userRepo := persistence.NewUserRepository(db.DB)
 	tenantRepo := persistence.NewTenantRepository(db.DB)
 	programRepo := persistence.NewProgramRepository(db.DB)
+	contentRepo := persistence.NewContentRepository(db.DB)
 	sessionRepo := persistence.NewSessionRepository(db.DB)
 	liveRepo := persistence.NewLiveRepository(db.DB)
 	notifRepo := persistence.NewNotificationRepository(db.DB)
@@ -79,7 +80,8 @@ func main() {
 	registry := handler.NewRegistry(authHandler)
 	registry.User = handler.NewUserHandler(userUC, jwt, liveSvc)
 	registry.Tenant = handler.NewTenantHandler(tenantUC, jwt)
-	registry.Program = handler.NewProgramHandler(programRepo)
+	registry.Program = handler.NewProgramHandler(programRepo, contentRepo)
+	registry.Content = handler.NewContentHandler(cfg, contentRepo)
 	registry.Session = handler.NewSessionHandler(sessionUC)
 	registry.SessionLifecycle = handler.NewSessionLifecycleHandler(sessionUC)
 	registry.SessionStage = handler.NewSessionStageHandler(sessionUC)
@@ -97,8 +99,8 @@ func main() {
 	registry.ParticipantMission = handler.NewParticipantMissionHandler(participantMissionRepo)
 	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo, messaging.NewWhatsAppGateway(cfg), cfg, hub)
 	registry.Frame = handler.NewFrameHandler(frameRepo)
-	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, recordingRepo, frameRepo, programRepo, userRepo)
-	registry.Media = handler.NewMediaHandler(cfg, photoRepo, recordingRepo, consentRepo, sessionRepo, frameRepo, programRepo, userRepo)
+	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, recordingRepo, frameRepo, contentRepo, userRepo)
+	registry.Media = handler.NewMediaHandler(cfg, photoRepo, recordingRepo, consentRepo, sessionRepo, frameRepo, contentRepo, userRepo)
 
 	deps := httppkg.Deps{
 		Config:   cfg,

@@ -14,12 +14,14 @@ import (
 
 // ProgramHandler serves /api/programs/* (SUPER_ADMIN, ADMIN, KOORDINATOR).
 type ProgramHandler struct {
-	repo repository.ProgramRepository
+	repo        repository.ProgramRepository
+	contentRepo repository.ContentRepository
 }
 
-// NewProgramHandler builds the program handler.
-func NewProgramHandler(repo repository.ProgramRepository) *ProgramHandler {
-	return &ProgramHandler{repo: repo}
+// NewProgramHandler builds the program handler. It owns the stage-scoped content
+// ops (list/assign/unassign/reorder) via the shared ContentRepository (CRIT-5).
+func NewProgramHandler(repo repository.ProgramRepository, contentRepo repository.ContentRepository) *ProgramHandler {
+	return &ProgramHandler{repo: repo, contentRepo: contentRepo}
 }
 
 // List handles GET /api/programs (paginated; ?search=, ?is_active=).

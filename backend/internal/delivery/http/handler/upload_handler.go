@@ -34,7 +34,7 @@ type UploadHandler struct {
 	photos     repository.PhotoRepository
 	recordings repository.RecordingRepository
 	frames     repository.FrameRepository
-	programs   repository.ProgramRepository
+	contentRepo repository.ContentRepository
 	users      repository.UserRepository
 }
 
@@ -44,10 +44,10 @@ func NewUploadHandler(
 	photos repository.PhotoRepository,
 	recordings repository.RecordingRepository,
 	frames repository.FrameRepository,
-	programs repository.ProgramRepository,
+	contentRepo repository.ContentRepository,
 	users repository.UserRepository,
 ) *UploadHandler {
-	return &UploadHandler{cfg: cfg, photos: photos, recordings: recordings, frames: frames, programs: programs, users: users}
+	return &UploadHandler{cfg: cfg, photos: photos, recordings: recordings, frames: frames, contentRepo: contentRepo, users: users}
 }
 
 const uploadFieldName = "file"
@@ -185,17 +185,13 @@ func (h *UploadHandler) UploadFrame(c *echo.Context) error {
 	return appresp.Created(c, dto.NewFrameResponse(f))
 }
 
-// UploadContent handles POST /api/program-stages/:stageId/contents/upload:
+// UploadContentFile handles POST /api/contents/upload (content-level, Model A):
 //   - validates + stores the multipart file to disk (subdir "contents"),
-//   - creates a StageContent row referencing the stored file.
+//   - creates a standalone Content row referencing the stored file (tenant-scoped),
+//   - the caller then assigns it to a stage via POST /api/program-stages/:stageId/contents/assign.
 //
-// The stage is resolved from the path param; tenant scoping is enforced through
-// the stage's owning program (looked up from the path id). file_type is required.
-func (h *UploadHandler) UploadContent(c *echo.Context) error {
-	stageID, ok := bindUUID(c, "stageId")
-	if !ok {
-		return nil
-	}
+// tenant scoping is enforced via the JWT/scope (never the body, F5). file_type is required.
+func (h *UploadHandler) UploadContentFile(c *echo.Context) error {
 	_, storedRel, err := h.persistFile(c, "contents")
 	if err != nil {
 		return err
@@ -207,17 +203,17 @@ func (h *UploadHandler) UploadContent(c *echo.Context) error {
 	}
 	fileType := entity.StageContentFileType((*c).FormValue("file_type"))
 	if fileType == "" {
-		_ = h.removeStored(h.cfg.UploadDir, storedRel)
+		_ = removeStored(h.cfg.UploadDir, storedRel)
 		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "Tipe file konten wajib diisi")
 	}
 
-	ct := &entity.StageContent{
-		ProgramStageID: stageID,
-		Title:          title,
-		FileURL:        storedRel,
-		FileType:       fileType,
-		IsActive:       true,
-		SortOrder:      0,
+	tenantID := appmiddleware.GetTenantID(c)
+
+	ct := &entity.Content{
+		TenantID: tenantID,
+		Title:    title,
+		FileURL:  storedRel,
+		FileType: fileType,
 	}
 	if v := (*c).FormValue("duration_seconds"); v != "" {
 		if n, e := strconv.Atoi(strings.TrimSpace(v)); e == nil {
@@ -232,9 +228,9 @@ func (h *UploadHandler) UploadContent(c *echo.Context) error {
 			ct.DurationSeconds = probed
 		}
 	}
-	if err := h.programs.CreateContent((*c).Request().Context(), ct); err != nil {
+	if err := h.contentRepo.CreateContent((*c).Request().Context(), ct); err != nil {
 		// Roll back the stored file so we don't leave orphans.
-		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
+		if rmErr := removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
 			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
 		}
 		return err
@@ -349,13 +345,19 @@ func (h *UploadHandler) persistFile(c *echo.Context, subdir string) (int64, stri
 	return fh.Size, rel, nil
 }
 
-// removeStored deletes a previously stored upload (rollback helper).
-func (h *UploadHandler) removeStored(uploadDir, rel string) error {
+// removeStored deletes a previously stored upload (rollback helper). Free
+// function so it is reusable across handlers (e.g. ContentHandler.Delete).
+func removeStored(uploadDir, rel string) error {
 	dest := filepath.Join(uploadDir, filepath.FromSlash(rel))
 	if !withinDir(uploadDir, dest) {
 		return nil
 	}
 	return os.Remove(dest)
+}
+
+// removeStored (method form) delegates to the free function above.
+func (h *UploadHandler) removeStored(uploadDir, rel string) error {
+	return removeStored(uploadDir, rel)
 }
 
 // --- media type detection (extension + magic bytes) ---

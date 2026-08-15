@@ -26,6 +26,7 @@ type Registry struct {
 	Frame                  *FrameHandler
 	Upload                 *UploadHandler
 	Media                  *MediaHandler
+	Content                *ContentHandler
 }
 
 // NewRegistry builds a registry with the mandatory auth handler.

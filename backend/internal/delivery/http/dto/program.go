@@ -21,19 +21,19 @@ type ProgramStageRequest struct {
 	IsPhotoStage     bool               `json:"is_photo_stage,omitempty"`
 }
 
-// StageContentRequest is the create/update payload for stage contents.
-//
-// FileURL is NOT required: VIDEO content may instead carry a YouTubeURL (no upload),
-// and GAME_BUNDLE content always uses a URL. Validation of the source is enforced
-// in the handlers (file upload vs. URL payload), not here.
-type StageContentRequest struct {
+// ContentRequest is the create/update payload for the standalone Content entity
+// (Model A). Global fields only; per-stage activation lives on the junction.
+type ContentRequest struct {
 	Title           string                      `json:"title" validate:"required"`
 	FileURL         string                      `json:"file_url"`
 	YouTubeURL      string                      `json:"youtube_url,omitempty"`
 	FileType        entity.StageContentFileType `json:"file_type" validate:"required"`
 	DurationSeconds int                         `json:"duration_seconds,omitempty"`
-	SortOrder       int                         `json:"sort_order,omitempty"`
-	IsActive        *bool                       `json:"is_active,omitempty"`
+}
+
+// AssignContentRequest carries the content_id to assign to a stage.
+type AssignContentRequest struct {
+	ContentID string `json:"content_id" validate:"required"`
 }
 
 // ReorderRequest carries an ordered list of IDs to re-sequence.

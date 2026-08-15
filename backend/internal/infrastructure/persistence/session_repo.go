@@ -552,3 +552,15 @@ func (r *GormSessionRepository) FindDuplicateParticipants(ctx context.Context, p
 	}
 	return out, nil
 }
+
+// TenantIDForSession resolves the owning tenant of a session (media scope checks).
+func (r *GormSessionRepository) TenantIDForSession(ctx context.Context, sessionID string) (string, error) {
+	var tid string
+	if err := r.db.WithContext(ctx).Raw(
+		"SELECT tenant_id FROM sessions WHERE id = ? AND deleted_at IS NULL LIMIT 1",
+		sessionID,
+	).Scan(&tid).Error; err != nil {
+		return "", apperrors.Internal("internal_error", err)
+	}
+	return tid, nil
+}

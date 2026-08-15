@@ -1,6 +1,8 @@
 package persistence
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,6 +22,15 @@ func NewUUID() string {
 // cryptographically-random consent token).
 func GenerateConsentToken() (string, error) {
 	return generateConsentToken()
+}
+
+// generateConsentToken returns a 64-char hex (32-byte) cryptographically-random token.
+func generateConsentToken() (string, error) {
+	var buf [32]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf[:]), nil
 }
 
 // isDuplicate reports whether err is a MySQL/MariaDB duplicate-entry (unique constraint) error.

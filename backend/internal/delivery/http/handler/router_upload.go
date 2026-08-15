@@ -39,6 +39,5 @@ func RegisterUploadRoutes(g *echo.Group, h *UploadHandler, jm *auth.JWTManager, 
 	g.POST("/photos/upload", h.UploadPhoto, authMW, scopeMW, bodyMW)
 	g.POST("/recordings/upload", h.UploadRecording, authMW, scopeMW, bodyMW)
 	g.POST("/frames/upload", h.UploadFrame, authMW, scopeMW, bodyMW)
-	g.POST("/program-stages/:stageId/contents/upload", h.UploadContent, authMW, scopeMW, bodyMW)
 	g.POST("/users/:id/avatar", h.UploadAvatar, authMW, scopeMW, bodyMW)
 }
