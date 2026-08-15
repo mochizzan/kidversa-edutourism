@@ -51,7 +51,7 @@ func (h *ConsentHandler) Respond(c *echo.Context) error {
 	}
 	ip := (*c).RealIP()
 	ua := (*c).Request().UserAgent()
-	if err := h.consent.Respond((*c).Request().Context(), req.ParticipantID, req.SessionID,
+	if err := h.consent.RespondConsent((*c).Request().Context(), req.ParticipantID, req.SessionID,
 		entity.ConsentType(req.ConsentType), req.Value, ip, ua); err != nil {
 		return err
 	}
@@ -94,8 +94,8 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 	now := time.Now().UTC()
 	ctx := (*c).Request().Context()
 	for _, p := range participants {
-		recGranted, _ := h.consent.GetValue(ctx, p.ID, req.SessionID, entity.ConsentRecording)
-		photoGranted, _ := h.consent.GetValue(ctx, p.ID, req.SessionID, entity.ConsentPhoto)
+		recGranted, _ := h.consent.GetConsentValue(ctx, p.ID, req.SessionID, entity.ConsentRecording)
+		photoGranted, _ := h.consent.GetConsentValue(ctx, p.ID, req.SessionID, entity.ConsentPhoto)
 		if recGranted && photoGranted {
 			continue
 		}
@@ -192,10 +192,10 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 					sessionID = *p.SessionID
 				}
 				if sessionID != "" {
-					if sErr := h.consent.SendRequest(ctx, p.ID, sessionID, entity.ConsentRecording); sErr != nil {
+					if sErr := h.consent.SendConsentRequest(ctx, p.ID, sessionID, entity.ConsentRecording); sErr != nil {
 						log.Printf("consent: send-request record failed for %s RECORDING: %v", p.ID, sErr)
 					}
-					if sErr := h.consent.SendRequest(ctx, p.ID, sessionID, entity.ConsentPhoto); sErr != nil {
+					if sErr := h.consent.SendConsentRequest(ctx, p.ID, sessionID, entity.ConsentPhoto); sErr != nil {
 						log.Printf("consent: send-request record failed for %s PHOTO: %v", p.ID, sErr)
 					}
 				}
@@ -249,7 +249,7 @@ func (h *ConsentHandler) RespondCombined(c *echo.Context) error {
 		return err
 	}
 
-	participant, err := h.consent.GetByCombinedToken((*c).Request().Context(), req.Token)
+	participant, err := h.consent.GetParticipantByConsentToken((*c).Request().Context(), req.Token)
 	if err != nil {
 		return err
 	}
@@ -266,11 +266,11 @@ func (h *ConsentHandler) RespondCombined(c *echo.Context) error {
 
 	ip := (*c).RealIP()
 	ua := (*c).Request().UserAgent()
-	if rerr := h.consent.Respond((*c).Request().Context(), participant.ID, sessionID,
+	if rerr := h.consent.RespondConsent((*c).Request().Context(), participant.ID, sessionID,
 		entity.ConsentRecording, req.Recording, ip, ua); rerr != nil {
 		return rerr
 	}
-	if rerr := h.consent.Respond((*c).Request().Context(), participant.ID, sessionID,
+	if rerr := h.consent.RespondConsent((*c).Request().Context(), participant.ID, sessionID,
 		entity.ConsentPhoto, req.Photo, ip, ua); rerr != nil {
 		return rerr
 	}
@@ -307,7 +307,7 @@ func (h *ConsentHandler) Info(c *echo.Context) error {
 		return appresp.OK(c, dto.ConsentInfoResponse{Status: "invalid"})
 	}
 
-	participant, err := h.consent.GetByCombinedToken((*c).Request().Context(), token)
+	participant, err := h.consent.GetParticipantByConsentToken((*c).Request().Context(), token)
 	if err != nil {
 		// Already-consumed tokens are cleared, so they read as not-found.
 		return appresp.OK(c, dto.ConsentInfoResponse{Status: "invalid"})
@@ -340,7 +340,7 @@ func (h *ConsentHandler) Summary(c *echo.Context) error {
 		return appresp.OK(c, dto.ConsentSummaryResponse{Sessions: []dto.ConsentSummaryItem{}})
 	}
 	ids := strings.Split(idsRaw, ",")
-	grouped, err := h.consent.ListBySessionIDs((*c).Request().Context(), ids)
+	grouped, err := h.consent.ListConsentsBySessionIDs((*c).Request().Context(), ids)
 	if err != nil {
 		return err
 	}
@@ -362,7 +362,7 @@ func (h *ConsentHandler) Summary(c *echo.Context) error {
 func (h *ConsentHandler) List(c *echo.Context) error {
 	sid := (*c).QueryParam("session_id")
 	if sid != "" {
-		items, err := h.consent.ListBySession((*c).Request().Context(), sid)
+		items, err := h.consent.ListConsentsBySession((*c).Request().Context(), sid)
 		if err != nil {
 			return err
 		}
@@ -372,7 +372,7 @@ func (h *ConsentHandler) List(c *echo.Context) error {
 	if pid == "" {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
-	items, err := h.consent.ListByParticipant((*c).Request().Context(), pid)
+	items, err := h.consent.ListConsentsByParticipant((*c).Request().Context(), pid)
 	if err != nil {
 		return err
 	}

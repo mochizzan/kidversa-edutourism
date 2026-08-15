@@ -16,12 +16,12 @@ import (
 type KioskHandler struct {
 	authUC      *auth.Usecase
 	sessionUC   *usecase.SessionUsecase
-	programRepo repository.ProgramRepository
+	contentRepo repository.ContentRepository
 }
 
 // NewKioskHandler builds the kiosk handler.
-func NewKioskHandler(authUC *auth.Usecase, sessionUC *usecase.SessionUsecase, programRepo repository.ProgramRepository) *KioskHandler {
-	return &KioskHandler{authUC: authUC, sessionUC: sessionUC, programRepo: programRepo}
+func NewKioskHandler(authUC *auth.Usecase, sessionUC *usecase.SessionUsecase, contentRepo repository.ContentRepository) *KioskHandler {
+	return &KioskHandler{authUC: authUC, sessionUC: sessionUC, contentRepo: contentRepo}
 }
 
 // kioskStageContent bundles a session stage with its program stage contents.
@@ -94,7 +94,7 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 	// Per stage, load program stage contents.
 	stages := make([]kioskStageContent, 0, len(s.Stages))
 	for i := range s.Stages {
-		contents, listErr := h.programRepo.ListContents((*c).Request().Context(), s.Stages[i].ProgramStageID)
+		contents, listErr := h.contentRepo.ListStageContents((*c).Request().Context(), s.Stages[i].ProgramStageID)
 		if listErr != nil {
 			// Contents are non-critical for kiosk display; fall back to empty.
 			contents = nil

@@ -88,7 +88,7 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 		TakenAt:         takenAt,
 		SyncStatus:      entity.SyncLocal,
 	}
-	if err := h.photos.Create((*c).Request().Context(), rec); err != nil {
+	if err := h.photos.CreatePhoto((*c).Request().Context(), rec); err != nil {
 		// Roll back the stored file so we don't leave orphans.
 		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
 			// Log cleanup failure but don't change the return value.
@@ -133,7 +133,7 @@ func (h *UploadHandler) UploadRecording(c *echo.Context) error {
 		ReviewedBy:      reviewedByPtr,
 		SyncStatus:      entity.SyncLocal,
 	}
-	if err := h.recordings.Create((*c).Request().Context(), rec); err != nil {
+	if err := h.recordings.CreateRecording((*c).Request().Context(), rec); err != nil {
 		// Roll back the stored file so we don't leave orphans.
 		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
 			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)

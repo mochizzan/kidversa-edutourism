@@ -29,7 +29,7 @@ func (h *PhotoHandler) GetByID(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	p, err := h.photos.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	p, err := h.photos.GetPhotoByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func (h *PhotoHandler) List(c *echo.Context) error {
 		SessionID:     (*c).QueryParam("session_id"),
 	}
 	page, limit := pagination(c)
-	res, err := h.photos.List((*c).Request().Context(), f, page, limit)
+	res, err := h.photos.ListPhotos((*c).Request().Context(), f, page, limit)
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func (h *PhotoHandler) Delete(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := h.photos.Delete((*c).Request().Context(), id); err != nil {
+	if err := h.photos.DeletePhoto((*c).Request().Context(), id); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
@@ -90,10 +90,10 @@ func (h *PhotoHandler) Update(c *echo.Context) error {
 	if req.FrameID != "" {
 		fields["frame_id"] = req.FrameID
 	}
-	if err := h.photos.UpdateFields((*c).Request().Context(), id, fields); err != nil {
+	if err := h.photos.UpdatePhotoFields((*c).Request().Context(), id, fields); err != nil {
 		return err
 	}
-	p, err := h.photos.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	p, err := h.photos.GetPhotoByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -106,14 +106,14 @@ func (h *PhotoHandler) SetReportPhoto(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	p, err := h.photos.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	p, err := h.photos.GetPhotoByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
 	if err := h.photos.SetReportPhoto((*c).Request().Context(), p.ParticipantID, p.SessionID, id); err != nil {
 		return err
 	}
-	updated, err := h.photos.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	updated, err := h.photos.GetPhotoByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

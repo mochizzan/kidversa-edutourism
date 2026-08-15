@@ -29,7 +29,7 @@ func (h *RecordingHandler) GetByID(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	r, err := h.recordings.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	r, err := h.recordings.GetRecordingByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (h *RecordingHandler) List(c *echo.Context) error {
 		ReviewStatus:   (*c).QueryParam("review_status"),
 	}
 	page, limit := pagination(c)
-	res, err := h.recordings.List((*c).Request().Context(), f, page, limit)
+	res, err := h.recordings.ListRecordings((*c).Request().Context(), f, page, limit)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (h *RecordingHandler) Review(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	r, err := h.recordings.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	r, err := h.recordings.GetRecordingByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func (h *RecordingHandler) Review(c *echo.Context) error {
 	if req.Transcript != nil {
 		r.TranscriptText = *req.Transcript
 	}
-	if err := h.recordings.Update((*c).Request().Context(), r); err != nil {
+	if err := h.recordings.UpdateRecording((*c).Request().Context(), r); err != nil {
 		return err
 	}
 	return appresp.OK(c, dto.NewRecordingResponse(r))
@@ -84,7 +84,7 @@ func (h *RecordingHandler) Delete(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := h.recordings.Delete((*c).Request().Context(), id); err != nil {
+	if err := h.recordings.DeleteRecording((*c).Request().Context(), id); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
@@ -121,10 +121,10 @@ func (h *RecordingHandler) Update(c *echo.Context) error {
 			fields["reviewed_at"] = req.ReviewedAt
 		}
 	}
-	if err := h.recordings.UpdateFields((*c).Request().Context(), id, fields); err != nil {
+	if err := h.recordings.UpdateRecordingFields((*c).Request().Context(), id, fields); err != nil {
 		return err
 	}
-	r, err := h.recordings.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	r, err := h.recordings.GetRecordingByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

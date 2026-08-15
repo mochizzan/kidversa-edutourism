@@ -85,7 +85,7 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 
 	switch kind {
 	case kindPhoto:
-		rec, err := h.photos.GetByID(ctx, id, "")
+		rec, err := h.photos.GetPhotoByID(ctx, id, "")
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		}
 		owningTenant = ot
 		// Consent gating: photo of a child requires positive PHOTO consent.
-		granted, cerr := h.consent.GetValue(ctx, participantID, sessionID, entity.ConsentPhoto)
+		granted, cerr := h.consent.GetConsentValue(ctx, participantID, sessionID, entity.ConsentPhoto)
 		if cerr != nil {
 			return cerr
 		}
@@ -106,7 +106,7 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 			return appresp.Fail(c, http.StatusForbidden, "consent_required")
 		}
 	case kindRecording:
-		rec, err := h.recordings.GetByID(ctx, id, "")
+		rec, err := h.recordings.GetRecordingByID(ctx, id, "")
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		}
 		owningTenant = ot
 		// Consent gating: recording of a child requires positive RECORDING consent.
-		granted, cerr := h.consent.GetValue(ctx, participantID, sessionID, entity.ConsentRecording)
+		granted, cerr := h.consent.GetConsentValue(ctx, participantID, sessionID, entity.ConsentRecording)
 		if cerr != nil {
 			return cerr
 		}

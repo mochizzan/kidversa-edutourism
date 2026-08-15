@@ -88,7 +88,7 @@ func main() {
 	registry.SessionGroup = handler.NewSessionGroupHandler(sessionUC)
 	registry.SessionParticipant = handler.NewSessionParticipantHandler(sessionUC)
 	registry.SessionParticipantBulk = handler.NewSessionParticipantBulkHandler(sessionUC)
-	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, programRepo)
+	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, contentRepo)
 	registry.Live = handler.NewLiveHandler(liveSvc, hub, cfg.SSEKeepaliveSec)
 	registry.Notification = handler.NewNotificationHandler(liveSvc, hub, cfg.SSEKeepaliveSec)
 	registry.Assessment = handler.NewAssessmentHandler(assessmentUC)
