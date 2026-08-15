@@ -2,135 +2,59 @@ package entity
 
 import "time"
 
-// Assessment is a star-rating + comment given to a participant at a session stage.
-type Assessment struct {
+// Content is a standalone, tenant-scoped, reusable media asset. It is NOT owned
+// by a stage: many program stages can reference the same Content via the
+// stage_contents junction (Model A / single-source refactor).
+//
+// Global fields (Title/FileURL/YouTubeURL/FileType/DurationSeconds) live here;
+// per-stage state (sort_order, is_active) lives on the junction (StageContentRef).
+//
+// `Contents.ID` is the ONLY media id used by the kiosk/learner:
+// /api/media/kiosk/content/:id resolves to contents.id -> contents.file_url.
+type Content struct {
 	BaseModel
-	ParticipantID  string     `json:"participant_id"`
-	SessionID      string     `json:"session_id"`
-	SessionStageID string     `json:"session_stage_id"`
-	StarRating     int        `json:"star_rating"`
-	Comment        string     `json:"comment,omitempty"`
-	AssessedBy     string     `json:"assessed_by"`
-	AssessedAt     time.Time  `json:"assessed_at"`
-	SyncStatus     SyncStatus `json:"sync_status"`
+	TenantID        string               `json:"tenant_id"`
+	Title           string               `json:"title"`
+	FileURL         string               `json:"file_url"`
+	YouTubeURL      string               `json:"youtube_url,omitempty" gorm:"column:youtube_url"`
+	FileType        StageContentFileType `json:"file_type"`
+	DurationSeconds int                  `json:"duration_seconds,omitempty"`
 }
 
-// SmartPhoto is a captured photo of a participant, optionally framed.
-type SmartPhoto struct {
-	BaseModel
-	ParticipantID   string     `json:"participant_id"`
-	SessionID       string     `json:"session_id"`
-	FrameID         string     `json:"frame_id,omitempty"`
-	OriginalFileURL string     `json:"original_file_url"`
-	FramedFileURL   string     `json:"framed_file_url,omitempty"`
-	IsReportPhoto   bool       `json:"is_report_photo"`
-	TakenBy         string     `json:"taken_by"`
-	TakenAt         time.Time  `json:"taken_at"`
-	SyncStatus      SyncStatus `json:"sync_status"`
+// StageContentRef is one row of the stage_contents junction: a Content assigned
+// to a Stage with per-stage ordering + activation.
+type StageContentRef struct {
+	ContentID      string               `json:"content_id"`
+	ProgramStageID string               `json:"program_stage_id"`
+	SortOrder      int                  `json:"sort_order"`
+	IsActive       bool                 `json:"is_active"`
+	CreatedAt      time.Time            `json:"created_at"`
+	UpdatedAt      time.Time            `json:"updated_at"`
 }
 
-// Recording is a captured audio/video of a participant at a session stage.
-type Recording struct {
-	BaseModel
-	ParticipantID   string                 `json:"participant_id"`
-	SessionID       string                 `json:"session_id"`
-	SessionStageID  string                 `json:"session_stage_id"`
-	FileURL         string                 `json:"file_url,omitempty"`
-	DurationSeconds int                    `json:"duration_seconds"`
-	FileSizeBytes   int64                  `json:"file_size_bytes,omitempty"`
-	TranscriptText  string                 `json:"transcript_text,omitempty"`
-	EmotionTags     []string               `json:"emotion_tags,omitempty" gorm:"-"`
-	ReviewStatus    RecordingsReviewStatus `json:"review_status"`
-	ReviewedBy      *string                `json:"reviewed_by,omitempty"`
-	ReviewedAt      *time.Time             `json:"reviewed_at,omitempty"`
-	SyncStatus      SyncStatus             `json:"sync_status"`
+// ContentUsage describes a single (program, stage) where a Content is used —
+// surfaced by the Manager "delete confirm" dialog (A3a).
+type ContentUsage struct {
+	ProgramID   string `json:"program_id"`
+	ProgramName string `json:"program_name"`
+	StageID     string `json:"stage_id"`
+	StageName   string `json:"stage_name"`
 }
 
-// Report is the generated narrative report for one participant in one session.
-type Report struct {
-	BaseModel
-	ParticipantID        string       `json:"participant_id"`
-	SessionID            string       `json:"session_id"`
-	AINarrativeDraft     string       `json:"ai_narrative_draft,omitempty"`
-	AINarrativeFinal     string       `json:"ai_narrative_final,omitempty"`
-	ReportPDFURL         string       `json:"report_pdf_url,omitempty"`
-	ParentAccessToken    string       `json:"-"`
-	ParentTokenExpiresAt *time.Time   `json:"-"`
-	ParentTokenRevoked   bool         `json:"-"`
-	Status               ReportStatus `json:"status"`
-	GeneratedAt          *time.Time   `json:"generated_at,omitempty"`
-	SentAt               *time.Time   `json:"sent_at,omitempty"`
-	ApprovedBy           *string      `json:"approved_by,omitempty"`
-	// MissionIDs is the derived list of mission-bank ids assigned to this report
-	// (1NF: sourced from the participant_missions junction, never a JSON column).
-	// It is computed by the repository and excluded from persistence.
-	MissionIDs []string `json:"mission_ids,omitempty" gorm:"-"`
-}
-
-// ParticipantMission links a report to a completed mission from the mission bank.
-// ParticipantID is intentionally omitted: it is derivable from
-// report_id -> reports.participant_id (3NF).
-type ParticipantMission struct {
-	BaseModel
-	ReportID      string     `json:"report_id"`
-	MissionBankID string     `json:"mission_bank_id"`
-	IsCompleted   bool       `json:"is_completed"`
-	CompletedAt   *time.Time `json:"completed_at,omitempty"`
-}
-
-// ConsentLog records a parent's consent response for recording/photo.
-type ConsentLog struct {
-	BaseModel
-	ParticipantID string      `json:"participant_id"`
-	SessionID     string      `json:"session_id"`
-	ConsentType   ConsentType `json:"consent_type"`
-	Value         bool        `json:"value"`
-	SentAt        time.Time   `json:"sent_at"`
-	RespondedAt   *time.Time  `json:"responded_at,omitempty"`
-	IPAddress     string      `json:"ip_address,omitempty"`
-	UserAgent     string      `json:"user_agent,omitempty"`
-	// ConsentToken is the single-use, unguessable token used by the public
-	// respond-public flow (plan B10). Empty for rows created via the JWT flow.
-	ConsentToken string `json:"consent_token,omitempty"`
-	// ConsumedAt is set when the token-based response is recorded (replay protection).
-	ConsumedAt *time.Time `json:"consumed_at,omitempty"`
-	// ExpiresAt is the RFC3339 expiry of the consent token.
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-}
-
-// TimelineEvent is a realtime log entry for the live dashboard (replaces frontend simulation).
-type TimelineEvent struct {
-	BaseModel
-	SessionID string            `json:"session_id"`
-	GroupID   string            `json:"group_id"`
-	Type      TimelineEventType `json:"type"` // enum: group:progress|group:completed|stage:unlock|override
-	Message   string            `json:"message"`
-	UserID    string            `json:"user_id,omitempty"`
-}
-
-// MissionBank is a reusable mission template (Home/Parent/School) tied to a program + tenant.
-type MissionBank struct {
-	BaseModel
-	TenantID          string          `json:"tenant_id"`
-	ProgramID         string          `json:"program_id"`
-	Category          MissionCategory `json:"category"`
-	TitleChild        string          `json:"title_child"`
-	TitleParent       string          `json:"title_parent"`
-	DescriptionParent string          `json:"description_parent,omitempty"`
-	// RelatedStageIDs is the ordered list of program-stage ids the mission targets.
-	// It is persisted via the mission_bank_stages junction table (1NF).
-	RelatedStageIDs []string `json:"related_stage_ids,omitempty" gorm:"-"`
-	IsActive        bool     `json:"is_active"`
-}
-
-// PhotoFrame is a decorative frame overlay (per tenant + optional program) applied to photos.
-type PhotoFrame struct {
-	BaseModel
-	TenantID     string `json:"tenant_id"`
-	ProgramID    string `json:"program_id,omitempty"`
-	Name         string `json:"name"`
-	FileURL      string `json:"file_url"`
-	ThumbnailURL string `json:"thumbnail_url,omitempty"`
-	IsActive     bool   `json:"is_active"`
-	SortOrder    int    `json:"sort_order"`
+// StageContent is the JOIN-shaped projection returned by the kiosk/learner path
+// and consumed by the frontend. It flattens StageContentRef + Content so the
+// JSON shape is backward-compatible with the old stage-coupled content DTO
+// (E22/CRIT-7): id == ContentID, file_url/file_type/duration_seconds come from
+// the Content, sort_order/is_active come from the junction.
+type StageContent struct {
+	ID             string               `json:"id"`
+	ProgramStageID string               `json:"program_stage_id"`
+	Title          string               `json:"title"`
+	FileURL        string               `json:"file_url"`
+	YouTubeURL     string               `json:"youtube_url,omitempty"`
+	FileType       StageContentFileType `json:"file_type"`
+	DurationSeconds int                 `json:"duration_seconds,omitempty"`
+	SortOrder      int                  `json:"sort_order"`
+	IsActive       bool                 `json:"is_active"`
+	CreatedAt      time.Time            `json:"created_at"`
 }

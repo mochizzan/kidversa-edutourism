@@ -23,24 +23,6 @@ type ProgramStage struct {
 	IsPhotoStage     bool        `json:"is_photo_stage"`
 }
 
-// StageContent is a media asset belonging to a program stage.
-//
-// A VIDEO content is sourced from either an uploaded file (FileURL) or a YouTube
-// link (YouTubeURL). Exactly one of the two is populated. YouTube content has no
-// DurationSeconds (the player reports it client-side), while uploaded video/audio
-// duration is probed on upload (see upload_handler.go).
-type StageContent struct {
-	BaseModel
-	ProgramStageID  string               `json:"program_stage_id"`
-	Title           string               `json:"title"`
-	FileURL         string               `json:"file_url"`
-	YouTubeURL      string               `json:"youtube_url,omitempty" gorm:"column:youtube_url"`
-	FileType        StageContentFileType `json:"file_type"`
-	DurationSeconds int                  `json:"duration_seconds,omitempty"`
-	SortOrder       int                  `json:"sort_order"`
-	IsActive        bool                 `json:"is_active"`
-}
-
-// NOTE: MissionBank and PhotoFrame are defined in content.go (richer, tenant-scoped
-// versions matching the DDL). They were previously also declared here, causing a
-// redeclaration conflict; this file keeps Program/ProgramStage/StageContent only.
+// NOTE: StageContent (now the JOIN-shaped kiosk/learner projection), MissionBank,
+// and PhotoFrame are defined in content.go. This file keeps Program/ProgramStage
+// only to avoid redeclaration conflicts.
