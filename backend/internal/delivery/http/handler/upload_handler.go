@@ -36,6 +36,7 @@ type UploadHandler struct {
 	frames      repository.FrameRepository
 	contentRepo repository.ContentRepository
 	users       repository.UserRepository
+	consent     repository.ConsentRepository
 }
 
 // NewUploadHandler builds the upload handler.
@@ -46,8 +47,9 @@ func NewUploadHandler(
 	frames repository.FrameRepository,
 	contentRepo repository.ContentRepository,
 	users repository.UserRepository,
+	consent repository.ConsentRepository,
 ) *UploadHandler {
-	return &UploadHandler{cfg: cfg, photos: photos, recordings: recordings, frames: frames, contentRepo: contentRepo, users: users}
+	return &UploadHandler{cfg: cfg, photos: photos, recordings: recordings, frames: frames, contentRepo: contentRepo, users: users, consent: consent}
 }
 
 const uploadFieldName = "file"
@@ -58,6 +60,26 @@ const uploadFieldName = "file"
 //   - creates a SmartPhoto row referencing the stored file,
 //   - returns the created record.
 func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
+	// Read IDs first; participant_id is required and must be present before any
+	// consent lookup or file persist.
+	participantID := (*c).FormValue("participant_id")
+	if participantID == "" {
+		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "participant_id wajib diisi")
+	}
+	sessionID := (*c).FormValue("session_id")
+
+	// Consent gate: check BEFORE persisting the file so a denied upload never
+	// writes an orphan to disk (E3.4). Consent is read fresh from the DB per
+	// request (E3.7); a client flag is NEVER trusted (E3.1).
+	ctx := (*c).Request().Context()
+	granted, cerr := h.consent.GetConsentValue(ctx, participantID, sessionID, entity.ConsentPhoto)
+	if cerr != nil {
+		return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
+	}
+	if !granted {
+		return appresp.Fail(c, http.StatusForbidden, "consent_required")
+	}
+
 	_, storedRel, err := h.persistFile(c, "photos")
 	if err != nil {
 		return err

@@ -99,7 +99,7 @@ func main() {
 	registry.ParticipantMission = handler.NewParticipantMissionHandler(participantMissionRepo)
 	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo, messaging.NewWhatsAppGateway(cfg), cfg, hub)
 	registry.Frame = handler.NewFrameHandler(frameRepo)
-	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, recordingRepo, frameRepo, contentRepo, userRepo)
+	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, recordingRepo, frameRepo, contentRepo, userRepo, consentRepo)
 	registry.Media = handler.NewMediaHandler(cfg, photoRepo, recordingRepo, consentRepo, sessionRepo, frameRepo, contentRepo, userRepo)
 
 	deps := httppkg.Deps{
