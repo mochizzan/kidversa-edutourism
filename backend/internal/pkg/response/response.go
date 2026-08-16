@@ -105,6 +105,10 @@ func MessageForCode(code string) string {
 		return "Token diperlukan"
 	case "kiosk_invalid":
 		return "Token kiosk tidak valid"
+	case "kiosk_expired":
+		return "Tautan kiosk telah kedaluwarsa"
+	case "kiosk_cancelled":
+		return "Sesi kiosk telah dibatalkan"
 	case "bad_request":
 		return "Permintaan tidak dapat diproses"
 	case "internal_error":

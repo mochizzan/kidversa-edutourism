@@ -164,14 +164,6 @@ func (u *Usecase) ValidateKioskToken(ctx context.Context, token string) (session
 	return u.kiosk.Validate(ctx, token)
 }
 
-// ConsumeKioskToken marks a kiosk token as used (single-use).
-func (u *Usecase) ConsumeKioskToken(ctx context.Context, token string) error {
-	if u.kiosk == nil {
-		return apperrors.Internal("internal_error", nil)
-	}
-	return u.kiosk.Consume(ctx, token)
-}
-
 // Register creates a pending, inactive user (self-service); an admin must approve.
 func (u *Usecase) Register(ctx context.Context, name, email, phone string, tenantID *string, role entity.UserRole, password string) (*entity.User, error) {
 	hash, err := BcryptHash(password, u.cost)

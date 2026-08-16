@@ -32,19 +32,17 @@ type KioskRecord struct {
 	SessionID string
 	TenantID  string
 	ExpiresAt time.Time
-	Consumed  bool
 }
 
-// KioskTokenStore issues, validates, and consumes single-use kiosk tokens.
+// KioskTokenStore issues and validates session-scoped, multi-use kiosk tokens.
 type KioskTokenStore interface {
 	Issue(ctx context.Context, sessionID, tenantID string, ttl time.Duration) (token string, err error)
 	Validate(ctx context.Context, token string) (sessionID, tenantID string, err error)
-	Consume(ctx context.Context, token string) error
 }
 
 // DBKioskStore persists kiosk tokens in MariaDB and keeps an in-memory
 // read-through cache keyed by token so hot-path validation avoids a DB hit.
-// Cache entries are invalidated on Issue/Consume. Multi-replica deployments
+// Cache entries are invalidated on Issue. Multi-replica deployments
 // should add a shared cache/lock; single-instance is correct as-is.
 type DBKioskStore struct {
 	db    *gorm.DB
@@ -88,13 +86,12 @@ func (s *DBKioskStore) Issue(ctx context.Context, sessionID, tenantID string, tt
 		SessionID: sessionID,
 		TenantID:  tenantID,
 		ExpiresAt: rec.ExpiresAt,
-		Consumed:  false,
 	}
 	s.mu.Unlock()
 	return token, nil
 }
 
-// Validate returns the session/tenant binding for a live (unconsumed, unexpired) token.
+// Validate returns the session/tenant binding for a live (unexpired) token.
 func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, string, error) {
 	// Double-checked locking pattern for cache population.
 	// Step 1: Try read lock first (fast path for cache hit).
@@ -105,9 +102,6 @@ func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, stri
 		if s.nowFn().After(cached.ExpiresAt) {
 			s.invalidate(token)
 			return "", "", apperrors.NotFound("kiosk_token_expired", nil)
-		}
-		if cached.Consumed {
-			return "", "", apperrors.NotFound("kiosk_token_consumed", nil)
 		}
 		return cached.SessionID, cached.TenantID, nil
 	}
@@ -123,9 +117,6 @@ func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, stri
 			s.invalidate(token)
 			return "", "", apperrors.NotFound("kiosk_token_expired", nil)
 		}
-		if cached.Consumed {
-			return "", "", apperrors.NotFound("kiosk_token_consumed", nil)
-		}
 		return cached.SessionID, cached.TenantID, nil
 	}
 
@@ -136,9 +127,6 @@ func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, stri
 			return "", "", apperrors.NotFound("kiosk_token_invalid", nil)
 		}
 		return "", "", apperrors.Internal("internal_error", err)
-	}
-	if rec.ConsumedAt != nil {
-		return "", "", apperrors.NotFound("kiosk_token_consumed", nil)
 	}
 	if s.nowFn().After(rec.ExpiresAt) {
 		return "", "", apperrors.NotFound("kiosk_token_expired", nil)
@@ -159,27 +147,9 @@ func (s *DBKioskStore) Validate(ctx context.Context, token string) (string, stri
 		SessionID: rec.SessionID,
 		TenantID:  tenantID,
 		ExpiresAt: rec.ExpiresAt,
-		Consumed:  false,
 	}
 	s.mu.Unlock()
 	return rec.SessionID, tenantID, nil
-}
-
-// Consume marks a token as used (single-use kiosk access).
-func (s *DBKioskStore) Consume(ctx context.Context, token string) error {
-	now := s.nowFn()
-	if err := s.db.WithContext(ctx).
-		Model(&KioskToken{}).
-		Where("token = ? AND consumed_at IS NULL", token).
-		Update("consumed_at", &now).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	s.mu.Lock()
-	if rec, ok := s.cache[token]; ok {
-		rec.Consumed = true
-	}
-	s.mu.Unlock()
-	return nil
 }
 
 // invalidate drops a token from the in-memory cache.

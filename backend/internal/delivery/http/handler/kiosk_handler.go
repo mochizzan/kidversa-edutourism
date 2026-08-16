@@ -8,6 +8,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/usecase"
 )
@@ -57,10 +58,15 @@ func toKioskSessionDTO(s entity.Session) kioskSessionDTO {
 
 // KioskAccess handles the PUBLIC GET /api/sessions/:id/kiosk?token=...
 //
-// The kiosk token (not a JWT) is the sole authorization. On success it validates the
-// token (single-use, unexpired), confirms the token's session+tenant binding matches the
-// requested session, then returns the session detail (stages + program contents) and
-// consumes the token so it cannot be reused. Invalid/expired/consumed tokens return 401/404.
+// The kiosk token (not a JWT) is the sole authorization. It is valid for its full TTL and
+// is multi-use: it is never consumed, so the kiosk may retry freely (e.g. under React
+// StrictMode double-invocation). On success it confirms the token's session+tenant binding
+// matches the requested session and that the session is not cancelled, then returns the
+// session detail (stages + program contents).
+//
+// Errors: invalid/not-found or session-binding mismatch -> 401 kiosk_invalid; expired token
+// -> 401 kiosk_expired; tenant mismatch -> 401 kiosk_forbidden; cancelled session -> 401
+// kiosk_cancelled.
 func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
@@ -73,7 +79,12 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 
 	sessionID, tenantID, err := h.authUC.ValidateKioskToken((*c).Request().Context(), token)
 	if err != nil {
-		// Invalid / expired / consumed tokens are indistinguishable to the kiosk UI.
+		// Expired tokens get a distinct code so the UI can tell the user to ask
+		// the facilitator to open the session again; everything else is kiosk_invalid.
+		_, code, _ := apperrors.AsAppError(err)
+		if code == "kiosk_token_expired" {
+			return appresp.Fail(c, http.StatusUnauthorized, "kiosk_expired")
+		}
 		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_invalid")
 	}
 
@@ -88,7 +99,12 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 	}
 	// Tenant binding: the token's tenant must match the session's tenant.
 	if s.Session.TenantID == nil || *s.Session.TenantID != tenantID {
-		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_invalid")
+		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_forbidden")
+	}
+
+	// A cancelled session must reject kiosk access even with a valid token.
+	if s.Session.Status == entity.SessionCancelled {
+		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_cancelled")
 	}
 
 	// Per stage, load program stage contents.
@@ -100,11 +116,6 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 			contents = nil
 		}
 		stages = append(stages, kioskStageContent{Stage: s.Stages[i], Contents: contents})
-	}
-
-	// Consume the single-use kiosk token so it cannot be reused.
-	if err := h.authUC.ConsumeKioskToken((*c).Request().Context(), token); err != nil {
-		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_invalid")
 	}
 
 	return appresp.OK(c, &kioskResponse{Session: toKioskSessionDTO(s.Session), Stages: stages})
