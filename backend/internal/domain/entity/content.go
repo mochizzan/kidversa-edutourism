@@ -162,7 +162,7 @@ type StageContent struct {
 	ProgramStageID  string               `json:"program_stage_id"`
 	Title           string               `json:"title"`
 	FileURL         string               `json:"file_url"`
-	YouTubeURL      string               `json:"youtube_url,omitempty"`
+	YouTubeURL      string               `json:"youtube_url,omitempty" gorm:"column:youtube_url"`
 	FileType        StageContentFileType `json:"file_type"`
 	DurationSeconds int                  `json:"duration_seconds,omitempty"`
 	SortOrder       int                  `json:"sort_order"`
