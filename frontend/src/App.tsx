@@ -86,6 +86,11 @@ function App() {
   const { checkSession, isLoading } = useAuthStore()
   const [splashDone, setSplashDone] = useState(false)
   const [backendDown, setBackendDown] = useState(false)
+  // SUPER_ADMIN needs its active tenant resolved before any operational route
+  // (incl. the AI-narrative button) is reachable. We block the router until
+  // fetchTenants settles (success OR failure) so ACTIVE_TENANT_ID is set and the
+  // tenant-scoped calls never fire with an empty tenant mid-race after refresh.
+  const [tenantReady, setTenantReady] = useState(false)
 
   // Public kiosk routes bypass auth + splash entirely — participants access
   // these directly via URL without logging in.
@@ -146,6 +151,9 @@ function App() {
         // kegagalan lain bersifat opsional; abaikan.
       }
     }
+    // Jangan hang: tetap lanjut meski fetch tenant gagal (guard route akan
+    // menampilkan pemilih tenant). Yang penting race startup sudah selesai.
+    setTenantReady(true)
   }
 
   useEffect(() => {
@@ -186,6 +194,17 @@ function App() {
 
   // Still loading after splash? (unlikely, but safe)
   if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  // SUPER_ADMIN tenant must be resolved before operational routes render
+  // (see runStartup). Blocks the router only briefly at startup; tenantReady
+  // is always set (even on fetch failure) so we never hang.
+  if (!tenantReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent" />
