@@ -76,3 +76,9 @@ progress.md
 task_plan.md
 .planning/
 .codebase-memory/
+.pi/
+
+# Local agent / tooling dirs (not for version control)
+tasks/
+.omp/
+.codebase-index/
