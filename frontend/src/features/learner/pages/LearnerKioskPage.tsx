@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Play, Pause, Volume2, VolumeX, SkipForward, AlertTriangle, Loader2 } from 'lucide-react'
+import { Volume2, VolumeX, SkipForward, AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
+import { ContentRenderer } from '../components/ContentRenderer'
 import { ApiError, getApiBaseUrl } from '../../../core/services/backendClient'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { kioskSessionPath } from '../../../core/constants/app'
 import type { SessionStage, StageContent } from '../../../core/types'
-import { StageContentFileType } from '../../../core/types/enums'
-import { extractYouTubeEmbedUrl } from '../../../core/utils/youtube'
 
 /* ── Public kiosk payload (GET /api/sessions/:id/kiosk?token=) ──
    Mirrors the backend kioskResponse DTO: the session, its stages, and each
@@ -33,11 +32,11 @@ const LearnerKioskPage = () => {
   const [stage, setStage] = useState<SessionStage | null>(null)
   const [contents, setContents] = useState<StageContent[]>([])
   const [currentContentIndex, setCurrentContentIndex] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
 
   const kioskRef = useRef<KioskResponse | null>(null)
   const inflightRef = useRef(false)
+  const maxVisitedRef = useRef(0)
 
   const applyKiosk = (kiosk: KioskResponse) => {
     if (!sessionId) return
@@ -117,17 +116,20 @@ const LearnerKioskPage = () => {
 
   const currentContent = contents[currentContentIndex]
 
+  const goTo = (index: number) => {
+    setCurrentContentIndex(index)
+    maxVisitedRef.current = Math.max(maxVisitedRef.current, index)
+  }
+
   const handleNext = () => {
     if (currentContentIndex < contents.length - 1) {
-      setCurrentContentIndex(currentContentIndex + 1)
-      setIsPlaying(false)
+      goTo(currentContentIndex + 1)
     }
   }
 
   const handlePrevious = () => {
     if (currentContentIndex > 0) {
-      setCurrentContentIndex(currentContentIndex - 1)
-      setIsPlaying(false)
+      goTo(currentContentIndex - 1)
     }
   }
 
@@ -182,93 +184,30 @@ const LearnerKioskPage = () => {
 
       {/* Content Area */}
       <div className="flex-1 flex items-center justify-center bg-black">
-        {currentContent?.file_type === StageContentFileType.VIDEO && (
-          currentContent.youtube_url ? (
-            // YouTube-sourced video: render an embed iframe (autoplay via query).
-            <iframe
-              key={currentContent.id}
-              src={`${extractYouTubeEmbedUrl(currentContent.youtube_url) ?? currentContent.youtube_url}?autoplay=1&mute=${isMuted ? 1 : 0}`}
-              className="w-full h-full border-0"
-              title={currentContent.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            // Uploaded video: native player.
-            <video
-              key={currentContent.id}
-              src={`/api/media/kiosk/content/${currentContent.id}`}
-              className="max-w-full max-h-full"
-              autoPlay={isPlaying}
-              muted={isMuted}
-              controls
-              onEnded={handleNext}
-            />
-          )
-        )}
-        {currentContent?.file_type === StageContentFileType.IMAGE && (
-          <img
-            key={currentContent.id}
-            src={`/api/media/kiosk/content/${currentContent.id}`}
-            alt={currentContent.title}
-            className="max-w-full max-h-full object-contain"
-          />
-        )}
-        {currentContent?.file_type === StageContentFileType.AUDIO && (
-          <div className="flex flex-col items-center gap-6">
-            <div className="w-32 h-32 rounded-full bg-primary-container flex items-center justify-center">
-              <Volume2 className="w-16 h-16 text-primary" />
-            </div>
-            <audio
-              key={currentContent.id}
-              src={`/api/media/kiosk/content/${currentContent.id}`}
-              autoPlay={isPlaying}
-              muted={isMuted}
-              controls
-              onEnded={handleNext}
-            />
-          </div>
-        )}
-        {currentContent?.file_type === StageContentFileType.GAME_BUNDLE && (
-          <div className="w-full h-full flex items-center justify-center">
-            <iframe
-              key={currentContent.id}
-              src={currentContent.file_url}
-              className="w-full h-full border-0"
-              title={currentContent.title}
-              allow="fullscreen"
-            />
-          </div>
-        )}
+        <ContentRenderer
+          content={currentContent}
+          isMuted={isMuted}
+          onEnded={handleNext}
+        />
       </div>
 
       {/* Footer Controls */}
       <div className="flex items-center justify-center gap-4 px-6 py-4 bg-black/80">
-        <Button
-          variant="secondary"
-          size="lg"
-          onClick={handlePrevious}
-          disabled={currentContentIndex === 0}
-        >
-          Sebelumnya
-        </Button>
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={() => setIsPlaying(!isPlaying)}
-          icon={isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-        >
-          {isPlaying ? 'Pause' : 'Play'}
-        </Button>
-        <Button
-          variant="secondary"
-          size="lg"
-          onClick={handleNext}
-          disabled={currentContentIndex === contents.length - 1}
-          icon={<SkipForward className="w-5 h-5" />}
-        >
-          Selanjutnya
-        </Button>
+        {currentContentIndex < maxVisitedRef.current && (
+          <Button variant="secondary" size="lg" onClick={handlePrevious}>
+            Sebelumnya
+          </Button>
+        )}
+        {currentContentIndex < contents.length - 1 && (
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handleNext}
+            icon={<SkipForward className="w-5 h-5" />}
+          >
+            Selanjutnya
+          </Button>
+        )}
       </div>
 
       {/* Progress Indicators */}
@@ -276,7 +215,7 @@ const LearnerKioskPage = () => {
         {contents.map((_, index) => (
           <button
             key={index}
-            onClick={() => setCurrentContentIndex(index)}
+            onClick={() => goTo(index)}
             className={`w-2 h-2 rounded-full transition-all ${
               index === currentContentIndex
                 ? 'bg-primary w-6'
