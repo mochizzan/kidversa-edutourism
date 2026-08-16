@@ -11,3 +11,7 @@ func NotifChannel(userID string) string { return "notif:" + userID }
 // ConsentChannel returns the SSE channel streaming WhatsApp consent-delivery
 // batch progress for a given batch ID.
 func ConsentChannel(batchID string) string { return "consent:" + batchID }
+
+// NarrativeChannel returns the SSE channel streaming narrative generation
+// progress for a given report ID.
+func NarrativeChannel(reportID string) string { return "narrative:" + reportID }

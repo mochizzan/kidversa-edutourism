@@ -132,6 +132,8 @@ export const API_ROUTES = {
     BY_SESSION: (sessionId: string) =>
       `/api/reports?session_id=${encodeURIComponent(sessionId)}`,
     GENERATE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate`,
+    GENERATE_STREAM: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
+    GENERATE_STREAM_SSE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
     GENERATE_SESSION: '/api/reports/generate',
     APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
     SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,

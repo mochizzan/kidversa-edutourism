@@ -152,6 +152,7 @@ export interface ReportService {
   generate(sessionId: string): Promise<Report[]>
   approve(reportId: string, data?: { narrative_final?: string; mission_ids?: string[] }): Promise<Report>
   send(reportId: string): Promise<Report>
+  generateNarrativeStream(reportId: string, force?: boolean): Promise<Report>
 }
 
 // Consent

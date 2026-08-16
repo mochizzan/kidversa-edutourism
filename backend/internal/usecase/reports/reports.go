@@ -17,6 +17,7 @@ import (
 // NarrativeGenerator produces a full AI narrative for a report.
 type NarrativeGenerator interface {
 	Generate(ctx context.Context, reportID string) (string, error)
+	StreamGenerate(ctx context.Context, reportID string, onDelta func(string) error) (string, error)
 }
 
 // Usecase implements report business logic: anti-IDOR parent tokens + narrative.
@@ -43,8 +44,8 @@ func generateToken() (string, error) {
 }
 
 // Approve marks a report approved and persists the approver.
-func (u *Usecase) Approve(ctx context.Context, reportID, approvedBy string, narrativeFinal string, missionIDs []string) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID, "")
+func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy string, narrativeFinal string, missionIDs []string) (*entity.Report, error) {
+	r, err := u.repo.GetByID(ctx, reportID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +68,8 @@ func (u *Usecase) Approve(ctx context.Context, reportID, approvedBy string, narr
 // Send generates a fresh unguessable parent access token (anti-IDOR) and marks
 // the report sent. The token is unguessable (32 random bytes → 64 hex chars),
 // scoped to exactly one report, and expires after ttlHours.
-func (u *Usecase) Send(ctx context.Context, reportID string, ttlHours int) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID, "")
+func (u *Usecase) Send(ctx context.Context, reportID, tenantID string, ttlHours int) (*entity.Report, error) {
+	r, err := u.repo.GetByID(ctx, reportID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +91,8 @@ func (u *Usecase) Send(ctx context.Context, reportID string, ttlHours int) (*ent
 }
 
 // RevokeToken invalidates a report's parent access token.
-func (u *Usecase) RevokeToken(ctx context.Context, reportID string) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID, "")
+func (u *Usecase) RevokeToken(ctx context.Context, reportID, tenantID string) (*entity.Report, error) {
+	r, err := u.repo.GetByID(ctx, reportID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +105,8 @@ func (u *Usecase) RevokeToken(ctx context.Context, reportID string) (*entity.Rep
 
 // GenerateNarrative produces an AI narrative for a single report.
 // If the report already has a draft narrative, it is skipped and returned as-is.
-func (u *Usecase) GenerateNarrative(ctx context.Context, reportID string) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID, "")
+func (u *Usecase) GenerateNarrative(ctx context.Context, reportID, tenantID string) (*entity.Report, error) {
+	r, err := u.repo.GetByID(ctx, reportID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +122,30 @@ func (u *Usecase) GenerateNarrative(ctx context.Context, reportID string) (*enti
 		return nil, err
 	}
 	return r, nil
+}
+
+// StreamNarrative produces an AI narrative for a single report, streaming
+// token deltas via onDelta. If the report already has a draft narrative and
+// force is false, the existing draft is returned without regeneration.
+// On success the draft is persisted; on error/partial generation nothing is
+// persisted. force=true overwrites any existing draft.
+func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string, force bool, onDelta func(string) error) (string, error) {
+	r, err := u.repo.GetByID(ctx, reportID, tenantID)
+	if err != nil {
+		return "", err
+	}
+	if !force && r.AINarrativeDraft != "" {
+		return r.AINarrativeDraft, nil
+	}
+	text, err := u.gen.StreamGenerate(ctx, reportID, onDelta)
+	if err != nil {
+		return "", err
+	}
+	r.AINarrativeDraft = text
+	if err := u.repo.Update(ctx, r); err != nil {
+		return "", err
+	}
+	return text, nil
 }
 
 // maxSessionReports is the upper bound for listing reports in a single

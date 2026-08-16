@@ -49,7 +49,7 @@ func (h *ReportHandler) Generate(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	r, err := h.uc.GenerateNarrative((*c).Request().Context(), id)
+	r, err := h.uc.GenerateNarrative((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (h *ReportHandler) Approve(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	r, err := h.uc.Approve((*c).Request().Context(), id, req.ApprovedBy, req.NarrativeFinal, req.MissionIDs)
+	r, err := h.uc.Approve((*c).Request().Context(), id, appmiddleware.GetTenantID(c), req.ApprovedBy, req.NarrativeFinal, req.MissionIDs)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (h *ReportHandler) Send(c *echo.Context) error {
 	if err := (*c).Bind(&req); err == nil && req.TTLHours > 0 {
 		ttl = req.TTLHours
 	}
-	r, err := h.uc.Send((*c).Request().Context(), id, ttl)
+	r, err := h.uc.Send((*c).Request().Context(), id, appmiddleware.GetTenantID(c), ttl)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (h *ReportHandler) RevokeToken(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	r, err := h.uc.RevokeToken((*c).Request().Context(), id)
+	r, err := h.uc.RevokeToken((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

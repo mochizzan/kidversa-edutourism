@@ -133,6 +133,107 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID st
 	return strings.TrimSpace(text), nil
 }
 
+// StreamGenerate produces a full AI narrative for the given report, invoking
+// onDelta for each streamed token delta.
+func (g *OpenRouterNarrativeGenerator) StreamGenerate(ctx context.Context, reportID string, onDelta func(string) error) (string, error) {
+	r, err := g.reportRepo.GetByID(ctx, reportID, "")
+	if err != nil {
+		return "", err
+	}
+
+	participant, err := g.sessionRepo.GetParticipantByID(ctx, r.ParticipantID, "")
+	if err != nil {
+		return "", fmt.Errorf("fetch participant: %w", err)
+	}
+
+	session, err := g.sessionRepo.GetSessionByID(ctx, r.SessionID, "")
+	if err != nil {
+		return "", fmt.Errorf("fetch session: %w", err)
+	}
+
+	sessionStages, err := g.sessionRepo.ListSessionStages(ctx, r.SessionID)
+	if err != nil {
+		return "", fmt.Errorf("fetch session stages: %w", err)
+	}
+
+	stageIDs := make([]string, 0, len(sessionStages))
+	for _, ss := range sessionStages {
+		stageIDs = append(stageIDs, ss.ProgramStageID)
+	}
+
+	programStages, err := g.programRepo.ListStages(ctx, session.ProgramID)
+	if err != nil {
+		return "", fmt.Errorf("fetch program stages: %w", err)
+	}
+
+	stageNameMap := make(map[string]string, len(programStages))
+	for _, ps := range programStages {
+		stageNameMap[ps.ID] = ps.Name
+	}
+
+	assessments, err := g.assessmentRepo.List(ctx, repository.AssessmentFilter{
+		ParticipantID: participant.ID,
+		SessionID:     r.SessionID,
+	}, 1, 100)
+	if err != nil {
+		return "", fmt.Errorf("fetch assessments: %w", err)
+	}
+
+	var assessmentLines []string
+	for _, a := range assessments.Items {
+		stageName := stageNameMap[a.SessionStageID]
+		if stageName == "" {
+			stageName = a.SessionStageID
+		}
+		line := fmt.Sprintf("Tahap %s: %d bintang", stageName, a.StarRating)
+		if a.Comment != "" {
+			line += fmt.Sprintf(" — \"%s\"", a.Comment)
+		}
+		assessmentLines = append(assessmentLines, line)
+	}
+
+	assessmentsText := strings.Join(assessmentLines, "\n")
+	if assessmentsText == "" {
+		assessmentsText = "Tidak ada penilaian yang tercatat."
+	}
+
+	tmplData := map[string]interface{}{
+		"ChildName":   participant.ChildName,
+		"ChildAge":    participant.ChildAge,
+		"SessionName": session.Name,
+		"SessionDate": session.SessionDate,
+		"Assessments": assessmentsText,
+	}
+
+	systemPrompt, err := g.loadSystemPrompt()
+	if err != nil {
+		return "", fmt.Errorf("load system prompt: %w", err)
+	}
+
+	userPrompt, err := g.buildUserPrompt(tmplData)
+	if err != nil {
+		return "", fmt.Errorf("build user prompt: %w", err)
+	}
+
+	var full strings.Builder
+	if err := g.client.StreamChatCompletion(ctx, systemPrompt, userPrompt, func(delta string) error {
+		full.WriteString(delta)
+		if onDelta != nil {
+			return onDelta(delta)
+		}
+		return nil
+	}); err != nil {
+		return "", err
+	}
+
+	text := strings.TrimSpace(full.String())
+	if text == "" {
+		return "", fmt.Errorf("openrouter: empty response content")
+	}
+
+	return text, nil
+}
+
 func (g *OpenRouterNarrativeGenerator) loadSystemPrompt() (string, error) {
 	systemPromptOnce.Do(func() {
 		b, err := promptFS.ReadFile("prompts/report-narrative-system.md")
