@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, Users, ChevronRight, Calendar } from 'lucide-react'
+import { Camera, Users, ChevronRight, Calendar, Lock } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
 import { liveService } from '../../../core/services/live'
@@ -74,6 +74,18 @@ const CameraPage = () => {
     fetchData()
   }, [fetchData])
 
+  useEffect(() => {
+    const refetch = () => {
+      if (document.visibilityState === 'visible') fetchData()
+    }
+    window.addEventListener('focus', refetch)
+    document.addEventListener('visibilitychange', refetch)
+    return () => {
+      window.removeEventListener('focus', refetch)
+      document.removeEventListener('visibilitychange', refetch)
+    }
+  }, [fetchData])
+
   // ── Loading ──
   if (loading) {
     return (
@@ -126,14 +138,9 @@ const CameraPage = () => {
       {groups.map((group) => (
         <Card key={group.groupId} title={group.groupName} padding="sm">
           <div className="space-y-2">
-            {group.participants.map((p) => (
-              <button
-                key={p.id}
-                onClick={() =>
-                  navigate(`/fasilitator/groups/${group.groupId}/children/${p.id}/photo`)
-                }
-                className="w-full flex items-center justify-between py-3 px-0 rounded-xl hover:bg-surface-container-low transition-colors text-left"
-              >
+            {group.participants.map((p) => {
+              const noConsent = !p.consent_photo
+              const avatar = (
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center shrink-0">
                     <Users className="w-5 h-5 text-on-primary-container" />
@@ -147,14 +154,47 @@ const CameraPage = () => {
                     </p>
                   </div>
                 </div>
+              )
+              const trailing = (
                 <div className="flex items-center gap-2 shrink-0">
-                  {!p.consent_photo && (
+                  {noConsent && (
                     <Badge variant="warning" size="sm">Tidak ada izin</Badge>
                   )}
-                  <ChevronRight className="w-4 h-4 text-on-surface-variant" />
+                  {noConsent ? (
+                    <Lock className="w-4 h-4 text-on-surface-variant" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-on-surface-variant" />
+                  )}
                 </div>
-              </button>
-            ))}
+              )
+
+              if (noConsent) {
+                return (
+                  <div
+                    key={p.id}
+                    aria-disabled
+                    title="Izin foto belum diberikan"
+                    className="w-full flex items-center justify-between py-3 px-0 rounded-xl opacity-60 cursor-not-allowed text-left"
+                  >
+                    {avatar}
+                    {trailing}
+                  </div>
+                )
+              }
+
+              return (
+                <button
+                  key={p.id}
+                  onClick={() =>
+                    navigate(`/fasilitator/groups/${group.groupId}/children/${p.id}/photo`)
+                  }
+                  className="w-full flex items-center justify-between py-3 px-0 rounded-xl hover:bg-surface-container-low transition-colors text-left"
+                >
+                  {avatar}
+                  {trailing}
+                </button>
+              )
+            })}
           </div>
         </Card>
       ))}
