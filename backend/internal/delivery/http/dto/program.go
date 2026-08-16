@@ -4,10 +4,10 @@ import "kidversa-edutourism-backend/internal/domain/entity"
 
 // ProgramRequest is the create/update payload for programs.
 type ProgramRequest struct {
-	Name         string `json:"name" validate:"required"`
-	Description  string `json:"description,omitempty"`
-	ThumbnailURL string `json:"thumbnail_url,omitempty"`
-	IsActive     *bool  `json:"is_active,omitempty"`
+	Name         *string `json:"name,omitempty"`
+	Description  *string `json:"description,omitempty"`
+	ThumbnailURL *string `json:"thumbnail_url,omitempty"`
+	IsActive     *bool   `json:"is_active,omitempty"`
 }
 
 // ProgramStageRequest is the create/update payload for program stages.
