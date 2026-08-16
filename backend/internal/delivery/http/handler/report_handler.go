@@ -13,6 +13,7 @@ import (
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
@@ -32,6 +33,17 @@ type ReportHandler struct {
 // NewReportHandler builds the report handler.
 func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository, hub *sse.Hub) *ReportHandler {
 	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo, hub: hub}
+}
+
+// tenantGuard rejects an empty tenant ID with 400 "tenant_required" before any
+// tenant-scoped work begins. Without it, GenerateStream would spawn its
+// background goroutine with a blank scope and surface an English SSE error
+// ("tenant ID is required") instead of a clear 400.
+func tenantGuard(c *echo.Context, tenantID string) error {
+	if tenantID == "" {
+		return appresp.Fail(c, http.StatusBadRequest, "tenant_required")
+	}
+	return nil
 }
 
 // GetByAccessToken handles GET /api/reports/access?token=... (PUBLIC).
@@ -55,7 +67,11 @@ func (h *ReportHandler) Generate(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	r, err := h.uc.GenerateNarrative((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	r, err := h.uc.GenerateNarrative((*c).Request().Context(), id, tenantID)
 	if err != nil {
 		return err
 	}
@@ -73,6 +89,9 @@ func (h *ReportHandler) GenerateStream(c *echo.Context) error {
 		return nil
 	}
 	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
 	// Ownership check up front so we never stream a report the caller can't see.
 	if _, err := h.uc.Repo().GetByID((*c).Request().Context(), id, tenantID); err != nil {
 		return err
@@ -94,7 +113,11 @@ func (h *ReportHandler) GenerateStreamSSE(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	if _, err := h.uc.Repo().GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c)); err != nil {
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	if _, err := h.uc.Repo().GetByID((*c).Request().Context(), id, tenantID); err != nil {
 		return err
 	}
 	return streamSSE(c, h.hub, sse.NarrativeChannel(id), nil, h.cfg.SSEKeepaliveSec)
@@ -118,7 +141,9 @@ func (h *ReportHandler) runNarrativeStream(ctx context.Context, id, tenantID str
 		return nil
 	})
 	if err != nil {
-		if perr := h.hub.Publish(ctx, ch, sse.Event{Type: "error", Data: map[string]string{"message": err.Error()}}); perr != nil {
+		_, code, _ := apperrors.AsAppError(err)
+		msg := appresp.MessageForCode(code)
+		if perr := h.hub.Publish(ctx, ch, sse.Event{Type: "error", Data: map[string]string{"code": code, "message": msg}}); perr != nil {
 			log.Printf("report: sse publish error failed for %s: %v", id, perr)
 		}
 		return
@@ -137,6 +162,9 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 		return err
 	}
 	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
 	participants, err := h.sessionRepo.ListParticipants((*c).Request().Context(), req.SessionID, "", tenantID)
 	if err != nil {
 		return err
@@ -158,7 +186,11 @@ func (h *ReportHandler) Approve(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	r, err := h.uc.Approve((*c).Request().Context(), id, appmiddleware.GetTenantID(c), req.ApprovedBy, req.NarrativeFinal, req.MissionIDs)
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	r, err := h.uc.Approve((*c).Request().Context(), id, tenantID, req.ApprovedBy, req.NarrativeFinal, req.MissionIDs)
 	if err != nil {
 		return err
 	}
@@ -179,7 +211,11 @@ func (h *ReportHandler) Send(c *echo.Context) error {
 	if err := (*c).Bind(&req); err == nil && req.TTLHours > 0 {
 		ttl = req.TTLHours
 	}
-	r, err := h.uc.Send((*c).Request().Context(), id, appmiddleware.GetTenantID(c), ttl)
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	r, err := h.uc.Send((*c).Request().Context(), id, tenantID, ttl)
 	if err != nil {
 		return err
 	}
@@ -192,7 +228,11 @@ func (h *ReportHandler) RevokeToken(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	r, err := h.uc.RevokeToken((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	r, err := h.uc.RevokeToken((*c).Request().Context(), id, tenantID)
 	if err != nil {
 		return err
 	}
@@ -220,7 +260,11 @@ func (h *ReportHandler) GetReport(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	r, err := h.uc.Repo().GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	r, err := h.uc.Repo().GetByID((*c).Request().Context(), id, tenantID)
 	if err != nil {
 		return err
 	}
