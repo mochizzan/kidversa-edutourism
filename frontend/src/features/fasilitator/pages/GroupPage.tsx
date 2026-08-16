@@ -352,19 +352,6 @@ const GroupPage = () => {
         />
       )}
 
-      {/* Open kiosk (public display) */}
-      <div className="flex justify-center pt-2">
-        <Button
-          variant="secondary"
-          onClick={handleOpenKiosk}
-          loading={kioskLoading}
-          disabled={!groupDetail?.group.current_session_stage_id}
-          icon={<Monitor className="w-4 h-4" />}
-        >
-          Buka Kiosk (Tampilan Peserta)
-        </Button>
-      </div>
-
       {/* Confirmation Modal */}
       <Modal
         open={confirm.open}
