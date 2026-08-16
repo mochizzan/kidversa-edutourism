@@ -213,7 +213,7 @@ const GroupPage = () => {
   const handleOpenKiosk = async () => {
     if (!groupDetail || !groupDetail.session.id) return
     const sessionId = groupDetail.session.id
-    const stageId = groupDetail.group.current_session_stage_id
+    const stageId = openableStageId ?? groupDetail.group.current_session_stage_id
     if (!stageId) {
       addToast({ type: 'error', message: 'Kelompok belum memiliki stage aktif untuk dibuka di kiosk.' })
       return
@@ -287,6 +287,7 @@ const GroupPage = () => {
   }
 
   const { group, participants, programStageName, isPhotoStage, isRecordingStage } = groupDetail
+  const openableStageId = groupDetail.sessionStage?.id ?? groupDetail.group.current_session_stage_id
 
   return (
     <div className="space-y-6">
