@@ -8,6 +8,7 @@ import { photoService } from '../../../core/services/photos'
 import { missionService } from '../../../core/services/missions'
 import { programService } from '../../../core/services/programs'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { friendlyError, ERROR_MESSAGES } from '../../../core/utils/errorMessages'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { formatDate } from '../../../core/utils'
 import {
@@ -213,7 +214,15 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       source.addEventListener('error', (ev: MessageEvent) => {
         try {
           const parsed = JSON.parse(ev.data)
-          addToast({ type: 'error', message: parsed.message || 'Gagal membuat narasi.' })
+          // Backend now sends { code, message } (Indonesian). Prefer the code
+          // so we stay consistent with friendlyError elsewhere; fall back to
+          // the message, then a sensible default.
+          const code: string | undefined = parsed.code
+          const msg: string | undefined = parsed.message
+          addToast({
+            type: 'error',
+            message: (code && ERROR_MESSAGES[code]) || msg || 'Gagal membuat narasi.',
+          })
         } catch { /* ignore */ }
         setNarrativeText(prevTextRef.current)
         source.close()
@@ -221,10 +230,10 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       })
       await reportService.generateNarrativeStream(reportId, force)
       return true
-    } catch {
+    } catch (err) {
       setNarrativeText(prevTextRef.current)
       setStreaming(false)
-      addToast({ type: 'error', message: 'Gagal memulai pembuatan narasi.' })
+      addToast({ type: 'error', message: friendlyError(err) })
       return false
     }
   }, [reportId, narrativeText, addToast, streaming])

@@ -1,6 +1,6 @@
 import { ApiError } from '../services/backendClient'
 
-const ERROR_MESSAGES: Record<string, string> = {
+export const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Email atau password salah. Periksa kembali data Anda.',
   unauthorized: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
   forbidden: 'Anda tidak memiliki akses untuk melakukan ini.',
