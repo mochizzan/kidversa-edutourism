@@ -2,24 +2,20 @@ package ai
 
 import (
 	"context"
+	"embed"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"text/template"
-	"time"
 
 	"kidversa-edutourism-backend/internal/domain/repository"
 )
 
-type promptCache struct {
-	mu      sync.RWMutex
-	content string
-	modTime time.Time
-}
+//go:embed prompts/report-narrative-system.md prompts/report-narrative-user.md
+var promptFS embed.FS
 
-var globalPromptCache promptCache
+var systemPromptCached string
+var systemPromptOnce sync.Once
 
 // OpenRouterNarrativeGenerator implements reports.NarrativeGenerator using
 // the OpenRouter chat completions API.
@@ -124,21 +120,12 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID st
 		return "", fmt.Errorf("load system prompt: %w", err)
 	}
 
-	tmpl, err := template.New("narrative").Parse(systemPrompt)
+	userPrompt, err := g.buildUserPrompt(tmplData)
 	if err != nil {
-		return "", fmt.Errorf("parse system prompt: %w", err)
+		return "", fmt.Errorf("build user prompt: %w", err)
 	}
 
-	var sb strings.Builder
-	if err := tmpl.Execute(&sb, tmplData); err != nil {
-		return "", fmt.Errorf("execute system prompt template: %w", err)
-	}
-	resolvedSystemPrompt := sb.String()
-
-	userPrompt := fmt.Sprintf("Anak: %s (Usia: %d tahun)\nSesi: %s\nTanggal: %s\n\nData penilaian:\n%s",
-		participant.ChildName, participant.ChildAge, session.Name, session.SessionDate, assessmentsText)
-
-	text, err := g.client.ChatCompletion(ctx, resolvedSystemPrompt, userPrompt)
+	text, err := g.client.ChatCompletion(ctx, systemPrompt, userPrompt)
 	if err != nil {
 		return "", err
 	}
@@ -147,30 +134,32 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID st
 }
 
 func (g *OpenRouterNarrativeGenerator) loadSystemPrompt() (string, error) {
-	promptPath := filepath.Join("backend", "internal", "infrastructure", "ai", "prompts", "report-narrative.md")
+	systemPromptOnce.Do(func() {
+		b, err := promptFS.ReadFile("prompts/report-narrative-system.md")
+		if err != nil {
+			systemPromptCached = ""
+			return
+		}
+		systemPromptCached = string(b)
+	})
+	if systemPromptCached == "" {
+		return "", fmt.Errorf("system prompt not embedded")
+	}
+	return systemPromptCached, nil
+}
 
-	info, err := os.Stat(promptPath)
+func (g *OpenRouterNarrativeGenerator) buildUserPrompt(data map[string]interface{}) (string, error) {
+	raw, err := promptFS.ReadFile("prompts/report-narrative-user.md")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("read user prompt: %w", err)
 	}
-
-	globalPromptCache.mu.RLock()
-	if globalPromptCache.content != "" && !info.ModTime().After(globalPromptCache.modTime) {
-		cached := globalPromptCache.content
-		globalPromptCache.mu.RUnlock()
-		return cached, nil
-	}
-	globalPromptCache.mu.RUnlock()
-
-	data, err := os.ReadFile(promptPath)
+	tmpl, err := template.New("user").Parse(string(raw))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("parse user prompt: %w", err)
 	}
-
-	globalPromptCache.mu.Lock()
-	globalPromptCache.content = string(data)
-	globalPromptCache.modTime = info.ModTime()
-	globalPromptCache.mu.Unlock()
-
-	return globalPromptCache.content, nil
+	var sb strings.Builder
+	if err := tmpl.Execute(&sb, data); err != nil {
+		return "", fmt.Errorf("execute user prompt: %w", err)
+	}
+	return sb.String(), nil
 }

@@ -120,8 +120,8 @@ export function useReportSession(sessionId: string | undefined) {
       await reportService.generate(sessionId)
       await loadData()
       return { ok: true, generatedCount: eligible.length, skippedParticipants: skipped }
-    } catch {
-      setGenError('Gagal generate laporan.')
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Gagal generate laporan.')
       return { ok: false, generatedCount: 0, skippedParticipants: skipped }
     } finally {
       setGenerating(false)
@@ -136,8 +136,8 @@ export function useReportSession(sessionId: string | undefined) {
       await reportService.generate(sessionId)
       await loadData()
       return true
-    } catch {
-      setGenError('Gagal generate laporan.')
+    } catch (e) {
+      setGenError(e instanceof Error ? e.message : 'Gagal generate laporan.')
       return false
     } finally {
       setGenerating(false)

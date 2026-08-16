@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -198,7 +198,8 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID string, part
 	wg.Wait()
 
 	if len(errs) > 0 {
-		log.Printf("reports: %d narrative generation errors for session %s", len(errs), sessionID)
+		return nil, apperrors.Internal("narrative_generation_failed",
+			fmt.Errorf("%d dari %d laporan gagal dibuatkan narasi: %v", len(errs), len(all.Items), errors.Join(errs...)))
 	}
 
 	all, err = u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, maxSessionReports)
