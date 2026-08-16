@@ -14,6 +14,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   internal_error: 'Terjadi kesalahan pada server. Silakan coba lagi.',
   kiosk_invalid: 'Sesi berakhir atau tautan tidak valid.',
   kiosk_forbidden: 'Anda tidak memiliki akses ke sesi tersebut.',
+  kiosk_expired: 'Tautan kiosk telah kedaluwarsa. Minta fasilitator membuka ulang sesi.',
+  kiosk_cancelled: 'Sesi ini telah dibatalkan.',
   session_not_found: 'Sesi tidak ditemukan.',
   session_not_deletable: 'Sesi ini tidak dapat dihapus.',
   participant_not_deletable: 'Peserta ini tidak dapat dihapus.',

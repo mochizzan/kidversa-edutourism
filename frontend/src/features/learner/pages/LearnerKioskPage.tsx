@@ -37,6 +37,7 @@ const LearnerKioskPage = () => {
   const [isMuted, setIsMuted] = useState(false)
 
   const kioskRef = useRef<KioskResponse | null>(null)
+  const inflightRef = useRef(false)
 
   const applyKiosk = (kiosk: KioskResponse) => {
     if (!sessionId) return
@@ -81,11 +82,16 @@ const LearnerKioskPage = () => {
     const loadData = async () => {
       try {
         // Guard: if we already fetched this kiosk payload, reuse it instead of
-        // re-fetching (the backend consumes the single-use token on first fetch).
+        // re-fetching.
         if (kioskRef.current) {
           applyKiosk(kioskRef.current)
           return
         }
+        // Guard: if a fetch for these params is already in flight (e.g. React
+        // StrictMode double-invoke), let the first one finish; it sets kioskRef
+        // and applies the result. Avoids a duplicate concurrent network call.
+        if (inflightRef.current) return
+        inflightRef.current = true
         // PUBLIC endpoint — the kiosk token (not a JWT) is the sole auth.
         const url = `${getApiBaseUrl()}${API_ROUTES.SESSIONS.KIOSK_ACCESS(sessionId)}?token=${encodeURIComponent(token)}`
         const res = await fetch(url, { credentials: 'omit' })
@@ -101,6 +107,7 @@ const LearnerKioskPage = () => {
       } catch (err) {
         setError(friendlyError(err))
       } finally {
+        inflightRef.current = false
         setLoading(false)
       }
     }
