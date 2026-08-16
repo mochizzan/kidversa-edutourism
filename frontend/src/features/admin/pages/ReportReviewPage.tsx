@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Camera,
   Send,
+  Sparkles,
   CheckCircle,
   Printer,
   Loader2,
@@ -49,10 +50,13 @@ const ReportReviewPage = () => {
     handleDownloadPdf,
     handleDownloadPng,
     hasNoAssessment,
+    streaming,
+    handleGenerateNarrative,
   } = useReportReview(sessionId, reportId)
 
   const [showApproveConfirm, setShowApproveConfirm] = useState(false)
   const [showSendConfirm, setShowSendConfirm] = useState(false)
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
 
   const handleCopyLink = async (link: string) => {
@@ -73,6 +77,12 @@ const ReportReviewPage = () => {
   const onSend = async () => {
     const ok = await handleSend()
     if (ok) setShowSendConfirm(false)
+  }
+
+  const onGenerate = async () => {
+    const force = narrativeText.trim().length > 0
+    setShowGenerateConfirm(false)
+    await handleGenerateNarrative(force)
   }
 
   if (loading) {
@@ -255,16 +265,33 @@ const ReportReviewPage = () => {
               value={narrativeText}
               onChange={(e) => setNarrativeText(e.target.value)}
               rows={6}
-              className="w-full rounded-xl border border-outline-variant bg-surface p-4 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none resize-y no-print"
+              readOnly={streaming}
+              className={`w-full rounded-xl border border-outline-variant bg-surface p-4 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none resize-y no-print ${streaming ? 'opacity-60' : ''}`}
               placeholder="Narasi akan muncul setelah laporan di-generate..."
             />
             <div className="print-report whitespace-pre-wrap p-4 hidden">{narrativeText}</div>
             <div className="flex items-center justify-between mt-2 no-print">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowGenerateConfirm(true)}
+                disabled={hasNoAssessment || streaming || actionLoading !== null}
+              >
+                {streaming ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Membuat...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-1" /> Buat Narasi AI
+                  </>
+                )}
+              </Button>
               <p className="text-xs text-on-surface-variant">
                 Edit narasi sesuai kebutuhan sebelum menyetujui laporan.
               </p>
               <span className="text-xs text-on-surface-variant">
-                {narrativeText.length} karakter
+                {narrativeText.length} karakter{streaming ? ' · mengetik…' : ''}
               </span>
             </div>
           </Card>
@@ -389,6 +416,28 @@ const ReportReviewPage = () => {
           Laporan akan dikirim ke orang tua/wali dari <strong>{participant.child_name}</strong>{' '}
           melalui tautan yang aman. Orang tua akan dapat melihat laporan lengkap beserta misi
           lanjutan.
+        </p>
+      </Modal>
+
+      <Modal
+        open={showGenerateConfirm}
+        onClose={() => setShowGenerateConfirm(false)}
+        title="Buat Narasi AI"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowGenerateConfirm(false)}>
+              Batal
+            </Button>
+            <Button onClick={onGenerate} disabled={streaming || actionLoading !== null}>
+              Buat Narasi
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-on-surface-variant">
+          Proses ini akan membuat ulang narasi AI. Teks yang sedang diedit akan diganti dengan
+          hasil terbaru.
         </p>
       </Modal>
     </div>
