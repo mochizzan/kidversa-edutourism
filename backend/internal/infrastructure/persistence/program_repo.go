@@ -78,8 +78,16 @@ func (r *GormProgramRepository) ListPrograms(ctx context.Context, f repository.P
 }
 
 func (r *GormProgramRepository) UpdateProgram(ctx context.Context, p *entity.Program) error {
-	m := programModelFromEntity(p)
-	if err := r.db.WithContext(ctx).Model(&ProgramModel{}).Where("id = ?", p.ID).Updates(m).Error; err != nil {
+	// Map-form update so zero/false/empty values are NOT skipped by GORM
+	// (struct mode drops zero-values, breaking is_active=false and clearing
+	// description/thumbnail_url).
+	fields := map[string]interface{}{
+		"name":          p.Name,
+		"description":   p.Description,
+		"thumbnail_url": p.ThumbnailURL,
+		"is_active":     p.IsActive,
+	}
+	if err := r.db.WithContext(ctx).Model(&ProgramModel{}).Where("id = ?", p.ID).Updates(fields).Error; err != nil {
 		if isDuplicate(err) {
 			return apperrors.Conflict("conflict", err)
 		}
