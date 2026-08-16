@@ -189,7 +189,7 @@ func (r *GormProgramRepository) ListStageContents(ctx context.Context, stageID s
 		IsActive        bool
 		Title           string
 		FileURL         string
-		YouTubeURL      string
+		YouTubeURL      string `gorm:"column:youtube_url"`
 		FileType        entity.StageContentFileType
 		DurationSeconds int
 	}
