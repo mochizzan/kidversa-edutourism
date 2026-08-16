@@ -77,8 +77,9 @@ func NewRouter(d Deps) *echo.Echo {
 	handler.RegisterConsentRoutes(api.Group("/consent"), h.Consent, d.JWT, d.Revoker)
 	handler.RegisterFramesRoutes(api.Group("/frames"), h.Frame, d.JWT, d.Revoker)
 
-	// Contents (standalone, single-source) + stage assign/unassign.
-	handler.RegisterContentsRoutes(api.Group(""), h.Content, h.Upload, h.Program, d.JWT, d.Revoker)
+	// Contents (standalone, single-source). Stage assign/unassign now live
+	// under /api/programs (RegisterProgramsRoutes) alongside stage list/reorder.
+	handler.RegisterContentsRoutes(api.Group(""), h.Content, h.Upload, d.JWT, d.Revoker)
 
 	// File upload + authenticated media.
 	handler.RegisterUploadRoutes(api.Group(""), h.Upload, d.JWT, d.Config, d.Revoker)

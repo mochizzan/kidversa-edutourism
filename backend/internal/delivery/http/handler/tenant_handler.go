@@ -105,6 +105,25 @@ func (h *TenantHandler) Stats(c *echo.Context) error {
 	return appresp.OK(c, stats)
 }
 
+// PublicList handles GET /api/public/tenants. It is intentionally
+// unauthenticated so the anonymous registration form can populate its
+// tenant selector. Only id/name/slug are projected (see dto.PublicTenantResponse)
+// so no tenant configuration leaks to unauthenticated callers.
+func (h *TenantHandler) PublicList(c *echo.Context) error {
+	page, limit := pagination(c)
+	f := repository.TenantFilter{Search: (*c).QueryParam("search")}
+	res, err := h.tenantUC.ListTenants((*c).Request().Context(), f, page, limit)
+	if err != nil {
+		return err
+	}
+	items := make([]dto.PublicTenantResponse, 0, len(res.Items))
+	for i := range res.Items {
+		t := res.Items[i]
+		items = append(items, dto.PublicTenantResponse{ID: t.ID, Name: t.Name, Slug: t.Slug})
+	}
+	return appresp.OKWithMeta(c, items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
+}
+
 // parseSettingsJSON converts a raw JSON string into entity.RawJSON, defaulting to {}.
 func parseSettingsJSON(s string) []byte {
 	if s == "" {

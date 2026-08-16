@@ -50,3 +50,13 @@ type TenantListResponse struct {
 	Items []entity.Tenant `json:"items"`
 	Total int             `json:"total"`
 }
+
+// PublicTenantResponse is the minimal tenant projection exposed on the
+// public (unauthenticated) register endpoint. It intentionally omits
+// settings_json and audit fields so anonymous callers cannot read tenant
+// configuration.
+type PublicTenantResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}

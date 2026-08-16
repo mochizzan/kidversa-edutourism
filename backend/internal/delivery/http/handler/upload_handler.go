@@ -188,7 +188,7 @@ func (h *UploadHandler) UploadFrame(c *echo.Context) error {
 // UploadContentFile handles POST /api/contents/upload (content-level, Model A):
 //   - validates + stores the multipart file to disk (subdir "contents"),
 //   - creates a standalone Content row referencing the stored file (tenant-scoped),
-//   - the caller then assigns it to a stage via POST /api/program-stages/:stageId/contents/assign.
+//   - the caller then assigns it to a stage via POST /api/programs/program-stages/:stageId/contents/assign.
 //
 // tenant scoping is enforced via the JWT/scope (never the body, F5). file_type is required.
 func (h *UploadHandler) UploadContentFile(c *echo.Context) error {
@@ -234,6 +234,82 @@ func (h *UploadHandler) UploadContentFile(c *echo.Context) error {
 			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
 		}
 		return err
+	}
+	return appresp.Created(c, ct)
+}
+
+// ReplaceContentFile handles POST /api/contents/:id/replace-file:
+//   - validates + stores the NEW multipart file to disk (subdir "contents"),
+//   - replaces the existing Content's FileURL in place (same Content ID, so all
+//     stage assignments stay intact), resets YouTubeURL, optionally updates
+//     Title/FileType, re-probes VIDEO duration from the new file,
+//   - then deletes the OLD stored file.
+//
+// Tenant scoping is enforced: a content may only be replaced by its owning
+// tenant (SUPER_ADMIN is exempt, consistent with the scope middleware).
+func (h *UploadHandler) ReplaceContentFile(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	ct, err := h.contentRepo.GetContentByID((*c).Request().Context(), id)
+	if err != nil {
+		return err
+	}
+
+	// Tenant guard: only the owning tenant (or SUPER_ADMIN) may replace.
+	actorRole, _ := (*c).Get(appmiddleware.CtxRole).(string)
+	if actorRole != string(entity.RoleSuperAdmin) {
+		if ct.TenantID != appmiddleware.GetTenantID(c) {
+			return appresp.Fail(c, http.StatusForbidden, "forbidden")
+		}
+	}
+
+	oldFileURL := ct.FileURL
+
+	_, storedRel, err := h.persistFile(c, "contents")
+	if err != nil {
+		return err
+	}
+
+	// Optional metadata overrides; missing fields keep their current value.
+	if v := (*c).FormValue("title"); v != "" {
+		ct.Title = v
+	}
+	if v := entity.StageContentFileType((*c).FormValue("file_type")); v != "" {
+		ct.FileType = v
+	}
+	ct.FileURL = storedRel
+	// Replacing with an uploaded file clears any prior YouTube source.
+	ct.YouTubeURL = ""
+
+	// Duration: prefer the authoritative ffprobe of the new VIDEO file; else an
+	// explicit form value; else keep the existing value.
+	duration := ct.DurationSeconds
+	if v := (*c).FormValue("duration_seconds"); v != "" {
+		if n, e := strconv.Atoi(strings.TrimSpace(v)); e == nil {
+			duration = n
+		}
+	}
+	if ct.FileType == entity.StageContentVideo {
+		if probed := apputil.ProbeVideoDuration(filepath.Join(h.cfg.UploadDir, filepath.FromSlash(storedRel))); probed > 0 {
+			duration = probed
+		}
+	}
+	ct.DurationSeconds = duration
+
+	if err := h.contentRepo.UpdateContent((*c).Request().Context(), ct); err != nil {
+		// Roll back the newly stored file so we don't leave orphans; the old file stays.
+		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
+			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
+		}
+		return err
+	}
+	// Remove the old file only after the row update succeeded.
+	if oldFileURL != "" && oldFileURL != storedRel {
+		if rmErr := h.removeStored(h.cfg.UploadDir, oldFileURL); rmErr != nil {
+			log.Printf("upload: failed to remove old content file %s: %v", oldFileURL, rmErr)
+		}
 	}
 	return appresp.Created(c, ct)
 }

@@ -20,3 +20,11 @@ func RegisterTenantsRoutes(g *echo.Group, h *TenantHandler, jm *auth.JWTManager,
 	g.PUT("/:id", h.Update, authMW, roleMW)
 	g.DELETE("/:id", h.Delete, authMW, roleMW)
 }
+
+// RegisterPublicRoutes mounts the anonymous tenant endpoints under /api/public/tenants.
+// These are intentionally unauthenticated (no JWTAuth/RequireRole) so the public
+// registration form can list tenants. Only a minimal projection (id/name/slug) is
+// returned by the handler; no tenant configuration is exposed.
+func RegisterPublicRoutes(g *echo.Group, h *TenantHandler) {
+	g.GET("/tenants", h.PublicList)
+}

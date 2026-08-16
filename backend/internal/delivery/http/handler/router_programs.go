@@ -7,10 +7,11 @@ import (
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
-// RegisterProgramsRoutes mounts /api/programs/* and /api/program-stages/* on the given echo group.
+// RegisterProgramsRoutes mounts /api/programs/* and /api/programs/program-stages/* on the given echo group.
 // Write operations require SUPER_ADMIN, ADMIN, or KOORDINATOR; read-only GETs on a program
 // (detail and stages) also allow FASILITATOR. Tenant scope is enforced
 // by TenantScope (programs filtered by GetTenantID; stages/contents scoped through their program).
+// Stage-content assign/unassign live here (under /api/programs) alongside list/reorder.
 func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMWAdmin := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR")
@@ -32,8 +33,10 @@ func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManage
 	g.DELETE("/:id/stages/:stageId", h.DeleteStage, authMW, roleMWAdmin, scopeMW)
 	g.POST("/:id/stages/reorder", h.ReorderStages, authMW, roleMWAdmin, scopeMW)
 
-	// Contents keyed directly by stage (read-only list for kiosk/learner; assign/
-	// unassign live under /api/contents in router_contents.go).
+	// Contents keyed directly by stage (list for kiosk/learner; reorder + assign/
+	// unassign are admin write operations). All four share the /programs prefix.
 	g.GET("/program-stages/:stageId/contents", h.ListContents, authMW, roleMWAdmin, scopeMW)
 	g.POST("/program-stages/:stageId/contents/reorder", h.ReorderContents, authMW, roleMWAdmin, scopeMW)
+	g.POST("/program-stages/:stageId/contents/assign", h.AssignContent, authMW, roleMWAdmin, scopeMW)
+	g.DELETE("/program-stages/:stageId/contents/:contentId", h.UnassignContent, authMW, roleMWAdmin, scopeMW)
 }

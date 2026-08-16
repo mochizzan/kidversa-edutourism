@@ -173,12 +173,11 @@ func (r *GormContentRepository) ListStageContents(ctx context.Context, stageID s
 		YouTubeURL      string
 		FileType        entity.StageContentFileType
 		DurationSeconds int
-		CreatedAt       interface{}
 	}
 	var rows []joinRow
 	err := r.db.WithContext(ctx).
 		Table("stage_contents sc").
-		Select("sc.content_id, sc.program_stage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds, c.created_at").
+		Select("sc.content_id, sc.program_stage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds").
 		Joins("JOIN contents c ON c.id = sc.content_id").
 		Where("sc.program_stage_id = ?", stageID).
 		Order("sc.sort_order ASC").
