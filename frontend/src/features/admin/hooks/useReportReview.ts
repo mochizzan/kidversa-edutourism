@@ -173,7 +173,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
   }, [reportId, loadData, addToast])
 
   const handleGenerateNarrative = useCallback(async (force = false) => {
-    if (!reportId) return false
+    if (!reportId || streaming) return false
     setStreaming(true)
     const prev = narrativeText
     prevTextRef.current = prev
@@ -184,6 +184,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
         () => {},
         {
           onError: () => {
+            source.close()
             setNarrativeText(prevTextRef.current)
             setStreaming(false)
             addToast({ type: 'error', message: 'Gagal memuat streaming narasi.' })
@@ -226,7 +227,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       addToast({ type: 'error', message: 'Gagal memulai pembuatan narasi.' })
       return false
     }
-  }, [reportId, narrativeText, addToast])
+  }, [reportId, narrativeText, addToast, streaming])
 
   const buildRaportHtml = useCallback((): string | null => {
     if (!participant || !session) return null
