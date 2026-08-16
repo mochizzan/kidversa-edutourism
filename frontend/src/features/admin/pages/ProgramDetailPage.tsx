@@ -74,7 +74,7 @@ const ProgramDetailPage = () => {
       <Tabs tabs={[{ key: 'info', label: 'Info' }, { key: 'stages', label: `Stages (${stages.length})` }]}
         activeKey={activeTab} onChange={setActiveTab} />
 
-      {activeTab === 'info' && <ProgramInfoTab program={program} />}
+      {activeTab === 'info' && <ProgramInfoTab program={program} onSaved={setProgram} />}
       {activeTab === 'stages' && (
         <ProgramStagesTab stages={stages}
           onAdd={() => navigate(programStagePath(program.id, 'new'))}
