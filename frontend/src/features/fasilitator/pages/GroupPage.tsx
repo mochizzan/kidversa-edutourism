@@ -309,7 +309,7 @@ const GroupPage = () => {
               size="sm"
               onClick={handleOpenKiosk}
               loading={kioskLoading}
-              disabled={!groupDetail?.group.current_session_stage_id}
+              disabled={!openableStageId}
               icon={<Monitor className="w-4 h-4" />}
             >
               Buka Kiosk
