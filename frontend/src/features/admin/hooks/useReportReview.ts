@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { reportService } from '../../../core/services/reports'
+import { openSSE } from '../../../core/services/backendClient'
+import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { photoService } from '../../../core/services/photos'
@@ -51,7 +53,10 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [narrativeText, setNarrativeText] = useState('')
+  const [streaming, setStreaming] = useState(false)
   const [hasNoAssessment, setHasNoAssessment] = useState(false)
+
+  const prevTextRef = useRef('')
 
   const loadData = useCallback(async () => {
     if (!sessionId || !reportId) return
@@ -167,6 +172,62 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     }
   }, [reportId, loadData, addToast])
 
+  const handleGenerateNarrative = useCallback(async (force = false) => {
+    if (!reportId) return false
+    setStreaming(true)
+    const prev = narrativeText
+    prevTextRef.current = prev
+    try {
+      // Open SSE first so we don't miss early tokens.
+      const source = openSSE(
+        API_ROUTES.REPORTS.GENERATE_STREAM_SSE(reportId),
+        () => {},
+        {
+          onError: () => {
+            setNarrativeText(prevTextRef.current)
+            setStreaming(false)
+            addToast({ type: 'error', message: 'Gagal memuat streaming narasi.' })
+          },
+        },
+      )
+      source.addEventListener('token', (ev: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(ev.data)
+          if (typeof parsed.delta === 'string') {
+            setNarrativeText((t) => t + parsed.delta)
+          }
+        } catch { /* ignore malformed */ }
+      })
+      source.addEventListener('done', (ev: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(ev.data)
+          if (typeof parsed.full === 'string' && parsed.full) {
+            setNarrativeText(parsed.full)
+          }
+        } catch { /* ignore */ }
+        source.close()
+        setStreaming(false)
+        addToast({ type: 'success', message: 'Narasi berhasil dibuat.' })
+      })
+      source.addEventListener('error', (ev: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(ev.data)
+          addToast({ type: 'error', message: parsed.message || 'Gagal membuat narasi.' })
+        } catch { /* ignore */ }
+        setNarrativeText(prevTextRef.current)
+        source.close()
+        setStreaming(false)
+      })
+      await reportService.generateNarrativeStream(reportId, force)
+      return true
+    } catch {
+      setNarrativeText(prevTextRef.current)
+      setStreaming(false)
+      addToast({ type: 'error', message: 'Gagal memulai pembuatan narasi.' })
+      return false
+    }
+  }, [reportId, narrativeText, addToast])
+
   const buildRaportHtml = useCallback((): string | null => {
     if (!participant || !session) return null
     const quote = extractFirstSentence(narrativeText)
@@ -250,7 +311,9 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     loading,
     error,
     actionLoading,
+    streaming,
     loadData,
+    handleGenerateNarrative,
     toggleMission,
     handleApprove,
     handleSend,

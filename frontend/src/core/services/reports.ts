@@ -59,6 +59,10 @@ const send = async (reportId: string): Promise<Report> => {
   }
 }
 
+const generateNarrativeStream = async (reportId: string, force = false): Promise<Report> => {
+  return itemRequest<Report>('POST', `${API_ROUTES.REPORTS.GENERATE_STREAM(reportId)}${force ? '?force=true' : ''}`)
+}
+
 // getPublicReport fetches a report via its parent access token (public endpoint).
 const getPublicReport = async (token: string): Promise<PublicReportResponse | null> => {
   const res = await apiRequest<{ data: PublicReportResponse }>('GET', `${API_ROUTES.REPORTS.ACCESS}?token=${encodeURIComponent(token)}`)
@@ -71,6 +75,7 @@ export const reportService: ReportService = {
   generate,
   approve,
   send,
+  generateNarrativeStream,
 }
 
 // Helpers used by the public parent flow (P1/P2, out of Fase 4 scope but kept
