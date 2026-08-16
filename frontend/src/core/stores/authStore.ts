@@ -192,6 +192,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setUser: (user: User) => {
+    // Persist so profile updates (name/email/phone, must_change_password, …)
+    // survive a page reload — checkSession rehydrates the user from storage.
+    setStoredUser(user)
     set({ user })
   },
 

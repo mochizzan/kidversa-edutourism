@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../core/hooks/useAuth'
+import { useTenantStore } from '../../core/stores/tenantStore'
+import { isSuperAdmin } from '../../core/utils/permissions'
 import { openSSE, refreshAccessToken } from '../../core/services/backendClient'
 import { notifications } from '../../core/services/notifications'
 import { ROUTES } from '../../core/constants/app'
@@ -19,6 +21,7 @@ export interface HeaderNotification {
 
 export function useHeaderNotifications() {
   const { user, token } = useAuth()
+  const { activeTenant } = useTenantStore()
   const [notificationsState, setNotificationsState] = useState<HeaderNotification[]>([])
   const [realUnread, setRealUnread] = useState(0)
   const [acknowledged, setAcknowledged] = useState(false)
@@ -67,6 +70,16 @@ export function useHeaderNotifications() {
   useEffect(() => {
     if (!user || !token) {
       setNotificationsState([])
+      return
+    }
+    // SUPER_ADMIN: the notification SSE stream is tenant-scoped (EventSource
+    // can't send X-Tenant-Id, so the tenant travels as ?tenant_id=). Wait until
+    // an active tenant is selected before opening — otherwise we open a
+    // tenant-less stream the backend rejects with 400, and openSSE emits a
+    // spurious warning. Non-SA roles carry the tenant in the JWT, so they skip
+    // this gate. Depending on activeTenant also reconnects the stream when the
+    // SUPER_ADMIN switches tenants.
+    if (isSuperAdmin(user) && !activeTenant) {
       return
     }
     let closed = false
@@ -127,7 +140,7 @@ export function useHeaderNotifications() {
       closed = true
       if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [user, token, refresh])
+  }, [user, token, activeTenant, refresh])
 
   const acknowledge = useCallback(() => {
     setAcknowledged(true)

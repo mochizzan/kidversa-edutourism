@@ -193,6 +193,7 @@ export const API_ROUTES = {
     BASE: '/api/contents',
     DETAIL: (id: string) => `/api/contents/${encodeURIComponent(id)}`,
     UPLOAD: '/api/contents/upload',
+    REPLACE_FILE: (id: string) => `/api/contents/${encodeURIComponent(id)}/replace-file`,
     USAGE: (id: string) => `/api/contents/${encodeURIComponent(id)}/usage`,
     ASSIGN: (stageId: string) =>
       `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/assign`,

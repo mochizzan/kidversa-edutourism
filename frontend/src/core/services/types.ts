@@ -64,6 +64,7 @@ export interface ContentService {
   remove(id: string): Promise<void>
   getUsage(id: string): Promise<ContentUsage[]>
   upload(data: { file: File; title: string; file_type: StageContentFileType; duration_seconds?: number; youtube_url?: string }): Promise<Content>
+  replaceFile(id: string, data: { file: File; title?: string; file_type?: StageContentFileType; duration_seconds?: number }): Promise<Content>
 }
 
 // Sessions

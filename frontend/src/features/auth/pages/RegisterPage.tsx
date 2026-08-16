@@ -7,6 +7,7 @@ import { ChevronRight, ChevronLeft, AlertCircle, Check } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { UserRole } from '../../../core/types'
 import { ROUTES } from '../../../core/constants/app'
+import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { cn } from '../../../core/utils'
 import { apiRequest } from '../../../core/services/backendClient'
 import { friendlyError } from '../../../core/utils/errorMessages'
@@ -67,7 +68,7 @@ const RegisterPage = () => {
   })
 
   useEffect(() => {
-    apiRequest<{ data: Tenant[] }>('GET', '/api/tenants')
+    apiRequest<{ data: Tenant[] }>('GET', API_ROUTES.PUBLIC.TENANTS)
       .then((res) => setTenants(res.data))
       .catch(() => setTenants([]))
   }, [])

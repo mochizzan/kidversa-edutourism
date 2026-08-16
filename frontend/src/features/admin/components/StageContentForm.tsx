@@ -31,7 +31,8 @@ export interface StageContentFormValues {
 }
 
 interface StageContentFormProps {
-  initial?: StageContent | null
+  initial?: Partial<StageContent> | null
+  showActive?: boolean
   onSubmit: (data: StageContentFormValues, file: File | null) => void
   onCancel: () => void
 }
@@ -46,21 +47,21 @@ const EMPTY: StageContentFormValues = {
   is_active: true,
 }
 
-export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFormProps) {
+export function StageContentForm({ initial, showActive = true, onSubmit, onCancel }: StageContentFormProps) {
   const [form, setForm] = useState<StageContentFormValues>(
     initial
       ? {
-          title: initial.title,
-          file_url: initial.file_url,
+          title: initial.title ?? '',
+          file_url: initial.file_url ?? '',
           youtube_url: initial.youtube_url ?? '',
-          file_type: initial.file_type,
+          file_type: initial.file_type ?? StageContentFileTypeEnum.VIDEO,
           // A VIDEO carrying a youtube_url is a YouTube source; otherwise it's an upload.
           source_mode:
             initial.file_type === StageContentFileTypeEnum.VIDEO && initial.youtube_url
               ? 'youtube'
               : 'upload',
           duration_seconds: initial.duration_seconds ?? 0,
-          is_active: initial.is_active,
+          is_active: initial.is_active ?? true,
         }
       : EMPTY
   )
@@ -360,15 +361,17 @@ export function StageContentForm({ initial, onSubmit, onCancel }: StageContentFo
         </div>
       )}
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={form.is_active}
-          onChange={(e) => set('is_active', e.target.checked)}
-          className="rounded"
-        />
-        Aktif
-      </label>
+      {showActive && (
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={form.is_active}
+            onChange={(e) => set('is_active', e.target.checked)}
+            className="rounded"
+          />
+          Aktif
+        </label>
+      )}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={compressing}>
           {initial ? 'Simpan' : 'Tambah'}

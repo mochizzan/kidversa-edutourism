@@ -4,6 +4,7 @@ import { UserRole } from '../types'
 import { apiRequest } from '../services/backendClient'
 import { useAuthStore } from './authStore'
 import { STORAGE_KEYS } from '../constants/storage'
+import { API_ROUTES } from '../constants/apiRoutes'
 
 const ACTIVE_TENANT_KEY = STORAGE_KEYS.ACTIVE_TENANT_ID
 
@@ -43,7 +44,7 @@ export const useTenantStore = create<TenantState>((set) => ({
   // For now this fetches tenants directly from the backend until the service
   // layer is built.
   fetchTenants: async () => {
-    const res = await apiRequest<TenantsResponse>('GET', '/api/tenants')
+    const res = await apiRequest<TenantsResponse>('GET', API_ROUTES.PUBLIC.TENANTS)
     const tenants = res.data
     const savedId = localStorage.getItem(ACTIVE_TENANT_KEY)
     let active = tenants.find((t) => t.id === savedId) || null

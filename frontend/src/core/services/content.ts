@@ -49,4 +49,15 @@ export const contentService: ContentService = {
     }
     return uploadMultipart<Content>(API_ROUTES.CONTENTS.UPLOAD, form)
   },
+
+  replaceFile: (id, data) => {
+    const form = new FormData()
+    form.append('file', data.file)
+    if (data.title) form.append('title', data.title)
+    if (data.file_type) form.append('file_type', data.file_type)
+    if (data.duration_seconds !== undefined) {
+      form.append('duration_seconds', String(data.duration_seconds))
+    }
+    return uploadMultipart<Content>(API_ROUTES.CONTENTS.REPLACE_FILE(id), form)
+  },
 }
