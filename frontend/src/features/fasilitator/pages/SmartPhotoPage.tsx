@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Camera, AlertTriangle, ChevronLeft } from 'lucide-react'
+import { Camera, AlertTriangle, ChevronLeft, Lock } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { getMediaUrl } from '../../../core/utils/media'
@@ -59,6 +59,7 @@ const SmartPhotoPage = () => {
 
   const [participant, setParticipant] = useState<Participant | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
+  const loadCancelledRef = useRef(false)
 
   const {
     videoRef,
@@ -70,31 +71,34 @@ const SmartPhotoPage = () => {
     switchCamera,
     selectDevice,
     restartCamera,
-  } = useCamera({ enabled: phase === 'camera' })
+  } = useCamera({ enabled: phase === 'camera' && !!participant?.consent_photo })
 
   const { photos, loadPhotos, deletePhoto, uploadPhoto } = useSmartPhotos(childId)
+
+  const loadParticipant = useCallback(async () => {
+    if (!childId) return
+    loadCancelledRef.current = false
+    try {
+      const part = await sessionService.getParticipantById(childId)
+      if (!loadCancelledRef.current) setParticipant(part)
+    } catch {
+      if (!loadCancelledRef.current) setParticipant(null)
+    } finally {
+      if (!loadCancelledRef.current) setDataLoading(false)
+    }
+  }, [childId])
 
   useEffect(() => {
     if (!childId) {
       setDataLoading(false)
       return
     }
-    let cancelled = false
-    const loadParticipant = async () => {
-      try {
-        const part = await sessionService.getParticipantById(childId)
-        if (!cancelled) setParticipant(part)
-      } catch {
-        if (!cancelled) setParticipant(null)
-      } finally {
-        if (!cancelled) setDataLoading(false)
-      }
-    }
+    loadCancelledRef.current = false
     loadParticipant()
     return () => {
-      cancelled = true
+      loadCancelledRef.current = true
     }
-  }, [childId])
+  }, [loadParticipant])
 
   const loadInitialData = useCallback(() => {
     frameService
@@ -236,9 +240,12 @@ const SmartPhotoPage = () => {
       setPhase('gallery')
       await loadPhotos()
     } catch (err: unknown) {
-      const e = err as Error
+      const e = err as Error & { code?: string }
       if (e.message === 'MAX_PHOTOS_REACHED') {
         addToast({ type: 'error', message: 'Maksimal 10 foto per anak' })
+      } else if (e.code === 'consent_required') {
+        addToast({ type: 'error', message: 'Izin foto belum diberikan' })
+        navigate(-1)
       } else {
         addToast({ type: 'error', message: 'Gagal menyimpan foto' })
       }
@@ -288,6 +295,20 @@ const SmartPhotoPage = () => {
         <h2 className="text-xl font-bold">Anak Tidak Ditemukan</h2>
         <p className="text-on-surface-variant">Data anak tidak tersedia atau telah dihapus.</p>
         <Button onClick={() => navigate(-1)}>Kembali</Button>
+      </div>
+    )
+  }
+
+  if (!participant.consent_photo) {
+    return (
+      <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-surface-container-low text-on-surface">
+        <Lock className="w-16 h-16 text-error" />
+        <h2 className="text-xl font-bold">Akses Foto Diblokir</h2>
+        <p className="text-on-surface-variant">Izin foto untuk anak ini belum diberikan oleh orang tua.</p>
+        <div className="flex gap-3">
+          <Button onClick={() => navigate(-1)}>Kembali</Button>
+          <Button variant="secondary" onClick={loadParticipant}>Coba lagi</Button>
+        </div>
       </div>
     )
   }
