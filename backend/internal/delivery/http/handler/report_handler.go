@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"context"
+	"log"
 	"math"
 	"net/http"
+	"sync"
 
 	"github.com/labstack/echo/v5"
 
@@ -11,6 +14,7 @@ import (
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	"kidversa-edutourism-backend/internal/pkg/sse"
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
 )
 
@@ -21,11 +25,13 @@ type ReportHandler struct {
 	uc          *reportsuc.Usecase
 	cfg         *config.Config
 	sessionRepo repository.SessionRepository
+	hub         *sse.Hub
+	genMu       sync.Map
 }
 
 // NewReportHandler builds the report handler.
-func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository) *ReportHandler {
-	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo}
+func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository, hub *sse.Hub) *ReportHandler {
+	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo, hub: hub}
 }
 
 // GetByAccessToken handles GET /api/reports/access?token=... (PUBLIC).
@@ -54,6 +60,72 @@ func (h *ReportHandler) Generate(c *echo.Context) error {
 		return err
 	}
 	return appresp.OK(c, dto.NewReportResponse(r))
+}
+
+// GenerateStream handles POST /api/reports/:id/generate/stream (JWT, tenant-scoped).
+// Validates ownership, then kicks off an async narrative generation and returns
+// 202 immediately. Tokens are delivered over the SSE endpoint
+// GET /api/reports/:id/generate/stream. A per-report guard prevents concurrent
+// generations (which would interleave tokens across tabs).
+func (h *ReportHandler) GenerateStream(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	// Ownership check up front so we never stream a report the caller can't see.
+	if _, err := h.uc.Repo().GetByID((*c).Request().Context(), id, tenantID); err != nil {
+		return err
+	}
+	force := (*c).QueryParam("force") == "true"
+	if !h.tryBeginGenerate(id) {
+		return appresp.Fail(c, http.StatusConflict, "already_generating")
+	}
+	defer h.endGenerate(id)
+	// Detached context survives the 202 response so generation keeps running.
+	go h.runNarrativeStream(context.WithoutCancel((*c).Request().Context()), id, tenantID, force)
+	return appresp.Accepted(c)
+}
+
+// GenerateStreamSSE handles GET /api/reports/:id/generate/stream (SSE, JWT).
+// Tenant ownership is re-checked here (E-S8a) before subscribing.
+func (h *ReportHandler) GenerateStreamSSE(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	if _, err := h.uc.Repo().GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c)); err != nil {
+		return err
+	}
+	return streamSSE(c, h.hub, sse.NarrativeChannel(id), nil, h.cfg.SSEKeepaliveSec)
+}
+
+func (h *ReportHandler) tryBeginGenerate(id string) bool {
+	_, loaded := h.genMu.LoadOrStore(id, struct{}{})
+	return !loaded
+}
+
+func (h *ReportHandler) endGenerate(id string) { h.genMu.Delete(id) }
+
+// runNarrativeStream runs the streaming generation in the background, publishing
+// token/done/error events on the report's SSE channel.
+func (h *ReportHandler) runNarrativeStream(ctx context.Context, id, tenantID string, force bool) {
+	ch := sse.NarrativeChannel(id)
+	full, err := h.uc.StreamNarrative(ctx, id, tenantID, force, func(delta string) error {
+		if perr := h.hub.Publish(ctx, ch, sse.Event{Type: "token", Data: map[string]string{"delta": delta}}); perr != nil {
+			log.Printf("report: sse publish token failed for %s: %v", id, perr)
+		}
+		return nil
+	})
+	if err != nil {
+		if perr := h.hub.Publish(ctx, ch, sse.Event{Type: "error", Data: map[string]string{"message": err.Error()}}); perr != nil {
+			log.Printf("report: sse publish error failed for %s: %v", id, perr)
+		}
+		return
+	}
+	if perr := h.hub.Publish(ctx, ch, sse.Event{Type: "done", Data: map[string]string{"full": full}}); perr != nil {
+		log.Printf("report: sse publish done failed for %s: %v", id, perr)
+	}
 }
 
 // GenerateForSession handles POST /api/reports/generate.
