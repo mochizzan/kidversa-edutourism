@@ -7,6 +7,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { cn } from '../../../core/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { PARTICIPANT_AGE, PARTICIPANT_AGE_ERROR } from '../../../core/constants/participant'
 import type { Participant, ParticipantSessionInfo } from '../../../core/types'
 import { isValidEmail } from '../../../core/utils/validation'
 
@@ -56,7 +57,7 @@ export function ParticipantFormModal({
 }: ParticipantFormModalProps) {
   const [formData, setFormData] = useState<ParticipantFormData>({
     child_name: '',
-    child_age: 6,
+    child_age: PARTICIPANT_AGE.DEFAULT,
     school_name: '',
     parent_name: '',
     parent_phone: '',
@@ -78,7 +79,7 @@ export function ParticipantFormModal({
       setFormData(
         initialData || {
           child_name: '',
-          child_age: 6,
+          child_age: PARTICIPANT_AGE.DEFAULT,
           school_name: '',
           parent_name: '',
           parent_phone: '',
@@ -189,8 +190,8 @@ export function ParticipantFormModal({
       newErrors.child_name = 'Nama anak harus diisi'
     }
 
-    if (!formData.child_age || formData.child_age < 4 || formData.child_age > 10) {
-      newErrors.child_age = 'Usia anak harus antara 4-10 tahun'
+    if (!formData.child_age || formData.child_age < PARTICIPANT_AGE.MIN || formData.child_age > PARTICIPANT_AGE.MAX) {
+      newErrors.child_age = PARTICIPANT_AGE_ERROR
     }
 
     if (!formData.parent_name.trim()) {
@@ -353,13 +354,13 @@ export function ParticipantFormModal({
           <Input
             label="Usia Anak"
             type="number"
-            min={4}
-            max={10}
-            placeholder="6"
+            min={PARTICIPANT_AGE.MIN}
+            max={PARTICIPANT_AGE.MAX}
+            placeholder={String(PARTICIPANT_AGE.DEFAULT)}
             value={formData.child_age}
             onChange={(e) => setFormData({ ...formData, child_age: parseInt(e.target.value, 10) })}
             error={errors.child_age}
-            hint="Usia antara 4-10 tahun"
+            hint={`Usia antara ${PARTICIPANT_AGE.MIN}-${PARTICIPANT_AGE.MAX} tahun`}
             required
           />
 

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Baby, Loader2, Save, Users } from 'lucide-react'
 import { ROUTES } from '../../../core/constants/app'
-import { Loader2, Save } from 'lucide-react'
+import {
+  PARTICIPANT_AGE,
+  PARTICIPANT_AGE_ERROR,
+} from '../../../core/constants/participant'
 import { Button } from '../../../shared/components/ui/Button'
 import { Card } from '../../../shared/components/ui/Card'
 import { Input } from '../../../shared/components/ui/Input'
@@ -23,9 +27,18 @@ type ParticipantFormState = {
   parent_email: string
 }
 
+type ParticipantFormErrors = {
+  child_name?: string
+  child_age?: string
+  school_name?: string
+  parent_name?: string
+  parent_phone?: string
+  parent_email?: string
+}
+
 const emptyForm: ParticipantFormState = {
   child_name: '',
-  child_age: '6',
+  child_age: String(PARTICIPANT_AGE.DEFAULT),
   school_name: '',
   parent_name: '',
   parent_phone: '',
@@ -41,6 +54,7 @@ const ParticipantFormPage = () => {
   const [loading, setLoading] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<ParticipantFormState>(emptyForm)
+  const [errors, setErrors] = useState<ParticipantFormErrors>({})
 
   useEffect(() => {
     if (!isEdit || !participantId) {
@@ -86,45 +100,33 @@ const ParticipantFormPage = () => {
     }
   }, [isEdit, participantId, addToast, navigate])
 
-  const validate = () => {
+  const validate = (): boolean => {
+    const next: ParticipantFormErrors = {}
     const childAge = Number.parseInt(form.child_age, 10)
 
     if (!form.child_name.trim()) {
-      addToast({ type: 'error', message: 'Nama anak harus diisi' })
-      return null
+      next.child_name = 'Nama anak harus diisi'
     }
 
-    if (!Number.isInteger(childAge) || childAge < 4 || childAge > 10) {
-      addToast({ type: 'error', message: 'Usia anak harus antara 4-10 tahun' })
-      return null
+    if (!Number.isInteger(childAge) || childAge < PARTICIPANT_AGE.MIN || childAge > PARTICIPANT_AGE.MAX) {
+      next.child_age = PARTICIPANT_AGE_ERROR
     }
 
     if (!form.parent_name.trim()) {
-      addToast({ type: 'error', message: 'Nama orang tua harus diisi' })
-      return null
+      next.parent_name = 'Nama orang tua harus diisi'
     }
 
     if (!form.parent_phone.trim()) {
-      addToast({ type: 'error', message: 'No. HP orang tua harus diisi' })
-      return null
+      next.parent_phone = 'No. HP orang tua harus diisi'
     }
 
     const trimmedEmail = form.parent_email.trim()
-    if (trimmedEmail) {
-      if (!isValidEmail(trimmedEmail)) {
-        addToast({ type: 'error', message: 'Format email tidak valid' })
-        return null
-      }
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
+      next.parent_email = 'Format email tidak valid'
     }
 
-    return {
-      child_name: form.child_name.trim(),
-      child_age: childAge,
-      school_name: form.school_name.trim() || undefined,
-      parent_name: form.parent_name.trim(),
-      parent_phone: form.parent_phone.trim(),
-      parent_email: trimmedEmail || undefined,
-    }
+    setErrors(next)
+    return Object.keys(next).length === 0
   }
 
   const handleChange = (key: keyof ParticipantFormState, value: string) => {
@@ -134,8 +136,10 @@ const ParticipantFormPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const payload = validate()
-    if (!payload) return
+    if (!validate()) return
+
+    const childAge = Number.parseInt(form.child_age, 10)
+    const trimmedEmail = form.parent_email.trim()
 
     setSaving(true)
     try {
@@ -150,10 +154,24 @@ const ParticipantFormPage = () => {
           addToast({ type: 'error', message: 'Peserta belum terikat sesi; edit melalui halaman sesi' })
           return
         }
-        await sessionService.updateParticipant(existing.session_id, participantId, payload)
+        await sessionService.updateParticipant(existing.session_id, participantId, {
+          child_name: form.child_name.trim(),
+          child_age: childAge,
+          school_name: form.school_name.trim() || undefined,
+          parent_name: form.parent_name.trim(),
+          parent_phone: form.parent_phone.trim(),
+          parent_email: trimmedEmail || undefined,
+        })
         addToast({ type: 'success', message: 'Peserta berhasil diperbarui' })
       } else {
-        await participantService.create(payload)
+        await participantService.create({
+          child_name: form.child_name.trim(),
+          child_age: childAge,
+          school_name: form.school_name.trim() || undefined,
+          parent_name: form.parent_name.trim(),
+          parent_phone: form.parent_phone.trim(),
+          parent_email: trimmedEmail || undefined,
+        })
         addToast({ type: 'success', message: 'Peserta berhasil ditambahkan' })
       }
 
@@ -192,27 +210,37 @@ const ParticipantFormPage = () => {
         ]}
       />
 
-      <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+      <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl" noValidate>
         <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-9 h-9 rounded-xl bg-primary-container flex items-center justify-center text-primary shrink-0">
+              <Baby className="w-5 h-5" />
+            </span>
+            <h2 className="text-lg font-semibold text-on-surface">Data Anak</h2>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Nama Anak"
+              label="Nama Anak *"
               required
+              autoFocus
               value={form.child_name}
               onChange={(e) => handleChange('child_name', e.target.value)}
               placeholder="Contoh: Budi Santoso"
+              error={errors.child_name}
             />
 
             <Input
-              label="Usia Anak"
+              label="Usia Anak *"
               type="number"
-              min={4}
-              max={10}
+              min={PARTICIPANT_AGE.MIN}
+              max={PARTICIPANT_AGE.MAX}
               required
               value={form.child_age}
               onChange={(e) => handleChange('child_age', e.target.value)}
-              placeholder="6"
-              hint="Usia antara 4-10 tahun"
+              placeholder={String(PARTICIPANT_AGE.DEFAULT)}
+              hint={`Usia antara ${PARTICIPANT_AGE.MIN}-${PARTICIPANT_AGE.MAX} tahun`}
+              error={errors.child_age}
             />
 
             <Input
@@ -221,22 +249,35 @@ const ParticipantFormPage = () => {
               onChange={(e) => handleChange('school_name', e.target.value)}
               placeholder="Contoh: TK Harapan Bangsa (opsional)"
             />
+          </div>
+        </Card>
 
+        <Card>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-9 h-9 rounded-xl bg-primary-container flex items-center justify-center text-primary shrink-0">
+              <Users className="w-5 h-5" />
+            </span>
+            <h2 className="text-lg font-semibold text-on-surface">Data Orang Tua / Wali</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Nama Orang Tua"
+              label="Nama Orang Tua *"
               required
               value={form.parent_name}
               onChange={(e) => handleChange('parent_name', e.target.value)}
               placeholder="Contoh: Andi Santoso"
+              error={errors.parent_name}
             />
 
             <Input
-              label="No. HP Orang Tua"
+              label="No. HP Orang Tua *"
               type="tel"
               required
               value={form.parent_phone}
               onChange={(e) => handleChange('parent_phone', e.target.value)}
               placeholder="Contoh: 081234567890"
+              error={errors.parent_phone}
             />
 
             <Input
@@ -245,9 +286,14 @@ const ParticipantFormPage = () => {
               value={form.parent_email}
               onChange={(e) => handleChange('parent_email', e.target.value)}
               placeholder="Contoh: andi@mail.com (opsional)"
+              error={errors.parent_email}
             />
           </div>
         </Card>
+
+        <p className="text-xs text-on-surface-variant">
+          Field bertanda <span className="text-error font-medium">*</span> wajib diisi.
+        </p>
 
         <div className="flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.PARTICIPANTS)}>
