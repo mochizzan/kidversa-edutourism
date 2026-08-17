@@ -34,6 +34,13 @@ type SessionSubstage struct {
 	CompletedAt       *time.Time            `json:"completed_at,omitempty"`
 }
 
+// BadgeType discriminates a participant badge as a per-SubTopik award or the
+// cross-session Final program award.
+const (
+	BadgeTypeSubtopik = "SUBTOPIK"
+	BadgeTypeFinal    = "FINAL"
+)
+
 // ParticipantBadge is an awarded badge row for a participant.
 type ParticipantBadge struct {
 	BaseModel

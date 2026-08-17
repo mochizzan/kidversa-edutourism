@@ -13,18 +13,26 @@ import (
 
 // Usecase implements assessment business logic (upsert + list).
 type Usecase struct {
-	repo repository.AssessmentRepository
+	repo    repository.AssessmentRepository
+	badgeUC BadgeEvaluator
 }
 
-// NewUsecase builds the assessment usecase.
-func NewUsecase(repo repository.AssessmentRepository) *Usecase {
-	return &Usecase{repo: repo}
+// BadgeEvaluator is the minimal contract the assessment usecase needs to trigger
+// badge recomputation after a scored upsert (kept narrow to avoid an import cycle).
+type BadgeEvaluator interface {
+	EvaluateAfterAssessment(ctx context.Context, participantID, sessionSubstageID string) error
+}
+
+// NewUsecase builds the assessment usecase. badgeUC may be nil (badge
+// recomputation is then skipped, preserving prior behavior).
+func NewUsecase(repo repository.AssessmentRepository, badgeUC BadgeEvaluator) *Usecase {
+	return &Usecase{repo: repo, badgeUC: badgeUC}
 }
 
 // Upsert creates or updates an assessment keyed on (participant_id, session_stage_id).
-// actorRole gates the write to the participant's group owner when the actor is a
-// FASILITATOR; ADMIN/KOORDINATOR/SUPER_ADMIN bypass. An unassigned group (no
-// facilitator) denies the facilitator write so an admin must assign first.
+// starRating 0 is a valid "absent/not-yet-scored" marker (DB DEFAULT 1); the
+// contract treats >=1 as scored. actorRole gates the write to the participant's
+// group owner when the actor is a FASILITATOR; ADMIN/KOORDINATOR/SUPER_ADMIN bypass.
 func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy, actorID, actorRole string, assessedAt time.Time, syncStatus string) (*entity.Assessment, error) {
 	if req.ParticipantID == "" || req.SessionStageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
@@ -32,6 +40,13 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	if err := u.assertOwnership(ctx, req.ParticipantID, actorID, actorRole); err != nil {
 		return nil, err
 	}
+	if starRating < 0 {
+		return nil, apperrors.BadRequest("validation_error", nil)
+	}
+	// starRating 0 is the explicit "absent" marker (Q5c=B): a child who did not
+	// participate. It is persisted as 0 (the column allows 0; DEFAULT 1 only
+	// applies when the field is omitted on INSERT). 0 must NOT be coerced to 1 —
+	// that would wrongly mark an absent child as scored and risk awarding badges.
 	existing, err := u.repo.GetByParticipantStage(ctx, req.ParticipantID, req.SessionStageID)
 	if err == nil && existing != nil {
 		existing.StarRating = starRating
@@ -50,7 +65,7 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 		if err := u.repo.Update(ctx, existing); err != nil {
 			return nil, err
 		}
-		return existing, nil
+		return u.afterUpsert(ctx, existing)
 	}
 	a := &entity.Assessment{
 		ParticipantID:  req.ParticipantID,
@@ -70,6 +85,19 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	}
 	if err := u.repo.Create(ctx, a); err != nil {
 		return nil, err
+	}
+	return u.afterUpsert(ctx, a)
+}
+
+// afterUpsert triggers badge recomputation when the upsert is a scored (star>=1)
+// assessment and a badge evaluator is wired. A badge error is returned so the
+// caller (handler) can log it; the assessment itself already persisted.
+func (u *Usecase) afterUpsert(ctx context.Context, a *entity.Assessment) (*entity.Assessment, error) {
+	if u.badgeUC == nil || a.StarRating < 1 {
+		return a, nil
+	}
+	if err := u.badgeUC.EvaluateAfterAssessment(ctx, a.ParticipantID, a.SessionStageID); err != nil {
+		return a, err
 	}
 	return a, nil
 }

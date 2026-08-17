@@ -19,6 +19,7 @@ import (
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	"kidversa-edutourism-backend/internal/usecase"
 	assessmentuc "kidversa-edutourism-backend/internal/usecase/assessment"
+	badgeuc "kidversa-edutourism-backend/internal/usecase/badge"
 	liveuc "kidversa-edutourism-backend/internal/usecase/live"
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
 )
@@ -61,6 +62,8 @@ func main() {
 	participantMissionRepo := persistence.NewParticipantMissionRepository(db.DB)
 	consentRepo := persistence.NewConsentRepository(db.DB, cfg.ConsentTokenTTL)
 	frameRepo := persistence.NewFrameRepository(db.DB)
+	programSubstageRepo := persistence.NewProgramSubstageRepository(db.DB)
+	sessionSubstageRepo := persistence.NewSessionSubstageRepository(db.DB)
 
 	// AI clients.
 	openRouterClient := ai.NewOpenRouterClient(cfg.OpenRouterAPIKey, cfg.OpenRouterModel, cfg.OpenRouterBaseURL)
@@ -71,8 +74,13 @@ func main() {
 	userUC := auth.NewUserUsecase(userRepo, notifRepo, hub, cfg.BcryptCost)
 	tenantUC := auth.NewTenantUsecase(tenantRepo)
 	sessionUC := usecase.NewSessionUsecase(sessionRepo, programRepo)
+	// Wire the v4 substage repos into the session usecase so CreateSession
+	// clones Kegiatan into session_substages and LinkParticipant clones scores.
+	sessionUC.SetSubstageRepos(programSubstageRepo, sessionSubstageRepo)
+	sessionUC.SetAssessmentRepo(assessmentRepo)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
-	assessmentUC := assessmentuc.NewUsecase(assessmentRepo)
+	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
+	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, badgeUC)
 	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen)
 
 	// Handlers.
@@ -88,7 +96,10 @@ func main() {
 	registry.SessionGroup = handler.NewSessionGroupHandler(sessionUC)
 	registry.SessionParticipant = handler.NewSessionParticipantHandler(sessionUC)
 	registry.SessionParticipantBulk = handler.NewSessionParticipantBulkHandler(sessionUC)
-	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, contentRepo)
+	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, contentRepo, sessionSubstageRepo)
+	registry.ProgramSubstage = handler.NewProgramSubstageHandler(programSubstageRepo)
+	registry.SessionSubstage = handler.NewSessionSubstageHandler(badgeUC)
+	registry.Badge = handler.NewBadgeHandler(sessionSubstageRepo)
 	registry.Live = handler.NewLiveHandler(liveSvc, hub, cfg.SSEKeepaliveSec)
 	registry.Notification = handler.NewNotificationHandler(liveSvc, hub, cfg.SSEKeepaliveSec)
 	registry.Assessment = handler.NewAssessmentHandler(assessmentUC)

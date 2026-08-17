@@ -55,6 +55,9 @@ func NewRouter(d Deps) *echo.Echo {
 	// Programs + stages + contents.
 	handler.RegisterProgramsRoutes(api.Group("/programs"), h.Program, d.JWT, d.Revoker)
 
+	// Program substages (Kegiatan) CRUD.
+	handler.RegisterProgramSubstagesRoutes(api.Group("/program-substages"), h.ProgramSubstage, d.JWT, d.Revoker)
+
 	// Sessions + stages + groups + participants.
 	handler.RegisterSessionsRoutes(
 		api.Group("/sessions"),
@@ -76,6 +79,12 @@ func NewRouter(d Deps) *echo.Echo {
 	handler.RegisterParticipantMissionsRoutes(api.Group("/participant-missions"), h.ParticipantMission, d.JWT, d.Revoker)
 	handler.RegisterConsentRoutes(api.Group("/consent"), h.Consent, d.JWT, d.Revoker)
 	handler.RegisterFramesRoutes(api.Group("/frames"), h.Frame, d.JWT, d.Revoker)
+
+	// Participant badges (read-only).
+	handler.RegisterBadgesRoutes(api.Group("/badges"), h.Badge, d.JWT, d.Revoker)
+
+	// Session substages (Live Monitor "Lanjut SubTopik" override).
+	handler.RegisterSessionSubstagesRoutes(api.Group("/session-substages"), h.SessionSubstage, d.JWT, d.Revoker)
 
 	// Contents (standalone, single-source). Stage assign/unassign now live
 	// under /api/programs (RegisterProgramsRoutes) alongside stage list/reorder.

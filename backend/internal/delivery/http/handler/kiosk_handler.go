@@ -15,20 +15,28 @@ import (
 
 // KioskHandler serves the public, token-protected learner kiosk access endpoint.
 type KioskHandler struct {
-	authUC      *auth.Usecase
-	sessionUC   *usecase.SessionUsecase
-	contentRepo repository.ContentRepository
+	authUC       *auth.Usecase
+	sessionUC    *usecase.SessionUsecase
+	contentRepo  repository.ContentRepository
+	substageRepo repository.SessionSubstageRepository
 }
 
 // NewKioskHandler builds the kiosk handler.
-func NewKioskHandler(authUC *auth.Usecase, sessionUC *usecase.SessionUsecase, contentRepo repository.ContentRepository) *KioskHandler {
-	return &KioskHandler{authUC: authUC, sessionUC: sessionUC, contentRepo: contentRepo}
+func NewKioskHandler(authUC *auth.Usecase, sessionUC *usecase.SessionUsecase, contentRepo repository.ContentRepository, substageRepo repository.SessionSubstageRepository) *KioskHandler {
+	return &KioskHandler{authUC: authUC, sessionUC: sessionUC, contentRepo: contentRepo, substageRepo: substageRepo}
 }
 
-// kioskStageContent bundles a session stage with its program stage contents.
+// kioskStageContent bundles a session stage with its Kegiatan (substage) leaves
+// and the content loaded per Kegiatan.
 type kioskStageContent struct {
-	Stage    entity.SessionStage   `json:"stage"`
-	Contents []entity.StageContent `json:"contents"`
+	Stage     entity.SessionStage    `json:"stage"`
+	Substages []kioskSubstageContent `json:"substages"`
+}
+
+// kioskSubstageContent bundles one instantiated Kegiatan with its content.
+type kioskSubstageContent struct {
+	Substage entity.SessionSubstage `json:"substage"`
+	Contents []entity.StageContent  `json:"contents"`
 }
 
 // kioskSessionDTO is the minimal, PII-free session view returned to the public kiosk.
@@ -44,6 +52,11 @@ type kioskSessionDTO struct {
 type kioskResponse struct {
 	Session kioskSessionDTO     `json:"session"`
 	Stages  []kioskStageContent `json:"stages"`
+}
+
+// kioskSubstage returns a session substage with an empty content list.
+func kioskSubstage(s entity.SessionSubstage) kioskSubstageContent {
+	return kioskSubstageContent{Substage: s, Contents: []entity.StageContent{}}
 }
 
 func toKioskSessionDTO(s entity.Session) kioskSessionDTO {
@@ -107,15 +120,31 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_cancelled")
 	}
 
-	// Per stage, load program stage contents.
+	// Per stage, load each instantiated Kegiatan (session_substage) with its
+	// per-Kegiatan content (content now lives on the program_substage leaf).
+	// Falls back to an empty substage list when substage cloning has not run.
 	stages := make([]kioskStageContent, 0, len(s.Stages))
 	for i := range s.Stages {
-		contents, listErr := h.contentRepo.ListStageContents((*c).Request().Context(), s.Stages[i].ProgramStageID)
-		if listErr != nil {
-			// Contents are non-critical for kiosk display; fall back to empty.
-			contents = nil
+		ksc := kioskStageContent{Stage: s.Stages[i], Substages: []kioskSubstageContent{}}
+		if h.substageRepo != nil {
+			subs, subErr := h.substageRepo.ListSessionSubstages((*c).Request().Context(), s.Session.ID)
+			if subErr == nil {
+				for j := range subs {
+					if subs[j].SessionStageID != s.Stages[i].ID {
+						continue
+					}
+					contents, listErr := h.contentRepo.ListStageContents((*c).Request().Context(), subs[j].ProgramSubstageID)
+					if listErr != nil {
+						// Contents are non-critical for kiosk display.
+						contents = []entity.StageContent{}
+					}
+					ks := kioskSubstage(subs[j])
+					ks.Contents = contents
+					ksc.Substages = append(ksc.Substages, ks)
+				}
+			}
 		}
-		stages = append(stages, kioskStageContent{Stage: s.Stages[i], Contents: contents})
+		stages = append(stages, ksc)
 	}
 
 	return appresp.OK(c, &kioskResponse{Session: toKioskSessionDTO(s.Session), Stages: stages})

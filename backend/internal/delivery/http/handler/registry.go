@@ -14,6 +14,9 @@ type Registry struct {
 	SessionParticipant     *SessionParticipantHandler
 	SessionParticipantBulk *SessionParticipantBulkHandler
 	Kiosk                  *KioskHandler
+	ProgramSubstage        *ProgramSubstageHandler
+	SessionSubstage        *SessionSubstageHandler
+	Badge                  *BadgeHandler
 	Live                   *LiveHandler
 	Notification           *NotificationHandler
 	Assessment             *AssessmentHandler

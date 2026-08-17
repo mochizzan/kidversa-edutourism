@@ -16,15 +16,39 @@ type ProgramStageReader interface {
 	ListStages(ctx context.Context, programID string) ([]entity.ProgramStage, error)
 }
 
+// ProgramSubstageReader provides read-only access to program substages (Kegiatan).
+// SessionUsecase uses this to clone program substages into session substages
+// during session creation.
+type ProgramSubstageReader interface {
+	ListSubstages(ctx context.Context, programStageID string) ([]entity.ProgramSubstage, error)
+}
+
 // SessionUsecase orchestrates session + stages + groups + participants business logic.
 type SessionUsecase struct {
-	sessionRepo   repository.SessionRepository
-	programStages ProgramStageReader
+	sessionRepo      repository.SessionRepository
+	programStages    ProgramStageReader
+	programSubstages ProgramSubstageReader
+	sessionSubstages repository.SessionSubstageRepository
+	assessmentRepo   repository.AssessmentRepository
 }
 
 // NewSessionUsecase builds the session usecase.
 func NewSessionUsecase(sessionRepo repository.SessionRepository, programStages ProgramStageReader) *SessionUsecase {
 	return &SessionUsecase{sessionRepo: sessionRepo, programStages: programStages}
+}
+
+// SetSubstageRepos injects the program-substage reader and session-substage repo
+// used for substage cloning in CreateSession. Kept separate from the constructor
+// to avoid perturbing existing call sites while the substage feature lands.
+func (u *SessionUsecase) SetSubstageRepos(programSubstages ProgramSubstageReader, sessionSubstages repository.SessionSubstageRepository) {
+	u.programSubstages = programSubstages
+	u.sessionSubstages = sessionSubstages
+}
+
+// SetAssessmentRepo injects the assessment repo used to clone scored assessments
+// when a participant migrates to a new session (LinkParticipant).
+func (u *SessionUsecase) SetAssessmentRepo(assessmentRepo repository.AssessmentRepository) {
+	u.assessmentRepo = assessmentRepo
 }
 
 // CreateSession creates a new DRAFT session owned by the tenant.
@@ -78,6 +102,15 @@ func (u *SessionUsecase) CreateSession(ctx context.Context, tenantID, createdBy 
 	})
 	if err != nil {
 		return nil, err
+	}
+	// Clone program substages (Kegiatan) into session_substages so each
+	// participant has a concrete leaf to assess. Runs after the session tx
+	// commits (s.ID is now populated); the substage repos are wired
+	// optionally, so a missing wiring simply skips cloning.
+	if u.programSubstages != nil && u.sessionSubstages != nil {
+		if cerr := u.cloneSubstages(ctx, s.ID, programID); cerr != nil {
+			return nil, cerr
+		}
 	}
 	return s, nil
 }
@@ -490,6 +523,12 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	if err := u.sessionRepo.UpdateParticipant(ctx, p); err != nil {
 		return nil, err
 	}
+	// Audit-friendly migration: clone the old participant's already-scored
+	// (star >= 1) assessments onto the new participant in the new session,
+	// remapped to the new session's session_substages (same Kegiatan leaf).
+	// Best-effort and non-fatal: the link already succeeded, so a clone error
+	// must not lose the result. Only runs when both repos are wired.
+	_ = u.cloneScoredAssessments(ctx, participantID, prevSessionID, sessionID)
 	return &repository.LinkParticipantResult{
 		Participant:         *p,
 		PreviousSessionID:   prevSessionID,
@@ -578,6 +617,101 @@ func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID, _
 	return u.sessionRepo.DeleteParticipant(ctx, participantID)
 }
 
+// cloneSubstages materializes one session_substages row (status WAITING) per
+// program_substage of every cloned session stage. It lists the freshly created
+// session stages for the session, then for each program stage's Kegiatan creates
+// a WAITING session_substage under the matching session stage. Idempotent: a
+// duplicate-key conflict (unique (session_id, program_substage_id)) is ignored.
+func (u *SessionUsecase) cloneSubstages(ctx context.Context, sessionID, programID string) error {
+	programStages, err := u.programStages.ListStages(ctx, programID)
+	if err != nil {
+		return err
+	}
+	sessionStages, err := u.sessionRepo.ListSessionStages(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	for _, ps := range programStages {
+		var ssID string
+		for i := range sessionStages {
+			if sessionStages[i].ProgramStageID == ps.ID {
+				ssID = sessionStages[i].ID
+				break
+			}
+		}
+		if ssID == "" {
+			continue
+		}
+		subs, serr := u.programSubstages.ListSubstages(ctx, ps.ID)
+		if serr != nil {
+			return serr
+		}
+		for i := range subs {
+			sub := subs[i]
+			ssub := &entity.SessionSubstage{
+				SessionID:         sessionID,
+				SessionStageID:    ssID,
+				ProgramSubstageID: sub.ID,
+				Status:            entity.SessionSubstageWaiting,
+			}
+			if cerr := u.sessionSubstages.CreateSessionSubstage(ctx, ssub); cerr != nil {
+				if isConflict(cerr) {
+					continue
+				}
+				return cerr
+			}
+		}
+	}
+	return nil
+}
+
+// cloneScoredAssessments copies the old participant's scored (star >= 1)
+// assessments from the previous session onto the same participant in the new
+// session (LinkParticipant moves the participant, not a different child). Each
+// old session_substage is resolved to its program_substage, then mapped to the
+// new session's session_substage (same Kegiatan leaf). Duplicate-key conflicts
+// (the participant already has a score for that leaf) are skipped.
+func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participantID, oldSessionID, newSessionID string) error {
+	if u.assessmentRepo == nil || u.sessionSubstages == nil || oldSessionID == "" {
+		return nil
+	}
+	scored, err := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
+		ParticipantID: participantID,
+		SessionID:     oldSessionID,
+	}, 1, 1000)
+	if err != nil {
+		return err
+	}
+	for i := range scored.Items {
+		a := scored.Items[i]
+		if a.StarRating < 1 {
+			continue
+		}
+		oldSub, gerr := u.sessionSubstages.GetSessionSubstage(ctx, a.SessionStageID)
+		if gerr != nil {
+			continue
+		}
+		newSub, nerr := u.sessionSubstages.GetSessionSubstageByKeys(ctx, newSessionID, oldSub.ProgramSubstageID)
+		if nerr != nil {
+			continue
+		}
+		clone := &entity.Assessment{
+			ParticipantID:  participantID,
+			SessionID:      newSessionID,
+			SessionStageID: newSub.ID,
+			StarRating:     a.StarRating,
+			Comment:        a.Comment,
+			AssessedBy:     a.AssessedBy,
+			AssessedAt:     a.AssessedAt,
+			SyncStatus:     entity.SyncSynced,
+		}
+		if cerr := u.assessmentRepo.Create(ctx, clone); cerr != nil && !isConflict(cerr) {
+			return cerr
+		}
+	}
+	return nil
+}
+
 func isValidSessionStatus(s string) bool {
 	switch entity.SessionStatus(s) {
 	case entity.SessionDraft, entity.SessionActive, entity.SessionCompleted, entity.SessionCancelled:
@@ -590,6 +724,17 @@ func isValidGroupStatus(s string) bool {
 	switch entity.GroupStatus(s) {
 	case entity.GroupWaiting, entity.GroupInProgress, entity.GroupCompleted:
 		return true
+	}
+	return false
+}
+
+// isConflict reports whether err is an app conflict (duplicate-key) error.
+func isConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	if ae, ok := err.(interface{ CodeName() string }); ok {
+		return ae.CodeName() == "conflict"
 	}
 	return false
 }
