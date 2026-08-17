@@ -103,7 +103,9 @@ func (h *ReportHandler) GenerateStream(c *echo.Context) error {
 	defer h.endGenerate(id)
 	// Detached context survives the 202 response so generation keeps running.
 	go h.runNarrativeStream(context.WithoutCancel((*c).Request().Context()), id, tenantID, force)
-	return appresp.Accepted(c)
+	// 204 (no body): the narrative arrives over the SSE endpoint, not here.
+	// The FE client treats 204 as no-content, so it must not body-parse this.
+	return appresp.NoContent(c)
 }
 
 // GenerateStreamSSE handles GET /api/reports/:id/generate/stream (SSE, JWT).
@@ -169,7 +171,7 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, participants)
+	reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, tenantID, participants)
 	if err != nil {
 		return err
 	}

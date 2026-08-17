@@ -145,13 +145,24 @@ export interface RecordingService {
 }
 
 // Reports
+export interface ReportTokenResponse {
+  id: string
+  parent_access_token: string
+  token_expires_at?: string | null
+  status: string
+}
+
 export interface ReportService {
   getBySession(sessionId: string): Promise<Report[]>
   getById(id: string): Promise<Report | null>
   generate(sessionId: string): Promise<Report[]>
-  approve(reportId: string, data?: { narrative_final?: string; mission_ids?: string[] }): Promise<Report>
-  send(reportId: string): Promise<Report>
-  generateNarrativeStream(reportId: string, force?: boolean): Promise<Report>
+  approve(
+    reportId: string,
+    data?: { narrative_final?: string; mission_ids?: string[] },
+    tenantId?: string | null,
+  ): Promise<Report>
+  send(reportId: string, tenantId?: string | null): Promise<ReportTokenResponse>
+  generateNarrativeStream(reportId: string, force?: boolean, tenantId?: string | null): Promise<void>
 }
 
 // Consent

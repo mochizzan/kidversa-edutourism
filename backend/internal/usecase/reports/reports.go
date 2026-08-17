@@ -14,10 +14,12 @@ import (
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
-// NarrativeGenerator produces a full AI narrative for a report.
+// NarrativeGenerator produces a full AI narrative for a report. tenantID is the
+// resolved request scope (set by TenantScope) and is forwarded to the repository
+// so tenant-scoped lookups work for SUPER_ADMIN (whose JWT carries an empty tid).
 type NarrativeGenerator interface {
-	Generate(ctx context.Context, reportID string) (string, error)
-	StreamGenerate(ctx context.Context, reportID string, onDelta func(string) error) (string, error)
+	Generate(ctx context.Context, reportID, tenantID string) (string, error)
+	StreamGenerate(ctx context.Context, reportID, tenantID string, onDelta func(string) error) (string, error)
 }
 
 // Usecase implements report business logic: anti-IDOR parent tokens + narrative.
@@ -113,7 +115,7 @@ func (u *Usecase) GenerateNarrative(ctx context.Context, reportID, tenantID stri
 	if r.AINarrativeDraft != "" {
 		return r, nil
 	}
-	text, err := u.gen.Generate(ctx, reportID)
+	text, err := u.gen.Generate(ctx, reportID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +139,7 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 	if !force && r.AINarrativeDraft != "" {
 		return r.AINarrativeDraft, nil
 	}
-	text, err := u.gen.StreamGenerate(ctx, reportID, onDelta)
+	text, err := u.gen.StreamGenerate(ctx, reportID, tenantID, onDelta)
 	if err != nil {
 		return "", err
 	}
@@ -156,7 +158,7 @@ const maxSessionReports = 1000
 // GenerateForSession creates a DRAFT report for each participant that does not
 // already have one, then runs the narrative generator for all reports in the
 // session concurrently. Returns the full list of reports after generation.
-func (u *Usecase) GenerateForSession(ctx context.Context, sessionID string, participants []entity.Participant) ([]entity.Report, error) {
+func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID string, participants []entity.Participant) ([]entity.Report, error) {
 	existing, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, maxSessionReports)
 	if err != nil {
 		return nil, err
@@ -205,7 +207,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID string, part
 			genCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 			defer cancel()
 
-			text, err := u.gen.Generate(genCtx, report.ID)
+			text, err := u.gen.Generate(genCtx, report.ID, tenantID)
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("report %s: %w", report.ID, err))

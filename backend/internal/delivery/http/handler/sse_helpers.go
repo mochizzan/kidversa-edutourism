@@ -45,8 +45,9 @@ func streamSSE(c *echo.Context, hub *sse.Hub, ch string, initial *sse.Event, kee
 
 	// Replay any events already buffered for this channel so a client that
 	// connects after publishing started does not miss early events (small-batch
-	// races). ReplaySince returns ReplayGap if the cursor is older than the
-	// buffer; in that case we simply start live.
+	// races). A cursor of 0 replays the whole buffer; ReplaySince only returns
+	// ReplayGap for a once-valid cursor that has since been evicted, in which
+	// case we simply start live.
 	if replay, err := hub.ReplaySince(ch, 0); err == nil {
 		for _, ev := range replay {
 			writeSSE(w, f, ev)

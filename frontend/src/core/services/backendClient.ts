@@ -160,6 +160,10 @@ export async function healthCheck(): Promise<boolean> {
 export interface RequestOptions {
   signal?: AbortSignal
   headers?: Record<string, string>
+  // Overrides the global active-tenant flag for SUPER_ADMIN scoping. Used when a
+  // resource owns a specific tenant (e.g. a report's session) so the request is
+  // pinned to that tenant regardless of the global tenant selector.
+  tenantId?: string
 }
 
 function backoff(attempt: number): Promise<void> {
@@ -320,8 +324,9 @@ export async function apiRequest<T>(
     // explicit X-Tenant-Id (or ?tenant_id= for SSE). Attach it here so every
     // request — including direct apiRequest callers like liveService — is
     // correctly scoped. Non-SA roles must NOT send this header (rejected by
-    // the middleware), so getActiveTenantId() returns null for them.
-    const tid = getActiveTenantId()
+    // the middleware), so getActiveTenantId() returns null for them. An explicit
+    // `opts.tenantId` (resource-owned scope) wins over the global flag.
+    const tid = opts?.tenantId || getActiveTenantId()
     if (tid) headers['X-Tenant-Id'] = tid
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`
@@ -399,6 +404,8 @@ export async function apiRequest<T>(
 
 export interface SSEOptions {
   onError?: (event: Event) => void
+  // Overrides the global active-tenant flag for SUPER_ADMIN scoping (see RequestOptions.tenantId).
+  tenantId?: string | null
 }
 
 export function openSSE(
@@ -412,8 +419,9 @@ export function openSSE(
   let url = base
   // SUPER_ADMIN: the JWT has empty tid, and EventSource cannot send custom
   // headers (X-Tenant-Id). Pass the active tenant as a query param so
-  // TenantScope can resolve it. Non-SA roles have tid in the JWT.
-  const tid = getActiveTenantId()
+  // TenantScope can resolve it. Non-SA roles have tid in the JWT. An explicit
+  // `opts.tenantId` (resource-owned scope) wins over the global flag.
+  const tid = opts?.tenantId || getActiveTenantId()
   if (tid) {
     url += `${url.includes('?') ? '&' : '?'}tenant_id=${encodeURIComponent(tid)}`
   } else {

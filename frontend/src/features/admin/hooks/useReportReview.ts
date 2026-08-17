@@ -10,6 +10,8 @@ import { programService } from '../../../core/services/programs'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { friendlyError, ERROR_MESSAGES } from '../../../core/utils/errorMessages'
 import { useAuth } from '../../../core/hooks/useAuth'
+import { isSuperAdmin } from '../../../core/utils/permissions'
+import { getActiveTenantId } from '../../../core/utils/tenant'
 import { formatDate } from '../../../core/utils'
 import {
   DEFAULT_FACILITATOR_MESSAGE,
@@ -58,6 +60,12 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
   const [hasNoAssessment, setHasNoAssessment] = useState(false)
 
   const prevTextRef = useRef('')
+
+  // SUPER_ADMIN must pin the request to the report's owning session tenant so the
+  // flow works even when the global tenant selector is empty or switched. Non-SA
+  // roles never send a tenant header (the middleware rejects it).
+  const saTenant: string | undefined =
+    isSuperAdmin(user) ? (session?.tenant_id || getActiveTenantId() || undefined) : undefined
 
   const loadData = useCallback(async () => {
     if (!sessionId || !reportId) return
@@ -142,10 +150,14 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     if (!reportId) return
     setActionLoading('approve')
     try {
-      await reportService.approve(reportId, {
-        narrative_final: narrativeText,
-        mission_ids: assignedMissionIds,
-      })
+      await reportService.approve(
+        reportId,
+        {
+          narrative_final: narrativeText,
+          mission_ids: assignedMissionIds,
+        },
+        saTenant,
+      )
       await loadData()
       addToast({ type: 'success', message: 'Laporan berhasil disetujui' })
       return true
@@ -155,13 +167,13 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     } finally {
       setActionLoading(null)
     }
-  }, [reportId, narrativeText, assignedMissionIds, loadData, addToast])
+  }, [reportId, narrativeText, assignedMissionIds, loadData, addToast, saTenant])
 
   const handleSend = useCallback(async () => {
     if (!reportId) return
     setActionLoading('send')
     try {
-      await reportService.send(reportId)
+      await reportService.send(reportId, saTenant)
       await loadData()
       addToast({ type: 'success', message: 'Laporan berhasil dikirim ke orang tua' })
       return true
@@ -171,19 +183,25 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     } finally {
       setActionLoading(null)
     }
-  }, [reportId, loadData, addToast])
+  }, [reportId, loadData, addToast, saTenant])
 
   const handleGenerateNarrative = useCallback(async (force = false) => {
     if (!reportId || streaming) return false
     setStreaming(true)
     const prev = narrativeText
     prevTextRef.current = prev
+    // Start from a clean form (line 0) instead of appending to the old
+    // narrative. The 'done' event delivers the authoritative `full` text; if
+    // it is missed (SSE race) the token appends land on an empty string rather
+    // than concatenating onto the previous generation.
+    setNarrativeText('')
     try {
       // Open SSE first so we don't miss early tokens.
       const source = openSSE(
         API_ROUTES.REPORTS.GENERATE_STREAM_SSE(reportId),
         () => {},
         {
+          tenantId: saTenant,
           onError: () => {
             source.close()
             setNarrativeText(prevTextRef.current)
@@ -228,7 +246,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
         source.close()
         setStreaming(false)
       })
-      await reportService.generateNarrativeStream(reportId, force)
+      await reportService.generateNarrativeStream(reportId, force, saTenant)
       return true
     } catch (err) {
       setNarrativeText(prevTextRef.current)
@@ -236,7 +254,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       addToast({ type: 'error', message: friendlyError(err) })
       return false
     }
-  }, [reportId, narrativeText, addToast, streaming])
+  }, [reportId, narrativeText, addToast, streaming, saTenant])
 
   const buildRaportHtml = useCallback((): string | null => {
     if (!participant || !session) return null

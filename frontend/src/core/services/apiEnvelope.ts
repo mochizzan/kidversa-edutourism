@@ -33,7 +33,9 @@ interface ItemsEnvelope<T> {
 // For SUPER_ADMIN the backend requires an explicit X-Tenant-Id header to scope
 // tenant data; other roles are scoped strictly from the JWT and MUST NOT send it
 // (the middleware rejects it). The active tenant lives in localStorage (set by
-// tenantStore); the current role comes from the persisted auth user.
+// tenantStore); the current role comes from the persisted auth user. A caller can
+// override the scope via `apiRequest`'s `tenantId` option (used by the report flow
+// to pin the resource-owned `session.tenant_id`).
 export function withTenantHeader(headers: Record<string, string> = {}): Record<string, string> {
   const tid = getActiveTenantId()
   if (tid) return { ...headers, 'X-Tenant-Id': tid }
@@ -140,9 +142,16 @@ export async function itemsRequest<T>(method: string, path: string, body?: unkno
 }
 
 // GET/POST/PUT a single item; returns the unwrapped `data` (tenant_id normalized).
-export async function itemRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
+// `tenantId` overrides the global active-tenant flag (SUPER_ADMIN resource scoping).
+export async function itemRequest<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  tenantId?: string | null,
+): Promise<T> {
   const res = await apiRequest<ItemEnvelope<T>>(method, path, body, {
     headers: withTenantHeader(),
+    tenantId: tenantId ?? undefined,
   })
   return normalizeTenantId(res.data)
 }

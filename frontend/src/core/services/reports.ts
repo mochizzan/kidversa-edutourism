@@ -1,16 +1,9 @@
 import type { Report } from '../types'
-import type { ReportService } from './types'
+import type { ReportService, ReportTokenResponse } from './types'
 import { apiRequest } from './backendClient'
 import { itemsRequest, itemRequest, nullableItemRequest } from './apiEnvelope'
 import { useAuthStore } from '../stores/authStore'
 import { API_ROUTES } from '../constants/apiRoutes'
-
-interface ReportTokenResponse {
-  id: string
-  parent_access_token: string
-  token_expires_at?: string | null
-  status: string
-}
 
 interface PublicReportResponse {
   id: string
@@ -39,28 +32,35 @@ const generate = async (sessionId: string): Promise<Report[]> => {
 const approve = async (
   reportId: string,
   data?: { narrative_final?: string; mission_ids?: string[] },
+  tenantId?: string | null,
 ): Promise<Report> => {
   return itemRequest<Report>('POST', API_ROUTES.REPORTS.APPROVE(reportId), {
     approved_by: useAuthStore.getState().user?.id ?? '',
     narrative_final: data?.narrative_final ?? '',
     mission_ids: data?.mission_ids ?? [],
-  })
+  }, tenantId)
 }
 
-const send = async (reportId: string): Promise<Report> => {
-  const res = await itemRequest<ReportTokenResponse>('POST', API_ROUTES.REPORTS.SEND(reportId))
-  // The token response exposes the freshly minted parent token; map back to a Report.
-  const existing = await getById(reportId).catch(() => null)
-  return {
-    ...(existing ?? ({} as Report)),
-    id: res.id,
-    parent_access_token: res.parent_access_token,
-    status: res.status as Report['status'],
-  }
+const send = async (reportId: string, tenantId?: string | null): Promise<ReportTokenResponse> => {
+  // /send returns the freshly minted parent token (ReportTokenResponse), not a
+  // full Report — type it precisely instead of faking a Report merge.
+  return itemRequest<ReportTokenResponse>('POST', API_ROUTES.REPORTS.SEND(reportId), undefined, tenantId)
 }
 
-const generateNarrativeStream = async (reportId: string, force = false): Promise<Report> => {
-  return itemRequest<Report>('POST', `${API_ROUTES.REPORTS.GENERATE_STREAM(reportId)}${force ? '?force=true' : ''}`)
+const generateNarrativeStream = async (
+  reportId: string,
+  force = false,
+  tenantId?: string | null,
+): Promise<void> => {
+  // The POST only kicks off async generation (204 no-content); the actual
+  // tokens arrive over the SSE stream, so nothing is returned here. Pass the
+  // resource-owned tenant explicitly (apiRequest honors opts.tenantId).
+  await apiRequest<unknown>(
+    'POST',
+    `${API_ROUTES.REPORTS.GENERATE_STREAM(reportId)}${force ? '?force=true' : ''}`,
+    undefined,
+    tenantId ? { tenantId } : undefined,
+  )
 }
 
 // getPublicReport fetches a report via its parent access token (public endpoint).

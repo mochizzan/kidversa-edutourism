@@ -146,7 +146,12 @@ func (h *Hub) Publish(_ context.Context, ch string, ev Event) error {
 	return nil
 }
 
-// ReplaySince returns events with counter > since. Returns ReplayGap if since is older than buffer head.
+// ReplaySince returns events with counter > since. A since of 0 means "replay
+// the entire buffered window" (the caller has no cursor yet), so it never
+// returns ReplayGap — returning an empty slice instead. ReplayGap is reserved
+// for a cursor that was once valid but has since been evicted (since > 0 and
+// below the current buffer head). This keeps early SSE events from being lost
+// when a subscriber connects just after publishing started.
 func (h *Hub) ReplaySince(ch string, since uint64) ([]Event, error) {
 	pc := h.getOrCreate(ch)
 	pc.bufMu.RLock()
@@ -155,6 +160,12 @@ func (h *Hub) ReplaySince(ch string, since uint64) ([]Event, error) {
 		return nil, nil
 	}
 	head := pc.buf[0].ID
+	// since == 0: caller has no cursor → replay everything in the buffer.
+	if since == 0 {
+		out := make([]Event, len(pc.buf))
+		copy(out, pc.buf)
+		return out, nil
+	}
 	if since < head {
 		return nil, ReplayGap{}
 	}
