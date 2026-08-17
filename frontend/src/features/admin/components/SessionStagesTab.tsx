@@ -41,24 +41,33 @@ export function SessionStagesTab({ stages, groups, facilitators, stageMap }: Ses
   }
 
   return (
-    <div className="space-y-4">
-      <Card padding="sm">
-        <p className="text-sm text-on-surface-variant">
-          Fasilitator tiap stage diturunkan dari grup yang sedang berada di stage tersebut
-          (ditentukan lewat tab <span className="font-medium text-on-surface">Groups</span>).
-        </p>
-      </Card>
-
-      <div className="flex flex-col gap-3">
-        {stages.map((stage: SessionStage, index: number) => {
-          const facilitatorIds = Array.from(
-            new Set(
-              groups
-                .filter((g) => g.current_session_stage_id === stage.id)
-                .map((g) => g.facilitator_id)
-                .filter((id): id is string => !!id),
-            ),
-          )
+    <div className="flex flex-col gap-3">
+      {stages.map((stage: SessionStage, index: number) => {
+        // Opsi A: a group contributes its facilitator to a stage when it is
+        // currently at that stage (current_session_stage_id set via Jump). A
+        // group assigned a facilitator but not yet jumped (WAITING, field NULL)
+        // belongs to the FIRST stage, so the assignment is visible immediately.
+        const isFirstStage = index === 0
+        const atStageIds = Array.from(
+          new Set(
+            groups
+              .filter((g) => g.current_session_stage_id === stage.id)
+              .map((g) => g.facilitator_id)
+              .filter((id): id is string => !!id),
+          ),
+        )
+        const waitingIds = isFirstStage
+          ? Array.from(
+              new Set(
+                groups
+                  .filter((g) => !g.current_session_stage_id)
+                  .map((g) => g.facilitator_id)
+                  .filter((id): id is string => !!id),
+              ),
+            )
+          : []
+        const facilitatorIds = Array.from(new Set([...atStageIds, ...waitingIds]))
+        const waitingIdSet = new Set(waitingIds)
           return (
             <Card key={stage.id} padding="sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -92,6 +101,11 @@ export function SessionStagesTab({ stages, groups, facilitators, stageMap }: Ses
                         >
                           <UserIcon className="w-3.5 h-3.5 text-on-surface-variant" />
                           {facilitators.find((f) => f.id === id)?.name ?? 'Belum ada fasilitator'}
+                          {isFirstStage && waitingIdSet.has(id) && (
+                            <span className="text-xs text-on-surface-variant">
+                              (belum di-jump)
+                            </span>
+                          )}
                         </span>
                       ))}
                     </div>
@@ -102,7 +116,6 @@ export function SessionStagesTab({ stages, groups, facilitators, stageMap }: Ses
           )
         })}
       </div>
-    </div>
   )
 }
 
