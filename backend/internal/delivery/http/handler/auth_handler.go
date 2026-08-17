@@ -153,6 +153,8 @@ func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
 	if tenantID == "" {
 		return appresp.Fail(c, http.StatusBadRequest, "tenant_required")
 	}
+	userID := appmiddleware.GetUserID(c)
+	role := appmiddleware.GetRole(c)
 
 	// Prevent cross-tenant kiosk token issuance (IDOR guard).
 	sessTenant, err := h.sessionRepo.TenantIDForSession((*c).Request().Context(), req.SessionID)
@@ -161,6 +163,18 @@ func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
 	}
 	if sessTenant != tenantID {
 		return appresp.Fail(c, http.StatusForbidden, "kiosk_forbidden")
+	}
+
+	// Facilitator ownership gate: a FASILITATOR may only issue a kiosk token for a
+	// session where they own at least one group. ADMIN/KOORDINATOR/SUPER_ADMIN bypass.
+	if entity.UserRole(role) == entity.RoleFasilitator {
+		owns, oerr := h.sessionRepo.FacilitatorOwnsAnyGroup((*c).Request().Context(), req.SessionID, userID)
+		if oerr != nil {
+			return oerr
+		}
+		if !owns {
+			return appresp.Fail(c, http.StatusForbidden, "kiosk_not_group_owner")
+		}
 	}
 
 	token, err := h.authUC.IssueKioskToken((*c).Request().Context(), req.SessionID, tenantID, kioskTokenTTL)

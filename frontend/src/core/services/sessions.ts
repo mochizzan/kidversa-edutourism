@@ -71,11 +71,6 @@ export const sessionService: SessionService = {
 
   delete: (id) => voidRequest('DELETE', API_ROUTES.SESSIONS.DETAIL(id)),
 
-  assignFacilitator: (sessionId, stageId, userId) =>
-    itemRequest<SessionStage>('POST', API_ROUTES.SESSIONS.ASSIGN_STAGE(sessionId, stageId), {
-      facilitator_id: userId || null,
-    }),
-
   getStages: (sessionId) =>
     arrayRequest<SessionStage>('GET', API_ROUTES.SESSIONS.STAGES(sessionId)),
 

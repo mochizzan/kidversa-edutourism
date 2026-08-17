@@ -38,8 +38,6 @@ export const API_ROUTES = {
     CANCEL: (id: string) => `/api/sessions/${encodeURIComponent(id)}/cancel`,
     STAGES: (sessionId: string) =>
       `/api/sessions/${encodeURIComponent(sessionId)}/stages`,
-    ASSIGN_STAGE: (sessionId: string, stageId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/stages/${encodeURIComponent(stageId)}/assign`,
     GROUPS: (sessionId: string) =>
       `/api/sessions/${encodeURIComponent(sessionId)}/groups`,
     GROUP_DETAIL: (sessionId: string, groupId: string) =>

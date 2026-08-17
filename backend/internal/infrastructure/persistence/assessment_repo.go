@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"gorm.io/gorm"
@@ -108,4 +109,25 @@ func (r *GormAssessmentRepository) Delete(ctx context.Context, id string) error 
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
+}
+
+// GetGroupFacilitatorIDByParticipant resolves the facilitator_id of the group a
+// participant belongs to (participants.group_id -> session_groups.facilitator_id).
+// Returns nil if the participant has no group or the group has no facilitator.
+func (r *GormAssessmentRepository) GetGroupFacilitatorIDByParticipant(ctx context.Context, participantID string) (*string, error) {
+	var fid sql.NullString
+	if err := r.db.WithContext(ctx).
+		Table("participants AS p").
+		Select("sg.facilitator_id").
+		Joins("LEFT JOIN session_groups AS sg ON sg.id = p.group_id").
+		Where("p.id = ?", participantID).
+		Limit(1).
+		Scan(&fid).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	if !fid.Valid || fid.String == "" {
+		return nil, nil
+	}
+	v := fid.String
+	return &v, nil
 }

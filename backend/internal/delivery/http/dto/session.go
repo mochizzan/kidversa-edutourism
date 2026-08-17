@@ -25,12 +25,6 @@ type UpdateSessionRequest struct {
 	Status      string  `json:"status,omitempty"`
 }
 
-// AssignFacilitatorRequest is the payload for POST /api/sessions/:id/stages/:stageId/assign.
-// FacilitatorID is optional: a nil/JSON-null value means "unassign" (set NULL).
-type AssignFacilitatorRequest struct {
-	FacilitatorID *string `json:"facilitator_id"`
-}
-
 // CreateGroupRequest is the payload for POST /api/sessions/:id/groups.
 type CreateGroupRequest struct {
 	Name string `json:"name" validate:"required"`

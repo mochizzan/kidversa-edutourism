@@ -28,7 +28,6 @@ func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecyc
 	g.POST("/:id/cancel", lh.Cancel, authMW, roleMW, appmiddleware.TenantScope())
 
 	g.GET("/:id/stages", sh.GetStages, authMW, roleMW, appmiddleware.TenantScope())
-	g.POST("/:id/stages/:stageId/assign", sh.AssignFacilitator, authMW, roleMW, appmiddleware.TenantScope())
 
 	g.GET("/:id/groups", gh.ListGroups, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("/:id/groups", gh.CreateGroup, authMW, roleMW, appmiddleware.TenantScope())

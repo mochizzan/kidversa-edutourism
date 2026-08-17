@@ -52,7 +52,7 @@ func (h *LiveHandler) Override(c *echo.Context, action live.OverrideAction) erro
 	groupID := (*c).Param("groupId")
 	stageID := (*c).Param("stageId")
 	actorID := appmiddleware.GetUserID(c)
-	p, err := h.svc.OverrideStage((*c).Request().Context(), groupID, stageID, action, actorID, appmiddleware.GetTenantID(c))
+	p, err := h.svc.OverrideStage((*c).Request().Context(), groupID, stageID, action, actorID, appmiddleware.GetRole(c), appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (h *LiveHandler) Jump(c *echo.Context) error {
 	}
 	groupID := (*c).Param("groupId")
 	actorID := appmiddleware.GetUserID(c)
-	if err := h.svc.Jump((*c).Request().Context(), groupID, req.StageID, actorID, appmiddleware.GetTenantID(c)); err != nil {
+	if err := h.svc.Jump((*c).Request().Context(), groupID, req.StageID, actorID, appmiddleware.GetRole(c), appmiddleware.GetTenantID(c)); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
@@ -77,7 +77,7 @@ func (h *LiveHandler) Jump(c *echo.Context) error {
 func (h *LiveHandler) Reset(c *echo.Context) error {
 	groupID := (*c).Param("groupId")
 	actorID := appmiddleware.GetUserID(c)
-	if err := h.svc.Reset((*c).Request().Context(), groupID, actorID, appmiddleware.GetTenantID(c)); err != nil {
+	if err := h.svc.Reset((*c).Request().Context(), groupID, actorID, appmiddleware.GetRole(c), appmiddleware.GetTenantID(c)); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)

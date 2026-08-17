@@ -6,6 +6,7 @@ interface GroupCompleteButtonProps {
   assessedCount: number
   onComplete: () => void
   loading?: boolean
+  disabled?: boolean
   className?: string
 }
 
@@ -14,6 +15,7 @@ export function GroupCompleteButton({
   assessedCount,
   onComplete,
   loading = false,
+  disabled = false,
   className,
 }: GroupCompleteButtonProps) {
   const allAssessed = totalChildren > 0 && assessedCount >= totalChildren
@@ -44,11 +46,11 @@ export function GroupCompleteButton({
       {/* Complete button */}
       <button
         onClick={onComplete}
-        disabled={!allAssessed || loading}
+        disabled={!allAssessed || loading || disabled}
         className={cn(
           'w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-base transition-all duration-200',
           'min-h-[52px]',
-          allAssessed
+          allAssessed && !disabled
             ? 'bg-primary text-white hover:bg-primary-dark shadow-sm hover:shadow-md'
             : 'bg-surface-container-high text-on-surface-variant/50 cursor-not-allowed',
           loading && 'opacity-70',

@@ -91,12 +91,17 @@ const (
 // OverrideStage applies a facilitator override to a group-stage and broadcasts it.
 // The session is resolved from the group's owning session. callerTenant is the
 // resolved tenant from the JWT/scope; an owning-tenant mismatch is rejected.
-func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, action OverrideAction, actorID, callerTenant string) (*entity.GroupStageProgress, error) {
+// actorRole gates the write to the group's owner when the actor is a FASILITATOR
+// (ADMIN/KOORDINATOR/SUPER_ADMIN bypass the ownership check).
+func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, action OverrideAction, actorID, actorRole, callerTenant string) (*entity.GroupStageProgress, error) {
 	g, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
 	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
+		return nil, err
+	}
+	if err := assertOwnership(actorRole, g.FacilitatorID, actorID); err != nil {
 		return nil, err
 	}
 	progress, _ := s.repo.GetProgressByGroup(ctx, groupID)
@@ -124,12 +129,16 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, ac
 }
 
 // Jump moves a group to a session stage (updates its current stage).
-func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID, callerTenant string) error {
+// actorRole gates the write to the group's owner when the actor is a FASILITATOR.
+func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID, actorRole, callerTenant string) error {
 	g, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil {
 		return err
 	}
 	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
+		return err
+	}
+	if err := assertOwnership(actorRole, g.FacilitatorID, actorID); err != nil {
 		return err
 	}
 	g.CurrentSessionStageID = &stageID
@@ -141,12 +150,16 @@ func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID, callerTen
 }
 
 // Reset clears a group's current stage (back to waiting).
-func (s *Service) Reset(ctx context.Context, groupID, actorID, callerTenant string) error {
+// actorRole gates the write to the group's owner when the actor is a FASILITATOR.
+func (s *Service) Reset(ctx context.Context, groupID, actorID, actorRole, callerTenant string) error {
 	g, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil {
 		return err
 	}
 	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
+		return err
+	}
+	if err := assertOwnership(actorRole, g.FacilitatorID, actorID); err != nil {
 		return err
 	}
 	g.CurrentSessionStageID = nil
@@ -256,6 +269,20 @@ func (s *Service) assertTenant(ctx context.Context, sessionID, callerTenant stri
 	}
 	if owner != callerTenant {
 		return apperrors.Forbidden("forbidden", errors.New("tenant mismatch"))
+	}
+	return nil
+}
+
+// assertOwnership enforces group-ownership for facilitator writes. Non-facilitator
+// roles (ADMIN/KOORDINATOR/SUPER_ADMIN) always pass. For a FASILITATOR, the group's
+// facilitator_id must equal actorID; when the group is unassigned (nil) every
+// facilitator is denied the write and an admin must assign it first.
+func assertOwnership(actorRole string, groupFacilitatorID *string, actorID string) error {
+	if entity.UserRole(actorRole) != entity.RoleFasilitator {
+		return nil
+	}
+	if groupFacilitatorID == nil || *groupFacilitatorID != actorID {
+		return apperrors.Forbidden("not_group_owner", errors.New("facilitator does not own this group"))
 	}
 	return nil
 }

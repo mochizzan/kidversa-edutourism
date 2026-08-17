@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
@@ -72,12 +73,12 @@ func (r *GormSessionRepository) ListSessions(ctx context.Context, f repository.S
 		q = q.Where("LOWER(name) LIKE ? OR LOWER(location) LIKE ?", like, like)
 	}
 	// When FacilitatorID is set, restrict to sessions where the facilitator
-	// is assigned to at least one session_stage OR session_group.
+	// owns at least one session_group (group.facilitator_id is the single
+	// source of truth under Opsi A; stage.facilitator_id is no longer assigned).
 	if f.FacilitatorID != "" {
 		q = q.Where(
-			"id IN (SELECT session_id FROM session_stages WHERE facilitator_id = ?) "+
-				"OR id IN (SELECT session_id FROM session_groups WHERE facilitator_id = ?)",
-			f.FacilitatorID, f.FacilitatorID,
+			"id IN (SELECT session_id FROM session_groups WHERE facilitator_id = ?)",
+			f.FacilitatorID,
 		)
 	}
 	var total int64
@@ -139,12 +140,12 @@ func (r *GormSessionRepository) ListSessionStages(ctx context.Context, sessionID
 
 func (r *GormSessionRepository) UpdateSessionStage(ctx context.Context, s *entity.SessionStage) error {
 	m := sessionStageModelFromEntity(s)
-	// Select forces FacilitatorID into the UPDATE even when nil (GORM otherwise
-	// skips zero-value fields, so a nil *string would not produce SET facilitator_id = NULL).
+	// Stage facilitator is derived from the owning group (Opsi A); the stage's own
+	// facilitator_id column is no longer written. Only status/updated_at are updated.
 	if err := r.db.WithContext(ctx).
 		Model(&SessionStageModel{}).
 		Where("id = ?", s.ID).
-		Select("FacilitatorID", "Status", "UpdatedAt").
+		Select("Status", "UpdatedAt").
 		Updates(m).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
@@ -563,4 +564,35 @@ func (r *GormSessionRepository) TenantIDForSession(ctx context.Context, sessionI
 		return "", apperrors.Internal("internal_error", err)
 	}
 	return tid, nil
+}
+
+// GetGroupFacilitatorID returns the facilitator_id of a session group, or nil if
+// the group is unassigned / not found. Used for facilitator ownership checks.
+func (r *GormSessionRepository) GetGroupFacilitatorID(ctx context.Context, groupID string) (*string, error) {
+	var fid sql.NullString
+	if err := r.db.WithContext(ctx).
+		Table("session_groups").
+		Select("facilitator_id").
+		Where("id = ?", groupID).
+		Scan(&fid).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	if !fid.Valid || fid.String == "" {
+		return nil, nil
+	}
+	v := fid.String
+	return &v, nil
+}
+
+// FacilitatorOwnsAnyGroup reports whether the facilitator owns at least one group
+// in the given session. Used to gate kiosk issuance to group owners.
+func (r *GormSessionRepository) FacilitatorOwnsAnyGroup(ctx context.Context, sessionID, facilitatorID string) (bool, error) {
+	var n int64
+	if err := r.db.WithContext(ctx).
+		Table("session_groups").
+		Where("session_id = ? AND facilitator_id = ?", sessionID, facilitatorID).
+		Count(&n).Error; err != nil {
+		return false, apperrors.Internal("internal_error", err)
+	}
+	return n > 0, nil
 }

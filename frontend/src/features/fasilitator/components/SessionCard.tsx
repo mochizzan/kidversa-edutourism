@@ -7,6 +7,9 @@ import type { Session } from '../../../core/types'
 interface SessionCardProps {
   session: Session
   onClick?: () => void
+  /** Force the card to be clickable even when session.is_my_session is false
+   *  (e.g. "Sesi Hari Ini" — visibility-all but always actionable to open). */
+  forceClickable?: boolean
   className?: string
 }
 
@@ -24,8 +27,9 @@ const statusLabel: Record<string, string> = {
   CANCELLED: 'Dibatalkan',
 }
 
-export function SessionCard({ session, onClick, className }: SessionCardProps) {
+export function SessionCard({ session, onClick, forceClickable = false, className }: SessionCardProps) {
   const isMySession = session.is_my_session === true
+  const clickable = isMySession || forceClickable
   const hasTime = session.start_time != null && session.end_time != null
   const timeDisplay = hasTime
     ? `${session.start_time!.slice(0, 5)} – ${session.end_time!.slice(0, 5)}`
@@ -33,11 +37,11 @@ export function SessionCard({ session, onClick, className }: SessionCardProps) {
 
   return (
     <button
-      onClick={isMySession ? onClick : undefined}
-      disabled={!isMySession}
+      onClick={clickable ? onClick : undefined}
+      disabled={!clickable}
       className={cn(
         'w-full text-left bg-surface rounded-2xl p-5 shadow-sm border',
-        isMySession
+        clickable
           ? 'border-primary/30 hover:border-primary/50 hover:shadow-md hover:bg-surface-container-low/50 cursor-pointer'
           : 'border-outline-variant/50 cursor-default',
         'transition-all duration-200 group',

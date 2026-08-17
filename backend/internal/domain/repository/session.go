@@ -138,4 +138,12 @@ type SessionRepository interface {
 
 	// TenantIDForSession resolves the owning tenant of a session (for media scope checks).
 	TenantIDForSession(ctx context.Context, sessionID string) (string, error)
+
+	// GetGroupFacilitatorID returns the facilitator_id of a session group, or nil if
+	// the group is unassigned / not found. Used for facilitator ownership checks.
+	GetGroupFacilitatorID(ctx context.Context, groupID string) (*string, error)
+
+	// FacilitatorOwnsAnyGroup reports whether the facilitator owns at least one group
+	// in the given session. Used to gate kiosk issuance to group owners.
+	FacilitatorOwnsAnyGroup(ctx context.Context, sessionID, facilitatorID string) (bool, error)
 }

@@ -196,7 +196,12 @@ const DashboardPage = () => {
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {todaySessions.map((session) => (
-              <SessionCard key={session.id} session={session} />
+              <SessionCard
+                key={session.id}
+                session={session}
+                forceClickable
+                onClick={() => navigate(`/fasilitator/groups?sessionId=${session.id}`)}
+              />
             ))}
           </div>
         )}
@@ -218,6 +223,8 @@ const DashboardPage = () => {
                     : undefined
                 }
                 status={deriveGroupStatus(item.progress)}
+                facilitatorId={item.group.facilitator_id}
+                currentUserId={user?.id}
                 onClick={() => navigate(`/fasilitator/groups/${item.group.id}`)}
               />
             ))}

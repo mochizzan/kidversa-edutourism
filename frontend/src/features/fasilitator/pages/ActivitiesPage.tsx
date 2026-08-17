@@ -59,9 +59,11 @@ const ActivitiesPage = () => {
         const detail = await sessionService.getById(session.id)
         if (!detail) continue
 
-        // Find stages assigned to this fasilitator
-        const myStages = detail.stages.filter((s) => s.facilitator_id === user.id)
-        if (myStages.length === 0) continue
+        // Opsi A: ownership is via the group (group.facilitator_id), not the
+        // stage. A facilitator's activity appears when they own ≥1 group in the
+        // session. Use the group's current stage (if any) as the representative.
+        const myGroups = detail.groups.filter((g) => g.facilitator_id === user.id)
+        if (myGroups.length === 0) continue
 
         // Get program stages for name lookup
         const programStages = await programService.getStages(detail.program_id)
@@ -71,9 +73,15 @@ const ActivitiesPage = () => {
         const assessments = await assessmentService.getBySession(session.id)
         const assessedParticipantIds = new Set(assessments.map((a) => a.participant_id))
 
-        // Use the first stage name as representative
-        const firstStage = myStages[0]
-        const stageName = stageNameMap.get(firstStage.program_stage_id) ?? 'Stage'
+        // Representative stage: the current stage of the first owned group.
+        const repStageId = myGroups[0].current_session_stage_id
+        const repStage = repStageId
+          ? detail.stages.find((s) => s.id === repStageId)
+          : undefined
+        const stageName =
+          (repStage && stageNameMap.get(repStage.program_stage_id)) ||
+          (detail.stages[0] && stageNameMap.get(detail.stages[0].program_stage_id)) ||
+          'Stage'
 
         items.push({
           id: session.id,

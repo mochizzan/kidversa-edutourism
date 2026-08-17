@@ -1,4 +1,4 @@
-import { Users, ChevronRight } from 'lucide-react'
+import { Users, ChevronRight, CheckCircle } from 'lucide-react'
 import { cn } from '../../../core/utils'
 import { Badge } from '../../../shared/components/ui/Badge'
 
@@ -7,6 +7,9 @@ interface GroupCardProps {
   childCount: number
   currentStage?: string
   status: 'WAITING' | 'IN_PROGRESS' | 'COMPLETED'
+  /** Group owner; when it matches currentUserId the "Tugas Saya" badge shows. */
+  facilitatorId?: string
+  currentUserId?: string
   onClick?: () => void
   className?: string
 }
@@ -17,8 +20,18 @@ const statusConfig: Record<string, { label: string; variant: 'warning' | 'accent
   COMPLETED: { label: 'Selesai', variant: 'success' },
 }
 
-export function GroupCard({ name, childCount, currentStage, status, onClick, className }: GroupCardProps) {
+export function GroupCard({
+  name,
+  childCount,
+  currentStage,
+  status,
+  facilitatorId,
+  currentUserId,
+  onClick,
+  className,
+}: GroupCardProps) {
   const config = statusConfig[status] ?? { label: status, variant: 'neutral' as const }
+  const isMine = !!currentUserId && facilitatorId === currentUserId
 
   return (
     <button
@@ -32,9 +45,17 @@ export function GroupCard({ name, childCount, currentStage, status, onClick, cla
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold text-on-surface text-base group-hover:text-primary transition-colors">
-            {name}
-          </h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold text-on-surface text-base group-hover:text-primary transition-colors">
+              {name}
+            </h3>
+            {isMine && (
+              <Badge variant="accent" size="sm" className="shrink-0">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Tugas Saya
+              </Badge>
+            )}
+          </div>
           {currentStage && (
             <p className="text-sm text-on-surface-variant mt-0.5">
               {currentStage}

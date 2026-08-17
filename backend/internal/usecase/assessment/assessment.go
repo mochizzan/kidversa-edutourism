@@ -2,6 +2,7 @@ package assessment
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -21,9 +22,15 @@ func NewUsecase(repo repository.AssessmentRepository) *Usecase {
 }
 
 // Upsert creates or updates an assessment keyed on (participant_id, session_stage_id).
-func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy string, assessedAt time.Time, syncStatus string) (*entity.Assessment, error) {
+// actorRole gates the write to the participant's group owner when the actor is a
+// FASILITATOR; ADMIN/KOORDINATOR/SUPER_ADMIN bypass. An unassigned group (no
+// facilitator) denies the facilitator write so an admin must assign first.
+func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy, actorID, actorRole string, assessedAt time.Time, syncStatus string) (*entity.Assessment, error) {
 	if req.ParticipantID == "" || req.SessionStageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
+	}
+	if err := u.assertOwnership(ctx, req.ParticipantID, actorID, actorRole); err != nil {
+		return nil, err
 	}
 	existing, err := u.repo.GetByParticipantStage(ctx, req.ParticipantID, req.SessionStageID)
 	if err == nil && existing != nil {
@@ -67,20 +74,37 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	return a, nil
 }
 
-// BulkUpsert upserts many assessments.
-func (u *Usecase) BulkUpsert(ctx context.Context, items []entity.Assessment) ([]entity.Assessment, error) {
+// BulkUpsert upserts many assessments. actorID/actorRole are threaded per-item for
+// the facilitator ownership gate (see Upsert).
+func (u *Usecase) BulkUpsert(ctx context.Context, items []entity.Assessment, actorID, actorRole string) ([]entity.Assessment, error) {
 	out := make([]entity.Assessment, 0, len(items))
 	for i := range items {
 		it := items[i]
 		res, err := u.Upsert(ctx,
 			repository.AssessmentFilter{ParticipantID: it.ParticipantID, SessionID: it.SessionID, SessionStageID: it.SessionStageID},
-			it.StarRating, it.Comment, it.AssessedBy, it.AssessedAt, string(it.SyncStatus))
+			it.StarRating, it.Comment, it.AssessedBy, actorID, actorRole, it.AssessedAt, string(it.SyncStatus))
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, *res)
 	}
 	return out, nil
+}
+
+// assertOwnership denies the write when the actor is a FASILITATOR who does not
+// own the participant's group. Non-facilitator roles bypass.
+func (u *Usecase) assertOwnership(ctx context.Context, participantID, actorID, actorRole string) error {
+	if entity.UserRole(actorRole) != entity.RoleFasilitator {
+		return nil
+	}
+	owner, err := u.repo.GetGroupFacilitatorIDByParticipant(ctx, participantID)
+	if err != nil {
+		return err
+	}
+	if owner == nil || *owner != actorID {
+		return apperrors.Forbidden("not_group_owner", errors.New("facilitator does not own this participant's group"))
+	}
+	return nil
 }
 
 // List returns assessments matching the filter (paginated).

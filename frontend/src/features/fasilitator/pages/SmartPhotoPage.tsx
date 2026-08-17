@@ -11,6 +11,7 @@ import { sessionService } from '../../../core/services/sessions'
 import { useAuthStore } from '../../../core/stores/authStore'
 import { useCamera } from '../hooks/useCamera'
 import { useSmartPhotos } from '../hooks/useSmartPhotos'
+import { useGroupOwnership } from '../hooks/useGroupOwnership'
 import { CameraViewport } from '../components/CameraViewport'
 import { PhotoEditor } from '../components/PhotoEditor'
 import { PhotoGallery, FullscreenPhoto } from '../components/PhotoGallery'
@@ -33,6 +34,7 @@ const SmartPhotoPage = () => {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const { addToast } = useGlobalToast()
+  const { isMine } = useGroupOwnership(childId)
 
   const captureCanvasRef = useRef<HTMLCanvasElement>(null)
   const editorCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -154,7 +156,7 @@ const SmartPhotoPage = () => {
   }, [phase, capturedPhotoDataUrl, selectedFrameId, frames])
 
   const takePhoto = useCallback(() => {
-    if (!videoRef.current || !captureCanvasRef.current || !user) return
+    if (!videoRef.current || !captureCanvasRef.current || !user || !isMine) return
     const video = videoRef.current
     const canvas = captureCanvasRef.current
     const isPortrait = window.innerWidth <= 1024
@@ -213,7 +215,7 @@ const SmartPhotoPage = () => {
   }, [navigate])
 
   const handleSave = useCallback(async () => {
-    if (!editorCanvasRef.current || !childId || !participant || !user) return
+    if (!editorCanvasRef.current || !childId || !participant || !user || !isMine) return
     if (!participant.session_id) {
       addToast({ type: 'error', message: 'Peserta belum masuk sesi' })
       return
@@ -316,6 +318,12 @@ const SmartPhotoPage = () => {
   return (
     <div className="min-h-dvh bg-surface-container-low -mx-4 -my-5 lg:-mx-6 lg:-my-6 pb-24">
       <div className="p-4 md:p-6 lg:p-8 space-y-5 max-w-5xl mx-auto">
+        {!isMine && (
+          <div className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+            <Lock className="w-4 h-4 shrink-0" />
+            Bukan kelompok Anda — foto hanya dapat dilihat (mode baca saja).
+          </div>
+        )}
         <div className="flex items-center gap-4 md:gap-6">
           <button
             onClick={handleBack}

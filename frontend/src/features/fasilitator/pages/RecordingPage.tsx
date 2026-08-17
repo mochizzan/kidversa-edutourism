@@ -6,6 +6,7 @@ import { recordingService } from '../../../core/services/recordings'
 import { sessionService } from '../../../core/services/sessions'
 import { programService } from '../../../core/services/programs'
 import { useMediaRecorder } from '../hooks/useMediaRecorder'
+import { useGroupOwnership } from '../hooks/useGroupOwnership'
 import { PreRecordingView } from '../components/PreRecordingView'
 import { RecordingView } from '../components/RecordingView'
 import { PreviewView } from '../components/PreviewView'
@@ -16,6 +17,7 @@ const MAX_DURATION = 90 // seconds
 const RecordingPage = () => {
   const { childId } = useParams<{ groupId: string; childId: string }>()
   const navigate = useNavigate()
+  const { isMine } = useGroupOwnership(childId)
 
   const previewVideoRef = useRef<HTMLVideoElement>(null)
 
@@ -102,11 +104,12 @@ const RecordingPage = () => {
   }, [])
 
   const handleStart = useCallback(() => {
+    if (!isMine) return
     startRecording(
       () => setPhase('preview'),
       () => setPhase('recording'),
     )
-  }, [startRecording])
+  }, [startRecording, isMine])
 
   const handleCancel = useCallback(() => {
     cancelRecording()
@@ -124,7 +127,7 @@ const RecordingPage = () => {
   }, [resetRecorder])
 
   const handleSave = useCallback(async () => {
-    if (!recordedBlob || !childId || !recordingSessionStageId) return
+    if (!recordedBlob || !childId || !recordingSessionStageId || !isMine) return
     setIsSaving(true)
     setSaveError('')
     try {
@@ -181,6 +184,11 @@ const RecordingPage = () => {
 
   return (
     <div className="h-screen h-dvh flex flex-col bg-black text-white">
+      {!isMine && (
+        <div className="px-4 py-2 bg-yellow-500/90 text-black text-sm text-center shrink-0">
+          Bukan kelompok Anda — rekaman hanya dapat dilihat (mode baca saja).
+        </div>
+      )}
       <header className="flex items-center justify-between px-4 py-3 bg-black/80 z-10 shrink-0">
         {phase === 'pre' && (
           <button onClick={() => navigate(-1)} className="p-1 rounded-full hover:bg-white/10">

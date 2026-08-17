@@ -78,7 +78,6 @@ export interface SessionService {
   cancel(id: string): Promise<Session>
   delete(id: string): Promise<void>
 
-  assignFacilitator(sessionId: string, stageId: string, userId: string | null): Promise<SessionStage>
   getStages(sessionId: string): Promise<SessionStage[]>
   getGroups(sessionId: string): Promise<SessionGroup[]>
 

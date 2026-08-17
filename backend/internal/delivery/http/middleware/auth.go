@@ -133,3 +133,9 @@ func GetUserID(c *echo.Context) string {
 	u, _ := (*c).Get(CtxUserID).(string)
 	return u
 }
+
+// GetRole extracts the resolved user role from context ("" if absent).
+func GetRole(c *echo.Context) string {
+	r, _ := (*c).Get(CtxRole).(string)
+	return r
+}

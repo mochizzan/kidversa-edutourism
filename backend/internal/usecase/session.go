@@ -292,25 +292,6 @@ func (u *SessionUsecase) DeleteSession(ctx context.Context, id, tenantID string)
 	return u.sessionRepo.DeleteSession(ctx, id)
 }
 
-// AssignFacilitator assigns a facilitator to a session stage. A nil
-// facilitatorID unassigns the facilitator (DB NULL).
-func (u *SessionUsecase) AssignFacilitator(ctx context.Context, sessionID, stageID string, facilitatorID *string) (*entity.SessionStage, error) {
-	stages, err := u.sessionRepo.ListSessionStages(ctx, sessionID)
-	if err != nil {
-		return nil, err
-	}
-	for i := range stages {
-		if stages[i].ID == stageID {
-			stages[i].FacilitatorID = facilitatorID
-			if err := u.sessionRepo.UpdateSessionStage(ctx, &stages[i]); err != nil {
-				return nil, err
-			}
-			return &stages[i], nil
-		}
-	}
-	return nil, apperrors.NotFound("not_found", nil)
-}
-
 // GetStages lists the session stages.
 func (u *SessionUsecase) GetStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
 	return u.sessionRepo.ListSessionStages(ctx, sessionID)

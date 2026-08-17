@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
@@ -29,7 +30,7 @@ func (h *AssessmentHandler) Upsert(c *echo.Context) error {
 	}
 	a, err := h.uc.Upsert((*c).Request().Context(),
 		repository.AssessmentFilter{ParticipantID: req.ParticipantID, SessionID: req.SessionID, SessionStageID: req.SessionStageID},
-		req.StarRating, req.Comment, req.AssessedBy, apputil.ParseISOOrNow(req.AssessedAt), req.SyncStatus)
+		req.StarRating, req.Comment, req.AssessedBy, appmiddleware.GetUserID(c), appmiddleware.GetRole(c), apputil.ParseISOOrNow(req.AssessedAt), req.SyncStatus)
 	if err != nil {
 		return err
 	}
@@ -56,7 +57,7 @@ func (h *AssessmentHandler) BulkUpsert(c *echo.Context) error {
 			SyncStatus:     entity.SyncStatus(it.SyncStatus),
 		})
 	}
-	out, err := h.uc.BulkUpsert((*c).Request().Context(), items)
+	out, err := h.uc.BulkUpsert((*c).Request().Context(), items, appmiddleware.GetUserID(c), appmiddleware.GetRole(c))
 	if err != nil {
 		return err
 	}

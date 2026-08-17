@@ -1,19 +1,15 @@
 import { Card } from '../../../shared/components/ui/Card'
 import { Badge } from '../../../shared/components/ui/Badge'
-import { Select } from '../../../shared/components/ui/Select'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
-import { Layers } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { sessionService } from '../../../core/services/sessions'
-import { useGlobalToast } from '../../../shared/components/feedback/Toast'
-import type { SessionStage, User } from '../../../core/types'
+import { Layers, User as UserIcon } from 'lucide-react'
+import type { SessionStage, SessionGroup, User } from '../../../core/types'
 
 interface SessionStagesTabProps {
   stages: SessionStage[]
+  groups: SessionGroup[]
   facilitators: User[]
   sessionId: string
   stageMap: Map<string, string>
-  onRefresh: () => void
 }
 
 const stageStatusVariant: Record<string, 'neutral' | 'warning' | 'success'> = {
@@ -28,50 +24,10 @@ const stageStatusLabel: Record<string, string> = {
   COMPLETED: 'Selesai',
 }
 
-export function SessionStagesTab({ stages, facilitators, sessionId, stageMap, onRefresh }: SessionStagesTabProps) {
-  const { addToast } = useGlobalToast()
-  const [pending, setPending] = useState<Record<string, boolean>>({})
-  const [facilitatorOverride, setFacilitatorOverride] = useState<Record<string, string | null>>({})
-
-  useEffect(() => {
-    setFacilitatorOverride((prev) => {
-      const next = { ...prev }
-      let changed = false
-      for (const stage of stages) {
-        if (stage.id in next && (next[stage.id] ?? null) === (stage.facilitator_id ?? null)) {
-          delete next[stage.id]
-          changed = true
-        }
-      }
-      return changed ? next : prev
-    })
-  }, [stages])
-
-  const handleAssign = async (stage: SessionStage, facilitatorId: string) => {
-    const normalizedId = facilitatorId || null
-    const previous = stage.id in facilitatorOverride
-      ? facilitatorOverride[stage.id]
-      : (stage.facilitator_id ?? null)
-    if (normalizedId === previous) return
-
-    setFacilitatorOverride((p) => ({ ...p, [stage.id]: normalizedId }))
-    setPending((p) => ({ ...p, [stage.id]: true }))
-    try {
-      await sessionService.assignFacilitator(sessionId, stage.id, normalizedId)
-      onRefresh()
-    } catch (err) {
-      setFacilitatorOverride((p) => ({ ...p, [stage.id]: previous }))
-      addToast({ type: 'error', message: 'Gagal mengubah fasilitator. Silakan coba lagi.' })
-    } finally {
-      setPending((p) => ({ ...p, [stage.id]: false }))
-    }
-  }
-
-  const facilitatorOptions = [
-    { value: '', label: 'Belum ada fasilitator' },
-    ...facilitators.map((f) => ({ value: f.id, label: f.name })),
-  ]
-
+// Opsi A: stage facilitator is derived from the group(s) currently at the stage
+// (group.facilitator_id is the single source of truth). Stage facilitator is
+// read-only — assignment happens via the Groups tab, not per stage.
+export function SessionStagesTab({ stages, groups, facilitators, stageMap }: SessionStagesTabProps) {
   if (!stages || stages.length === 0) {
     return (
       <Card>
@@ -84,54 +40,70 @@ export function SessionStagesTab({ stages, facilitators, sessionId, stageMap, on
     )
   }
 
-  const assignedCount = stages.filter((s) => s.facilitator_id).length
-
   return (
     <div className="space-y-4">
       <Card padding="sm">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <span className="text-on-surface-variant">
-            Total stage: <span className="font-semibold text-on-surface">{stages.length}</span>
-          </span>
-          <span className="text-on-surface-variant">
-            Fasilitator ditugaskan: <span className="font-semibold text-on-surface">{assignedCount}</span> / {stages.length}
-          </span>
-        </div>
+        <p className="text-sm text-on-surface-variant">
+          Fasilitator tiap stage diturunkan dari grup yang sedang berada di stage tersebut
+          (ditentukan lewat tab <span className="font-medium text-on-surface">Groups</span>).
+        </p>
       </Card>
 
       <div className="flex flex-col gap-3">
-        {stages.map((stage: SessionStage, index: number) => (
-          <Card key={stage.id} padding="sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-container text-sm font-semibold text-on-primary-container">
-                  {index + 1}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-on-surface">
-                    {stageMap.get(stage.program_stage_id) || stage.program_stage_id}
-                  </p>
-                  <div className="mt-1">
-                    <Badge variant={stageStatusVariant[stage.status] || 'neutral'}>
-                      {stageStatusLabel[stage.status] || stage.status}
-                    </Badge>
+        {stages.map((stage: SessionStage, index: number) => {
+          const facilitatorIds = Array.from(
+            new Set(
+              groups
+                .filter((g) => g.current_session_stage_id === stage.id)
+                .map((g) => g.facilitator_id)
+                .filter((id): id is string => !!id),
+            ),
+          )
+          return (
+            <Card key={stage.id} padding="sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-container text-sm font-semibold text-on-primary-container">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-on-surface">
+                      {stageMap.get(stage.program_stage_id) || stage.program_stage_id}
+                    </p>
+                    <div className="mt-1">
+                      <Badge variant={stageStatusVariant[stage.status] || 'neutral'}>
+                        {stageStatusLabel[stage.status] || stage.status}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="w-full sm:w-64 sm:shrink-0">
-                <Select
-                  value={(stage.id in facilitatorOverride ? facilitatorOverride[stage.id] : stage.facilitator_id) ?? ''}
-                  options={facilitatorOptions}
-                  disabled={pending[stage.id]}
-                  onChange={(e) => handleAssign(stage, e.target.value)}
-                  aria-label={`Fasilitator stage ${stageMap.get(stage.program_stage_id) || stage.program_stage_id}`}
-                />
+                <div className="w-full sm:w-72 sm:shrink-0">
+                  {facilitatorIds.length === 0 ? (
+                    <span className="text-sm text-on-surface-variant">
+                      Belum ada fasilitator
+                    </span>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {facilitatorIds.map((id) => (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1.5 text-sm text-on-surface"
+                        >
+                          <UserIcon className="w-3.5 h-3.5 text-on-surface-variant" />
+                          {facilitators.find((f) => f.id === id)?.name ?? 'Belum ada fasilitator'}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          )
+        })}
       </div>
     </div>
   )
 }
+
+export default SessionStagesTab

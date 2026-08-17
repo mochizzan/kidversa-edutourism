@@ -184,7 +184,7 @@ const SessionDetailPage = () => {
         activeKey={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'info' && <SessionInfoTab session={session} programName={programMap.get(session.program_id) || session.program_id} />}
-      {activeTab === 'stages' && <SessionStagesTab stages={session.stages} facilitators={facilitators} sessionId={sessionId!} stageMap={stageMap} onRefresh={loadSession} />}
+      {activeTab === 'stages' && <SessionStagesTab stages={session.stages} groups={session.groups} facilitators={facilitators} sessionId={sessionId!} stageMap={stageMap} />}
       {activeTab === 'groups' && <SessionGroupsTab sessionId={sessionId!} sessionStatus={session.status} groups={session.groups} facilitators={facilitators} onRefresh={loadSession} />}
     </div>
   )

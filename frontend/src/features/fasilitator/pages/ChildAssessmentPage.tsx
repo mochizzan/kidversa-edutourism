@@ -63,6 +63,7 @@ const ChildAssessmentPage = () => {
     saving,
     saveSuccess,
     isDirty,
+    isMine,
     fetchData,
     handleSave,
   } = useChildAssessment(childId)
@@ -144,6 +145,13 @@ const ChildAssessmentPage = () => {
           </div>
         </div>
 
+        {!isMine && (
+          <div className="mb-6 flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+            <ShieldX className="w-4 h-4 shrink-0" />
+            Bukan kelompok Anda — penilaian hanya dapat dilihat (mode baca saja).
+          </div>
+        )}
+
         {/* Consent status */}
         <div className="flex items-center gap-4 mb-6 flex-wrap">
           {programStage?.is_photo_stage && (
@@ -184,7 +192,7 @@ const ChildAssessmentPage = () => {
             <StarRatingInput
               value={starRating}
               onChange={setStarRating}
-              disabled={saving}
+              disabled={saving || !isMine}
             />
           </div>
 
@@ -199,7 +207,7 @@ const ChildAssessmentPage = () => {
               placeholder="Tulis komentar tentang anak ini..."
               maxLength={300}
               rows={4}
-              disabled={saving}
+              disabled={saving || !isMine}
               className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface placeholder-on-surface-variant focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none transition-all"
             />
             <p className="text-xs text-on-surface-variant mt-1 text-right">
@@ -212,7 +220,7 @@ const ChildAssessmentPage = () => {
             <Button
               onClick={handleSave}
               loading={saving}
-              disabled={starRating === 0 || !isDirty || saving}
+              disabled={(starRating === 0 || !isDirty || saving) && isMine}
               icon={<Save className="w-4 h-4" />}
             >
               Simpan Penilaian
@@ -234,7 +242,7 @@ const ChildAssessmentPage = () => {
             {/* Photo action */}
             {programStage.is_photo_stage && (
               <div className="flex-1 min-w-[180px]">
-                {hasConsentPhoto ? (
+                {hasConsentPhoto && isMine ? (
                   <button
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-medium text-sm hover:bg-primary-container/80 transition-colors"
                     onClick={() =>
@@ -256,7 +264,7 @@ const ChildAssessmentPage = () => {
             {/* Recording action */}
             {programStage.is_recording_stage && (
               <div className="flex-1 min-w-[180px]">
-                {hasConsentRecording ? (
+                {hasConsentRecording && isMine ? (
                   <button
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-medium text-sm hover:bg-primary-container/80 transition-colors"
                     onClick={() =>

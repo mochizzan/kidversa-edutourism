@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Users, Target, Monitor } from 'lucide-react'
+import { Users, Target, Monitor, User } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
 import { liveService } from '../../../core/services/live'
 import { ROUTES } from '../../../core/constants/app'
@@ -8,6 +8,7 @@ import { kioskAccessPath } from '../../../core/constants/app'
 import { apiRequest } from '../../../core/services/backendClient'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { assessmentService } from '../../../core/services/assessments'
+import { userService } from '../../../core/services/users'
 import { programService } from '../../../core/services/programs'
 import { useConfirmDialog } from '../../../shared/hooks/useConfirmDialog'
 import { useAuth } from '../../../core/hooks/useAuth'
@@ -86,6 +87,7 @@ const GroupPage = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [completing, setCompleting] = useState(false)
   const [kioskLoading, setKioskLoading] = useState(false)
+  const [facilitatorName, setFacilitatorName] = useState<string | undefined>(undefined)
 
   const fetchData = useCallback(async () => {
     if (!groupId) return
@@ -154,6 +156,23 @@ const GroupPage = () => {
         isPhotoStage: programStage?.is_photo_stage ?? false,
         isRecordingStage: programStage?.is_recording_stage ?? false,
       })
+
+      // Resolve the group's facilitator name for the info card (Opsi A).
+      if (group.facilitator_id) {
+        try {
+          const users = await userService.getAll({
+            filters: { role: 'FASILITATOR' },
+            limit: 200,
+          })
+          setFacilitatorName(
+            users.data.find((f) => f.id === group.facilitator_id)?.name,
+          )
+        } catch {
+          setFacilitatorName(undefined)
+        }
+      } else {
+        setFacilitatorName(undefined)
+      }
     } catch (err) {
       setError(friendlyError(err))
     } finally {
@@ -289,6 +308,11 @@ const GroupPage = () => {
   const { group, participants, programStageName, isPhotoStage, isRecordingStage } = groupDetail
   const openableStageId = groupDetail.sessionStage?.id ?? groupDetail.group.current_session_stage_id
 
+  // Opsi A: a FASILITATOR may act only on groups they own (group.facilitator_id).
+  // ADMIN/KOORDINATOR/SUPER_ADMIN bypass (full access). Drives the read-only UI.
+  const isMine =
+    !user || user.role !== 'FASILITATOR' || group.facilitator_id === user.id
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -309,7 +333,7 @@ const GroupPage = () => {
               size="sm"
               onClick={handleOpenKiosk}
               loading={kioskLoading}
-              disabled={!openableStageId}
+              disabled={!openableStageId || !isMine}
               icon={<Monitor className="w-4 h-4" />}
             >
               Buka Kiosk
@@ -317,6 +341,22 @@ const GroupPage = () => {
           </div>
         }
       />
+
+      {!isMine ? (
+        <div className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+          <User className="w-4 h-4 shrink-0" />
+          {facilitatorName
+            ? `Bukan kelompok Anda (PIC: ${facilitatorName}) — mode baca saja.`
+            : 'Bukan kelompok Anda — mode baca saja.'}
+        </div>
+      ) : (
+        facilitatorName && (
+          <div className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
+            <User className="w-4 h-4 shrink-0" />
+            Fasilitator: {facilitatorName}
+          </div>
+        )
+      )}
 
       {/* Participant list */}
       {participants.length === 0 ? (
@@ -336,7 +376,7 @@ const GroupPage = () => {
               isAssessed={isAssessed(participant.id)}
               showPhoto={isPhotoStage}
               showRecording={isRecordingStage}
-              onAssess={() => handleAssess(participant.id)}
+              onAssess={isMine ? () => handleAssess(participant.id) : undefined}
             />
           ))}
         </div>
@@ -349,6 +389,7 @@ const GroupPage = () => {
           assessedCount={assessedCount}
           onComplete={handleComplete}
           loading={completing}
+          disabled={!isMine}
         />
       )}
 

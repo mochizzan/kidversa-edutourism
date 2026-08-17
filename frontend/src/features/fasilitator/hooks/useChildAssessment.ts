@@ -6,8 +6,10 @@ import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { useGroupOwnership } from './useGroupOwnership'
 import type {
   Participant,
+  SessionGroup,
   Assessment,
   SessionStage,
   ProgramStage,
@@ -16,6 +18,7 @@ import type {
 
 export interface ChildDetail {
   participant: Participant
+  group: SessionGroup | undefined
   programStage?: ProgramStage
   sessionStage: SessionStage | undefined
 }
@@ -61,7 +64,7 @@ async function findChildInSessions(childId: string): Promise<ChildDetail | null>
       ? programStages.find((ps) => ps.id === currentStage.program_stage_id)
       : undefined
 
-    return { participant, programStage, sessionStage: currentStage }
+    return { participant, group, programStage, sessionStage: currentStage }
   }
   return null
 }
@@ -69,6 +72,7 @@ async function findChildInSessions(childId: string): Promise<ChildDetail | null>
 export function useChildAssessment(childId: string | undefined) {
   const { user } = useAuth()
   const { addToast } = useGlobalToast()
+  const { isMine } = useGroupOwnership(childId)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -163,6 +167,7 @@ export function useChildAssessment(childId: string | undefined) {
     saving,
     saveSuccess,
     isDirty,
+    isMine,
     fetchData,
     handleSave,
   }
