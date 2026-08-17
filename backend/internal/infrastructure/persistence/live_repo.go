@@ -54,7 +54,7 @@ func (r *GormLiveRepository) UpsertProgress(ctx context.Context, p *entity.Group
 	// explicitly write the incoming progress fields.
 	var existing GroupStageProgressModel
 	err := r.db.WithContext(ctx).
-		Where("group_id = ? AND session_stage_id = ?", p.GroupID, p.SessionStageID).
+		Where("group_id = ? AND session_substage_id = ?", p.GroupID, p.SessionStageID).
 		First(&existing).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		if cerr := r.db.WithContext(ctx).Create(m).Error; cerr != nil {

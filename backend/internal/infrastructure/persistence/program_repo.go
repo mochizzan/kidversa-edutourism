@@ -177,28 +177,29 @@ func (r *GormProgramRepository) ReorderStages(ctx context.Context, _ string, ord
 	return r.reorder(ctx, &ProgramStageModel{}, "sequence_order", orderedIDs)
 }
 
-// ListStageContents returns the JOIN-shaped StageContent list for a stage
-// (read-only kiosk/learner projection). Content ownership lives in
-// ContentRepository; this delegates to the dedicated content repo via the
-// shared DB by reusing the stage_contents + contents JOIN logic.
-func (r *GormProgramRepository) ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error) {
+// ListStageContents returns the JOIN-shaped StageContent list for a program
+// substage (Kegiatan). Content ownership lives in ContentRepository; this
+// reuses the stage_contents + contents JOIN logic against the v4 column
+// program_substage_id (content is now owned by the Kegiatan leaf, not the
+// SubTopik stage). stageID is the program_substage_id.
+func (r *GormProgramRepository) ListStageContents(ctx context.Context, substageID string) ([]entity.StageContent, error) {
 	type joinRow struct {
-		ContentID       string
-		ProgramStageID  string
-		SortOrder       int
-		IsActive        bool
-		Title           string
-		FileURL         string
-		YouTubeURL      string `gorm:"column:youtube_url"`
-		FileType        entity.StageContentFileType
-		DurationSeconds int
+		ContentID         string
+		ProgramSubstageID string
+		SortOrder         int
+		IsActive          bool
+		Title             string
+		FileURL           string
+		YouTubeURL        string `gorm:"column:youtube_url"`
+		FileType          entity.StageContentFileType
+		DurationSeconds   int
 	}
 	var rows []joinRow
 	err := r.db.WithContext(ctx).
 		Table("stage_contents sc").
-		Select("sc.content_id, sc.program_stage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds").
+		Select("sc.content_id, sc.program_substage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds").
 		Joins("JOIN contents c ON c.id = sc.content_id").
-		Where("sc.program_stage_id = ?", stageID).
+		Where("sc.program_substage_id = ?", substageID).
 		Order("sc.sort_order ASC").
 		Find(&rows).Error
 	if err != nil {
@@ -208,7 +209,7 @@ func (r *GormProgramRepository) ListStageContents(ctx context.Context, stageID s
 	for _, row := range rows {
 		items = append(items, entity.StageContent{
 			ID:              row.ContentID,
-			ProgramStageID:  row.ProgramStageID,
+			ProgramStageID:  row.ProgramSubstageID,
 			Title:           row.Title,
 			FileURL:         row.FileURL,
 			YouTubeURL:      row.YouTubeURL,

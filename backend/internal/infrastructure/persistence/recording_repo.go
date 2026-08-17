@@ -135,7 +135,7 @@ func (r *GormRecordingRepository) ListRecordings(ctx context.Context, f reposito
 		q = q.Where("session_id = ?", f.SessionID)
 	}
 	if f.SessionStageID != "" {
-		q = q.Where("session_stage_id = ?", f.SessionStageID)
+		q = q.Where("session_substage_id = ?", f.SessionStageID)
 	}
 	if f.ReviewStatus != "" {
 		q = q.Where("review_status = ?", f.ReviewStatus)

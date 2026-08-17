@@ -7,7 +7,7 @@ type Assessment struct {
 	BaseModel
 	ParticipantID  string     `json:"participant_id"`
 	SessionID      string     `json:"session_id"`
-	SessionStageID string     `json:"session_stage_id"`
+	SessionStageID string     `json:"session_stage_id" gorm:"column:session_substage_id"`
 	StarRating     int        `json:"star_rating"`
 	Comment        string     `json:"comment,omitempty"`
 	AssessedBy     string     `json:"assessed_by"`
@@ -34,7 +34,7 @@ type Recording struct {
 	BaseModel
 	ParticipantID   string                 `json:"participant_id"`
 	SessionID       string                 `json:"session_id"`
-	SessionStageID  string                 `json:"session_stage_id"`
+	SessionStageID  string                 `json:"session_stage_id" gorm:"column:session_substage_id"`
 	FileURL         string                 `json:"file_url,omitempty"`
 	DurationSeconds int                    `json:"duration_seconds"`
 	FileSizeBytes   int64                  `json:"file_size_bytes,omitempty"`
@@ -141,7 +141,7 @@ type Content struct {
 // to a Stage with per-stage ordering + activation.
 type StageContentRef struct {
 	ContentID      string    `json:"content_id"`
-	ProgramStageID string    `json:"program_stage_id"`
+	ProgramStageID string    `json:"program_stage_id" gorm:"column:program_substage_id"`
 	SortOrder      int       `json:"sort_order"`
 	IsActive       bool      `json:"is_active"`
 	CreatedAt      time.Time `json:"created_at"`

@@ -42,7 +42,7 @@ type SessionGroup struct {
 type GroupStageProgress struct {
 	BaseModel
 	GroupID        string                   `json:"group_id"`
-	SessionStageID string                   `json:"session_stage_id"`
+	SessionStageID string                   `json:"session_stage_id" gorm:"column:session_substage_id"`
 	Status         GroupStageProgressStatus `json:"status"`
 	EnteredAt      *time.Time               `json:"entered_at,omitempty"`
 	CompletedAt    *time.Time               `json:"completed_at,omitempty"`

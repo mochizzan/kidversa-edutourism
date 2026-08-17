@@ -151,7 +151,7 @@ func (r *GormContentRepository) AssignContentToStage(ctx context.Context, stageI
 
 func (r *GormContentRepository) UnassignContentFromStage(ctx context.Context, stageID, contentID string) error {
 	res := r.db.WithContext(ctx).
-		Where("content_id = ? AND program_stage_id = ?", contentID, stageID).
+		Where("content_id = ? AND program_substage_id = ?", contentID, stageID).
 		Delete(&StageContentRefModel{})
 	if res.Error != nil {
 		return apperrors.Internal("internal_error", res.Error)
@@ -160,26 +160,29 @@ func (r *GormContentRepository) UnassignContentFromStage(ctx context.Context, st
 	return nil
 }
 
-// ListStageContents returns the JOIN-shaped StageContent list for a stage,
-// ordered by sort_order, filtering soft-deleted junctions (E22/CRIT-7).
-func (r *GormContentRepository) ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error) {
+// ListStageContents returns the JOIN-shaped StageContent list for a program
+// substage (Kegiatan), ordered by sort_order, filtering soft-deleted junctions.
+// Content now belongs to the Kegiatan leaf (program_substages), so the filter
+// is on sc.program_substage_id (v4 column rename). stageID is the
+// program_substage_id.
+func (r *GormContentRepository) ListStageContents(ctx context.Context, substageID string) ([]entity.StageContent, error) {
 	type joinRow struct {
-		ContentID       string
-		ProgramStageID  string
-		SortOrder       int
-		IsActive        bool
-		Title           string
-		FileURL         string
-		YouTubeURL      string `gorm:"column:youtube_url"`
-		FileType        entity.StageContentFileType
-		DurationSeconds int
+		ContentID         string
+		ProgramSubstageID string
+		SortOrder         int
+		IsActive          bool
+		Title             string
+		FileURL           string
+		YouTubeURL        string `gorm:"column:youtube_url"`
+		FileType          entity.StageContentFileType
+		DurationSeconds   int
 	}
 	var rows []joinRow
 	err := r.db.WithContext(ctx).
 		Table("stage_contents sc").
-		Select("sc.content_id, sc.program_stage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds").
+		Select("sc.content_id, sc.program_substage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds").
 		Joins("JOIN contents c ON c.id = sc.content_id").
-		Where("sc.program_stage_id = ?", stageID).
+		Where("sc.program_substage_id = ?", substageID).
 		Order("sc.sort_order ASC").
 		Find(&rows).Error
 	if err != nil {
@@ -189,7 +192,7 @@ func (r *GormContentRepository) ListStageContents(ctx context.Context, stageID s
 	for _, row := range rows {
 		items = append(items, entity.StageContent{
 			ID:              row.ContentID,
-			ProgramStageID:  row.ProgramStageID,
+			ProgramStageID:  row.ProgramSubstageID,
 			Title:           row.Title,
 			FileURL:         row.FileURL,
 			YouTubeURL:      row.YouTubeURL,
@@ -215,7 +218,8 @@ func (r *GormContentRepository) GetContentUsage(ctx context.Context, contentID s
 	err := r.db.WithContext(ctx).
 		Table("stage_contents sc").
 		Select("p.id AS program_id, p.name AS program_name, ps.id AS stage_id, ps.name AS stage_name").
-		Joins("JOIN program_stages ps ON ps.id = sc.program_stage_id").
+		Joins("JOIN program_substages psub ON psub.id = sc.program_substage_id").
+		Joins("JOIN program_stages ps ON ps.id = psub.program_stage_id").
 		Joins("JOIN programs p ON p.id = ps.program_id").
 		Where("sc.content_id = ?", contentID).
 		Order("p.name ASC, ps.name ASC").
@@ -244,7 +248,8 @@ func (r *GormContentRepository) GetContentProgramTenant(ctx context.Context, con
 		Table("contents c").
 		Select("COALESCE(p.tenant_id, '')").
 		Joins("JOIN stage_contents sc ON sc.content_id = c.id").
-		Joins("JOIN program_stages ps ON ps.id = sc.program_stage_id").
+		Joins("JOIN program_substages psub ON psub.id = sc.program_substage_id").
+		Joins("JOIN program_stages ps ON ps.id = psub.program_stage_id").
 		Joins("JOIN programs p ON p.id = ps.program_id").
 		Where("c.id = ?", contentID).
 		Limit(1).

@@ -226,7 +226,7 @@ func (r *GormSessionRepository) CreateGroupStageProgress(ctx context.Context, p 
 
 func (r *GormSessionRepository) ListGroupStageProgress(ctx context.Context, sessionStageID string) ([]entity.GroupStageProgress, error) {
 	var models []GroupStageProgressModel
-	if err := r.db.WithContext(ctx).Where("session_stage_id = ?", sessionStageID).Order("created_at ASC").Find(&models).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("session_substage_id = ?", sessionStageID).Order("created_at ASC").Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.GroupStageProgress, 0, len(models))

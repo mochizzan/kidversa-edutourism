@@ -54,7 +54,7 @@ func (r *GormAssessmentRepository) GetByID(ctx context.Context, id, tenantID str
 func (r *GormAssessmentRepository) GetByParticipantStage(ctx context.Context, participantID, sessionStageID string) (*entity.Assessment, error) {
 	var m AssessmentModel
 	if err := r.db.WithContext(ctx).
-		Where("participant_id = ? AND session_stage_id = ?", participantID, sessionStageID).
+		Where("participant_id = ? AND session_substage_id = ?", participantID, sessionStageID).
 		First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
@@ -73,7 +73,7 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 		q = q.Where("session_id = ?", f.SessionID)
 	}
 	if f.SessionStageID != "" {
-		q = q.Where("session_stage_id = ?", f.SessionStageID)
+		q = q.Where("session_substage_id = ?", f.SessionStageID)
 	}
 
 	var total int64
