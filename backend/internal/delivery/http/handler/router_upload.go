@@ -22,12 +22,12 @@ func uploadMaxBodyBytes(cfg *config.Config) int64 {
 // RegisterUploadRoutes mounts the file-upload endpoints:
 //   - POST /api/photos/upload
 //   - POST /api/frames/upload
-//   - POST /api/contents/upload
 //   - POST /api/users/:id/avatar
 //
 // All require a valid JWT and tenant scope, and enforce an echo BodyLimit of
-// the configured max upload size on the raw request. The frame/content/avatar
-// routes reuse the same middleware chain as the photo uploads.
+// the configured max upload size on the raw request. The frame/avatar routes
+// reuse the same middleware chain as the photo uploads. (Content upload lives
+// in router_contents.go to keep content-level routes grouped together.)
 func RegisterUploadRoutes(g *echo.Group, h *UploadHandler, jm *auth.JWTManager, cfg *config.Config, revoker auth.TokenRevoker) {
 	sseCookie := cfg.SSECookieName()
 	limit := uploadMaxBodyBytes(cfg)
@@ -36,7 +36,6 @@ func RegisterUploadRoutes(g *echo.Group, h *UploadHandler, jm *auth.JWTManager, 
 	bodyMW := middleware.BodyLimit(limit)
 
 	g.POST("/photos/upload", h.UploadPhoto, authMW, scopeMW, bodyMW)
-	g.POST("/contents/upload", h.UploadContentFile, authMW, scopeMW, bodyMW)
 	g.POST("/frames/upload", h.UploadFrame, authMW, scopeMW, bodyMW)
 	g.POST("/users/:id/avatar", h.UploadAvatar, authMW, scopeMW, bodyMW)
 }
