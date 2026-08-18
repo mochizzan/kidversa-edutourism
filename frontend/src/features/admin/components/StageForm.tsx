@@ -80,8 +80,10 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
 
       <BadgeEditor
         title="Badge SubTopik"
+        variant="subtopik"
         name={badgeName}
         imageUrl={badgeImageUrl}
+        helperText="Diberikan otomatis ke anak saat semua kegiatan dalam topik ini sudah dinilai (bintang ≥ 1)."
         onNameChange={setBadgeName}
         onImageChange={setBadgeImageUrl}
       />

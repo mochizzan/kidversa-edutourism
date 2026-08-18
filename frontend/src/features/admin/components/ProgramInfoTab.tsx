@@ -70,8 +70,10 @@ export function ProgramInfoTab({ program, onSaved }: ProgramInfoTabProps) {
 
       <BadgeEditor
         title="Badge Final Program"
+        variant="final"
         name={finalBadgeName}
         imageUrl={finalBadgeImageUrl}
+        helperText="Diberikan otomatis ke anak setelah semua topik dalam program ini selesai."
         onNameChange={setFinalBadgeName}
         onImageChange={setFinalBadgeImageUrl}
       />
