@@ -30,7 +30,6 @@ export function ProgramStagesTab({ stages, onAdd, onEdit }: ProgramStagesTabProp
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="primary">{stage.content_type}</Badge>
-                {stage.is_recording_stage && <Badge variant="accent">Merekam</Badge>}
                 {stage.is_photo_stage && <Badge variant="success">Foto</Badge>}
                 <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit Topik" onClick={() => onEdit(stage)} />
               </div>

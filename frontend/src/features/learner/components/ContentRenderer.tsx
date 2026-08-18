@@ -1,7 +1,6 @@
 import type { StageContent } from '../../../core/types/entities'
 import { StageContentFileType } from '../../../core/types/enums'
 import { extractYouTubeEmbedUrl } from '../../../core/utils/youtube'
-import { Volume2 } from 'lucide-react'
 
 interface ContentRendererProps {
   content: StageContent
@@ -55,21 +54,6 @@ export function ContentRenderer({ content, isMuted, onEnded }: ContentRendererPr
         alt={content.title}
         className="max-w-full max-h-full object-contain"
       />
-    )
-  } else if (content.file_type === StageContentFileType.AUDIO && hasFile) {
-    return (
-      <div className="flex flex-col items-center gap-6">
-        <div className="w-32 h-32 rounded-full bg-primary-container flex items-center justify-center">
-          <Volume2 className="w-16 h-16 text-primary" />
-        </div>
-        <audio
-          key={content.id}
-          src={content.file_url}
-          muted={isMuted}
-          controls
-          onEnded={onEnded}
-        />
-      </div>
     )
   } else if (content.file_type === StageContentFileType.GAME_BUNDLE) {
     return (

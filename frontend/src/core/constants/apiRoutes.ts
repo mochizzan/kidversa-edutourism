@@ -110,13 +110,6 @@ export const API_ROUTES = {
     UPLOAD: '/api/photos/upload',
   },
 
-  RECORDINGS: {
-    BASE: '/api/recordings',
-    DETAIL: (id: string) => `/api/recordings/${encodeURIComponent(id)}`,
-    REVIEW: (id: string) => `/api/recordings/${encodeURIComponent(id)}/review`,
-    UPLOAD: '/api/recordings/upload',
-  },
-
   FRAMES: {
     BASE: '/api/frames',
     DETAIL: (id: string) => `/api/frames/${encodeURIComponent(id)}`,

@@ -1,4 +1,4 @@
-import { Star, Camera, Video } from 'lucide-react'
+import { Star, Camera } from 'lucide-react'
 import { cn } from '../../../core/utils'
 
 interface ChildListItemProps {
@@ -7,10 +7,8 @@ interface ChildListItemProps {
   school?: string
   isAssessed: boolean
   showPhoto?: boolean
-  showRecording?: boolean
   onAssess?: () => void
   onPhoto?: () => void
-  onRecording?: () => void
   className?: string
 }
 
@@ -20,10 +18,8 @@ export function ChildListItem({
   school,
   isAssessed,
   showPhoto = false,
-  showRecording = false,
   onAssess,
   onPhoto,
-  onRecording,
   className,
 }: ChildListItemProps) {
   return (
@@ -86,15 +82,6 @@ export function ChildListItem({
             aria-label="Ambil Foto"
           >
             <Camera className="w-4 h-4" />
-          </button>
-        )}
-        {showRecording && onRecording && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onRecording() }}
-            className="flex items-center justify-center w-10 h-10 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
-            aria-label="Rekam Video"
-          >
-            <Video className="w-4 h-4" />
           </button>
         )}
       </div>

@@ -28,8 +28,6 @@ const ContentFormPage = lazy(() => import('../../features/admin/pages/ContentFor
 const FramesPage = lazy(() => import('../../features/admin/pages/FramesPage'))
 const FrameFormPage = lazy(() => import('../../features/admin/pages/FrameFormPage'))
 const FrameUploadPage = lazy(() => import('../../features/admin/pages/FrameUploadPage'))
-const RecordingReviewPage = lazy(() => import('../../features/admin/pages/RecordingReviewPage'))
-const RecordingDetailPage = lazy(() => import('../../features/admin/pages/RecordingDetailPage'))
 
 // ── Settings ──
 const UsersPage = lazy(() => import('../../features/admin/pages/UsersPage'))
@@ -74,8 +72,6 @@ export const adminRoutes: RouteObject[] = [
       guardedRoute('frames/upload', 'frames', FrameUploadPage),
       guardedRoute('frames', 'frames', FramesPage),
       guardedRoute('frames/:frameId/edit', 'frames', FrameFormPage),
-      guardedRoute('recordings', 'recordings', RecordingReviewPage),
-      guardedRoute('recordings/:recordingId', 'recordings', RecordingDetailPage),
 
       // ── Settings ──
       guardedRoute('users', 'users', UsersPage),

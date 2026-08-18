@@ -67,7 +67,6 @@ export const ADMIN_ROUTE_ACCESS: RouteAccess[] = [
   { path: 'missions', section: 'PROGRAM', label: 'Missions', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { path: 'content', section: 'CONTENT', label: 'Content Manager', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { path: 'frames', section: 'CONTENT', label: 'Frame Manager', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-  { path: 'recordings', section: 'CONTENT', label: 'Recordings', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'tenants', section: 'SETTINGS', label: 'Tenants', roles: [UserRole.SUPER_ADMIN], tenantFree: true },
   { path: 'users', section: 'SETTINGS', label: 'Users', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { path: 'consent', section: 'SETTINGS', label: 'Consent Monitor', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },

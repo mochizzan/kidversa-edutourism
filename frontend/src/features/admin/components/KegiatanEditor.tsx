@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Loader2, Camera, Video } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Loader2, Camera } from 'lucide-react'
 import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
 import { Input } from '../../../shared/components/ui/Input'
@@ -23,7 +23,6 @@ interface DraftState {
   name: string
   description: string
   duration_minutes: number
-  is_recording_stage: boolean
   is_photo_stage: boolean
 }
 
@@ -32,7 +31,6 @@ const emptyDraft = (): DraftState => ({
   name: '',
   description: '',
   duration_minutes: 0,
-  is_recording_stage: false,
   is_photo_stage: true,
 })
 
@@ -54,7 +52,6 @@ export function KegiatanEditor({
       name: k.name,
       description: k.description ?? '',
       duration_minutes: k.duration_minutes,
-      is_recording_stage: k.is_recording_stage,
       is_photo_stage: k.is_photo_stage,
     })
   }
@@ -75,7 +72,6 @@ export function KegiatanEditor({
           name: draft.name.trim(),
           description: draft.description,
           duration_minutes: draft.duration_minutes,
-          is_recording_stage: draft.is_recording_stage,
           is_photo_stage: draft.is_photo_stage,
         })
         onChange(items.map((k) => (k.id === updated.id ? updated : k)))
@@ -86,7 +82,6 @@ export function KegiatanEditor({
           name: draft.name.trim(),
           description: draft.description,
           duration_minutes: draft.duration_minutes,
-          is_recording_stage: draft.is_recording_stage,
           is_photo_stage: draft.is_photo_stage,
         })
         onChange([...items, created])
@@ -149,11 +144,6 @@ export function KegiatanEditor({
                 <p className="text-sm font-medium text-on-surface">{k.name}</p>
                 <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant">
                   <span>{k.duration_minutes} menit</span>
-                  {k.is_recording_stage && (
-                    <span className="flex items-center gap-1">
-                      <Video className="w-3.5 h-3.5" /> Rekam
-                    </span>
-                  )}
                   {k.is_photo_stage && (
                     <span className="flex items-center gap-1">
                       <Camera className="w-3.5 h-3.5" /> Foto
@@ -223,15 +213,6 @@ export function KegiatanEditor({
               }
             />
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-on-surface">
-                <input
-                  type="checkbox"
-                  checked={draft.is_recording_stage}
-                  onChange={(e) => setDraft((d) => ({ ...d, is_recording_stage: e.target.checked }))}
-                  className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
-                />
-                Merekam
-              </label>
               <label className="flex items-center gap-2 text-sm text-on-surface">
                 <input
                   type="checkbox"

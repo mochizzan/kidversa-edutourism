@@ -7,19 +7,16 @@ import { extractYouTubeID } from './youtube'
 export function autoDetectFileType(file: File): StageContentFileType {
   if (file.type.startsWith('video/')) return StageContentFileType.VIDEO
   if (file.type.startsWith('image/')) return StageContentFileType.IMAGE
-  if (file.type.startsWith('audio/')) return StageContentFileType.AUDIO
   return StageContentFileType.GAME_BUNDLE
 }
 
 export function getMediaDuration(file: File): Promise<number> {
-  if (!file.type.startsWith('video/') && !file.type.startsWith('audio/')) {
+  if (!file.type.startsWith('video/')) {
     return Promise.resolve(0)
   }
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file)
-    const el = file.type.startsWith('video/')
-      ? document.createElement('video')
-      : document.createElement('audio')
+    const el = document.createElement('video')
     el.preload = 'metadata'
     el.onloadedmetadata = () => {
       resolve(Math.ceil(el.duration))
@@ -44,7 +41,7 @@ export function detectContentType(contents: StageContent[]): ContentType {
 
 export function computeDurationMinutes(contents: StageContent[]): number {
   const totalSeconds = contents
-    .filter(c => c.file_type === 'VIDEO' || c.file_type === 'AUDIO')
+    .filter(c => c.file_type === 'VIDEO')
     .reduce((sum, c) => sum + (c.duration_seconds ?? 0), 0)
   return Math.ceil(totalSeconds / 60)
 }

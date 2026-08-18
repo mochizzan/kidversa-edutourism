@@ -23,7 +23,6 @@ export interface CreateProgramSubstageDTO {
   name: string
   description?: string
   duration_minutes: number
-  is_recording_stage: boolean
   is_photo_stage: boolean
 }
 
@@ -45,7 +44,6 @@ const create = async (data: CreateProgramSubstageDTO): Promise<ProgramSubstage> 
     name: data.name,
     description: data.description ?? '',
     duration_minutes: data.duration_minutes,
-    is_recording_stage: data.is_recording_stage,
     is_photo_stage: data.is_photo_stage,
   })
 }
@@ -60,7 +58,6 @@ const update = async (
   if (data.name !== undefined) body.name = data.name
   if (data.description !== undefined) body.description = data.description
   if (data.duration_minutes !== undefined) body.duration_minutes = data.duration_minutes
-  if (data.is_recording_stage !== undefined) body.is_recording_stage = data.is_recording_stage
   if (data.is_photo_stage !== undefined) body.is_photo_stage = data.is_photo_stage
   return itemRequest<ProgramSubstage>('PUT', API_ROUTES.PROGRAM_SUBSTAGES.DETAIL(id), body)
 }

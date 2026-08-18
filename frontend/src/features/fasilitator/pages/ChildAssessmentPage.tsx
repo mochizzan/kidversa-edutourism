@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { Star, Camera, Video, Save, ShieldCheck, ShieldX } from 'lucide-react'
+import { Star, Camera, Save, ShieldCheck, ShieldX } from 'lucide-react'
 import { ROUTES } from '../../../core/constants/app'
 import { cn } from '../../../core/utils'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
@@ -93,7 +93,6 @@ const ChildAssessmentPage = () => {
 
   const { participant, programStage } = childDetail ?? {}
   const hasConsentPhoto = participant?.consent_photo ?? false
-  const hasConsentRecording = participant?.consent_recording ?? false
 
   // ── Loading state ──
   if (loading) {
@@ -182,19 +181,6 @@ const ChildAssessmentPage = () => {
               ) : (
                 <span className="flex items-center gap-1 text-yellow-600">
                   <ShieldX className="w-3.5 h-3.5" /> Tidak Ada Izin Foto
-                </span>
-              )}
-            </div>
-          )}
-          {programStage?.is_recording_stage && (
-            <div className="flex items-center gap-1.5 text-xs">
-              {hasConsentRecording ? (
-                <span className="flex items-center gap-1 text-green-600">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Izin Rekaman
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-yellow-600">
-                  <ShieldX className="w-3.5 h-3.5" /> Tidak Ada Izin Rekaman
                 </span>
               )}
             </div>
@@ -289,7 +275,7 @@ const ChildAssessmentPage = () => {
       </div>
 
       {/* Quick Actions */}
-      {(programStage?.is_photo_stage || programStage?.is_recording_stage) && (
+      {programStage?.is_photo_stage && (
         <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50">
           <h3 className="text-sm font-semibold text-on-surface mb-4">Aksi Cepat</h3>
           <div className="flex flex-wrap gap-3">
@@ -310,28 +296,6 @@ const ChildAssessmentPage = () => {
                   <div className="w-full px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm flex items-center gap-2">
                     <ShieldX className="w-4 h-4 shrink-0" />
                     <span>Tidak ada izin foto</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Recording action */}
-            {programStage.is_recording_stage && (
-              <div className="flex-1 min-w-[180px]">
-                {hasConsentRecording && isMine ? (
-                  <button
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-medium text-sm hover:bg-primary-container/80 transition-colors"
-                    onClick={() =>
-                      navigate(`/fasilitator/groups/${groupId}/children/${childId}/record`)
-                    }
-                  >
-                    <Video className="w-5 h-5" />
-                    Rekam Video
-                  </button>
-                ) : (
-                  <div className="w-full px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm flex items-center gap-2">
-                    <ShieldX className="w-4 h-4 shrink-0" />
-                    <span>Tidak ada izin rekaman</span>
                   </div>
                 )}
               </div>

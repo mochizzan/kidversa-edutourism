@@ -85,10 +85,6 @@ export const ConsentSessionCard = ({
         )}
 
         <div className="flex items-center gap-4 mt-3 text-sm">
-          <span className="text-on-surface-variant">Rekaman:</span>
-          <span className="text-green-600 font-medium">
-            {data.consentedRecording}/{totalParticipants}
-          </span>
           <span className="text-on-surface-variant">Foto:</span>
           <span className="text-green-600 font-medium">
             {data.consentedPhoto}/{totalParticipants}
@@ -139,17 +135,11 @@ export const ConsentSessionCard = ({
               <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-surface-container-low text-xs font-medium text-on-surface-variant">
                 <span className="flex-[2]">Nama Anak</span>
                 <span className="flex-[2]">Orang Tua</span>
-                <span className="flex-1">Rekaman</span>
                 <span className="flex-1">Foto</span>
                 <span className="flex-[1.5]">Tanggal Respon</span>
               </div>
 
               {data.participants.map((participant) => {
-                const recordingStatus = getConsentStatus(
-                  participant.id,
-                  ConsentType.RECORDING,
-                  data.logs,
-                )
                 const photoStatus = getConsentStatus(participant.id, ConsentType.PHOTO, data.logs)
                 const log = data.logs.find((l) => l.participant_id === participant.id)
 
@@ -169,9 +159,6 @@ export const ConsentSessionCard = ({
                     <div className="hidden md:block flex-[2] min-w-0">
                       <p className="text-sm text-on-surface truncate">{participant.parent_name}</p>
                       <p className="text-xs text-on-surface-variant">{participant.parent_phone}</p>
-                    </div>
-                    <div className="flex-1">
-                      <ConsentStatusBadge status={recordingStatus} />
                     </div>
                     <div className="flex-1">
                       <ConsentStatusBadge status={photoStatus} />

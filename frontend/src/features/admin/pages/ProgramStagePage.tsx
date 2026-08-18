@@ -100,7 +100,6 @@ const ProgramStagePage = () => {
   const handleSave = async (data: {
     name: string
     description: string
-    is_recording_stage: boolean
     is_photo_stage: boolean
     badge_name: string
     badge_image_url: string
@@ -114,7 +113,6 @@ const ProgramStagePage = () => {
           sequence_order: stages.length + 1,
           name: data.name,
           description: data.description,
-          is_recording_stage: data.is_recording_stage,
           is_photo_stage: data.is_photo_stage,
           content_type: ContentTypeEnum.MIXED,
           duration_minutes: 0,
@@ -131,7 +129,6 @@ const ProgramStagePage = () => {
         await programService.updateStage(programId, stageId, {
           name: data.name,
           description: data.description,
-          is_recording_stage: data.is_recording_stage,
           is_photo_stage: data.is_photo_stage,
           duration_minutes: computeDurationMinutes(existingContents),
           badge_name: data.badge_name,

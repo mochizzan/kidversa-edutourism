@@ -283,7 +283,6 @@ const DashboardPage = () => {
     count: allReports.filter((r) => r.status === status).length,
   }))
 
-  const recordingConsented = filteredParticipants.filter((p) => p.consent_recording).length
   const photoConsented = filteredParticipants.filter((p) => p.consent_photo).length
 
   const filteredParticipantCounts = filteredSessions.reduce<Record<string, number>>(
@@ -475,7 +474,6 @@ const DashboardPage = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <ReportPipeline data={reportPipelineData} />
             <ConsentOverview
-              recordingConsented={recordingConsented}
               photoConsented={photoConsented}
               total={filteredParticipants.length || 1}
             />

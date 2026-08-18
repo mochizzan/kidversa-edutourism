@@ -45,12 +45,10 @@ const sendViaWhatsApp = async (
 
 const submitCombined = async (
   token: string,
-  recording: boolean,
   photo: boolean,
 ): Promise<void> => {
   await apiRequest<unknown>('POST', API_ROUTES.CONSENT.RESPOND_COMBINED, {
     token,
-    recording,
     photo,
   })
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
 import { formatDateTime } from '../../../shared/utils'
-import { Pencil, Trash2, School2, UserRound, Phone, Mail, CalendarDays, Camera, Mic } from 'lucide-react'
+import { Pencil, Trash2, School2, UserRound, Phone, Mail, CalendarDays, Camera } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -126,10 +126,6 @@ const ParticipantDetailPage = () => {
         <Card title="Persetujuan">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={participant.consent_recording ? 'success' : 'danger'} size="sm">
-                <Mic className="w-3 h-3 mr-1" />
-                Rekaman: {participant.consent_recording ? 'Diizinkan' : 'Tidak Diizinkan'}
-              </Badge>
               <Badge variant={participant.consent_photo ? 'success' : 'danger'} size="sm">
                 <Camera className="w-3 h-3 mr-1" />
                 Foto: {participant.consent_photo ? 'Diizinkan' : 'Tidak Diizinkan'}

@@ -76,7 +76,6 @@ export const programService: ProgramService = {
       description: data.description,
       content_type: data.content_type,
       duration_minutes: data.duration_minutes,
-      is_recording_stage: data.is_recording_stage,
       is_photo_stage: data.is_photo_stage,
     }),
 
@@ -87,7 +86,6 @@ export const programService: ProgramService = {
       description: data.description,
       content_type: data.content_type,
       duration_minutes: data.duration_minutes,
-      is_recording_stage: data.is_recording_stage,
       is_photo_stage: data.is_photo_stage,
       badge_name: data.badge_name,
       badge_image_url: data.badge_image_url,

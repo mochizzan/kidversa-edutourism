@@ -1,9 +1,8 @@
 import { type ReactNode } from 'react'
-import { AlertTriangle, Camera, Mic } from 'lucide-react'
+import { AlertTriangle, Camera } from 'lucide-react'
 import { cn } from '../../../core/utils'
 
 interface ConsentGateProps {
-  consentType: 'recording' | 'photo'
   childName: string
   hasConsent: boolean
   onBack?: () => void
@@ -11,26 +10,15 @@ interface ConsentGateProps {
   className?: string
 }
 
-const consentConfig = {
-  recording: {
-    icon: Mic,
-    title: 'Izin Rekaman Diperlukan',
-    description:
-      'Orang tua/wali belum memberikan izin untuk merekam aktivitas',
-    detail:
-      'Rekaman suara dan video tidak dapat dilakukan tanpa persetujuan dari orang tua atau wali.',
-  },
-  photo: {
-    icon: Camera,
-    title: 'Izin Foto Diperlukan',
-    description: 'Orang tua/wali belum memberikan izin untuk mengambil foto',
-    detail:
-      'Pengambilan foto tidak dapat dilakukan tanpa persetujuan dari orang tua atau wali.',
-  },
+const cfg = {
+  icon: Camera,
+  title: 'Izin Foto Diperlukan',
+  description: 'Orang tua/wali belum memberikan izin untuk mengambil foto',
+  detail:
+    'Pengambilan foto tidak dapat dilakukan tanpa persetujuan dari orang tua atau wali.',
 } as const
 
 export function ConsentGate({
-  consentType,
   childName,
   hasConsent,
   onBack,
@@ -41,14 +29,13 @@ export function ConsentGate({
     return <>{children}</>
   }
 
-  const cfg = consentConfig[consentType]
   const Icon = cfg.icon
 
   return (
     <div
       className={cn(
         'flex flex-col items-center text-center py-10 px-6',
-        className
+        className,
       )}
     >
       <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mb-4">

@@ -36,7 +36,6 @@ export interface CreateStageDTO {
   description?: string
   content_type: ContentType
   duration_minutes: number
-  is_recording_stage?: boolean
   is_photo_stage?: boolean
 }
 

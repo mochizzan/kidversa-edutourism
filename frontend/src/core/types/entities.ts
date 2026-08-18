@@ -59,7 +59,6 @@ export interface ProgramStage {
   description?: string
   content_type: ContentType
   duration_minutes: number
-  is_recording_stage: boolean
   is_photo_stage: boolean
   // Badge SubTopik (per-SubTopik award; shown after all Kegiatan are scored).
   badge_name?: string
@@ -75,7 +74,6 @@ export interface ProgramSubstage {
   name: string
   description?: string
   duration_minutes: number
-  is_recording_stage: boolean
   is_photo_stage: boolean
   created_at: string
   updated_at: string
@@ -205,7 +203,6 @@ export interface Participant {
   parent_name: string
   parent_phone: string
   parent_email?: string
-  consent_recording: boolean
   consent_photo: boolean
   consent_at?: string
   created_at: string
@@ -229,7 +226,6 @@ export interface LinkParticipantResponse {
   parent_name: string
   parent_phone: string
   parent_email?: string
-  consent_recording: boolean
   consent_photo: boolean
   consent_at?: string
   created_at: string
@@ -271,23 +267,6 @@ export interface SmartPhoto {
   taken_by: string
   taken_at: string
   sync_status: import('./enums').SyncStatus
-}
-
-export interface Recording {
-  id: string
-  participant_id: string
-  session_id: string
-  session_stage_id: string
-  file_url?: string
-  duration_seconds: number
-  file_size_bytes?: number
-  transcript_text?: string
-  emotion_tags?: string[]
-  review_status: import('./enums').RecordingsReviewStatus
-  reviewed_by?: string
-  reviewed_at?: string
-  sync_status: import('./enums').SyncStatus
-  created_at: string
 }
 
 export interface Report {

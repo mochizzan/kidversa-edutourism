@@ -23,7 +23,6 @@ import type {
   UpdateUserDTO,
   PhotoFrame,
   SmartPhoto,
-  Recording,
   Report,
   ConsentLog,
   Assessment,
@@ -134,16 +133,6 @@ export interface PhotoService {
   delete(id: string): Promise<void>
 }
 
-// Recordings
-export interface RecordingService {
-  getBySession(sessionId: string): Promise<Recording[]>
-  getByParticipant(participantId: string): Promise<Recording[]>
-  getById(id: string): Promise<Recording | null>
-  update(id: string, data: Partial<Recording>): Promise<Recording>
-  upload(participantId: string, sessionStageId: string, file: File): Promise<Recording>
-  delete(id: string): Promise<void>
-}
-
 // Reports
 export interface ReportTokenResponse {
   id: string
@@ -195,7 +184,7 @@ export interface ConsentProgressEvent {
 
 export interface ConsentService {
   sendViaWhatsApp(sessionId: string, force?: boolean): Promise<ConsentSendWhatsAppResponse>
-  submitCombined(token: string, recording: boolean, photo: boolean): Promise<void>
+  submitCombined(token: string, photo: boolean): Promise<void>
   getBySession(sessionId: string): Promise<ConsentLog[]>
   getSummary(sessionIds: string[]): Promise<Record<string, ConsentLog[]>>
   getInfo(token: string): Promise<ConsentInfo>

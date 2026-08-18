@@ -414,7 +414,6 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                               </div>
 
                               <div className="flex shrink-0 items-center gap-1.5">
-                                <Badge variant={participant.consent_recording ? 'success' : 'danger'}>Rekaman</Badge>
                                 <Badge variant={participant.consent_photo ? 'success' : 'danger'}>Foto</Badge>
                               </div>
 

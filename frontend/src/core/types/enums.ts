@@ -15,7 +15,6 @@ export enum ContentType {
 export enum StageContentFileType {
   VIDEO = 'VIDEO',
   IMAGE = 'IMAGE',
-  AUDIO = 'AUDIO',
   GAME_BUNDLE = 'GAME_BUNDLE',
 }
 
@@ -59,14 +58,7 @@ export enum SyncStatus {
   FAILED = 'FAILED',
 }
 
-export enum RecordingsReviewStatus {
-  PENDING = 'PENDING',
-  REVIEWED = 'REVIEWED',
-  SKIPPED = 'SKIPPED',
-}
-
 export enum ConsentType {
-  RECORDING = 'RECORDING',
   PHOTO = 'PHOTO',
 }
 
@@ -80,7 +72,6 @@ export enum ReportStatus {
 export enum SyncQueueDataType {
   ASSESSMENT = 'ASSESSMENT',
   PHOTO = 'PHOTO',
-  RECORDING = 'RECORDING',
   PROGRESS = 'PROGRESS',
 }
 

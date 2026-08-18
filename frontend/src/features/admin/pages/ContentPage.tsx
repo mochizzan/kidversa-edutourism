@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ROUTES, contentEditPath } from '../../../core/constants/app'
-import { Plus, Pencil, Trash2, Play, Image, Music, Gamepad2, Loader2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Play, Image, Gamepad2, Loader2, Search } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -23,7 +23,6 @@ import { getActiveTenantId } from '../../../core/utils/tenant'
 const FILE_TYPE_META: Record<StageContentFileType, { icon: ReactNode; label: string; bg: string; fg: string; ring: string }> = {
   VIDEO: { icon: <Play className="w-4 h-4" />, label: 'Video', bg: 'bg-blue-100', fg: 'text-blue-700', ring: 'ring-blue-200/50' },
   IMAGE: { icon: <Image className="w-4 h-4" />, label: 'Gambar', bg: 'bg-emerald-100', fg: 'text-emerald-700', ring: 'ring-emerald-200/50' },
-  AUDIO: { icon: <Music className="w-4 h-4" />, label: 'Audio', bg: 'bg-amber-100', fg: 'text-amber-700', ring: 'ring-amber-200/50' },
   GAME_BUNDLE: { icon: <Gamepad2 className="w-4 h-4" />, label: 'Game', bg: 'bg-purple-100', fg: 'text-purple-700', ring: 'ring-purple-200/50' },
 }
 
@@ -39,7 +38,6 @@ const FILE_TYPE_FILTER_OPTIONS = [
   { value: '', label: 'Semua Tipe' },
   { value: StageContentFileType.VIDEO, label: 'Video' },
   { value: StageContentFileType.IMAGE, label: 'Gambar' },
-  { value: StageContentFileType.AUDIO, label: 'Audio' },
   { value: StageContentFileType.GAME_BUNDLE, label: 'Game' },
 ]
 
@@ -123,7 +121,7 @@ const ContentPage = () => {
     <div className="space-y-6">
       <PageHeader
         title="Content Manager"
-        subtitle="Perpustakaan konten tenant: video, gambar, audio, game."
+        subtitle="Perpustakaan konten tenant: video, gambar, game."
         actions={
           <Link to={ROUTES.ADMIN.CONTENT_NEW}>
             <Button icon={<Plus className="w-4 h-4" />}>

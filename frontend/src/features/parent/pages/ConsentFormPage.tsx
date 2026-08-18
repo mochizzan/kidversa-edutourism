@@ -3,7 +3,6 @@ import {
   CheckCircle2,
   XCircle,
   Camera,
-  Mic,
   User,
   ShieldCheck,
   AlertTriangle,
@@ -125,7 +124,6 @@ function ConsentForm() {
   const [info, setInfo] = useState<ConsentInfo | null>(null)
   const [infoLoading, setInfoLoading] = useState(true)
 
-  const [recordingConsent, setRecordingConsent] = useState<boolean | null>(null)
   const [photoConsent, setPhotoConsent] = useState<boolean | null>(null)
   const [parentName, setParentName] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -172,15 +170,15 @@ function ConsentForm() {
       addToast({ type: 'error', message: 'Silakan masukkan nama Anda.' })
       return
     }
-    if (recordingConsent === null || photoConsent === null) {
-      addToast({ type: 'error', message: 'Silakan pilih Ya/Tidak untuk kedua izin.' })
+    if (photoConsent === null) {
+      addToast({ type: 'error', message: 'Silakan pilih Ya/Tidak untuk izin foto.' })
       return
     }
 
     setSubmitting(true)
 
     try {
-      await consentService.submitCombined(token, recordingConsent, photoConsent)
+      await consentService.submitCombined(token, photoConsent)
       setSuccess(true)
     } catch (err) {
       const code = err instanceof ApiError ? err.code : ''
@@ -245,10 +243,9 @@ function ConsentForm() {
   }
 
   const completedSteps =
-    (recordingConsent !== null ? 1 : 0) +
     (photoConsent !== null ? 1 : 0) +
     (parentName.trim() ? 1 : 0)
-  const progressPct = Math.round((completedSteps / 3) * 100)
+  const progressPct = Math.round((completedSteps / 2) * 100)
 
   /* ── Form ── */
   return (
@@ -315,7 +312,7 @@ function ConsentForm() {
       <div className="bg-primary-container/60 rounded-2xl p-4 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <p className="text-sm text-on-surface-variant">
-          Kami meminta izin Anda untuk merekam dan memotret selama kegiatan edutourism. Data
+          Kami meminta izin Anda untuk memotret selama kegiatan edutourism. Data
           hanya digunakan untuk laporan perkembangan anak dan{' '}
           <span className="font-medium text-on-surface">tidak disebarluaskan</span>.
         </p>
@@ -342,27 +339,6 @@ function ConsentForm() {
           />
         </div>
       </div>
-
-      {/* Recording consent */}
-      <Card padding="md">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary flex items-center justify-center shrink-0">
-            <Mic className="w-5 h-5" />
-          </span>
-          <div>
-            <h3 className="text-base font-semibold text-on-surface">Izin Rekaman</h3>
-            <p className="text-xs text-on-surface-variant">Rekaman suara selama kegiatan</p>
-          </div>
-        </div>
-        <p className="text-sm text-on-surface-variant mt-3 mb-4">
-          Rekaman digunakan untuk menilai perkembangan bicara dan interaksi anak selama kegiatan.
-        </p>
-        <YaTidakChoice
-          label="Izin rekaman suara"
-          value={recordingConsent}
-          onChange={setRecordingConsent}
-        />
-      </Card>
 
       {/* Photo consent */}
       <Card padding="md">

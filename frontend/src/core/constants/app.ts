@@ -41,7 +41,6 @@ export const ROUTES = {
     CONTENT_NEW: '/admin/content/new',
     FRAMES: '/admin/frames',
     FRAME_UPLOAD: '/admin/frames/upload',
-    RECORDINGS: '/admin/recordings',
     USERS: '/admin/users',
     USER_NEW: '/admin/users/new',
     TENANTS: '/admin/tenants',

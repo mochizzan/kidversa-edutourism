@@ -33,7 +33,6 @@ export const participantService: ParticipantService = {
       parent_phone: data.parent_phone,
       parent_email: data.parent_email,
       group_id: data.group_id,
-      consent_recording: false,
       consent_photo: false,
     }),
 }

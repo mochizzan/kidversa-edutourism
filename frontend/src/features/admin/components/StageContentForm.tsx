@@ -100,9 +100,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
       setFileError(
         detectedType === StageContentFileTypeEnum.IMAGE
           ? 'Gambar melebihi batas 10 MB'
-          : detectedType === StageContentFileTypeEnum.AUDIO
-            ? 'File melebihi batas 50 MB'
-            : `File melebihi batas ${limitMB} MB`
+          : `File melebihi batas ${limitMB} MB`
       )
       return
     }
@@ -144,7 +142,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
       set('youtube_url', '')
 
       // Duration is computed automatically for uploaded VIDEO only (backend also
-      // probes it authoritatively on upload). AUDIO has no duration field of its own.
+      // probes it authoritatively on upload).
       if (detectedType === StageContentFileTypeEnum.VIDEO) {
         const duration = await getMediaDuration(file)
         set('duration_seconds', duration)

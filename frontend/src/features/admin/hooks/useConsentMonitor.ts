@@ -11,7 +11,6 @@ export interface SessionConsentData {
   session: Session
   participants: Participant[]
   logs: ConsentLog[]
-  consentedRecording: number
   consentedPhoto: number
   pendingCount: number
 }
@@ -60,13 +59,6 @@ export function useConsentMonitor() {
         const participants = participantResults[i]
         const logs = consentMap[session.id] ?? []
 
-        const consentedRecording = participants.filter((p) =>
-          logs.some(
-            (l) =>
-              l.participant_id === p.id && l.consent_type === ConsentType.RECORDING && l.value,
-          ),
-        ).length
-
         const consentedPhoto = participants.filter((p) =>
           logs.some(
             (l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO && l.value,
@@ -74,24 +66,17 @@ export function useConsentMonitor() {
         ).length
 
         const pendingCount = participants.filter((p) => {
-          const hasRecording = logs.some(
-            (l) =>
-              l.participant_id === p.id &&
-              l.consent_type === ConsentType.RECORDING &&
-              l.responded_at,
-          )
           const hasPhoto = logs.some(
             (l) =>
               l.participant_id === p.id && l.consent_type === ConsentType.PHOTO && l.responded_at,
           )
-          return !hasRecording || !hasPhoto
+          return !hasPhoto
         }).length
 
         dataMap[session.id] = {
           session,
           participants,
           logs,
-          consentedRecording,
           consentedPhoto,
           pendingCount,
         }

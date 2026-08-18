@@ -112,7 +112,6 @@ export const sessionService: SessionService = {
       parent_phone: data.parent_phone,
       parent_email: data.parent_email,
       group_id: data.group_id ?? groupId,
-      consent_recording: false,
       consent_photo: false,
     }),
 
@@ -131,7 +130,6 @@ export const sessionService: SessionService = {
       parent_phone: data.parent_phone,
       parent_email: data.parent_email,
       group_id: data.group_id,
-      consent_recording: false,
       consent_photo: false,
     }),
 
@@ -151,7 +149,6 @@ export const sessionService: SessionService = {
           parent_phone: r.parent_phone,
           parent_email: r.parent_email,
           group_id: r.group_id,
-          consent_recording: false,
           consent_photo: false,
         })),
       },

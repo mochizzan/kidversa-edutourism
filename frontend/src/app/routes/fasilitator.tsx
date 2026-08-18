@@ -12,7 +12,6 @@ const FasilitatorGroupPage = lazy(() => import('../../features/fasilitator/pages
 const FasilitatorChildAssessmentPage = lazy(() => import('../../features/fasilitator/pages/ChildAssessmentPage'))
 const FasilitatorCameraPage = lazy(() => import('../../features/fasilitator/pages/CameraPage'))
 const FasilitatorSmartPhotoPage = lazy(() => import('../../features/fasilitator/pages/SmartPhotoPage'))
-const FasilitatorRecordingPage = lazy(() => import('../../features/fasilitator/pages/RecordingPage'))
 const FasilitatorProfilePage = lazy(() => import('../../features/fasilitator/pages/ProfilePage'))
 
 export const fasilitatorRoutes: RouteObject[] = [
@@ -30,7 +29,6 @@ export const fasilitatorRoutes: RouteObject[] = [
           lazyRoute('groups/:groupId', FasilitatorGroupPage),
           lazyRoute('groups/:groupId/children/:childId', FasilitatorChildAssessmentPage),
           lazyRoute('groups/:groupId/children/:childId/photo', FasilitatorSmartPhotoPage),
-          lazyRoute('groups/:groupId/children/:childId/record', FasilitatorRecordingPage),
           lazyRoute('camera', FasilitatorCameraPage),
           lazyRoute('profile', FasilitatorProfilePage),
         ],

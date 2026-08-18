@@ -6,7 +6,7 @@
 // This module centralizes that translation so every display site resolves a
 // stored path (or entity reference) into a servable URL consistently.
 
-export type MediaKind = 'photo' | 'recording' | 'frame' | 'content' | 'avatar'
+export type MediaKind = 'photo' | 'frame' | 'content' | 'avatar'
 
 // Resolve an entity-relative media id into a streamable URL.
 // Returns a relative path so the request goes through the Vite dev proxy

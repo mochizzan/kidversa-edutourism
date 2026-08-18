@@ -36,7 +36,6 @@ interface GroupDetail {
   session: Session
   sessionStage: SessionStage | undefined
   isPhotoStage: boolean
-  isRecordingStage: boolean
 }
 
 function findGroupInSessions(
@@ -154,7 +153,6 @@ const GroupPage = () => {
         session: detail,
         sessionStage: currentStage,
         isPhotoStage: programStage?.is_photo_stage ?? false,
-        isRecordingStage: programStage?.is_recording_stage ?? false,
       })
 
       // Resolve the group's facilitator name for the info card (Opsi A).
@@ -305,7 +303,7 @@ const GroupPage = () => {
     )
   }
 
-  const { group, participants, programStageName, isPhotoStage, isRecordingStage } = groupDetail
+  const { group, participants, programStageName, isPhotoStage } = groupDetail
   const openableStageId = groupDetail.sessionStage?.id ?? groupDetail.group.current_session_stage_id
 
   // Opsi A: a FASILITATOR may act only on groups they own (group.facilitator_id).
@@ -375,7 +373,6 @@ const GroupPage = () => {
               school={participant.school_name}
               isAssessed={isAssessed(participant.id)}
               showPhoto={isPhotoStage}
-              showRecording={isRecordingStage}
               onAssess={isMine ? () => handleAssess(participant.id) : undefined}
             />
           ))}
