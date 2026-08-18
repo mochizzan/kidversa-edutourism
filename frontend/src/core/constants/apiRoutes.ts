@@ -164,6 +164,27 @@ export const API_ROUTES = {
       `/api/assessments?session_id=${encodeURIComponent(sessionId)}`,
   },
 
+  // Kegiatan (ProgramSubstage) CRUD + reorder, scoped to a SubTopik.
+  PROGRAM_SUBSTAGES: {
+    BASE: '/api/program-substages',
+    BY_STAGE: (programStageId: string) =>
+      `/api/program-substages?program_stage_id=${encodeURIComponent(programStageId)}`,
+    DETAIL: (id: string) => `/api/program-substages/${encodeURIComponent(id)}`,
+    REORDER: '/api/program-substages/reorder',
+  },
+
+  // Participant badges (read-only; SUBTOPIK + FINAL awards).
+  BADGES: {
+    BASE: '/api/badges',
+    BY_PARTICIPANT: (participantId: string) =>
+      `/api/badges?participant_id=${encodeURIComponent(participantId)}`,
+  },
+
+  // Live Monitor "Lanjut SubTopik" override — complete a Kegiatan leaf.
+  SESSION_SUBSTAGES: {
+    COMPLETE: (id: string) => `/api/session-substages/${encodeURIComponent(id)}/complete`,
+  },
+
   NOTIFICATIONS: {
     BASE: '/api/notifications',
     READ_ALL: '/api/notifications/read-all',

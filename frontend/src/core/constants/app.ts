@@ -92,8 +92,10 @@ export const contentEditPath = (contentId: string, params?: { programId?: string
 export const kioskAccessPath = (sessionId: string, stageId: string) =>
   `${ROUTES.LEARNER.BASE}/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
 
-export const kioskSessionPath = (sessionId: string, stageId: string) =>
-  `${ROUTES.KIOSK.BASE}/session/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
+export const kioskSessionPath = (sessionId: string, stageId: string, substageId?: string) => {
+  const base = `${ROUTES.KIOSK.BASE}/session/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
+  return substageId ? `${base}/${encodeURIComponent(substageId)}` : base
+}
 
 // API
 // NOTE: API_BASE_URL was removed — all callers must use getApiBaseUrl() from

@@ -25,6 +25,9 @@ export interface CreateProgramDTO {
 
 export interface UpdateProgramDTO extends Partial<CreateProgramDTO> {
   is_active?: boolean
+  // Badge Final Program (cross-session award) — persisted when provided.
+  final_badge_name?: string
+  final_badge_image_url?: string
 }
 
 export interface CreateStageDTO {
@@ -39,6 +42,9 @@ export interface CreateStageDTO {
 
 export interface UpdateStageDTO extends Partial<CreateStageDTO> {
   sequence_order?: number
+  // Badge SubTopik (per-SubTopik award) — persisted when provided.
+  badge_name?: string
+  badge_image_url?: string
 }
 
 export interface CreateSessionDTO {

@@ -1,3 +1,5 @@
+import type { ContentType } from './enums'
+
 export interface User {
   id: string
   tenant_id?: string | null
@@ -43,6 +45,9 @@ export interface Program {
   description?: string
   thumbnail_url?: string
   is_active: boolean
+  // Badge Final Program (cross-session award).
+  final_badge_name?: string
+  final_badge_image_url?: string
   created_at: string
 }
 
@@ -52,11 +57,53 @@ export interface ProgramStage {
   sequence_order: number
   name: string
   description?: string
-  content_type: import('./enums').ContentType
+  content_type: ContentType
+  duration_minutes: number
+  is_recording_stage: boolean
+  is_photo_stage: boolean
+  // Badge SubTopik (per-SubTopik award; shown after all Kegiatan are scored).
+  badge_name?: string
+  badge_image_url?: string
+  created_at: string
+}
+
+// Kegiatan — assessed leaf under a ProgramStage (program-substages).
+export interface ProgramSubstage {
+  id: string
+  program_stage_id: string
+  sequence_order: number
+  name: string
+  description?: string
   duration_minutes: number
   is_recording_stage: boolean
   is_photo_stage: boolean
   created_at: string
+  updated_at: string
+}
+
+// Instantiated Kegiatan leaf within a session (session-substages).
+export interface SessionSubstage {
+  id: string
+  session_id: string
+  session_stage_id: string
+  program_substage_id: string
+  status: 'WAITING' | 'ACTIVE' | 'COMPLETED'
+  started_at?: string
+  completed_at?: string
+}
+
+export type BadgeType = 'SUBTOPIK' | 'FINAL'
+
+// Participant badge row (SUBTOPIK rows carry program_stage_id; FINAL rows carry null).
+export interface ParticipantBadge {
+  id: string
+  participant_id: string
+  program_id: string
+  program_stage_id: string | null
+  badge_type: BadgeType
+  badge_name: string
+  badge_image_url: string
+  awarded_at: string
 }
 
 export interface StageContent {
@@ -261,6 +308,7 @@ export interface Report {
 export interface ParticipantMission {
   id: string
   report_id: string
+  participant_id: string
   mission_bank_id: string
   is_completed: boolean
   completed_at?: string

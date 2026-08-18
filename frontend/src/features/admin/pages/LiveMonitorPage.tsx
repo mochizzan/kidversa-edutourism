@@ -45,6 +45,7 @@ const LiveMonitorPage = () => {
     allActiveSessions,
     stageNames,
     groups,
+    sessionSubstages,
     timeline,
     connectionStatus,
     loading,
@@ -55,8 +56,9 @@ const LiveMonitorPage = () => {
     getActiveStageIndex,
     getNextLockedStageId,
     handleConfirm,
-    handleUnlock,
     handleComplete,
+    handleUnlock,
+    handleCompleteKegiatan,
   } = useLiveMonitor(urlSessionId)
 
   const [overrideModal, setOverrideModal] = useState<{
@@ -289,8 +291,10 @@ const LiveMonitorPage = () => {
               isKoordinator={isKoordinator}
               allCompleted={allCompleted}
               nextLockedStageId={getNextLockedStageId(g)}
+              sessionSubstages={sessionSubstages}
               onComplete={handleComplete}
               onUnlock={handleUnlock}
+              onCompleteKegiatan={handleCompleteKegiatan}
               onOverride={(groupId, action) => setOverrideModal({ groupId, action })}
             />
           )

@@ -6,9 +6,6 @@ import {
   Circle,
   Loader2,
   AlertTriangle,
-  Home,
-  Users,
-  School,
   ArrowLeft,
 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -21,30 +18,8 @@ import {
 import { missionService } from '../../../core/services/missions'
 import { participantMissionService } from '../../../core/services/missions'
 import type { MissionBank, ParticipantMission } from '../../../core/types'
-import { MissionCategory } from '../../../core/types/enums'
 import { cn } from '../../../core/utils/cn'
-
-/* ── Category config ── */
-const missionCategories = [
-  {
-    key: MissionCategory.HOME,
-    icon: Home,
-    label: 'Di Rumah',
-    color: 'bg-blue-100 text-blue-700',
-  },
-  {
-    key: MissionCategory.PARENT,
-    icon: Users,
-    label: 'Bersama Orang Tua',
-    color: 'bg-purple-100 text-purple-700',
-  },
-  {
-    key: MissionCategory.SCHOOL,
-    icon: School,
-    label: 'Di Sekolah',
-    color: 'bg-green-100 text-green-700',
-  },
-]
+import { BadgeList } from '../components/BadgeList'
 
 /* ── Inner component ── */
 function MissionsView() {
@@ -55,6 +30,7 @@ function MissionsView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [participantMissions, setParticipantMissions] = useState<ParticipantMission[]>([])
+  const [participantId, setParticipantId] = useState<string>('')
   const [missionBank, setMissionBank] = useState<Map<string, MissionBank>>(new Map())
   const [togglingId, setTogglingId] = useState<string | null>(null)
 
@@ -70,6 +46,8 @@ function MissionsView() {
     try {
       const missions = await participantMissionService.getByReport(reportIdParam)
       setParticipantMissions(missions)
+      // Derive the participant id (the first mission carries it) to fetch badges.
+      if (missions.length > 0) setParticipantId(missions[0].participant_id)
 
       // Load mission bank details
       const bankIds = [...new Set(missions.map((pm) => pm.mission_bank_id))]
@@ -105,18 +83,31 @@ function MissionsView() {
     }
   }
 
-  /* ── Compute progress and grouped missions ── */
+  /* ── Compute progress and group missions by SubTopik ── */
   const completedCount = participantMissions.filter((pm) => pm.is_completed).length
   const totalCount = participantMissions.length
 
-  const groupedMissions = missionCategories
-    .map((cat) => {
+  // SubTopik key: derived from the mission bank's related_stage_ids (its
+  // SubTopik/ProgramStage). Missions sharing a SubTopik are grouped together.
+  const subtopikKey = (bank?: MissionBank): string => {
+    if (bank?.related_stage_ids && bank.related_stage_ids.length > 0) {
+      return bank.related_stage_ids.join('|')
+    }
+    return bank?.id ?? 'lainnya'
+  }
+
+  // Stable, ordered list of SubTopik keys (by first appearance in the mission list).
+  const subtopikKeys: string[] = []
+  for (const pm of participantMissions) {
+    const k = subtopikKey(missionBank.get(pm.mission_bank_id))
+    if (!subtopikKeys.includes(k)) subtopikKeys.push(k)
+  }
+
+  const groupedMissions = subtopikKeys
+    .map((key, idx) => {
       const missions = participantMissions
-        .map((pm) => ({
-          pm,
-          bank: missionBank.get(pm.mission_bank_id),
-        }))
-        .filter((item) => item.bank?.category === cat.key)
+        .map((pm) => ({ pm, bank: missionBank.get(pm.mission_bank_id) }))
+        .filter((item) => subtopikKey(item.bank) === key)
 
       // Sort: incomplete first, then completed
       missions.sort((a, b) => {
@@ -124,7 +115,7 @@ function MissionsView() {
         return a.pm.is_completed ? 1 : -1
       })
 
-      return { ...cat, missions }
+      return { key, index: idx + 1, missions }
     })
     .filter((g) => g.missions.length > 0)
 
@@ -211,6 +202,9 @@ function MissionsView() {
         </p>
       </div>
 
+      {/* Badges earned by the child */}
+      <BadgeList participantId={participantId} />
+
       {/* Progress */}
       <Card>
         <div className="flex items-center gap-4">
@@ -233,16 +227,12 @@ function MissionsView() {
         </div>
       </Card>
 
-      {/* Mission groups by category */}
+      {/* Mission groups by SubTopik */}
       {groupedMissions.map((group) => {
-        const Icon = group.icon
         return (
           <div key={group.key}>
             <div className="flex items-center gap-2 mb-3">
-              <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', group.color)}>
-                <Icon className="w-4 h-4" />
-              </div>
-              <h2 className="font-semibold text-on-surface">{group.label}</h2>
+              <h2 className="font-semibold text-on-surface">SubTopik {group.index}</h2>
               <span className="text-xs text-on-surface-variant ml-auto">
                 {group.missions.filter((m) => m.pm.is_completed).length}/{group.missions.length}
               </span>

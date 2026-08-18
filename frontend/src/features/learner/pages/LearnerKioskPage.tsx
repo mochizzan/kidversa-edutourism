@@ -7,29 +7,43 @@ import { ApiError, getApiBaseUrl } from '../../../core/services/backendClient'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { kioskSessionPath } from '../../../core/constants/app'
-import type { SessionStage, StageContent } from '../../../core/types'
+import type { SessionStage, SessionSubstage, StageContent } from '../../../core/types'
 
 /* ── Public kiosk payload (GET /api/sessions/:id/kiosk?token=) ──
-   Mirrors the backend kioskResponse DTO: the session, its stages, and each
-   stage's program contents. PII is intentionally excluded. */
-interface KioskStageContent {
-  stage: SessionStage
+   P3+ shape: the session, its stages, and each stage's Kegiatan (substages),
+   each carrying its own contents. P4 added session_substage leaves; legacy
+   payloads without `substages` fall back to the stage-level `contents`. */
+interface KioskSubstage {
+  substage: SessionSubstage
   contents: StageContent[]
+}
+interface KioskStage {
+  stage: SessionStage
+  substages: KioskSubstage[]
+  contents?: StageContent[] // legacy fallback when substages is empty/absent
 }
 interface KioskResponse {
   session: { id: string; name: string; session_date: string; location: string; status: string }
-  stages: KioskStageContent[]
+  stages: KioskStage[]
 }
+
+const activeSorted = (contents: StageContent[] = []) =>
+  contents.filter((c) => c.is_active).sort((a, b) => a.sort_order - b.sort_order)
 
 const LearnerKioskPage = () => {
   const navigate = useNavigate()
-  const { sessionId, stageId } = useParams<{ sessionId: string; stageId?: string }>()
+  const { sessionId, stageId, substageId } = useParams<{
+    sessionId: string
+    stageId?: string
+    substageId?: string
+  }>()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [stage, setStage] = useState<SessionStage | null>(null)
+  const [substage, setSubstage] = useState<SessionSubstage | null>(null)
   const [contents, setContents] = useState<StageContent[]>([])
   const [currentContentIndex, setCurrentContentIndex] = useState(0)
   const [isMuted, setIsMuted] = useState(false)
@@ -38,32 +52,52 @@ const LearnerKioskPage = () => {
   const inflightRef = useRef(false)
   const maxVisitedRef = useRef(0)
 
+  // Resolve the contents for the requested (stage, substage). Falls back to the
+  // legacy stage-level contents when the stage has no substages.
+  const resolveStage = (
+    kiosk: KioskResponse,
+    reqStageId?: string,
+    reqSubstageId?: string,
+  ): { stage: KioskStage; substage: SessionSubstage | null; contents: StageContent[] } | null => {
+    const target = kiosk.stages.find((s) => s.stage.id === reqStageId) ?? kiosk.stages[0]
+    if (!target) return null
+
+    const hasSubstages = Array.isArray(target.substages) && target.substages.length > 0
+    if (hasSubstages) {
+      const sub =
+        target.substages.find((x) => x.substage.id === reqSubstageId) ?? target.substages[0]
+      return { stage: target, substage: sub.substage, contents: activeSorted(sub.contents) }
+    }
+    // Legacy fallback: stage-level contents.
+    return { stage: target, substage: null, contents: activeSorted(target.contents) }
+  }
+
   const applyKiosk = (kiosk: KioskResponse) => {
     if (!sessionId) return
-    // No stageId in the URL (e.g. /kiosk/session/:id) → jump to the first stage.
+
+    // No stageId in the URL (e.g. /kiosk/session/:id) → jump to the first
+    // stage's first Kegiatan (or stage contents when there are no substages).
     if (!stageId) {
       const first = kiosk.stages[0]
       if (!first) {
         setError('Sesi ini belum memiliki konten.')
         return
       }
-      navigate(`${kioskSessionPath(sessionId, first.stage.id)}?token=${encodeURIComponent(token)}`, { replace: true })
+      const firstSub = first.substages[0]?.substage.id
+      navigate(kioskSessionPath(sessionId, first.stage.id, firstSub), { replace: true })
       return
     }
 
-    const found = kiosk.stages.find((s) => s.stage.id === stageId)
-
-    if (!found) {
+    const resolved = resolveStage(kiosk, stageId, substageId)
+    if (!resolved) {
       setError('Stage tidak ditemukan pada sesi ini.')
       setLoading(false)
       return
     }
 
-    setStage(found.stage)
-    const active = (found.contents ?? [])
-      .filter((c) => c.is_active)
-      .sort((a, b) => a.sort_order - b.sort_order)
-    setContents(active)
+    setStage(resolved.stage.stage)
+    setSubstage(resolved.substage)
+    setContents(resolved.contents)
   }
 
   useEffect(() => {
@@ -80,15 +114,12 @@ const LearnerKioskPage = () => {
 
     const loadData = async () => {
       try {
-        // Guard: if we already fetched this kiosk payload, reuse it instead of
-        // re-fetching.
+        // Reuse an already-fetched payload instead of re-fetching.
         if (kioskRef.current) {
           applyKiosk(kioskRef.current)
           return
         }
-        // Guard: if a fetch for these params is already in flight (e.g. React
-        // StrictMode double-invoke), let the first one finish; it sets kioskRef
-        // and applies the result. Avoids a duplicate concurrent network call.
+        // Guard against concurrent fetches from StrictMode double-invoke.
         if (inflightRef.current) return
         inflightRef.current = true
         // PUBLIC endpoint — the kiosk token (not a JWT) is the sole auth.
@@ -112,7 +143,7 @@ const LearnerKioskPage = () => {
     }
 
     loadData()
-  }, [sessionId, stageId, token])
+  }, [sessionId, stageId, substageId, token])
 
   const currentContent = contents[currentContentIndex]
 
@@ -157,7 +188,7 @@ const LearnerKioskPage = () => {
       <div className="h-screen w-screen bg-surface flex flex-col items-center justify-center text-on-surface p-8 text-center">
         <AlertTriangle className="w-16 h-16 text-warning mb-4" />
         <h1 className="text-xl font-bold mb-2">Belum Ada Konten</h1>
-        <p className="text-on-surface-variant">Stage ini belum memiliki konten yang dapat ditampilkan.</p>
+        <p className="text-on-surface-variant">Kegiatan ini belum memiliki konten yang dapat ditampilkan.</p>
       </div>
     )
   }
@@ -169,6 +200,7 @@ const LearnerKioskPage = () => {
         <div>
           <p className="text-xs text-white/60">Stage {currentContentIndex + 1} dari {contents.length}</p>
           <h1 className="text-lg font-semibold">{currentContent?.title}</h1>
+          {substage && <p className="text-xs text-white/50">{substage.status === 'COMPLETED' ? 'Kegiatan selesai' : 'Kegiatan berlangsung'}</p>}
         </div>
         <div className="flex items-center gap-2">
           <Button

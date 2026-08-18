@@ -6,9 +6,10 @@ import { liveService } from '../../../core/services/live'
 import { programService } from '../../../core/services/programs'
 import { useLiveSession } from '../../../core/hooks/useLiveSession'
 import { SessionStatus, GroupStageProgressStatus } from '../../../core/types/enums'
-import { ApiError } from '../../../core/services/backendClient'
+import { ApiError, apiRequest } from '../../../core/services/backendClient'
 import { redirectToLogin } from '../../../core/stores/authStore'
-import type { Session, SessionStage, ProgramStage } from '../../../core/types'
+import { API_ROUTES } from '../../../core/constants/apiRoutes'
+import type { Session, SessionStage, ProgramStage, SessionSubstage } from '../../../core/types'
 import type { LiveGroupWithProgress } from '../../../core/services/live'
 
 export type GroupStatus = 'LOCKED' | 'UNLOCKED' | 'IN_PROGRESS' | 'COMPLETED'
@@ -43,6 +44,38 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
       })),
     [liveGroups, progress, participantsByGroup],
   )
+
+  // Session substages (Kegiatan leaves) for the live session. The live snapshot
+  // does not include them, but the public kiosk detail does — so we mint a
+  // kiosk token (same call the "Buka Kiosk" button uses) and read the kiosk
+  // payload to obtain the per-session-stage SessionSubstage rows. No new backend
+  // endpoint is introduced.
+  const [sessionSubstages, setSessionSubstages] = useState<SessionSubstage[]>([])
+
+  const loadSessionSubstages = useCallback(async () => {
+    if (!activeSession) {
+      setSessionSubstages([])
+      return
+    }
+    try {
+      const res = await apiRequest<{ data: { token: string } }>(
+        'POST',
+        API_ROUTES.AUTH.KIOSK,
+        { session_id: activeSession.id },
+      )
+      const token = res.data.token
+      const kiosk = await apiRequest<{
+        data: { stages: { stage: { id: string }; substages: { substage: SessionSubstage }[] }[] }
+      }>('GET', `${API_ROUTES.SESSIONS.KIOSK_ACCESS(activeSession.id)}?token=${encodeURIComponent(token)}`)
+      const flat: SessionSubstage[] = []
+      for (const st of kiosk.data.stages) {
+        for (const sub of st.substages) flat.push(sub.substage)
+      }
+      setSessionSubstages(flat)
+    } catch {
+      setSessionSubstages([])
+    }
+  }, [activeSession])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -235,6 +268,31 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     [activeSession, user, groups, stages, programStages],
   )
 
+  const handleCompleteKegiatan = useCallback(
+    async (sessionSubstageId: string) => {
+      if (!activeSession || !user) return
+      try {
+        await liveService.completeSessionSubstage(sessionSubstageId)
+        await loadSessionSubstages()
+        await liveService.addTimelineEvent(
+          activeSession.id,
+          '',
+          'override',
+          'Lanjut SubTopik — kegiatan diselesaikan',
+          user.id,
+        )
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) redirectToLogin()
+      }
+    },
+    [activeSession, user, loadSessionSubstages],
+  )
+
+  // Load session substages once the active session is resolved.
+  useEffect(() => {
+    void loadSessionSubstages()
+  }, [loadSessionSubstages])
+
   return {
     activeSession,
     stages,
@@ -242,6 +300,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     allActiveSessions,
     stageNames,
     groups,
+    sessionSubstages,
     timeline,
     connectionStatus,
     loading,
@@ -254,5 +313,6 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     handleConfirm,
     handleUnlock,
     handleComplete,
+    handleCompleteKegiatan,
   }
 }

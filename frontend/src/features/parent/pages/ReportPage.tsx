@@ -12,6 +12,8 @@ import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 import { DEFAULT_FACILITATOR_MESSAGE, DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
 import { extractFirstSentence } from '../../../core/utils/reportNarrative'
+import { participantMissionService } from '../../../core/services/missions'
+import { BadgeList } from '../components/BadgeList'
 
 /* ── Inner report component ── */
 function ReportView() {
@@ -22,6 +24,7 @@ function ReportView() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [participantId, setParticipantId] = useState<string>('')
 
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -37,6 +40,17 @@ function ReportView() {
   const scaleFactor = Math.min(1, windowWidth / A4_SHEET_WIDTH)
   const scaledHeight = iframeHeight * scaleFactor
 
+  // Derive the participant id (for badge display) from the report's missions.
+  useEffect(() => {
+    if (!report) return
+    participantMissionService
+      .getByReport(report.id)
+      .then((list) => {
+        if (list.length > 0) setParticipantId(list[0].participant_id)
+      })
+      .catch(() => {})
+  }, [report])
+
   useEffect(() => {
     if (!report) return
 
@@ -44,7 +58,7 @@ function ReportView() {
 
     const buildHtml = () => {
       // The public report payload is an anti-IDOR view: it exposes the final
-      // narrative, the mission id list, and the (optional) PDF url — never PII.
+      // narrative, its mission id list, and the (optional) PDF url — never PII.
       const narrative = pub.ai_narrative_final || ''
       const missions: string[] = pub.mission_ids ?? []
 
@@ -180,6 +194,12 @@ function ReportView() {
       {downloadError && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-2 shadow-lg no-print">
           {downloadError}
+        </div>
+      )}
+
+      {participantId && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[min(92vw,420px)] no-print">
+          <BadgeList participantId={participantId} />
         </div>
       )}
 

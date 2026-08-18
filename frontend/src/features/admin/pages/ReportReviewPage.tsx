@@ -24,6 +24,7 @@ import { useReportReview } from '../hooks/useReportReview'
 import { ReportStatusBanner } from '../components/ReportStatusBanner'
 import { ReportAssessmentScores } from '../components/ReportAssessmentScores'
 import { ReportMissionSelector } from '../components/ReportMissionSelector'
+import { BadgeList } from '../../../features/parent/components/BadgeList'
 
 const ReportReviewPage = () => {
   const { sessionId, reportId } = useParams<{ sessionId: string; reportId: string }>()
@@ -256,6 +257,8 @@ const ReportReviewPage = () => {
             </div>
           </div>
         </Card>
+
+        <BadgeList participantId={report.participant_id} />
 
         <ReportAssessmentScores stageInfos={stageInfos} />
 

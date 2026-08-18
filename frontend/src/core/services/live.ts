@@ -147,6 +147,13 @@ export const liveService = {
     invalidateSnapshot()
   },
 
+  // Live Monitor "Lanjut SubTopik": marks a Kegiatan leaf (session_substage)
+  // COMPLETED and re-runs per-child badge evaluation. POST /api/session-substages/:id/complete.
+  completeSessionSubstage: async (sessionSubstageId: string): Promise<void> => {
+    await apiRequest('POST', API_ROUTES.SESSION_SUBSTAGES.COMPLETE(sessionSubstageId))
+    invalidateSnapshot()
+  },
+
   addTimelineEvent: async (
     sessionId: string,
     groupId: string,

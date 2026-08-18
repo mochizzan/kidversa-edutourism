@@ -1,4 +1,4 @@
-import { SkipForward, RotateCcw, CheckCircle2, AlertTriangle, Users, Unlock } from 'lucide-react'
+import { SkipForward, RotateCcw, CheckCircle2, AlertTriangle, Users, Unlock, Flag } from 'lucide-react'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Button } from '../../../shared/components/ui/Button'
 import { cn } from '../../../core/utils'
@@ -6,7 +6,7 @@ import { GroupStageProgressStatus } from '../../../core/types/enums'
 import { StageProgressBar } from './StageProgressBar'
 import type { GroupStatus } from '../hooks/useLiveMonitor'
 import type { LiveGroupWithProgress } from '../../../core/services/live'
-import type { SessionStage, ProgramStage } from '../../../core/types'
+import type { SessionStage, ProgramStage, SessionSubstage } from '../../../core/types'
 
 interface LiveGroupCardProps {
   group: LiveGroupWithProgress
@@ -19,8 +19,10 @@ interface LiveGroupCardProps {
   isKoordinator: boolean
   allCompleted: boolean
   nextLockedStageId?: string
+  sessionSubstages: SessionSubstage[]
   onComplete: (groupId: string, stageId: string) => void
   onUnlock: (groupId: string, stageId: string) => void
+  onCompleteKegiatan: (sessionSubstageId: string) => void
   onOverride: (groupId: string, action: 'skip' | 'jump' | 'reset') => void
 }
 
@@ -42,10 +44,16 @@ export const LiveGroupCard = ({
   isKoordinator,
   allCompleted,
   nextLockedStageId,
+  sessionSubstages,
   onComplete,
   onUnlock,
+  onCompleteKegiatan,
   onOverride,
 }: LiveGroupCardProps) => {
+  // Kegiatan (session_substages) belonging to this group's current session stage.
+  const kegiatanForStage = (stageId ? sessionSubstages.filter((s) => s.session_stage_id === stageId) : [])
+    .slice()
+    .sort((a, b) => a.id.localeCompare(b.id))
   const config = statusConfig[status] || statusConfig.LOCKED
 
   const durationWarning = (() => {
@@ -107,6 +115,35 @@ export const LiveGroupCard = ({
         <Users className="w-4 h-4" />
         <span>{g.participants.length} anak</span>
       </div>
+
+      {kegiatanForStage.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Kegiatan</p>
+          {kegiatanForStage.map((k, idx) => {
+            const done = k.status === 'COMPLETED'
+            return (
+              <div
+                key={k.id}
+                className="flex items-center justify-between gap-2 rounded-lg bg-surface-variant px-3 py-2"
+              >
+                <span className="text-sm text-on-surface truncate">
+                  {done ? '✅' : '⏳'} Kegiatan {idx + 1}
+                </span>
+                {!done && isKoordinator && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onCompleteKegiatan(k.id)}
+                    icon={<Flag className="w-3.5 h-3.5" />}
+                  >
+                    Lanjut SubTopik
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 mt-4 flex-wrap">
         {status === 'LOCKED' && nextLockedStageId && (

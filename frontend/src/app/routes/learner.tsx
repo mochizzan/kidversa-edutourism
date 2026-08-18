@@ -5,7 +5,7 @@ import { SuspenseWrapper } from './helpers'
 const LearnerKioskPage = lazy(() => import('../../features/learner/pages/LearnerKioskPage'))
 
 export const learnerRoute: RouteObject = {
-  path: '/learner/:sessionId/:stageId',
+  path: '/learner/:sessionId/:stageId/:substageId?',
   element: (
     <SuspenseWrapper>
       <LearnerKioskPage />
@@ -14,9 +14,10 @@ export const learnerRoute: RouteObject = {
 }
 
 // Public kiosk entry that carries the session id in the path; the kiosk token
-// is supplied via the `?token=` query string (P3).
+// is supplied via the `?token=` query string (P3). The optional :substageId
+// selects a Kegiatan (session_substage) under the :stageId (SubTopik).
 export const kioskRoute: RouteObject = {
-  path: '/kiosk/session/:sessionId/:stageId',
+  path: '/kiosk/session/:sessionId/:stageId/:substageId?',
   element: (
     <SuspenseWrapper>
       <LearnerKioskPage />

@@ -57,6 +57,8 @@ export const programService: ProgramService = {
       description: data.description,
       thumbnail_url: data.thumbnail_url,
       is_active: data.is_active,
+      final_badge_name: data.final_badge_name,
+      final_badge_image_url: data.final_badge_image_url,
     }),
 
   toggleActive: (id) =>
@@ -87,6 +89,8 @@ export const programService: ProgramService = {
       duration_minutes: data.duration_minutes,
       is_recording_stage: data.is_recording_stage,
       is_photo_stage: data.is_photo_stage,
+      badge_name: data.badge_name,
+      badge_image_url: data.badge_image_url,
     }),
 
   deleteStage: (programId, stageId) =>

@@ -16,8 +16,25 @@ function StarRatingInput({
   onChange: (v: number) => void
   disabled?: boolean
 }) {
+  // 0 = "tidak hadir" (absent); 1–5 are normal ratings. Default selection is 1.
   return (
     <div className="flex items-center gap-1">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(0)}
+        className={cn(
+          'px-2 py-1 rounded-lg text-xs font-medium transition-all',
+          'hover:scale-105 active:scale-95',
+          disabled && 'cursor-not-allowed opacity-60',
+          value === 0
+            ? 'bg-error-container text-on-error-container'
+            : 'bg-surface-variant text-on-surface-variant',
+        )}
+        aria-label="Tidak hadir"
+      >
+        Tidak Hadir
+      </button>
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
@@ -42,7 +59,7 @@ function StarRatingInput({
         </button>
       ))}
       <span className="ml-3 text-sm font-medium text-on-surface-variant">
-        {value > 0 ? `${value}/5` : 'Belum dinilai'}
+        {value === 0 ? 'Tidak hadir' : `${value}/5`}
       </span>
     </div>
   )
@@ -60,6 +77,8 @@ const ChildAssessmentPage = () => {
     setStarRating,
     comment,
     setComment,
+    selectedSubstageId,
+    selectSubstage,
     saving,
     saveSuccess,
     isDirty,
@@ -182,6 +201,38 @@ const ChildAssessmentPage = () => {
           )}
         </div>
 
+        {/* Kegiatan (per-leaf) selector */}
+        {childDetail.sessionSubstages.length > 0 && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-on-surface mb-2">
+              Kegiatan (SubTopik)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {childDetail.sessionSubstages.map((k, idx) => {
+                const active = k.id === selectedSubstageId
+                const done = k.status === 'COMPLETED'
+                return (
+                  <button
+                    key={k.id}
+                    type="button"
+                    disabled={saving || !isMine}
+                    onClick={() => selectSubstage(k.id)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-xl text-sm border transition-colors',
+                      active
+                        ? 'bg-primary-container text-on-primary-container border-primary'
+                        : 'bg-surface-variant text-on-surface-variant border-outline-variant',
+                      (saving || !isMine) && 'cursor-not-allowed opacity-60',
+                    )}
+                  >
+                    {done ? '✅ ' : ''}Kegiatan {idx + 1}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Assessment form */}
         <div className="space-y-6">
           {/* Star Rating */}
@@ -189,6 +240,9 @@ const ChildAssessmentPage = () => {
             <label className="block text-sm font-medium text-on-surface mb-2">
               Penilaian Bintang
             </label>
+            <p className="text-xs text-on-surface-variant mb-2">
+              Pilih "Tidak Hadir" (0) jika anak tidak mengikuti kegiatan ini.
+            </p>
             <StarRatingInput
               value={starRating}
               onChange={setStarRating}
@@ -220,7 +274,7 @@ const ChildAssessmentPage = () => {
             <Button
               onClick={handleSave}
               loading={saving}
-              disabled={(starRating === 0 || !isDirty || saving) && isMine}
+              disabled={(!isDirty || saving) && isMine}
               icon={<Save className="w-4 h-4" />}
             >
               Simpan Penilaian

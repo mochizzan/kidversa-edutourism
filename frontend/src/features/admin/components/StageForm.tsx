@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
 import type { ProgramStage } from '../../../core/types'
+import { BadgeEditor } from './BadgeEditor'
 
 interface StageFormProps {
   editingStage: ProgramStage | null
@@ -10,6 +11,8 @@ interface StageFormProps {
     description: string
     is_recording_stage: boolean
     is_photo_stage: boolean
+    badge_name: string
+    badge_image_url: string
   }) => void
   onCancel: () => void
   submitting?: boolean
@@ -24,6 +27,8 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
   const [isPhotoStage, setIsPhotoStage] = useState<boolean>(
     editingStage?.is_photo_stage ?? true
   )
+  const [badgeName, setBadgeName] = useState(editingStage?.badge_name ?? '')
+  const [badgeImageUrl, setBadgeImageUrl] = useState(editingStage?.badge_image_url ?? '')
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -32,6 +37,8 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
       description,
       is_recording_stage: isRecordingStage,
       is_photo_stage: isPhotoStage,
+      badge_name: badgeName,
+      badge_image_url: badgeImageUrl,
     })
   }
 
@@ -70,6 +77,15 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
           Photo Stage
         </label>
       </div>
+
+      <BadgeEditor
+        title="Badge SubTopik"
+        name={badgeName}
+        imageUrl={badgeImageUrl}
+        onNameChange={setBadgeName}
+        onImageChange={setBadgeImageUrl}
+      />
+
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="secondary" type="button" onClick={onCancel}>
           Batal

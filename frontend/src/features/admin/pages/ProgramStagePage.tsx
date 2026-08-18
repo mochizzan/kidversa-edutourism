@@ -9,7 +9,8 @@ import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
-import type { Program, ProgramStage, StageContent } from '../../../core/types'
+import { programSubstageService } from '../../../core/services/programSubstages'
+import type { Program, ProgramStage, StageContent, ProgramSubstage } from '../../../core/types'
 import { ContentType as ContentTypeEnum } from '../../../core/types'
 import {
   programListPath,
@@ -23,6 +24,7 @@ import { computeDurationMinutes, syncStageMeta } from '../../../core/utils/conte
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { StageForm } from '../components/StageForm'
 import { ContentPickerModal } from '../components/ContentPickerModal'
+import { KegiatanEditor } from '../components/KegiatanEditor'
 import { Plus, FileText } from 'lucide-react'
 
 const ProgramStagePage = () => {
@@ -38,11 +40,16 @@ const ProgramStagePage = () => {
   const [deleteTarget, setDeleteTarget] = useState<ProgramStage | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'detail' | 'konten'>('detail')
+  const [activeTab, setActiveTab] = useState<'detail' | 'konten' | 'kegiatan'>('detail')
   const [contents, setContents] = useState<StageContent[]>([])
   const [deleteTargetContent, setDeleteTargetContent] = useState<StageContent | null>(null)
   const [contentDeleting, setContentDeleting] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+
+  const [kegiatan, setKegiatan] = useState<ProgramSubstage[]>([])
+  const [kegiatanLoading, setKegiatanLoading] = useState(false)
+  const [deleteTargetKegiatan, setDeleteTargetKegiatan] = useState<ProgramSubstage | null>(null)
+  const [kegiatanDeleting, setKegiatanDeleting] = useState(false)
 
   useEffect(() => {
     if (!programId) return
@@ -70,32 +77,65 @@ const ProgramStagePage = () => {
     await syncStageMeta(programService, programId, stageId)
   }
 
+  const loadKegiatan = async () => {
+    if (!stageId || isNew) return
+    setKegiatanLoading(true)
+    try {
+      setKegiatan(await programSubstageService.listByStage(stageId))
+    } catch {
+      setKegiatan([])
+    } finally {
+      setKegiatanLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadContents()
   }, [stageId])
+
+  useEffect(() => {
+    loadKegiatan()
+  }, [stageId, isNew])
 
   const handleSave = async (data: {
     name: string
     description: string
     is_recording_stage: boolean
     is_photo_stage: boolean
+    badge_name: string
+    badge_image_url: string
   }) => {
     if (!programId) return
     setSaving(true)
     try {
       if (isNew) {
         const stages = await programService.getStages(programId)
-        await programService.createStage(programId, {
+        const created = await programService.createStage(programId, {
           sequence_order: stages.length + 1,
-          ...data,
+          name: data.name,
+          description: data.description,
+          is_recording_stage: data.is_recording_stage,
+          is_photo_stage: data.is_photo_stage,
           content_type: ContentTypeEnum.MIXED,
           duration_minutes: 0,
         })
+        // Badge fields are not accepted on create; persist them via update.
+        if (data.badge_name || data.badge_image_url) {
+          await programService.updateStage(programId, created.id, {
+            badge_name: data.badge_name,
+            badge_image_url: data.badge_image_url,
+          })
+        }
       } else if (stageId) {
         const existingContents = await programService.getContents(stageId)
         await programService.updateStage(programId, stageId, {
-          ...data,
+          name: data.name,
+          description: data.description,
+          is_recording_stage: data.is_recording_stage,
+          is_photo_stage: data.is_photo_stage,
           duration_minutes: computeDurationMinutes(existingContents),
+          badge_name: data.badge_name,
+          badge_image_url: data.badge_image_url,
         })
       }
       navigate(programDetailPath(programId))
@@ -161,9 +201,13 @@ const ProgramStagePage = () => {
 
       {!isNew && (
         <Tabs
-          tabs={[{ key: 'detail', label: 'Detail' }, { key: 'konten', label: 'Konten' }]}
+          tabs={[
+            { key: 'detail', label: 'Detail' },
+            { key: 'konten', label: 'Konten' },
+            { key: 'kegiatan', label: `Kegiatan (${kegiatan.length})` },
+          ]}
           activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as 'detail' | 'konten')}
+          onChange={(key) => setActiveTab(key as 'detail' | 'konten' | 'kegiatan')}
         />
       )}
 
@@ -263,6 +307,17 @@ const ProgramStagePage = () => {
         </>
       )}
 
+      {!isNew && activeTab === 'kegiatan' && stageId && (
+        <KegiatanEditor
+          programStageId={stageId}
+          items={kegiatan}
+          loading={kegiatanLoading}
+          onChange={setKegiatan}
+          onReload={loadKegiatan}
+          onRequestDelete={(k) => setDeleteTargetKegiatan(k)}
+        />
+      )}
+
       <ConfirmDialog
         open={!!deleteTarget}
         title="Hapus Stage"
@@ -281,6 +336,29 @@ const ProgramStagePage = () => {
         loading={contentDeleting}
         onConfirm={handleContentDelete}
         onClose={() => setDeleteTargetContent(null)}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTargetKegiatan}
+        title="Hapus Kegiatan"
+        message={`Yakin ingin menghapus kegiatan "${deleteTargetKegiatan?.name || ''}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus Kegiatan"
+        loading={kegiatanDeleting}
+        onConfirm={async () => {
+          if (!deleteTargetKegiatan) return
+          setKegiatanDeleting(true)
+          try {
+            await programSubstageService.remove(deleteTargetKegiatan.id)
+            setDeleteTargetKegiatan(null)
+            await loadKegiatan()
+            addToast({ type: 'success', message: 'Kegiatan dihapus' })
+          } catch (err) {
+            addToast({ type: 'error', message: friendlyError(err) })
+          } finally {
+            setKegiatanDeleting(false)
+          }
+        }}
+        onClose={() => setDeleteTargetKegiatan(null)}
       />
     </div>
   )
