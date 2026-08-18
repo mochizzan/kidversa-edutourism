@@ -71,7 +71,7 @@ const ProgramDetailPage = () => {
         breadcrumbs={[{ label: 'Programs', href: programListPath() }, { label: program.name }]}
         actions={<Badge variant={program.is_active ? 'success' : 'neutral'}>{program.is_active ? 'Aktif' : 'Nonaktif'}</Badge>} />
 
-      <Tabs tabs={[{ key: 'info', label: 'Info' }, { key: 'stages', label: `Stages (${stages.length})` }]}
+      <Tabs tabs={[{ key: 'info', label: 'Info' }, { key: 'stages', label: `Topik (${stages.length})` }]}
         activeKey={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'info' && <ProgramInfoTab program={program} onSaved={setProgram} />}

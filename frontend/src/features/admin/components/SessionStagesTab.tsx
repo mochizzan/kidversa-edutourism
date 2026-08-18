@@ -33,8 +33,8 @@ export function SessionStagesTab({ stages, groups, facilitators, stageMap }: Ses
       <Card>
         <EmptyState
           icon={<Layers className="w-12 h-12" />}
-          title="Belum ada stage"
-          description="Stage akan otomatis dibuat dari program saat sesi dibuat."
+          title="Belum ada topik"
+          description="Topik akan otomatis dibuat dari program saat sesi dibuat."
         />
       </Card>
     )
