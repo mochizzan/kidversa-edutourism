@@ -16,15 +16,14 @@ import (
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
-// MediaHandler serves uploaded media (photos / recordings of children, plus
-// decorative frames, stage content, and user avatars) through an authenticated,
+// MediaHandler serves uploaded media (photos of children, plus decorative
+// frames, stage content, and user avatars) through an authenticated,
 // tenant-scoped route. Media is NEVER served via e.Static; every request is
-// gated by JWT auth, tenant scope, and (for photos/recordings) a consent log
-// check. HTML / SVG content is refused to prevent stored-XSS.
+// gated by JWT auth, tenant scope, and (for photos) a consent log check.
+// HTML / SVG content is refused to prevent stored-XSS.
 type MediaHandler struct {
 	cfg         *config.Config
 	photos      repository.PhotoRepository
-	recordings  repository.RecordingRepository
 	consent     repository.ConsentRepository
 	sessions    repository.SessionRepository
 	frames      repository.FrameRepository
@@ -36,40 +35,37 @@ type MediaHandler struct {
 func NewMediaHandler(
 	cfg *config.Config,
 	photos repository.PhotoRepository,
-	recordings repository.RecordingRepository,
 	consent repository.ConsentRepository,
 	sessions repository.SessionRepository,
 	frames repository.FrameRepository,
 	contentRepo repository.ContentRepository,
 	users repository.UserRepository,
 ) *MediaHandler {
-	return &MediaHandler{cfg: cfg, photos: photos, recordings: recordings, consent: consent, sessions: sessions, frames: frames, contentRepo: contentRepo, users: users}
+	return &MediaHandler{cfg: cfg, photos: photos, consent: consent, sessions: sessions, frames: frames, contentRepo: contentRepo, users: users}
 }
 
 // mediaKind enumerates the served asset kinds.
 type mediaKind string
 
 const (
-	kindPhoto     mediaKind = "photo"
-	kindRecording mediaKind = "recording"
-	kindFrame     mediaKind = "frame"
-	kindContent   mediaKind = "content"
-	kindAvatar    mediaKind = "avatar"
+	kindPhoto   mediaKind = "photo"
+	kindFrame   mediaKind = "frame"
+	kindContent mediaKind = "content"
+	kindAvatar  mediaKind = "avatar"
 )
 
 // Get handles GET /api/media/:kind/:id.
-//   - :kind is "photo", "recording", "frame", "content", or "avatar"; any other
-//     value is 400.
+//   - :kind is "photo", "frame", "content", or "avatar"; any other value is 400.
 //   - :id must be a UUID; otherwise 400.
 //   - Requires a valid JWT (enforced by JWTAuth middleware upstream).
 //   - Enforces tenant scope: the asset's owning tenant must equal the caller's
 //     resolved tenant (from TenantScope middleware).
-//   - For photos/recordings, requires a positive ConsentLog value.
+//   - For photos, requires a positive ConsentLog value.
 //   - Reads the file from disk and streams it with a SAFE content type; refuses
 //     to serve .html (or any disallowed type).
 func (h *MediaHandler) Get(c *echo.Context) error {
 	kind := mediaKind((*c).Param("kind"))
-	if kind != kindPhoto && kind != kindRecording && kind != kindFrame && kind != kindContent && kind != kindAvatar {
+	if kind != kindPhoto && kind != kindFrame && kind != kindContent && kind != kindAvatar {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
 	id := (*c).Param("id")
@@ -99,27 +95,6 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		owningTenant = ot
 		// Consent gating: photo of a child requires positive PHOTO consent.
 		granted, cerr := h.consent.GetConsentValue(ctx, participantID, sessionID, entity.ConsentPhoto)
-		if cerr != nil {
-			return cerr
-		}
-		if !granted {
-			return appresp.Fail(c, http.StatusForbidden, "consent_required")
-		}
-	case kindRecording:
-		rec, err := h.recordings.GetRecordingByID(ctx, id, "")
-		if err != nil {
-			return err
-		}
-		relPath = rec.FileURL
-		sessionID = rec.SessionID
-		participantID = rec.ParticipantID
-		ot, oerr := h.sessions.TenantIDForSession(ctx, rec.SessionID)
-		if oerr != nil {
-			return oerr
-		}
-		owningTenant = ot
-		// Consent gating: recording of a child requires positive RECORDING consent.
-		granted, cerr := h.consent.GetConsentValue(ctx, participantID, sessionID, entity.ConsentRecording)
 		if cerr != nil {
 			return cerr
 		}
@@ -199,7 +174,7 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 
 // GetContent serves stage content files without authentication — used by the
 // public learner kiosk where no JWT is available. Only content files are
-// served; photos, recordings, frames, and avatars remain JWT-gated.
+// served; photos, frames, and avatars remain JWT-gated.
 func (h *MediaHandler) GetContent(c *echo.Context) error {
 	id := (*c).Param("id")
 	if _, err := uuid.Parse(id); err != nil {

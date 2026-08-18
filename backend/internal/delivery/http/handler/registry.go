@@ -21,7 +21,6 @@ type Registry struct {
 	Notification           *NotificationHandler
 	Assessment             *AssessmentHandler
 	Photo                  *PhotoHandler
-	Recording              *RecordingHandler
 	Report                 *ReportHandler
 	MissionBank            *MissionBankHandler
 	ParticipantMission     *ParticipantMissionHandler

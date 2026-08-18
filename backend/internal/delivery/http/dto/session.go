@@ -40,28 +40,26 @@ type UpdateGroupRequest struct {
 
 // CreateParticipantRequest is the payload for POST /api/sessions/:id/participants.
 type CreateParticipantRequest struct {
-	ChildName        string `json:"child_name" validate:"required"`
-	ChildAge         int    `json:"child_age" validate:"gte=0"`
-	SchoolName       string `json:"school_name,omitempty"`
-	ParentName       string `json:"parent_name" validate:"required"`
-	ParentPhone      string `json:"parent_phone" validate:"required"`
-	ParentEmail      string `json:"parent_email,omitempty"`
-	GroupID          string `json:"group_id,omitempty"`
-	ConsentRecording bool   `json:"consent_recording"`
-	ConsentPhoto     bool   `json:"consent_photo"`
+	ChildName    string `json:"child_name" validate:"required"`
+	ChildAge     int    `json:"child_age" validate:"gte=0"`
+	SchoolName   string `json:"school_name,omitempty"`
+	ParentName   string `json:"parent_name" validate:"required"`
+	ParentPhone  string `json:"parent_phone" validate:"required"`
+	ParentEmail  string `json:"parent_email,omitempty"`
+	GroupID      string `json:"group_id,omitempty"`
+	ConsentPhoto bool   `json:"consent_photo"`
 }
 
 // UpdateParticipantRequest is the payload for PUT /api/sessions/:id/participants/:participantId.
 type UpdateParticipantRequest struct {
-	ChildName        string `json:"child_name,omitempty"`
-	ChildAge         int    `json:"child_age,omitempty"`
-	SchoolName       string `json:"school_name,omitempty"`
-	ParentName       string `json:"parent_name,omitempty"`
-	ParentPhone      string `json:"parent_phone,omitempty"`
-	ParentEmail      string `json:"parent_email,omitempty"`
-	GroupID          string `json:"group_id,omitempty"`
-	ConsentRecording bool   `json:"consent_recording"`
-	ConsentPhoto     bool   `json:"consent_photo"`
+	ChildName    string `json:"child_name,omitempty"`
+	ChildAge     int    `json:"child_age,omitempty"`
+	SchoolName   string `json:"school_name,omitempty"`
+	ParentName   string `json:"parent_name,omitempty"`
+	ParentPhone  string `json:"parent_phone,omitempty"`
+	ParentEmail  string `json:"parent_email,omitempty"`
+	GroupID      string `json:"group_id,omitempty"`
+	ConsentPhoto bool   `json:"consent_photo"`
 }
 
 // ImportParticipantsRequest is the payload for POST /api/sessions/:id/participants/import.

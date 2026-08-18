@@ -94,9 +94,8 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 	now := time.Now().UTC()
 	ctx := (*c).Request().Context()
 	for _, p := range participants {
-		recGranted, _ := h.consent.GetConsentValue(ctx, p.ID, req.SessionID, entity.ConsentRecording)
 		photoGranted, _ := h.consent.GetConsentValue(ctx, p.ID, req.SessionID, entity.ConsentPhoto)
-		if recGranted && photoGranted {
+		if photoGranted {
 			continue
 		}
 		// When force=true we already cleared tokens above (lines 86-90), so skip
@@ -192,9 +191,6 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 					sessionID = *p.SessionID
 				}
 				if sessionID != "" {
-					if sErr := h.consent.SendConsentRequest(ctx, p.ID, sessionID, entity.ConsentRecording); sErr != nil {
-						log.Printf("consent: send-request record failed for %s RECORDING: %v", p.ID, sErr)
-					}
 					if sErr := h.consent.SendConsentRequest(ctx, p.ID, sessionID, entity.ConsentPhoto); sErr != nil {
 						log.Printf("consent: send-request record failed for %s PHOTO: %v", p.ID, sErr)
 					}
@@ -240,7 +236,7 @@ func (h *ConsentHandler) SendWhatsAppStream(c *echo.Context) error {
 }
 
 // RespondCombined handles POST /api/consent/respond-combined (PUBLIC): records a
-// parent's combined recording+photo consent via a single combined token. It
+// parent's combined photo consent via a single combined token. It
 // writes two consent_log audit rows, syncs the participant consent fields (so
 // facilitator pages see it), and clears the token.
 func (h *ConsentHandler) RespondCombined(c *echo.Context) error {
@@ -267,10 +263,6 @@ func (h *ConsentHandler) RespondCombined(c *echo.Context) error {
 	ip := (*c).RealIP()
 	ua := (*c).Request().UserAgent()
 	if rerr := h.consent.RespondConsent((*c).Request().Context(), participant.ID, sessionID,
-		entity.ConsentRecording, req.Recording, ip, ua); rerr != nil {
-		return rerr
-	}
-	if rerr := h.consent.RespondConsent((*c).Request().Context(), participant.ID, sessionID,
 		entity.ConsentPhoto, req.Photo, ip, ua); rerr != nil {
 		return rerr
 	}
@@ -280,7 +272,6 @@ func (h *ConsentHandler) RespondCombined(c *echo.Context) error {
 	// Single map-based update: persists both true AND false consent values (C2)
 	// and clears the combined token in one round-trip (replay protection).
 	if uerr := h.sessionRepo.UpdateParticipantFields((*c).Request().Context(), participant.ID, map[string]interface{}{
-		"consent_recording":                 req.Recording,
 		"consent_photo":                     req.Photo,
 		"consent_at":                        &nowCopy,
 		"consent_combined_token":            nil,
@@ -447,7 +438,6 @@ Kami dari Kidversa Edutourism meminta persetujuan Anda untuk kegiatan edutourism
 📍 Lokasi: %s
 
 Mohon berikan izin untuk:
-• Rekaman suara selama kegiatan
 • Pengambilan foto selama kegiatan
 
 Klik tautan berikut untuk memberikan persetujuan:

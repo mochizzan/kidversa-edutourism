@@ -34,7 +34,6 @@ type StageContentFileType string
 const (
 	StageContentVideo  StageContentFileType = "VIDEO"
 	StageContentImage  StageContentFileType = "IMAGE"
-	StageContentAudio  StageContentFileType = "AUDIO"
 	StageContentBundle StageContentFileType = "GAME_BUNDLE"
 )
 
@@ -96,21 +95,11 @@ const (
 	SyncFailed    SyncStatus = "FAILED"
 )
 
-// RecordingsReviewStatus enumerates review states for recordings.
-type RecordingsReviewStatus string
-
-const (
-	RecordingPending  RecordingsReviewStatus = "PENDING"
-	RecordingReviewed RecordingsReviewStatus = "REVIEWED"
-	RecordingSkipped  RecordingsReviewStatus = "SKIPPED"
-)
-
 // ConsentType enumerates consent kinds.
 type ConsentType string
 
 const (
-	ConsentRecording ConsentType = "RECORDING"
-	ConsentPhoto     ConsentType = "PHOTO"
+	ConsentPhoto ConsentType = "PHOTO"
 )
 
 // ReportStatus enumerates report lifecycle states.

@@ -9,7 +9,7 @@ import (
 )
 
 // RegisterMediaRoutes mounts the authenticated media-serving endpoint:
-//   - GET /api/media/:kind/:id   (kind = photo | recording)
+//   - GET /api/media/:kind/:id   (kind = photo | frame | content | avatar)
 //
 // Auth + tenant scope are enforced via middleware; per-asset consent and
 // on-disk security checks live in the handler.
@@ -23,7 +23,7 @@ func RegisterMediaRoutes(g *echo.Group, h *MediaHandler, jm *auth.JWTManager, cf
 
 // RegisterKioskMediaRoutes mounts a PUBLIC content-serving endpoint for the
 // learner kiosk — no JWT or session cookie required. Only stage content files
-// are served; photos/recordings/frames/avatars remain authenticated.
+// are served; photos/frames/avatars remain authenticated.
 func RegisterKioskMediaRoutes(g *echo.Group, h *MediaHandler) {
 	g.GET("/content/:id", h.GetContent)
 }

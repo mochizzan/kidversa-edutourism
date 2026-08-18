@@ -378,7 +378,7 @@ func (u *SessionUsecase) GetGroups(ctx context.Context, sessionID string) ([]ent
 }
 
 // CreateParticipant adds a participant to a session (and optional group).
-func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessionID, groupID, childName string, childAge int, schoolName, parentName, parentPhone, parentEmail string, consentRecording, consentPhoto bool) (*entity.Participant, error) {
+func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessionID, groupID, childName string, childAge int, schoolName, parentName, parentPhone, parentEmail string, consentPhoto bool) (*entity.Participant, error) {
 	tp := &tenantID
 	if tenantID == "" {
 		tp = nil
@@ -393,17 +393,16 @@ func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessio
 		gid = &g
 	}
 	p := &entity.Participant{
-		TenantID:         tp,
-		SessionID:        sid,
-		GroupID:          gid,
-		ChildName:        childName,
-		ChildAge:         childAge,
-		SchoolName:       schoolName,
-		ParentName:       parentName,
-		ParentPhone:      parentPhone,
-		ParentEmail:      parentEmail,
-		ConsentRecording: consentRecording,
-		ConsentPhoto:     consentPhoto,
+		TenantID:     tp,
+		SessionID:    sid,
+		GroupID:      gid,
+		ChildName:    childName,
+		ChildAge:     childAge,
+		SchoolName:   schoolName,
+		ParentName:   parentName,
+		ParentPhone:  parentPhone,
+		ParentEmail:  parentEmail,
+		ConsentPhoto: consentPhoto,
 	}
 	if err := u.sessionRepo.CreateParticipant(ctx, p); err != nil {
 		return nil, err
@@ -469,17 +468,16 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 			}
 			gid := r.GroupID
 			p := &entity.Participant{
-				TenantID:         tp,
-				SessionID:        sid,
-				GroupID:          gid,
-				ChildName:        r.ChildName,
-				ChildAge:         r.ChildAge,
-				SchoolName:       r.SchoolName,
-				ParentName:       r.ParentName,
-				ParentPhone:      r.ParentPhone,
-				ParentEmail:      r.ParentEmail,
-				ConsentRecording: r.ConsentRecording,
-				ConsentPhoto:     r.ConsentPhoto,
+				TenantID:     tp,
+				SessionID:    sid,
+				GroupID:      gid,
+				ChildName:    r.ChildName,
+				ChildAge:     r.ChildAge,
+				SchoolName:   r.SchoolName,
+				ParentName:   r.ParentName,
+				ParentPhone:  r.ParentPhone,
+				ParentEmail:  r.ParentEmail,
+				ConsentPhoto: r.ConsentPhoto,
 			}
 			if err := tx.CreateParticipant(ctx, p); err != nil {
 				return err
@@ -549,7 +547,7 @@ func (u *SessionUsecase) FindParticipantSessionInfo(ctx context.Context, partici
 }
 
 // UpdateParticipant patches a participant's fields.
-func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, childName string, childAge int, schoolName, parentName, parentPhone, parentEmail, groupID string, consentRecording, consentPhoto bool, hasAge bool) (*entity.Participant, error) {
+func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, childName string, childAge int, schoolName, parentName, parentPhone, parentEmail, groupID string, consentPhoto bool, hasAge bool) (*entity.Participant, error) {
 	p, err := u.sessionRepo.GetParticipantByID(ctx, participantID, "")
 	if err != nil {
 		return nil, err
@@ -575,9 +573,6 @@ func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, c
 	if groupID != "" {
 		g := groupID
 		p.GroupID = &g
-	}
-	if consentRecording {
-		p.ConsentRecording = true
 	}
 	if consentPhoto {
 		p.ConsentPhoto = true

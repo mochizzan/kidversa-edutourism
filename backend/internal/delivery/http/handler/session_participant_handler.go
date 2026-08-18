@@ -39,7 +39,7 @@ func (h *SessionParticipantHandler) CreateParticipant(c *echo.Context) error {
 	}
 	p, err := h.uc.CreateParticipant((*c).Request().Context(),
 		appmiddleware.GetTenantID(c), id, req.GroupID, req.ChildName, req.ChildAge,
-		req.SchoolName, req.ParentName, req.ParentPhone, req.ParentEmail, req.ConsentRecording, req.ConsentPhoto)
+		req.SchoolName, req.ParentName, req.ParentPhone, req.ParentEmail, req.ConsentPhoto)
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func (h *SessionParticipantHandler) CreateParticipantGlobal(c *echo.Context) err
 	}
 	p, err := h.uc.CreateParticipant((*c).Request().Context(),
 		appmiddleware.GetTenantID(c), "", req.GroupID, req.ChildName, req.ChildAge,
-		req.SchoolName, req.ParentName, req.ParentPhone, req.ParentEmail, req.ConsentRecording, req.ConsentPhoto)
+		req.SchoolName, req.ParentName, req.ParentPhone, req.ParentEmail, req.ConsentPhoto)
 	if err != nil {
 		return err
 	}

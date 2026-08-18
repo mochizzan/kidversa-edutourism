@@ -25,13 +25,12 @@ func NewProgramSubstageHandler(repo repository.ProgramSubstageRepository) *Progr
 
 // SubstageRequest is the create/update payload (Kegiatan leaf).
 type SubstageRequest struct {
-	ProgramStageID   string `json:"program_stage_id" validate:"required"`
-	SequenceOrder    int    `json:"sequence_order"`
-	Name             string `json:"name" validate:"required"`
-	Description      string `json:"description,omitempty"`
-	DurationMinutes  int    `json:"duration_minutes"`
-	IsRecordingStage bool   `json:"is_recording_stage"`
-	IsPhotoStage     bool   `json:"is_photo_stage"`
+	ProgramStageID  string `json:"program_stage_id" validate:"required"`
+	SequenceOrder   int    `json:"sequence_order"`
+	Name            string `json:"name" validate:"required"`
+	Description     string `json:"description,omitempty"`
+	DurationMinutes int    `json:"duration_minutes"`
+	IsPhotoStage    bool   `json:"is_photo_stage"`
 }
 
 // Create handles POST /api/program-substages.
@@ -41,13 +40,12 @@ func (h *ProgramSubstageHandler) Create(c *echo.Context) error {
 		return err
 	}
 	s := &entity.ProgramSubstage{
-		ProgramStageID:   req.ProgramStageID,
-		SequenceOrder:    req.SequenceOrder,
-		Name:             req.Name,
-		Description:      req.Description,
-		DurationMinutes:  req.DurationMinutes,
-		IsRecordingStage: req.IsRecordingStage,
-		IsPhotoStage:     req.IsPhotoStage,
+		ProgramStageID:  req.ProgramStageID,
+		SequenceOrder:   req.SequenceOrder,
+		Name:            req.Name,
+		Description:     req.Description,
+		DurationMinutes: req.DurationMinutes,
+		IsPhotoStage:    req.IsPhotoStage,
 	}
 	if err := h.repo.CreateSubstage((*c).Request().Context(), s); err != nil {
 		return err
@@ -99,7 +97,6 @@ func (h *ProgramSubstageHandler) Update(c *echo.Context) error {
 	s.Name = req.Name
 	s.Description = req.Description
 	s.DurationMinutes = req.DurationMinutes
-	s.IsRecordingStage = req.IsRecordingStage
 	s.IsPhotoStage = req.IsPhotoStage
 	if err := h.repo.UpdateSubstage((*c).Request().Context(), s); err != nil {
 		return err

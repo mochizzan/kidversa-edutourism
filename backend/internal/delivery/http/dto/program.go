@@ -12,13 +12,12 @@ type ProgramRequest struct {
 
 // ProgramStageRequest is the create/update payload for program stages.
 type ProgramStageRequest struct {
-	SequenceOrder    int                `json:"sequence_order,omitempty"`
-	Name             string             `json:"name" validate:"required"`
-	Description      string             `json:"description,omitempty"`
-	ContentType      entity.ContentType `json:"content_type" validate:"required"`
-	DurationMinutes  int                `json:"duration_minutes,omitempty"`
-	IsRecordingStage bool               `json:"is_recording_stage,omitempty"`
-	IsPhotoStage     bool               `json:"is_photo_stage,omitempty"`
+	SequenceOrder   int                `json:"sequence_order,omitempty"`
+	Name            string             `json:"name" validate:"required"`
+	Description     string             `json:"description,omitempty"`
+	ContentType     entity.ContentType `json:"content_type" validate:"required"`
+	DurationMinutes int                `json:"duration_minutes,omitempty"`
+	IsPhotoStage    bool               `json:"is_photo_stage,omitempty"`
 }
 
 // ContentRequest is the create/update payload for the standalone Content entity

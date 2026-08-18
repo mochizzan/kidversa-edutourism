@@ -112,39 +112,6 @@ func smartPhotoModelFromEntity(e *entity.SmartPhoto) *SmartPhotoModel {
 	return &SmartPhotoModel{SmartPhoto: *e}
 }
 
-// RecordingModel is the GORM persistence model for recordings.
-type RecordingModel struct {
-	entity.Recording
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
-}
-
-// TableName pins the table name.
-func (RecordingModel) TableName() string { return "recordings" }
-
-// BeforeCreate generates a UUID if missing and stamps audit fields.
-func (m *RecordingModel) BeforeCreate(*gorm.DB) error {
-	if m.ID == "" {
-		m.ID = newUUID()
-	}
-	now := time.Now()
-	if m.CreatedAt.IsZero() {
-		m.CreatedAt = now
-	}
-	m.UpdatedAt = m.CreatedAt
-	return nil
-}
-
-// ToEntity maps the model back to the domain entity.
-func (m *RecordingModel) ToEntity() *entity.Recording {
-	e := m.Recording
-	return &e
-}
-
-// recordingModelFromEntity builds a model from a domain entity.
-func recordingModelFromEntity(e *entity.Recording) *RecordingModel {
-	return &RecordingModel{Recording: *e}
-}
-
 // ConsentLogModel is the GORM persistence model for consent logs.
 type ConsentLogModel struct {
 	entity.ConsentLog

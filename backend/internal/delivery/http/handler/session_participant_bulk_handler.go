@@ -34,7 +34,7 @@ func (h *SessionParticipantBulkHandler) ImportParticipants(c *echo.Context) erro
 		rows = append(rows, repository.ParticipantInput{
 			ChildName: r.ChildName, ChildAge: r.ChildAge, SchoolName: r.SchoolName,
 			ParentName: r.ParentName, ParentPhone: r.ParentPhone, ParentEmail: r.ParentEmail,
-			ConsentRecording: r.ConsentRecording, ConsentPhoto: r.ConsentPhoto,
+			ConsentPhoto: r.ConsentPhoto,
 		})
 	}
 	out, err := h.uc.ImportParticipants((*c).Request().Context(), appmiddleware.GetTenantID(c), id, rows)
@@ -55,7 +55,7 @@ func (h *SessionParticipantBulkHandler) UpdateParticipant(c *echo.Context) error
 	}
 	p, err := h.uc.UpdateParticipant((*c).Request().Context(), pid,
 		req.ChildName, req.ChildAge, req.SchoolName, req.ParentName, req.ParentPhone,
-		req.ParentEmail, req.GroupID, req.ConsentRecording, req.ConsentPhoto, req.ChildAge != 0)
+		req.ParentEmail, req.GroupID, req.ConsentPhoto, req.ChildAge != 0)
 	if err != nil {
 		return err
 	}

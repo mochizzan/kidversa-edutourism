@@ -53,20 +53,19 @@ type GroupStageProgress struct {
 // Participant is a child (and their parent/guardian) in a session group.
 type Participant struct {
 	BaseModel
-	TenantID         *string    `json:"tenant_id,omitempty"`
-	SessionID        *string    `json:"session_id,omitempty"`
-	GroupID          *string    `json:"group_id,omitempty"`
-	ChildName        string     `json:"child_name"`
-	ChildAge         int        `json:"child_age"`
-	SchoolName       string     `json:"school_name,omitempty"`
-	ParentName       string     `json:"parent_name"`
-	ParentPhone      string     `json:"parent_phone"`
-	ParentEmail      string     `json:"parent_email,omitempty"`
-	ConsentRecording bool       `json:"consent_recording"`
-	ConsentPhoto     bool       `json:"consent_photo"`
-	ConsentAt        *time.Time `json:"consent_at,omitempty"`
+	TenantID     *string    `json:"tenant_id,omitempty"`
+	SessionID    *string    `json:"session_id,omitempty"`
+	GroupID      *string    `json:"group_id,omitempty"`
+	ChildName    string     `json:"child_name"`
+	ChildAge     int        `json:"child_age"`
+	SchoolName   string     `json:"school_name,omitempty"`
+	ParentName   string     `json:"parent_name"`
+	ParentPhone  string     `json:"parent_phone"`
+	ParentEmail  string     `json:"parent_email,omitempty"`
+	ConsentPhoto bool       `json:"consent_photo"`
+	ConsentAt    *time.Time `json:"consent_at,omitempty"`
 	// ConsentCombinedToken is a single-use token (per participant) used by the
-	// WhatsApp consent-delivery flow. The parent submits recording+photo consent
+	// WhatsApp consent-delivery flow. The parent submits photo consent
 	// in one form via this token. Empty when no active request is pending.
 	ConsentCombinedToken *string `json:"consent_combined_token,omitempty"`
 	// ConsentCombinedTokenExpiresAt is the RFC3339 expiry of the combined token.

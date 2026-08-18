@@ -68,9 +68,8 @@ type ConsentParticipantResult struct {
 
 // ConsentRespondCombinedRequest is the public combined-consent payload.
 type ConsentRespondCombinedRequest struct {
-	Token     string `json:"token" validate:"required"`
-	Recording bool   `json:"recording"`
-	Photo     bool   `json:"photo"`
+	Token string `json:"token" validate:"required"`
+	Photo bool   `json:"photo"`
 }
 
 // ConsentRespondCombinedResponse is returned after a combined consent is recorded.

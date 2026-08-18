@@ -26,13 +26,12 @@ import (
 
 // UploadHandler serves the multipart file-upload endpoints that persist media
 // to disk (under cfg.UploadDir) and create the corresponding SmartPhoto /
-// Recording / PhotoFrame / StageContent records (or patch a User's avatar).
+// PhotoFrame / StageContent records (or patch a User's avatar).
 // Served media is later retrieved via the authenticated media handler (never
 // e.Static).
 type UploadHandler struct {
 	cfg         *config.Config
 	photos      repository.PhotoRepository
-	recordings  repository.RecordingRepository
 	frames      repository.FrameRepository
 	contentRepo repository.ContentRepository
 	users       repository.UserRepository
@@ -43,13 +42,12 @@ type UploadHandler struct {
 func NewUploadHandler(
 	cfg *config.Config,
 	photos repository.PhotoRepository,
-	recordings repository.RecordingRepository,
 	frames repository.FrameRepository,
 	contentRepo repository.ContentRepository,
 	users repository.UserRepository,
 	consent repository.ConsentRepository,
 ) *UploadHandler {
-	return &UploadHandler{cfg: cfg, photos: photos, recordings: recordings, frames: frames, contentRepo: contentRepo, users: users, consent: consent}
+	return &UploadHandler{cfg: cfg, photos: photos, frames: frames, contentRepo: contentRepo, users: users, consent: consent}
 }
 
 const uploadFieldName = "file"
@@ -114,50 +112,6 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 		// Roll back the stored file so we don't leave orphans.
 		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
 			// Log cleanup failure but don't change the return value.
-			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
-		}
-		return err
-	}
-	return appresp.Created(c, rec)
-}
-
-// UploadRecording handles POST /api/recordings/upload (same contract as photos,
-// for audio/video). Creates a Recording row referencing the stored file.
-func (h *UploadHandler) UploadRecording(c *echo.Context) error {
-	fileSize, storedRel, err := h.persistFile(c, "recordings")
-	if err != nil {
-		return err
-	}
-
-	reviewedBy := (*c).FormValue("reviewed_by")
-	var reviewedByPtr *string
-	if reviewedBy != "" {
-		reviewedByPtr = &reviewedBy
-	}
-
-	duration := 0
-	if v := (*c).FormValue("duration_seconds"); v != "" {
-		if n, e := strconv.Atoi(strings.TrimSpace(v)); e == nil {
-			duration = n
-		}
-	}
-
-	rec := &entity.Recording{
-		BaseModel:       entity.BaseModel{ID: uuid.NewString()},
-		ParticipantID:   (*c).FormValue("participant_id"),
-		SessionID:       (*c).FormValue("session_id"),
-		SessionStageID:  (*c).FormValue("session_stage_id"),
-		FileURL:         storedRel,
-		DurationSeconds: duration,
-		FileSizeBytes:   fileSize,
-		TranscriptText:  (*c).FormValue("transcript_text"),
-		ReviewStatus:    entity.RecordingPending,
-		ReviewedBy:      reviewedByPtr,
-		SyncStatus:      entity.SyncLocal,
-	}
-	if err := h.recordings.CreateRecording((*c).Request().Context(), rec); err != nil {
-		// Roll back the stored file so we don't leave orphans.
-		if rmErr := h.removeStored(h.cfg.UploadDir, storedRel); rmErr != nil {
 			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
 		}
 		return err

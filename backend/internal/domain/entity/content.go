@@ -29,23 +29,6 @@ type SmartPhoto struct {
 	SyncStatus      SyncStatus `json:"sync_status"`
 }
 
-// Recording is a captured audio/video of a participant at a session stage.
-type Recording struct {
-	BaseModel
-	ParticipantID   string                 `json:"participant_id"`
-	SessionID       string                 `json:"session_id"`
-	SessionStageID  string                 `json:"session_stage_id" gorm:"column:session_substage_id"`
-	FileURL         string                 `json:"file_url,omitempty"`
-	DurationSeconds int                    `json:"duration_seconds"`
-	FileSizeBytes   int64                  `json:"file_size_bytes,omitempty"`
-	TranscriptText  string                 `json:"transcript_text,omitempty"`
-	EmotionTags     []string               `json:"emotion_tags,omitempty" gorm:"-"`
-	ReviewStatus    RecordingsReviewStatus `json:"review_status"`
-	ReviewedBy      *string                `json:"reviewed_by,omitempty"`
-	ReviewedAt      *time.Time             `json:"reviewed_at,omitempty"`
-	SyncStatus      SyncStatus             `json:"sync_status"`
-}
-
 // Report is the generated narrative report for one participant in one session.
 type Report struct {
 	BaseModel
@@ -73,7 +56,7 @@ type ParticipantMission struct {
 	CompletedAt   *time.Time `json:"completed_at,omitempty"`
 }
 
-// ConsentLog records a parent's consent response for recording/photo.
+// ConsentLog records a parent's consent response for photo.
 type ConsentLog struct {
 	BaseModel
 	ParticipantID string      `json:"participant_id"`

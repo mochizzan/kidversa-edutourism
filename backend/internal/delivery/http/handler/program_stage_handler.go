@@ -36,7 +36,7 @@ func (h *ProgramHandler) CreateStage(c *echo.Context) error {
 	s := &entity.ProgramStage{
 		ProgramID: programID, SequenceOrder: req.SequenceOrder, Name: req.Name,
 		Description: req.Description, ContentType: req.ContentType, DurationMinutes: req.DurationMinutes,
-		IsRecordingStage: req.IsRecordingStage, IsPhotoStage: req.IsPhotoStage,
+		IsPhotoStage: req.IsPhotoStage,
 	}
 	if err := h.repo.CreateStage((*c).Request().Context(), s); err != nil {
 		return err
@@ -69,7 +69,6 @@ func (h *ProgramHandler) UpdateStage(c *echo.Context) error {
 	}
 	s.SequenceOrder = req.SequenceOrder
 	s.DurationMinutes = req.DurationMinutes
-	s.IsRecordingStage = req.IsRecordingStage
 	s.IsPhotoStage = req.IsPhotoStage
 	if err := h.repo.UpdateStage((*c).Request().Context(), s); err != nil {
 		return err

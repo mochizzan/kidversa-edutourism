@@ -384,7 +384,7 @@ func (r *GormSessionRepository) ClearParticipantTokens(ctx context.Context, sess
 func (r *GormSessionRepository) DeleteParticipant(ctx context.Context, id string) error {
 	// Guard: refuse to delete a participant that is still operationally linked or
 	// has child records. This mirrors the frontend parity intent — a participant
-	// that still carries session/group membership or assessment/photo/recording/
+	// that still carries session/group membership or assessment/photo/
 	// report/consent data must be unlinked/cleared first (or archived), not dropped
 	// outright, to avoid dangling foreign keys and lost history.
 	var p ParticipantModel
@@ -404,7 +404,6 @@ func (r *GormSessionRepository) DeleteParticipant(ctx context.Context, id string
 		col   string
 	}{
 		{"smart_photos", "participant_id"},
-		{"recordings", "participant_id"},
 		{"assessments", "participant_id"},
 		{"reports", "participant_id"},
 		{"consent_logs", "participant_id"},

@@ -15,16 +15,15 @@ type Program struct {
 // ProgramStage is an ordered step within a program.
 type ProgramStage struct {
 	BaseModel
-	ProgramID        string      `json:"program_id"`
-	SequenceOrder    int         `json:"sequence_order"`
-	Name             string      `json:"name"`
-	Description      string      `json:"description,omitempty"`
-	ContentType      ContentType `json:"content_type"`
-	DurationMinutes  int         `json:"duration_minutes"`
-	IsRecordingStage bool        `json:"is_recording_stage"`
-	IsPhotoStage     bool        `json:"is_photo_stage"`
-	BadgeName        string      `json:"badge_name,omitempty"`
-	BadgeImageURL    string      `json:"badge_image_url,omitempty"`
+	ProgramID       string      `json:"program_id"`
+	SequenceOrder   int         `json:"sequence_order"`
+	Name            string      `json:"name"`
+	Description     string      `json:"description,omitempty"`
+	ContentType     ContentType `json:"content_type"`
+	DurationMinutes int         `json:"duration_minutes"`
+	IsPhotoStage    bool        `json:"is_photo_stage"`
+	BadgeName       string      `json:"badge_name,omitempty"`
+	BadgeImageURL   string      `json:"badge_image_url,omitempty"`
 }
 
 // NOTE: StageContent (now the JOIN-shaped kiosk/learner projection), MissionBank,

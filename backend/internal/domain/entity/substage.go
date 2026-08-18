@@ -14,13 +14,12 @@ const (
 // ProgramSubstage is an assessed leaf ("Kegiatan") under a program stage.
 type ProgramSubstage struct {
 	BaseModel
-	ProgramStageID   string `json:"program_stage_id"`
-	SequenceOrder    int    `json:"sequence_order"`
-	Name             string `json:"name"`
-	Description      string `json:"description,omitempty"`
-	DurationMinutes  int    `json:"duration_minutes"`
-	IsRecordingStage bool   `json:"is_recording_stage"`
-	IsPhotoStage     bool   `json:"is_photo_stage"`
+	ProgramStageID  string `json:"program_stage_id"`
+	SequenceOrder   int    `json:"sequence_order"`
+	Name            string `json:"name"`
+	Description     string `json:"description,omitempty"`
+	DurationMinutes int    `json:"duration_minutes"`
+	IsPhotoStage    bool   `json:"is_photo_stage"`
 }
 
 // SessionSubstage is an instantiation of a program substage within a session.
