@@ -97,7 +97,7 @@ export const LiveGroupCard = ({
           const ps = programStages.find((pp) => pp.id === ss?.program_stage_id)
           return {
             id: p.session_stage_id,
-            name: stageNames[p.session_stage_id] || ps?.name || 'Stage',
+            name: stageNames[p.session_stage_id] || ps?.name || 'Topik',
             sequenceOrder: ps?.sequence_order ?? 0,
             status: p.status,
           }
@@ -107,7 +107,7 @@ export const LiveGroupCard = ({
       <div className="flex items-center justify-between mt-4 text-sm">
         <span className="text-on-surface-variant">🎯 {stageNames[stageId || ''] || '-'}</span>
         <span className="text-on-surface-variant font-medium">
-          Stage {activeIndex.current}/{activeIndex.total}
+          Topik {activeIndex.current}/{activeIndex.total}
         </span>
       </div>
 
@@ -149,7 +149,7 @@ export const LiveGroupCard = ({
         {status === 'LOCKED' && nextLockedStageId && (
           <Button variant="primary" size="sm" onClick={() => onUnlock(g.group.id, nextLockedStageId)}>
             <Unlock className="w-4 h-4 mr-1" />
-            Buka Stage
+            Buka Topik
           </Button>
         )}
         {status === 'IN_PROGRESS' && (

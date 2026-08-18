@@ -90,7 +90,7 @@ const LearnerKioskPage = () => {
 
     const resolved = resolveStage(kiosk, stageId, substageId)
     if (!resolved) {
-      setError('Stage tidak ditemukan pada sesi ini.')
+      setError('Topik tidak ditemukan pada sesi ini.')
       setLoading(false)
       return
     }
@@ -178,7 +178,7 @@ const LearnerKioskPage = () => {
       <div className="h-screen w-screen bg-surface flex flex-col items-center justify-center text-on-surface p-8 text-center">
         <AlertTriangle className="w-16 h-16 text-warning mb-4" />
         <h1 className="text-xl font-bold mb-2">Konten Tidak Tersedia</h1>
-        <p className="text-on-surface-variant">{error || 'Stage tidak ditemukan'}</p>
+        <p className="text-on-surface-variant">{error || 'Topik tidak ditemukan'}</p>
       </div>
     )
   }
@@ -198,7 +198,7 @@ const LearnerKioskPage = () => {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 bg-black/80">
         <div>
-          <p className="text-xs text-white/60">Stage {currentContentIndex + 1} dari {contents.length}</p>
+          <p className="text-xs text-white/60">Konten {currentContentIndex + 1} dari {contents.length}</p>
           <h1 className="text-lg font-semibold">{currentContent?.title}</h1>
           {substage && <p className="text-xs text-white/50">{substage.status === 'COMPLETED' ? 'Kegiatan selesai' : 'Kegiatan berlangsung'}</p>}
         </div>

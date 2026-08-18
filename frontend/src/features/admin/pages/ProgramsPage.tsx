@@ -84,7 +84,7 @@ const ProgramsPage = () => {
     <div className="space-y-6">
       <PageHeader
         title="Programs"
-        subtitle="Kelola program edutourism dan stage-nya."
+        subtitle="Kelola program edutourism dan topik di dalamnya."
         actions={
           <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.PROGRAM_NEW)}>Buat Program</Button>
         }

@@ -81,7 +81,7 @@ const ActivitiesPage = () => {
         const stageName =
           (repStage && stageNameMap.get(repStage.program_stage_id)) ||
           (detail.stages[0] && stageNameMap.get(detail.stages[0].program_stage_id)) ||
-          'Stage'
+          'Topik'
 
         items.push({
           id: session.id,
@@ -112,7 +112,7 @@ const ActivitiesPage = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Aktivitas Saya" subtitle="Riwayat sesi dan stage yang telah dikerjakan." />
+        <PageHeader title="Aktivitas Saya" subtitle="Riwayat sesi dan topik yang telah dikerjakan." />
         <div className="bg-surface rounded-2xl p-4 shadow-sm border border-outline-variant/50 animate-pulse">
           <div className="h-10 bg-surface-container-high rounded w-48" />
         </div>

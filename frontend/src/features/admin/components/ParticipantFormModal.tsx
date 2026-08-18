@@ -177,8 +177,8 @@ export function ParticipantFormModal({
 
     return (
       <div className="flex gap-1">
-        <Badge variant={participant.consent_recording ? 'success' : 'danger'} size="sm">Recording</Badge>
-        <Badge variant={participant.consent_photo ? 'success' : 'danger'} size="sm">Photo</Badge>
+        <Badge variant={participant.consent_recording ? 'success' : 'danger'} size="sm">Rekaman</Badge>
+        <Badge variant={participant.consent_photo ? 'success' : 'danger'} size="sm">Foto</Badge>
       </div>
     )
   }

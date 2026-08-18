@@ -14,8 +14,8 @@ export function ProgramStagesTab({ stages, onAdd, onEdit }: ProgramStagesTabProp
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-on-surface">Daftar Stage</h3>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={onAdd}>Tambah Stage</Button>
+        <h3 className="text-lg font-semibold text-on-surface">Daftar Topik</h3>
+        <Button icon={<Plus className="w-4 h-4" />} onClick={onAdd}>Tambah Topik</Button>
       </div>
 
       <div className="space-y-3">
@@ -30,9 +30,9 @@ export function ProgramStagesTab({ stages, onAdd, onEdit }: ProgramStagesTabProp
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="primary">{stage.content_type}</Badge>
-                {stage.is_recording_stage && <Badge variant="accent">Recording</Badge>}
-                {stage.is_photo_stage && <Badge variant="success">Photo</Badge>}
-                <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit Stage" onClick={() => onEdit(stage)} />
+                {stage.is_recording_stage && <Badge variant="accent">Merekam</Badge>}
+                {stage.is_photo_stage && <Badge variant="success">Foto</Badge>}
+                <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit Topik" onClick={() => onEdit(stage)} />
               </div>
             </div>
           </Card>

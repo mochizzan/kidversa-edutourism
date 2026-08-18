@@ -212,7 +212,7 @@ const GroupPage = () => {
         groupDetail.session.id,
         groupId,
         'group:completed',
-        `${group.name} menyelesaikan "${groupDetail.programStageName ?? 'Stage'}"`,
+        `${group.name} menyelesaikan "${groupDetail.programStageName ?? 'Topik'}"`,
         user?.id,
       )
       confirm.dismiss()
@@ -317,7 +317,7 @@ const GroupPage = () => {
     <div className="space-y-6">
       <PageHeader
         title={group.name}
-        subtitle={programStageName ?? 'Stage'}
+        subtitle={programStageName ?? 'Topik'}
         breadcrumbs={[
           { label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD },
           { label: group.name },
@@ -326,7 +326,7 @@ const GroupPage = () => {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 text-sm text-on-surface-variant">
               <Target className="w-4 h-4" />
-              <span>{programStageName ?? 'Stage'}</span>
+              <span>{programStageName ?? 'Topik'}</span>
             </div>
             <Button
               variant="primary"

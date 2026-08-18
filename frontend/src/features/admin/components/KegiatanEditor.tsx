@@ -230,7 +230,7 @@ export function KegiatanEditor({
                   onChange={(e) => setDraft((d) => ({ ...d, is_recording_stage: e.target.checked }))}
                   className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
                 />
-                Recording
+                Merekam
               </label>
               <label className="flex items-center gap-2 text-sm text-on-surface">
                 <input
@@ -239,7 +239,7 @@ export function KegiatanEditor({
                   onChange={(e) => setDraft((d) => ({ ...d, is_photo_stage: e.target.checked }))}
                   className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
                 />
-                Photo
+                Foto
               </label>
             </div>
             <div className="flex justify-end gap-2 pt-1">

@@ -123,8 +123,8 @@ export function ConfirmOverrideModal({
         {/* Target stage selector (jump only) */}
         {actionType === 'jump' && (
           <Select
-            label="Stage Tujuan"
-            placeholder="Pilih stage..."
+            label="Topik Tujuan"
+            placeholder="Pilih topik..."
             options={availableStages}
             value={targetStageId}
             onChange={(e) => {

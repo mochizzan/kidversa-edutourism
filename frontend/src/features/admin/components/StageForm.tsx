@@ -45,17 +45,17 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
       <Input
-        label="Nama Stage"
+        label="Nama Topik"
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
-        placeholder="Nama stage"
+        placeholder="Nama topik"
       />
       <Input
         label="Deskripsi"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="Deskripsi stage"
+        placeholder="Deskripsi topik"
       />
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-sm text-on-surface">
@@ -65,7 +65,7 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
             onChange={(e) => setIsRecordingStage(e.target.checked)}
             className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
           />
-          Recording Stage
+          Merekam
         </label>
         <label className="flex items-center gap-2 text-sm text-on-surface">
           <input
@@ -74,7 +74,7 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
             onChange={(e) => setIsPhotoStage(e.target.checked)}
             className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
           />
-          Photo Stage
+          Foto
         </label>
       </div>
 

@@ -179,21 +179,21 @@ const ProgramStagePage = () => {
 
   if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>
   if (!program) return <div className="text-center text-on-surface-variant">Program not found</div>
-  if (!isNew && !stage) return <div className="text-center text-on-surface-variant">Stage not found</div>
+  if (!isNew && !stage) return <div className="text-center text-on-surface-variant">Topik tidak ditemukan</div>
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isNew ? 'Buat Stage Baru' : `Edit Stage: ${stage?.name ?? ''}`}
+        title={isNew ? 'Buat Topik Baru' : `Edit Topik: ${stage?.name ?? ''}`}
         breadcrumbs={[
           { label: 'Programs', href: programListPath() },
           { label: program.name, href: programDetailPath(program.id) },
-          { label: stage?.name || 'Buat Stage Baru', href: isNew ? undefined : programStagePath(program.id, stageId!) },
+          { label: stage?.name || 'Buat Topik Baru', href: isNew ? undefined : programStagePath(program.id, stageId!) },
         ]}
         actions={
           !isNew && stage ? (
             <Button variant="danger" onClick={() => setDeleteTarget(stage)}>
-              Hapus Stage
+              Hapus Topik
             </Button>
           ) : undefined
         }
@@ -320,9 +320,9 @@ const ProgramStagePage = () => {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Hapus Stage"
-        message={`Yakin ingin menghapus stage "${deleteTarget?.name || ''}"? Seluruh konten di dalam stage ini juga akan dihapus. Tindakan ini tidak dapat dibatalkan.`}
-        confirmLabel="Hapus Stage"
+        title="Hapus Topik"
+        message={`Yakin ingin menghapus topik "${deleteTarget?.name || ''}"? Seluruh konten di dalam topik ini juga akan dihapus. Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus Topik"
         loading={deleting}
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}
