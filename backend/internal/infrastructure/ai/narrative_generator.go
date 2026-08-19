@@ -26,11 +26,12 @@ var systemPromptOnce sync.Once
 const defaultStageLabel = "Tahap"
 
 // buildAssessmentText renders the assessment block fed to the narrative prompt.
-// It maps each assessment (keyed by its session-stage instance ID) to its
+// It maps each assessment (keyed by its session-substage ID) to its parent
 // program stage for a human-readable name and stable ordering, and drops
 // uninformative rows (no rating and no comment). The mapping is built by the
-// callers from sessionStages + programStages so no internal UUIDs leak.
-func buildAssessmentText(assessments *repository.Paginated[entity.Assessment], stageBySessionID map[string]entity.ProgramStage) string {
+// callers from sessionStages + sessionSubstages + programStages so no internal
+// UUIDs leak.
+func buildAssessmentText(assessments *repository.Paginated[entity.Assessment], stageBySubstageID map[string]entity.ProgramStage) string {
 	type row struct {
 		order int
 		text  string
@@ -39,7 +40,7 @@ func buildAssessmentText(assessments *repository.Paginated[entity.Assessment], s
 	for i, a := range assessments.Items {
 		order := i + 1
 		name := defaultStageLabel
-		if st, ok := stageBySessionID[a.SessionStageID]; ok {
+		if st, ok := stageBySubstageID[a.SessionSubstageID]; ok {
 			if st.SequenceOrder > 0 {
 				order = st.SequenceOrder
 			}
@@ -69,12 +70,55 @@ func buildAssessmentText(assessments *repository.Paginated[entity.Assessment], s
 	return strings.Join(out, "\n")
 }
 
+// buildStageBySubstageID resolves each session substage (Kegiatan) of a session
+// to its parent program stage (SubTopik). Assessments are keyed by
+// session-substage ID, so this lets buildAssessmentText print the real stage
+// name instead of the "Tahap" fallback. Returns an empty (non-nil) map when
+// the substage repo is unwired, preserving prior behaviour.
+func (g *OpenRouterNarrativeGenerator) buildStageBySubstageID(ctx context.Context, sessionID, programID string) (map[string]entity.ProgramStage, error) {
+	stageBySubstageID := make(map[string]entity.ProgramStage)
+	if g.substageRepo == nil {
+		return stageBySubstageID, nil
+	}
+	programStages, err := g.programRepo.ListStages(ctx, programID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch program stages: %w", err)
+	}
+	stageByProgramID := make(map[string]entity.ProgramStage, len(programStages))
+	for _, ps := range programStages {
+		stageByProgramID[ps.ID] = ps
+	}
+	// sub.SessionStageID is a session_stages ID, so it must be bridged through
+	// the session stage to reach its program_stages row.
+	sessionStages, err := g.sessionRepo.ListSessionStages(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch session stages: %w", err)
+	}
+	stageBySessionStageID := make(map[string]entity.ProgramStage, len(sessionStages))
+	for _, ss := range sessionStages {
+		if ps, ok := stageByProgramID[ss.ProgramStageID]; ok {
+			stageBySessionStageID[ss.ID] = ps
+		}
+	}
+	subs, err := g.substageRepo.ListSessionSubstages(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch session substages: %w", err)
+	}
+	for _, sub := range subs {
+		if ps, ok := stageBySessionStageID[sub.SessionStageID]; ok {
+			stageBySubstageID[sub.ID] = ps
+		}
+	}
+	return stageBySubstageID, nil
+}
+
 // OpenRouterNarrativeGenerator implements reports.NarrativeGenerator using
 // the OpenRouter chat completions API.
 type OpenRouterNarrativeGenerator struct {
 	client         *OpenRouterClient
 	reportRepo     repository.ReportRepository
 	sessionRepo    repository.SessionRepository
+	substageRepo   repository.SessionSubstageRepository
 	assessmentRepo repository.AssessmentRepository
 	programRepo    repository.ProgramRepository
 }
@@ -86,11 +130,13 @@ func NewOpenRouterNarrativeGenerator(
 	sessionRepo repository.SessionRepository,
 	assessmentRepo repository.AssessmentRepository,
 	programRepo repository.ProgramRepository,
+	substageRepo repository.SessionSubstageRepository,
 ) *OpenRouterNarrativeGenerator {
 	return &OpenRouterNarrativeGenerator{
 		client:         client,
 		reportRepo:     reportRepo,
 		sessionRepo:    sessionRepo,
+		substageRepo:   substageRepo,
 		assessmentRepo: assessmentRepo,
 		programRepo:    programRepo,
 	}
@@ -113,27 +159,12 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID, t
 		return "", fmt.Errorf("fetch session: %w", err)
 	}
 
-	sessionStages, err := g.sessionRepo.ListSessionStages(ctx, r.SessionID)
+	// Bridge session-substage IDs -> their parent program stage so each
+	// assessment (keyed by session-substage ID) resolves to a real name + order
+	// instead of the fallback "Tahap" label.
+	stageBySubstageID, err := g.buildStageBySubstageID(ctx, r.SessionID, session.ProgramID)
 	if err != nil {
-		return "", fmt.Errorf("fetch session stages: %w", err)
-	}
-
-	programStages, err := g.programRepo.ListStages(ctx, session.ProgramID)
-	if err != nil {
-		return "", fmt.Errorf("fetch program stages: %w", err)
-	}
-
-	// Bridge session-stage instance IDs -> their program stage so assessments
-	// (keyed by session-stage ID) resolve to a real name + order.
-	stageByProgramID := make(map[string]entity.ProgramStage, len(programStages))
-	for _, ps := range programStages {
-		stageByProgramID[ps.ID] = ps
-	}
-	stageBySessionID := make(map[string]entity.ProgramStage, len(sessionStages))
-	for _, ss := range sessionStages {
-		if ps, ok := stageByProgramID[ss.ProgramStageID]; ok {
-			stageBySessionID[ss.ID] = ps
-		}
+		return "", err
 	}
 
 	assessments, err := g.assessmentRepo.List(ctx, repository.AssessmentFilter{
@@ -144,7 +175,7 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID, t
 		return "", fmt.Errorf("fetch assessments: %w", err)
 	}
 
-	assessmentsText := buildAssessmentText(assessments, stageBySessionID)
+	assessmentsText := buildAssessmentText(assessments, stageBySubstageID)
 
 	tmplData := map[string]interface{}{
 		"ChildName":   participant.ChildName,
@@ -190,27 +221,12 @@ func (g *OpenRouterNarrativeGenerator) StreamGenerate(ctx context.Context, repor
 		return "", fmt.Errorf("fetch session: %w", err)
 	}
 
-	sessionStages, err := g.sessionRepo.ListSessionStages(ctx, r.SessionID)
+	// Bridge session-substage IDs -> their parent program stage so each
+	// assessment (keyed by session-substage ID) resolves to a real name + order
+	// instead of the fallback "Tahap" label.
+	stageBySubstageID, err := g.buildStageBySubstageID(ctx, r.SessionID, session.ProgramID)
 	if err != nil {
-		return "", fmt.Errorf("fetch session stages: %w", err)
-	}
-
-	programStages, err := g.programRepo.ListStages(ctx, session.ProgramID)
-	if err != nil {
-		return "", fmt.Errorf("fetch program stages: %w", err)
-	}
-
-	// Bridge session-stage instance IDs -> their program stage so assessments
-	// (keyed by session-stage ID) resolve to a real name + order.
-	stageByProgramID := make(map[string]entity.ProgramStage, len(programStages))
-	for _, ps := range programStages {
-		stageByProgramID[ps.ID] = ps
-	}
-	stageBySessionID := make(map[string]entity.ProgramStage, len(sessionStages))
-	for _, ss := range sessionStages {
-		if ps, ok := stageByProgramID[ss.ProgramStageID]; ok {
-			stageBySessionID[ss.ID] = ps
-		}
+		return "", err
 	}
 
 	assessments, err := g.assessmentRepo.List(ctx, repository.AssessmentFilter{
@@ -221,7 +237,7 @@ func (g *OpenRouterNarrativeGenerator) StreamGenerate(ctx context.Context, repor
 		return "", fmt.Errorf("fetch assessments: %w", err)
 	}
 
-	assessmentsText := buildAssessmentText(assessments, stageBySessionID)
+	assessmentsText := buildAssessmentText(assessments, stageBySubstageID)
 
 	tmplData := map[string]interface{}{
 		"ChildName":   participant.ChildName,
