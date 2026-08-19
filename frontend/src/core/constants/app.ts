@@ -89,15 +89,22 @@ export const contentEditPath = (contentId: string, params?: { programId?: string
 }
 
 export const kioskAccessPath = (sessionId: string, stageId: string, groupId?: string) => {
-  const base = `${ROUTES.LEARNER.BASE}/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
-  return groupId ? `${base}?groupId=${encodeURIComponent(groupId)}` : base
+  // Opsi A: groupId lives in the PATH (first segment), not the query string.
+  // Route: /learner/:groupId?/:sessionId/:stageId. token stays in ?token=.
+  const segs: string[] = [ROUTES.LEARNER.BASE]
+  if (groupId) segs.push(encodeURIComponent(groupId))
+  segs.push(encodeURIComponent(sessionId), encodeURIComponent(stageId))
+  return segs.join('/')
 }
 
 export const kioskSessionPath = (sessionId: string, stageId: string, substageId?: string, groupId?: string) => {
-  let base = `${ROUTES.KIOSK.BASE}/session/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
-  if (substageId) base += `/${encodeURIComponent(substageId)}`
-  if (groupId) base += `${base.includes('?') ? '&' : '?'}groupId=${encodeURIComponent(groupId)}`
-  return base
+  // Opsi A: groupId lives in the PATH (first segment after /session).
+  // Route: /kiosk/session/:groupId?/:sessionId/:stageId/:substageId?
+  const segs: string[] = [ROUTES.KIOSK.BASE, 'session']
+  if (groupId) segs.push(encodeURIComponent(groupId))
+  segs.push(encodeURIComponent(sessionId), encodeURIComponent(stageId))
+  if (substageId) segs.push(encodeURIComponent(substageId))
+  return segs.join('/')
 }
 
 // API
