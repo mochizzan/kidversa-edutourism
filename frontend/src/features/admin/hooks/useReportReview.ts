@@ -24,6 +24,7 @@ import {
   downloadBlob,
 } from '../../../core/utils/raportCapture'
 import { extractFirstSentence } from '../../../core/utils/reportNarrative'
+import { substagesOfStage } from '../../../core/utils/substage'
 import type {
   Report,
   Participant,
@@ -73,11 +74,12 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     setError(null)
 
     try {
-      const [rpt, sess, stageAssessments, sessStages, partPhotos] = await Promise.all([
+      const [rpt, sess, stageAssessments, sessStages, sessSubstages, partPhotos] = await Promise.all([
         reportService.getById(reportId),
         sessionService.getById(sessionId),
         assessmentService.getBySession(sessionId),
         sessionService.getStages(sessionId),
+        sessionService.getSubstages(sessionId),
         photoService.getBySession(sessionId),
       ])
 
@@ -112,7 +114,16 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
         .map((ss) => {
           const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
           if (!pgStage) return null
-          const assessment = partAssessments.find((a) => a.session_stage_id === ss.id)
+          // Assessments are keyed at Kegiatan level, so resolve down to this
+          // SubTopik's leaves. A SubTopik holds several Kegiatan but the raport
+          // renders ONE star row per SubTopik, so pick a representative: the
+          // first leaf (in stable leaf order) actually scored (star_rating >= 1),
+          // else the first leaf assessed at all (0 = "tidak hadir"), else none.
+          const leafAssessments = substagesOfStage(sessSubstages, ss.id)
+            .map((k) => partAssessments.find((a) => a.session_substage_id === k.id))
+            .filter((a): a is Assessment => a !== undefined)
+          const assessment: Assessment | undefined =
+            leafAssessments.find((a) => a.star_rating >= 1) || leafAssessments[0]
           return { programStage: pgStage, sessionStageId: ss.id, assessment } as StageInfo
         })
         .filter((s): s is NonNullable<typeof s> => s !== null) as StageInfo[]

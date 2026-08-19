@@ -6,9 +6,9 @@ import { liveService } from '../../../core/services/live'
 import { programService } from '../../../core/services/programs'
 import { useLiveSession } from '../../../core/hooks/useLiveSession'
 import { SessionStatus, GroupStageProgressStatus } from '../../../core/types/enums'
-import { ApiError, apiRequest } from '../../../core/services/backendClient'
+import { ApiError } from '../../../core/services/backendClient'
 import { redirectToLogin } from '../../../core/stores/authStore'
-import { API_ROUTES } from '../../../core/constants/apiRoutes'
+import { parentStageId, substagesOfStage } from '../../../core/utils/substage'
 import type { Session, SessionStage, ProgramStage, SessionSubstage } from '../../../core/types'
 import type { LiveGroupWithProgress } from '../../../core/services/live'
 
@@ -46,10 +46,9 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
   )
 
   // Session substages (Kegiatan leaves) for the live session. The live snapshot
-  // does not include them, but the public kiosk detail does — so we mint a
-  // kiosk token (same call the "Buka Kiosk" button uses) and read the kiosk
-  // payload to obtain the per-session-stage SessionSubstage rows. No new backend
-  // endpoint is introduced.
+  // does not carry them, so they come from the dedicated read endpoint
+  // (GET /api/session-substages?session_id=...). They are what resolves a
+  // Kegiatan-level progress row up to its parent SubTopik for display.
   const [sessionSubstages, setSessionSubstages] = useState<SessionSubstage[]>([])
 
   const loadSessionSubstages = useCallback(async () => {
@@ -58,20 +57,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
       return
     }
     try {
-      const res = await apiRequest<{ data: { token: string } }>(
-        'POST',
-        API_ROUTES.AUTH.KIOSK,
-        { session_id: activeSession.id },
-      )
-      const token = res.data.token
-      const kiosk = await apiRequest<{
-        data: { stages: { stage: { id: string }; substages: { substage: SessionSubstage }[] }[] }
-      }>('GET', `${API_ROUTES.SESSIONS.KIOSK_ACCESS(activeSession.id)}?token=${encodeURIComponent(token)}`)
-      const flat: SessionSubstage[] = []
-      for (const st of kiosk.data.stages) {
-        for (const sub of st.substages) flat.push(sub.substage)
-      }
-      setSessionSubstages(flat)
+      setSessionSubstages(await sessionService.getSubstages(activeSession.id))
     } catch {
       setSessionSubstages([])
     }
@@ -126,41 +112,60 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     fetchData()
   }, [fetchData])
 
+  // Progress rows are Kegiatan-level, so their SubTopik order is reached by
+  // resolving up: Kegiatan -> parent SubTopik -> program stage sequence_order.
+  // Kegiatan sharing a SubTopik tie-break on the substage's created_at then id,
+  // matching the leaf order used everywhere else.
+  const progressOrderKey = useCallback(
+    (sessionSubstageId: string): [number, number, string] => {
+      const stageId = parentStageId(sessionSubstages, sessionSubstageId)
+      const ss = stages.find((s) => s.id === stageId)
+      const ps = programStages.find((p) => p.id === ss?.program_stage_id)
+      const sub = sessionSubstages.find((s) => s.id === sessionSubstageId)
+      return [
+        ps?.sequence_order ?? 0,
+        sub ? new Date(sub.created_at).getTime() : 0,
+        sessionSubstageId,
+      ]
+    },
+    [sessionSubstages, stages, programStages],
+  )
+
   const getNextLockedStageId = useCallback(
     (g: LiveGroupWithProgress): string | undefined => {
-      const sorted = [...g.progress].sort((a, b) => {
-        const sa = stages.find((s) => s.id === a.session_stage_id)
-        const sb = stages.find((s) => s.id === b.session_stage_id)
-        const pa = programStages.find((p) => p.id === sa?.program_stage_id)
-        const pb = programStages.find((p) => p.id === sb?.program_stage_id)
-        return (pa?.sequence_order ?? 0) - (pb?.sequence_order ?? 0)
-      })
-      return sorted.find((p) => p.status === GroupStageProgressStatus.LOCKED)?.session_stage_id
+      const keyed = g.progress.map((p) => ({ p, k: progressOrderKey(p.session_substage_id) }))
+      keyed.sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2].localeCompare(b.k[2]))
+      // Returns a Kegiatan id — it feeds onUnlock, whose route writes the
+      // FK-constrained group_stage_progress.session_substage_id column.
+      return keyed.find(({ p }) => p.status === GroupStageProgressStatus.LOCKED)?.p
+        .session_substage_id
     },
-    [stages, programStages],
+    [progressOrderKey],
   )
 
   const getGroupStatus = useCallback(
     (g: LiveGroupWithProgress): { status: GroupStatus; stageId?: string } => {
       if (g.progress.length === 0) {
-        // No progress yet: frontier is the first ordered stage.
+        // No progress yet: frontier is the first ordered stage's first Kegiatan.
+        // stageId must stay Kegiatan-level (C3) — it is posted to the unlock
+        // route, which writes the FK-constrained session_substage_id column.
         const first = [...stages].sort((a, b) => {
           const pa = programStages.find((p) => p.id === a.program_stage_id)
           const pb = programStages.find((p) => p.id === b.program_stage_id)
           return (pa?.sequence_order ?? 0) - (pb?.sequence_order ?? 0)
         })[0]
-        return { status: 'LOCKED', stageId: first?.id }
+        return { status: 'LOCKED', stageId: substagesOfStage(sessionSubstages, first?.id)[0]?.id }
       }
       const active = g.progress.find((p) => p.status === GroupStageProgressStatus.IN_PROGRESS)
-      if (active) return { status: 'IN_PROGRESS', stageId: active.session_stage_id }
+      if (active) return { status: 'IN_PROGRESS', stageId: active.session_substage_id }
       const unlocked = g.progress.find((p) => p.status === GroupStageProgressStatus.UNLOCKED)
-      if (unlocked) return { status: 'UNLOCKED', stageId: unlocked.session_stage_id }
+      if (unlocked) return { status: 'UNLOCKED', stageId: unlocked.session_substage_id }
       const nextLocked = getNextLockedStageId(g)
       if (nextLocked) return { status: 'LOCKED', stageId: nextLocked }
       // All stages completed/skipped: no frontier (terminal state).
       return { status: 'COMPLETED' }
     },
-    [stages, getNextLockedStageId],
+    [stages, programStages, sessionSubstages, getNextLockedStageId],
   )
 
   const getActiveStageIndex = useCallback(
@@ -172,21 +177,25 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
       )
       if (!activeProgress) return { current: 0, total: programStages.length }
 
-      const ss = stages.find((s) => s.id === activeProgress.session_stage_id)
+      const ss = stages.find(
+        (s) => s.id === parentStageId(sessionSubstages, activeProgress.session_substage_id),
+      )
       const ps = programStages.find((p) => p.id === ss?.program_stage_id)
 
       return { current: ps?.sequence_order ?? 0, total: programStages.length }
     },
-    [stages, programStages],
+    [stages, programStages, sessionSubstages],
   )
 
+  // sessionSubstageId is a Kegiatan id (C3); the API takes it as-is and only
+  // the timeline label resolves up to the parent SubTopik's name.
   const handleUnlock = useCallback(
-    async (groupId: string, sessionStageId: string) => {
+    async (groupId: string, sessionSubstageId: string) => {
       if (!user || !activeSession) return
       try {
-        await liveService.unlockStage(groupId, sessionStageId, user.id)
+        await liveService.unlockStage(groupId, sessionSubstageId, user.id)
         const group = groups.find((g) => g.group.id === groupId)
-        const ss = stages.find((s) => s.id === sessionStageId)
+        const ss = stages.find((s) => s.id === parentStageId(sessionSubstages, sessionSubstageId))
         const ps = programStages.find((p) => p.id === ss?.program_stage_id)
         await liveService.addTimelineEvent(
           activeSession.id,
@@ -199,38 +208,37 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
         if (err instanceof ApiError && err.status === 401) redirectToLogin()
       }
     },
-    [user, activeSession, groups, stages, programStages],
+    [user, activeSession, groups, stages, programStages, sessionSubstages],
   )
 
+  // Lock is group-scoped: the backend route carries only :groupId (C6).
   const handleLock = useCallback(
-    async (groupId: string, sessionStageId: string) => {
+    async (groupId: string) => {
       if (!user || !activeSession) return
       try {
-        await liveService.lockStage(groupId, sessionStageId, user.id)
+        await liveService.lockStage(groupId, user.id)
         const group = groups.find((g) => g.group.id === groupId)
-        const ss = stages.find((s) => s.id === sessionStageId)
-        const ps = programStages.find((p) => p.id === ss?.program_stage_id)
         await liveService.addTimelineEvent(
           activeSession.id,
           groupId,
           'stage:lock',
-          `${group?.group.name || 'Kelompok'} dikunci "${ps?.name || 'Stage'}"`,
+          `${group?.group.name || 'Kelompok'} dikunci`,
           user.id,
         )
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) redirectToLogin()
       }
     },
-    [user, activeSession, groups, stages, programStages],
+    [user, activeSession, groups],
   )
 
   const handleComplete = useCallback(
-    async (groupId: string, sessionStageId: string) => {
+    async (groupId: string, sessionSubstageId: string) => {
       if (!activeSession || !user) return
       try {
-        await liveService.completeStage(groupId, sessionStageId)
+        await liveService.completeStage(groupId, sessionSubstageId)
         const group = groups.find((g) => g.group.id === groupId)
-        const ss = stages.find((s) => s.id === sessionStageId)
+        const ss = stages.find((s) => s.id === parentStageId(sessionSubstages, sessionSubstageId))
         const ps = programStages.find((p) => p.id === ss?.program_stage_id)
         await liveService.addTimelineEvent(
           activeSession.id,
@@ -243,7 +251,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
         if (err instanceof ApiError && err.status === 401) redirectToLogin()
       }
     },
-    [activeSession, user, groups, stages, programStages],
+    [activeSession, user, groups, stages, programStages, sessionSubstages],
   )
 
   const handleCompleteKegiatan = useCallback(

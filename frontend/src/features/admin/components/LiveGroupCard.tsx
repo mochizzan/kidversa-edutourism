@@ -4,6 +4,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { cn } from '../../../core/utils'
 import { GroupStageProgressStatus } from '../../../core/types/enums'
 import { StageProgressBar } from './StageProgressBar'
+import { parentStageId, siblingSubstages } from '../../../core/utils/substage'
 import type { GroupStatus } from '../hooks/useLiveMonitor'
 import type { LiveGroupWithProgress } from '../../../core/services/live'
 import type { SessionStage, ProgramStage, SessionSubstage } from '../../../core/types'
@@ -21,7 +22,7 @@ interface LiveGroupCardProps {
   sessionSubstages: SessionSubstage[]
   onComplete: (groupId: string, stageId: string) => void
   onUnlock: (groupId: string, stageId: string) => void
-  onLock: (groupId: string, stageId: string) => void
+  onLock: (groupId: string) => void
   onCompleteKegiatan: (sessionSubstageId: string) => void
 }
 
@@ -48,10 +49,10 @@ export const LiveGroupCard = ({
   onLock,
   onCompleteKegiatan,
 }: LiveGroupCardProps) => {
-  // Kegiatan (session_substages) belonging to this group's current session stage.
-  const kegiatanForStage = (stageId ? sessionSubstages.filter((s) => s.session_stage_id === stageId) : [])
-    .slice()
-    .sort((a, b) => a.id.localeCompare(b.id))
+  // stageId is a Kegiatan id (C3), so the SubTopik's leaves are its siblings —
+  // the helper resolves up to the parent SubTopik and returns them in order.
+  const kegiatanForStage = siblingSubstages(sessionSubstages, stageId)
+  const activeStageId = parentStageId(sessionSubstages, stageId)
   const config = statusConfig[status] || statusConfig.LOCKED
 
   const durationWarning = (() => {
@@ -91,11 +92,15 @@ export const LiveGroupCard = ({
 
       <StageProgressBar
         stages={g.progress.map((p) => {
-          const ss = stages.find((s) => s.id === p.session_stage_id)
+          // Progress rows are Kegiatan-level: resolve up for the SubTopik name
+          // and order, but keep the Kegiatan id as identity — several Kegiatan
+          // share one SubTopik and a duplicated key would drop segments.
+          const parentId = parentStageId(sessionSubstages, p.session_substage_id)
+          const ss = stages.find((s) => s.id === parentId)
           const ps = programStages.find((pp) => pp.id === ss?.program_stage_id)
           return {
-            id: p.session_stage_id,
-            name: stageNames[p.session_stage_id] || ps?.name || 'Topik',
+            id: p.session_substage_id,
+            name: stageNames[parentId || ''] || ps?.name || 'Topik',
             sequenceOrder: ps?.sequence_order ?? 0,
             status: p.status,
           }
@@ -103,7 +108,7 @@ export const LiveGroupCard = ({
       />
 
       <div className="flex items-center justify-between mt-4 text-sm">
-        <span className="text-on-surface-variant">🎯 {stageNames[stageId || ''] || '-'}</span>
+        <span className="text-on-surface-variant">🎯 {stageNames[activeStageId || ''] || '-'}</span>
         <span className="text-on-surface-variant font-medium">
           Topik {activeIndex.current}/{activeIndex.total}
         </span>
@@ -158,12 +163,10 @@ export const LiveGroupCard = ({
         )}
         {status === 'UNLOCKED' || status === 'IN_PROGRESS' ? (
           <>
-            {stageId && (
-              <Button variant="secondary" size="sm" onClick={() => onLock(g.group.id, stageId)}>
-                <Lock className="w-4 h-4 mr-1" />
-                Kunci Konten
-              </Button>
-            )}
+            <Button variant="secondary" size="sm" onClick={() => onLock(g.group.id)}>
+              <Lock className="w-4 h-4 mr-1" />
+              Kunci Konten
+            </Button>
             {nextLockedStageId && (
               <Button
                 variant="primary"
