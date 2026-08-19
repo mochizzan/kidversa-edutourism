@@ -48,10 +48,10 @@ func logMigrationFailure(err error) {
 	msg := err.Error()
 	if strings.Contains(msg, "Dirty database") {
 		log.Printf("migration failed: %v", err)
-		log.Printf("RECOVERY: connect to the database and run: " +
-			"UPDATE schema_migrations SET version=<completed_version>, dirty=false; " +
-			"(or use `migrate force <version>`), then restart. " +
-			"The hardened runner now also self-heals dirty state automatically.")
+		log.Printf("RECOVERY: the migration runner no longer auto-heals a dirty schema. " +
+			"Connect to the database, revert the partially-applied DDL for the dirty version, " +
+			"then run: UPDATE schema_migrations SET version=<N-1>, dirty=false; " +
+			"(or `migrate force <N-1>`), and restart.")
 		log.Fatalf("migration failed (dirty database)")
 	}
 	log.Fatalf("migration failed: %v", err)

@@ -111,11 +111,12 @@ func waitForDB(cfg *config.Config, timeout time.Duration) error {
 	}
 }
 
-// upWithRecovery applies pending migrations and self-heals a dirty schema state.
-// If a previous run failed mid-migration, golang-migrate records the version as
-// dirty and refuses to proceed. We force the recorded version (clearing the dirty
-// flag) and retry, instead of crashing in a loop. Transient connect errors are
-// also retried with backoff.
+// upWithRecovery applies pending migrations. A dirty schema version is a hard,
+// actionable failure: golang-migrate records a version dirty when its up-DDL was
+// only partly applied, so forcing the recorded version would mark it APPLIED
+// without replaying the SQL and silently drift the schema. We therefore never
+// force — we return immediately and tell the operator how to recover. Only
+// transient connect errors (cold start, brief blip) are retried, exactly 3 times.
 func upWithRecovery(m *migrate.Migrate) error {
 	const maxAttempts = 3
 	var lastErr error
@@ -128,15 +129,15 @@ func upWithRecovery(m *migrate.Migrate) error {
 
 		var dirtyErr migrate.ErrDirty
 		if errors.As(err, &dirtyErr) {
-			log.Printf("migration dirty at version %d: forcing version then retrying (attempt %d/%d)",
-				dirtyErr.Version, attempt, maxAttempts)
-			// Force the recorded version (clears the dirty flag without replaying
-			// SQL). On the next Up(), golang-migrate treats it as already applied.
-			if ferr := m.Force(dirtyErr.Version); ferr != nil {
-				return fmt.Errorf("force version %d: %w", dirtyErr.Version, ferr)
-			}
-			time.Sleep(time.Duration(attempt) * time.Second)
-			continue
+			// Never force the version: it clears the dirty flag and records the
+			// version as APPLIED without replaying its SQL, silently drifting the
+			// schema.
+			// The operator must revert the partial DDL for this version and reset
+			// schema_migrations, then restart.
+			return fmt.Errorf("migration dirty at version %d: auto-forcing is disabled because it silently skips SQL and drifts the schema; "+
+				"manually revert the partially-applied DDL for version %d, then run "+
+				"UPDATE schema_migrations SET version=%d, dirty=false; (or `migrate force %d`) and restart: %w",
+				dirtyErr.Version, dirtyErr.Version, dirtyErr.Version-1, dirtyErr.Version-1, err)
 		}
 
 		if isTransientConnect(err) {
@@ -145,9 +146,11 @@ func upWithRecovery(m *migrate.Migrate) error {
 			continue
 		}
 
+		// Any other error (SQL/DDL failure or unexpected) is not retried and
+		// never forced — replaying a half-applied file would drift the schema.
 		return fmt.Errorf("migrate up: %w", err)
 	}
-	return fmt.Errorf("migrate up: %w", lastErr)
+	return fmt.Errorf("migrate up: all %d attempts exhausted (last error): %w", maxAttempts, lastErr)
 }
 
 // isTransientConnect reports whether err looks like a transient connection
