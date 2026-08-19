@@ -151,6 +151,18 @@ function App() {
         // kegagalan lain bersifat opsional; abaikan.
       }
     }
+    // SA auto-select: pastikan tenant terpilih setelah fetchTenants selesai
+    // (race cold-start dapat mengembalikan [] lalu seed). Jika activeTenant
+    // masih null padahal tenant ada, paksa pilih tenants[0] agar header
+    // X-Tenant-Id ter-set sebelum router terbuka. Zero tenant → biarkan null
+    // supaya TenantGuard menampilkan picker dan /admin/tenants tetap reachable.
+    const a = useAuthStore.getState()
+    if (a.isAuthenticated && a.user?.role === UserRole.SUPER_ADMIN) {
+      const ts = useTenantStore.getState()
+      if (!ts.activeTenant && ts.tenants.length > 0) {
+        ts.setActiveTenant(ts.tenants[0])
+      }
+    }
     // Jangan hang: tetap lanjut meski fetch tenant gagal (guard route akan
     // menampilkan pemilih tenant). Yang penting race startup sudah selesai.
     setTenantReady(true)
