@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/labstack/echo/v5"
@@ -10,6 +11,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	"kidversa-edutourism-backend/internal/usecase"
 	badgeuc "kidversa-edutourism-backend/internal/usecase/badge"
 )
 
@@ -156,14 +158,19 @@ func (h *BadgeHandler) List(c *echo.Context) error {
 
 // SessionSubstageHandler serves the Live Monitor "Lanjut SubTopik" override at
 // POST /api/session-substages/:id/complete (marks a Kegiatan leaf COMPLETED and
-// re-runs per-child badge evaluation).
+// re-runs per-child badge evaluation) and the facilitator-reachable read route
+// GET /api/session-substages?session_id= (returns the Kegiatan leaves of a
+// session).
 type SessionSubstageHandler struct {
-	badgeUC *badgeuc.Usecase
+	badgeUC      *badgeuc.Usecase
+	sessionUC    *usecase.SessionUsecase
+	substageRepo repository.SessionSubstageRepository
+	sessionRepo  repository.SessionRepository
 }
 
 // NewSessionSubstageHandler builds the session-substage handler.
-func NewSessionSubstageHandler(badgeUC *badgeuc.Usecase) *SessionSubstageHandler {
-	return &SessionSubstageHandler{badgeUC: badgeUC}
+func NewSessionSubstageHandler(badgeUC *badgeuc.Usecase, sessionUC *usecase.SessionUsecase, substageRepo repository.SessionSubstageRepository, sessionRepo repository.SessionRepository) *SessionSubstageHandler {
+	return &SessionSubstageHandler{badgeUC: badgeUC, sessionUC: sessionUC, substageRepo: substageRepo, sessionRepo: sessionRepo}
 }
 
 // Complete handles POST /api/session-substages/:id/complete.
@@ -176,4 +183,53 @@ func (h *SessionSubstageHandler) Complete(c *echo.Context) error {
 		return err
 	}
 	return appresp.NoContent(c)
+}
+
+// ListBySession handles GET /api/session-substages?session_id=: it returns the
+// Kegiatan (session_substages) leaves of a session. The caller must be in the
+// session's tenant, and a FASILITATOR must own at least one group in it.
+func (h *SessionSubstageHandler) ListBySession(c *echo.Context) error {
+	sessionID := (*c).QueryParam("session_id")
+	if sessionID == "" {
+		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
+	}
+
+	ctx := (*c).Request().Context()
+
+	// Tenant IDOR guard: the session must belong to the caller's tenant.
+	tenantID := appmiddleware.GetTenantID(c)
+	if tenantID == "" {
+		return appresp.Fail(c, http.StatusBadRequest, "tenant_required")
+	}
+	sessTenant, err := h.sessionRepo.TenantIDForSession(ctx, sessionID)
+	if err != nil {
+		return appresp.Fail(c, http.StatusNotFound, "session_not_found")
+	}
+	if sessTenant != tenantID {
+		return appresp.Fail(c, http.StatusForbidden, "forbidden")
+	}
+
+	// Facilitator ownership gate: a FASILITATOR may only read a session where
+	// they own at least one group. ADMIN/KOORDINATOR/SUPER_ADMIN bypass.
+	if entity.UserRole(appmiddleware.GetRole(c)) == entity.RoleFasilitator {
+		owns, oerr := h.sessionRepo.FacilitatorOwnsAnyGroup(ctx, sessionID, appmiddleware.GetUserID(c))
+		if oerr != nil {
+			return oerr
+		}
+		if !owns {
+			return appresp.Fail(c, http.StatusForbidden, "not_group_owner")
+		}
+	}
+
+	// Self-heal: ensure the Kegiatan leaves exist (idempotent). Failure is
+	// non-fatal — fall through to listing whatever is present.
+	if err := h.sessionUC.EnsureSessionSubstages(ctx, sessionID); err != nil {
+		log.Printf("session-substages: ensure failed for %s: %v", sessionID, err)
+	}
+
+	items, err := h.substageRepo.ListSessionSubstages(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, items)
 }

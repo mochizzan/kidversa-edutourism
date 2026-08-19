@@ -66,7 +66,7 @@ func main() {
 
 	// AI clients.
 	openRouterClient := ai.NewOpenRouterClient(cfg.OpenRouterAPIKey, cfg.OpenRouterModel, cfg.OpenRouterBaseURL)
-	narrativeGen := ai.NewOpenRouterNarrativeGenerator(openRouterClient, reportRepo, sessionRepo, assessmentRepo, programRepo)
+	narrativeGen := ai.NewOpenRouterNarrativeGenerator(openRouterClient, reportRepo, sessionRepo, assessmentRepo, programRepo, sessionSubstageRepo)
 
 	// Usecases.
 	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, auth.NewKioskStore(db.DB), cfg.BcryptCost)
@@ -98,7 +98,7 @@ func main() {
 	registry.SessionParticipantBulk = handler.NewSessionParticipantBulkHandler(sessionUC)
 	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, contentRepo, sessionSubstageRepo, liveRepo)
 	registry.ProgramSubstage = handler.NewProgramSubstageHandler(programSubstageRepo)
-	registry.SessionSubstage = handler.NewSessionSubstageHandler(badgeUC)
+	registry.SessionSubstage = handler.NewSessionSubstageHandler(badgeUC, sessionUC, sessionSubstageRepo, sessionRepo)
 	registry.Badge = handler.NewBadgeHandler(sessionSubstageRepo)
 	registry.Live = handler.NewLiveHandler(liveSvc, hub, cfg.SSEKeepaliveSec)
 	registry.Notification = handler.NewNotificationHandler(liveSvc, hub, cfg.SSEKeepaliveSec)

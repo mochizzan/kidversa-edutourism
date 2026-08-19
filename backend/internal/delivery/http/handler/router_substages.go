@@ -35,11 +35,13 @@ func RegisterBadgesRoutes(g *echo.Group, h *BadgeHandler, jm *auth.JWTManager, r
 }
 
 // RegisterSessionSubstagesRoutes mounts /api/session-substages/* (Live Monitor
-// "Lanjut SubTopik" override). Every route is JWT + TenantScope guarded.
+// "Lanjut SubTopik" override) plus the facilitator-reachable read route
+// GET /api/session-substages?session_id=. Every route is JWT + TenantScope guarded.
 func RegisterSessionSubstagesRoutes(g *echo.Group, h *SessionSubstageHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMW := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR", "FASILITATOR")
 	scopeMW := appmiddleware.TenantScope()
 
 	g.POST("/:id/complete", h.Complete, authMW, roleMW, scopeMW)
+	g.GET("", h.ListBySession, authMW, roleMW, scopeMW)
 }
