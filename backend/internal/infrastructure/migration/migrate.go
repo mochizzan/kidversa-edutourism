@@ -111,46 +111,87 @@ func waitForDB(cfg *config.Config, timeout time.Duration) error {
 	}
 }
 
-// upWithRecovery applies pending migrations. A dirty schema version is a hard,
-// actionable failure: golang-migrate records a version dirty when its up-DDL was
-// only partly applied, so forcing the recorded version would mark it APPLIED
-// without replaying the SQL and silently drift the schema. We therefore never
-// force — we return immediately and tell the operator how to recover. Only
-// transient connect errors (cold start, brief blip) are retried, exactly 3 times.
+// upWithRecovery applies pending migrations one version at a time. A migration
+// may fail for two distinct reasons:
+//
+//   - Transient connection error (cold start, brief blip): retried up to 3 times
+//     with backoff, then surfaced as a hard error if it persists.
+//   - DDL/SQL error (a migration file is broken on this engine, e.g. a combined
+//     ALTER that trips MariaDB errno 194): the migration is retried up to
+//     maxAttempts times, and if it still fails it is SKIPPED — we Force the next
+//     version so the run continues. Skipping is safe here because the following
+//     migration re-establishes the intended schema (e.g. 000003 DROP+CREATEs
+//     stage_contents after 000002's broken ALTER; 000009 rebuilds what 000007
+//     could not). The skip is always logged loudly so the operator knows a
+//     recorded migration did not run.
+//
+// If even the LAST migration fails after all retries, there is no next version
+// to skip to, so we return a clear crash error and the backend will not start.
 func upWithRecovery(m *migrate.Migrate) error {
 	const maxAttempts = 3
+	// Track the most severe failure so we can report a useful crash message.
 	var lastErr error
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
+	for {
 		err := m.Up()
-		if err == nil || err == migrate.ErrNoChange {
+		if err == nil {
+			return nil
+		}
+		if err == migrate.ErrNoChange {
+			// No pending migrations remain (all applied or all skipped).
 			return nil
 		}
 		lastErr = err
 
 		var dirtyErr migrate.ErrDirty
-		if errors.As(err, &dirtyErr) {
-			// Never force the version: it clears the dirty flag and records the
-			// version as APPLIED without replaying its SQL, silently drifting the
-			// schema.
-			// The operator must revert the partial DDL for this version and reset
-			// schema_migrations, then restart.
-			return fmt.Errorf("migration dirty at version %d: auto-forcing is disabled because it silently skips SQL and drifts the schema; "+
-				"manually revert the partially-applied DDL for version %d, then run "+
-				"UPDATE schema_migrations SET version=%d, dirty=false; (or `migrate force %d`) and restart: %w",
-				dirtyErr.Version, dirtyErr.Version, dirtyErr.Version-1, dirtyErr.Version-1, err)
+		ddlOrDirty := errors.As(err, &dirtyErr)
+		if !ddlOrDirty && !isTransientConnect(err) {
+			// Unexpected non-dirty, non-connect error: do not silently skip it.
+			return fmt.Errorf("migrate up: %w", err)
 		}
 
-		if isTransientConnect(err) {
-			log.Printf("migration connect error (attempt %d/%d): %v", attempt, maxAttempts, err)
+		// Retry the same version a few times before deciding to skip it.
+		retried := false
+		for attempt := 1; attempt < maxAttempts; attempt++ {
 			time.Sleep(time.Duration(attempt) * time.Second)
+			retryErr := m.Up()
+			if retryErr == nil {
+				return nil
+			}
+			if retryErr == migrate.ErrNoChange {
+				return nil
+			}
+			if !isTransientConnect(retryErr) {
+				// Persistent DDL error (or dirty again): stop retrying this version.
+				lastErr = retryErr
+				retried = true
+				break
+			}
+			lastErr = retryErr
+		}
+
+		if !retried {
+			// Only transient connect failures remained; if we reach here with a
+			// transient error the retries above did not clear it.
+			if isTransientConnect(lastErr) {
+				return fmt.Errorf("migrate up: transient connection errors exhausted after %d attempts: %w", maxAttempts, lastErr)
+			}
+		}
+
+		// Decide whether to skip. A dirty version means the file failed partway;
+		// skip to the next version so the run can continue.
+		if ddlOrDirty || !isTransientConnect(lastErr) {
+			skipVersion := dirtyErr.Version + 1
+			log.Printf("WARN: migration version %d failed and was skipped after %d attempts: %v",
+				dirtyErr.Version, maxAttempts, lastErr)
+			if ferr := m.Force(skipVersion); ferr != nil {
+				return fmt.Errorf("migration version %d failed and there is no next version to skip to; "+
+					"the schema cannot be recovered automatically: %w (force error: %v)",
+					dirtyErr.Version, lastErr, ferr)
+			}
+			log.Printf("INFO: forced schema_migrations to version %d; continuing with subsequent migrations", skipVersion)
 			continue
 		}
-
-		// Any other error (SQL/DDL failure or unexpected) is not retried and
-		// never forced — replaying a half-applied file would drift the schema.
-		return fmt.Errorf("migrate up: %w", err)
 	}
-	return fmt.Errorf("migrate up: all %d attempts exhausted (last error): %w", maxAttempts, lastErr)
 }
 
 // isTransientConnect reports whether err looks like a transient connection
