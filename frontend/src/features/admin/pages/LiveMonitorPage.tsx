@@ -206,7 +206,7 @@ const LiveMonitorPage = () => {
             variant="secondary"
             size="sm"
             onClick={handleOpenKiosk}
-            disabled={kioskLoading || !activeSession || stages.length === 0}
+            disabled={kioskLoading || !activeSession || stages.length === 0 || (connectionStatus !== 'online' && groups.length === 0)}
           >
             <Monitor className="w-4 h-4 mr-1" />
             {kioskLoading ? 'Membuka…' : 'Buka Kiosk'}
