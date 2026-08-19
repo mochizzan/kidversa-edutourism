@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Volume2, VolumeX, SkipForward, AlertTriangle, Loader2 } from 'lucide-react'
+import { Volume2, VolumeX, SkipForward, AlertTriangle, Loader2, Lock } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { ContentRenderer } from '../components/ContentRenderer'
 import { ApiError, getApiBaseUrl } from '../../../core/services/backendClient'
@@ -16,6 +16,7 @@ import type { SessionStage, SessionSubstage, StageContent } from '../../../core/
 interface KioskSubstage {
   substage: SessionSubstage
   contents: StageContent[]
+  locked?: boolean
 }
 interface KioskStage {
   stage: SessionStage
@@ -25,6 +26,7 @@ interface KioskStage {
 interface KioskResponse {
   session: { id: string; name: string; session_date: string; location: string; status: string }
   stages: KioskStage[]
+  group_id?: string
 }
 
 const activeSorted = (contents: StageContent[] = []) =>
@@ -32,7 +34,8 @@ const activeSorted = (contents: StageContent[] = []) =>
 
 const LearnerKioskPage = () => {
   const navigate = useNavigate()
-  const { sessionId, stageId, substageId } = useParams<{
+  const { groupId, sessionId, stageId, substageId } = useParams<{
+    groupId?: string
     sessionId: string
     stageId?: string
     substageId?: string
@@ -47,6 +50,7 @@ const LearnerKioskPage = () => {
   const [contents, setContents] = useState<StageContent[]>([])
   const [currentContentIndex, setCurrentContentIndex] = useState(0)
   const [isMuted, setIsMuted] = useState(false)
+  const [locked, setLocked] = useState(false)
 
   const kioskRef = useRef<KioskResponse | null>(null)
   const inflightRef = useRef(false)
@@ -58,7 +62,7 @@ const LearnerKioskPage = () => {
     kiosk: KioskResponse,
     reqStageId?: string,
     reqSubstageId?: string,
-  ): { stage: KioskStage; substage: SessionSubstage | null; contents: StageContent[] } | null => {
+  ): { stage: KioskStage; substage: SessionSubstage | null; contents: StageContent[]; locked: boolean } | null => {
     const target = kiosk.stages.find((s) => s.stage.id === reqStageId) ?? kiosk.stages[0]
     if (!target) return null
 
@@ -66,10 +70,15 @@ const LearnerKioskPage = () => {
     if (hasSubstages) {
       const sub =
         target.substages.find((x) => x.substage.id === reqSubstageId) ?? target.substages[0]
-      return { stage: target, substage: sub.substage, contents: activeSorted(sub.contents) }
+      return {
+        stage: target,
+        substage: sub.substage,
+        contents: sub.locked ? [] : activeSorted(sub.contents),
+        locked: !!sub.locked,
+      }
     }
     // Legacy fallback: stage-level contents.
-    return { stage: target, substage: null, contents: activeSorted(target.contents) }
+    return { stage: target, substage: null, contents: activeSorted(target.contents), locked: false }
   }
 
   const applyKiosk = (kiosk: KioskResponse) => {
@@ -84,7 +93,7 @@ const LearnerKioskPage = () => {
         return
       }
       const firstSub = first.substages[0]?.substage.id
-      navigate(kioskSessionPath(sessionId, first.stage.id, firstSub), { replace: true })
+      navigate(kioskSessionPath(sessionId, first.stage.id, firstSub, groupId), { replace: true })
       return
     }
 
@@ -95,12 +104,13 @@ const LearnerKioskPage = () => {
       return
     }
 
+    setLocked(!!resolved.locked)
     setStage(resolved.stage.stage)
     setSubstage(resolved.substage)
     setContents(resolved.contents)
   }
 
-  useEffect(() => {
+  const loadData = async () => {
     if (!sessionId) {
       setError('Parameter tidak lengkap')
       setLoading(false)
@@ -111,44 +121,64 @@ const LearnerKioskPage = () => {
       setLoading(false)
       return
     }
-
-    const loadData = async () => {
-      try {
-        // Reuse an already-fetched payload instead of re-fetching.
-        if (kioskRef.current) {
-          applyKiosk(kioskRef.current)
-          return
-        }
-        // Guard against concurrent fetches from StrictMode double-invoke.
-        if (inflightRef.current) return
-        inflightRef.current = true
-        // PUBLIC endpoint — the kiosk token (not a JWT) is the sole auth.
-        const url = `${getApiBaseUrl()}${API_ROUTES.SESSIONS.KIOSK_ACCESS(sessionId)}?token=${encodeURIComponent(token)}`
-        const res = await fetch(url, {
-          credentials: 'omit',
-          // Bound the wait so a non-responsive backend surfaces an error
-          // instead of an endless spinner.
-          signal: AbortSignal.timeout(15000),
-        })
-        if (!res.ok) {
-          const body = await res.json().catch(() => null)
-          const code = body?.error?.code ?? 'internal_error'
-          throw new ApiError(body?.error?.message ?? 'Terjadi kesalahan', code, res.status)
-        }
-        const env = (await res.json()) as { data: KioskResponse }
-        const kiosk = env.data
-        kioskRef.current = kiosk
-        applyKiosk(kiosk)
-      } catch (err) {
-        setError(friendlyError(err))
-      } finally {
-        inflightRef.current = false
-        setLoading(false)
+    try {
+      // Reuse an already-fetched payload instead of re-fetching.
+      if (kioskRef.current) {
+        applyKiosk(kioskRef.current)
+        return
       }
+      // Guard against concurrent fetches from StrictMode double-invoke.
+      if (inflightRef.current) return
+      inflightRef.current = true
+      // PUBLIC endpoint — the kiosk token (not a JWT) is the sole auth.
+      const url = `${getApiBaseUrl()}${API_ROUTES.SESSIONS.KIOSK_ACCESS(sessionId)}?token=${encodeURIComponent(token)}${groupId ? `&groupId=${encodeURIComponent(groupId)}` : ''}`
+      const res = await fetch(url, {
+        credentials: 'omit',
+        // Bound the wait so a non-responsive backend surfaces an error
+        // instead of an endless spinner.
+        signal: AbortSignal.timeout(15000),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        const code = body?.error?.code ?? 'internal_error'
+        throw new ApiError(body?.error?.message ?? 'Terjadi kesalahan', code, res.status)
+      }
+      const env = (await res.json()) as { data: KioskResponse }
+      const kiosk = env.data
+      kioskRef.current = kiosk
+      applyKiosk(kiosk)
+    } catch (err) {
+      setError(friendlyError(err))
+    } finally {
+      inflightRef.current = false
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     loadData()
   }, [sessionId, stageId, substageId, token])
+
+  // Refresh the kiosk payload when the tab regains focus or becomes visible
+  // again, so lock/unlock changes made by the facilitator are picked up live.
+  useEffect(() => {
+    const onVisible = () => {
+      if (!document.hidden) {
+        kioskRef.current = null
+        loadData()
+      }
+    }
+    const onFocus = () => {
+      kioskRef.current = null
+      loadData()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [loadData])
 
   const currentContent = contents[currentContentIndex]
 
@@ -184,6 +214,16 @@ const LearnerKioskPage = () => {
         <AlertTriangle className="w-16 h-16 text-warning mb-4" />
         <h1 className="text-xl font-bold mb-2">Konten Tidak Tersedia</h1>
         <p className="text-on-surface-variant">{error || 'Topik tidak ditemukan'}</p>
+      </div>
+    )
+  }
+
+  if (locked) {
+    return (
+      <div className="h-screen w-screen bg-surface flex flex-col items-center justify-center text-on-surface p-8 text-center">
+        <Lock className="w-16 h-16 text-warning mb-4" />
+        <h1 className="text-xl font-bold mb-2">Konten Dikunci</h1>
+        <p className="text-on-surface-variant">Kegiatan ini sedang dikunci oleh fasilitator. Silakan tunggu hingga dibuka kembali.</p>
       </div>
     )
   }

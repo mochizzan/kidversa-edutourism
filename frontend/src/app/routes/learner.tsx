@@ -6,7 +6,7 @@ import { ErrorBoundary } from '../../shared/components/feedback/ErrorBoundary'
 const LearnerKioskPage = lazy(() => import('../../features/learner/pages/LearnerKioskPage'))
 
 export const learnerRoute: RouteObject = {
-  path: '/learner/:sessionId/:stageId/:substageId?',
+  path: '/learner/:groupId?/:sessionId/:stageId/:substageId?',
   element: (
     <ErrorBoundary>
       <SuspenseWrapper>
@@ -20,7 +20,7 @@ export const learnerRoute: RouteObject = {
 // is supplied via the `?token=` query string (P3). The optional :substageId
 // selects a Kegiatan (session_substage) under the :stageId (SubTopik).
 export const kioskRoute: RouteObject = {
-  path: '/kiosk/session/:sessionId/:stageId/:substageId?',
+  path: '/kiosk/session/:groupId?/:sessionId/:stageId/:substageId?',
   element: (
     <ErrorBoundary>
       <SuspenseWrapper>

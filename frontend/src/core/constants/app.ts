@@ -88,12 +88,16 @@ export const contentEditPath = (contentId: string, params?: { programId?: string
   return `${base}?${q.toString()}`
 }
 
-export const kioskAccessPath = (sessionId: string, stageId: string) =>
-  `${ROUTES.LEARNER.BASE}/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
+export const kioskAccessPath = (sessionId: string, stageId: string, groupId?: string) => {
+  const base = `${ROUTES.LEARNER.BASE}/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
+  return groupId ? `${base}?groupId=${encodeURIComponent(groupId)}` : base
+}
 
-export const kioskSessionPath = (sessionId: string, stageId: string, substageId?: string) => {
-  const base = `${ROUTES.KIOSK.BASE}/session/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
-  return substageId ? `${base}/${encodeURIComponent(substageId)}` : base
+export const kioskSessionPath = (sessionId: string, stageId: string, substageId?: string, groupId?: string) => {
+  let base = `${ROUTES.KIOSK.BASE}/session/${encodeURIComponent(sessionId)}/${encodeURIComponent(stageId)}`
+  if (substageId) base += `/${encodeURIComponent(substageId)}`
+  if (groupId) base += `${base.includes('?') ? '&' : '?'}groupId=${encodeURIComponent(groupId)}`
+  return base
 }
 
 // API

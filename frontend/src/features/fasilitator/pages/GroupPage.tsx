@@ -227,7 +227,7 @@ const GroupPage = () => {
     setKioskLoading(true)
     // Buka jendela SEBELUM await agar tidak terblokir popup blocker
     // (browser hanya mengizinkan window.open dalam user-gesture sync).
-    const kioskUrl = `${kioskAccessPath(sessionId, stageId)}?token=`
+    const kioskUrl = `${kioskAccessPath(sessionId, stageId, groupId)}?token=`
     const popup = window.open(kioskUrl, '_blank')
     try {
       const res = await apiRequest<{ data: { token: string } }>(
@@ -236,7 +236,7 @@ const GroupPage = () => {
         { session_id: sessionId },
       )
       const token = res.data.token
-      const finalUrl = `${kioskAccessPath(sessionId, stageId)}?token=${encodeURIComponent(token)}`
+      const finalUrl = `${kioskAccessPath(sessionId, stageId, groupId)}?token=${encodeURIComponent(token)}`
       if (popup) {
         popup.location.href = finalUrl
         popup.focus()

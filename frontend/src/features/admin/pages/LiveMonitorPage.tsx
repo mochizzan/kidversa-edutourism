@@ -151,7 +151,7 @@ const LiveMonitorPage = () => {
         { session_id: activeSession.id },
       )
       const token = res.data.token
-      window.open(`${kioskAccessPath(activeSession.id, targetStageId)}?token=${encodeURIComponent(token)}`, '_blank')
+      window.open(`${kioskAccessPath(activeSession.id, targetStageId, activeGroup?.group.id)}?token=${encodeURIComponent(token)}`, '_blank')
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
     } finally {
