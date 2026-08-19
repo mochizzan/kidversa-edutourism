@@ -15,6 +15,7 @@ import {
   fireUnauthorized,
 } from '../services/backendClient'
 import { normalizePhone } from '../utils/phone'
+import { decodeJwtClaims } from '../utils/jwtClaims'
 
 // Single in-flight guard: concurrent checkSession calls (React StrictMode
 // double-invoke in dev) share one resolution instead of racing two refreshes.
@@ -154,6 +155,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
           const token = await refreshAccessToken()
           set({ token, isAuthenticated: true })
+
+          // Verify the freshly minted token matches the rehydrated user.
+          // A shared HttpOnly refresh cookie can mint a DIFFERENT user's token
+          // (e.g. another admin's session) — in that case the local session is
+          // inconsistent and we tear it down LOCALLY only (no POST /logout, which
+          // would kill the shared cookie / other tabs). SA tid is "" by design
+          // (scope comes from the X-Tenant-Id header), so we compare sub + role.
+          try {
+            const stored = getStoredUser<User>()
+            const claims = decodeJwtClaims(token)
+            if (claims && stored && (claims.sub !== stored.id || claims.role !== stored.role)) {
+              clearTokens()
+              clearStoredUser()
+              set({ user: null, token: null, isAuthenticated: false, isLoading: false })
+              fireUnauthorized()
+              return
+            }
+          } catch {
+            // Decode/compare errors must never break the otherwise-valid session.
+          }
         } catch {
           console.error('[Auth] Refresh failed, logging out')
           // Refresh gagal (cookie tidak valid/kadaluarsa) ⇒ sesi mati.
