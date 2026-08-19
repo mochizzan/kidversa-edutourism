@@ -24,6 +24,7 @@ import { apiRequest } from '../../../core/services/backendClient'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { kioskAccessPath } from '../../../core/constants/app'
+import { parentStageId } from '../../../core/utils/substage'
 import { TimelineFeed } from '../components/TimelineFeed'
 import { LiveGroupCard } from '../components/LiveGroupCard'
 import { useLiveMonitor } from '../hooks/useLiveMonitor'
@@ -138,7 +139,7 @@ const LiveMonitorPage = () => {
     // session's first stage so the kiosk can display content even before any
     // group is unlocked (the kiosk page itself defaults to the first stage too).
     const { stageId } = activeGroup ? getGroupStatus(activeGroup) : { stageId: undefined }
-    const targetStageId = stageId ?? stages[0]?.id
+    const targetStageId = parentStageId(sessionSubstages, stageId) ?? stages[0]?.id
     if (!targetStageId) {
       addToast({ type: 'error', message: 'Belum ada topik untuk sesi ini.' })
       return
@@ -151,7 +152,7 @@ const LiveMonitorPage = () => {
         { session_id: activeSession.id },
       )
       const token = res.data.token
-      window.open(`${kioskAccessPath(activeSession.id, targetStageId, activeGroup?.group.id)}?token=${encodeURIComponent(token)}`, '_blank')
+      window.open(`${kioskAccessPath(activeSession.id, targetStageId, activeGroup?.group.id ?? groups[0]?.group.id)}?token=${encodeURIComponent(token)}`, '_blank')
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
     } finally {
