@@ -286,6 +286,11 @@ export async function refreshAccessToken(): Promise<string> {
       }
       accessToken = newToken
       tokenSetAt = Date.now()
+      // Backend envelope { data: { access_token, user } } — reconcile the
+      // refreshed user into sessionStorage so authStore rehydrates without a
+      // round-trip. Avoids importing authStore (circular) and any /me call.
+      const u = (payload as { user?: unknown }).user
+      if (u) setStoredUser(u)
       return newToken
     } finally {
       authChannel?.postMessage({ type: 'refresh:end', token: accessToken })
