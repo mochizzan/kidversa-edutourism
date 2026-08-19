@@ -173,8 +173,11 @@ export const API_ROUTES = {
       `/api/badges?participant_id=${encodeURIComponent(participantId)}`,
   },
 
-  // Live Monitor "Lanjut SubTopik" override — complete a Kegiatan leaf.
+  // Session-substage reads (used by Live Monitor, fasilitator, and admin) plus
+  // the "Lanjut SubTopik" complete override for a Kegiatan leaf.
   SESSION_SUBSTAGES: {
+    BY_SESSION: (sessionId: string) =>
+      `/api/session-substages?session_id=${encodeURIComponent(sessionId)}`,
     COMPLETE: (id: string) => `/api/session-substages/${encodeURIComponent(id)}/complete`,
   },
 
@@ -190,8 +193,8 @@ export const API_ROUTES = {
     TIMELINE: (sessionId: string) => `/api/live/${encodeURIComponent(sessionId)}/timeline`,
     UNLOCK_STAGE: (groupId: string, stageId: string) =>
       `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/unlock`,
-    LOCK_STAGE: (groupId: string, stageId: string) =>
-      `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/lock`,
+    LOCK_STAGE: (groupId: string) =>
+      `/api/live/groups/${encodeURIComponent(groupId)}/lock`,
     COMPLETE_STAGE: (groupId: string, stageId: string) =>
       `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/complete`,
     EVENTS: '/api/live/events',

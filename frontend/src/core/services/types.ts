@@ -13,6 +13,7 @@ import type {
   ContentUsage,
   Session,
   SessionStage,
+  SessionSubstage,
   CreateSessionDTO,
   UpdateSessionDTO,
   SessionGroup,
@@ -78,6 +79,7 @@ export interface SessionService {
   delete(id: string): Promise<void>
 
   getStages(sessionId: string): Promise<SessionStage[]>
+  getSubstages(sessionId: string): Promise<SessionSubstage[]>
   getGroups(sessionId: string): Promise<SessionGroup[]>
 
   createGroup(sessionId: string, name: string): Promise<SessionGroup>

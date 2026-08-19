@@ -3,6 +3,7 @@ import type {
   Session,
   SessionStage,
   SessionGroup,
+  SessionSubstage,
   Participant,
   CreateParticipantDTO,
   CreateSessionDTO,
@@ -73,6 +74,9 @@ export const sessionService: SessionService = {
 
   getStages: (sessionId) =>
     arrayRequest<SessionStage>('GET', API_ROUTES.SESSIONS.STAGES(sessionId)),
+
+  getSubstages: (sessionId) =>
+    arrayRequest<SessionSubstage>('GET', API_ROUTES.SESSION_SUBSTAGES.BY_SESSION(sessionId)),
 
   getGroups: (sessionId) =>
     arrayRequest<SessionGroup>('GET', API_ROUTES.SESSIONS.GROUPS(sessionId)),

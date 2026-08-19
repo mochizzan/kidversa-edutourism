@@ -16,7 +16,7 @@ import { API_ROUTES } from '../constants/apiRoutes'
 export interface GroupStageProgressRow {
   id: string
   group_id: string
-  session_stage_id: string
+  session_substage_id: string
   status: GroupStageProgressStatus
   entered_at?: string
   completed_at?: string
@@ -121,14 +121,16 @@ export const liveService = {
     return timeline
   },
 
-  // Facilitator overrides — POST /api/live/groups/:groupId/stages/:stageId/{unlock,lock,complete}
+  // Facilitator overrides. Unlock/complete are stage-scoped Kegiatan routes
+  // (POST /api/live/groups/:groupId/stages/:stageId/{unlock,complete}); lock is
+  // group-scoped (POST /api/live/groups/:groupId/lock), so it takes no stageId.
   unlockStage: async (groupId: string, sessionStageId: string, userId: string): Promise<void> => {
     await apiRequest('POST', API_ROUTES.LIVE.UNLOCK_STAGE(groupId, sessionStageId), { userId })
     invalidateSnapshot()
   },
 
-  lockStage: async (groupId: string, sessionStageId: string, userId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.LOCK_STAGE(groupId, sessionStageId), { userId })
+  lockStage: async (groupId: string, userId: string): Promise<void> => {
+    await apiRequest('POST', API_ROUTES.LIVE.LOCK_STAGE(groupId), { userId })
     invalidateSnapshot()
   },
 
