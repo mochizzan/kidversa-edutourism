@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Users, Target, Monitor, User } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
@@ -7,6 +7,7 @@ import { ROUTES } from '../../../core/constants/app'
 import { kioskAccessPath } from '../../../core/constants/app'
 import { apiRequest } from '../../../core/services/backendClient'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
+import { parentStageId, substagesOfStage } from '../../../core/utils/substage'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { useConfirmDialog } from '../../../shared/hooks/useConfirmDialog'
@@ -29,6 +30,7 @@ import type {
   SessionGroup,
   Participant,
   Assessment,
+  SessionSubstage,
 } from '../../../core/types'
 
 interface GroupDetail {
@@ -86,6 +88,7 @@ const GroupPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [groupDetail, setGroupDetail] = useState<GroupDetail | null>(null)
   const [assessments, setAssessments] = useState<Assessment[]>([])
+  const [sessionSubstages, setSessionSubstages] = useState<SessionSubstage[]>([])
   const [completing, setCompleting] = useState(false)
   const [kioskLoading, setKioskLoading] = useState(false)
 
@@ -115,6 +118,11 @@ const GroupPage = () => {
       const programStages = await programService.getStages(detail.program_id)
       const stageNameMap = new Map(programStages.map((ps) => [ps.id, ps.name]))
 
+      // Load session-substages (Kegiatan leaves). No kiosk token hack — the new
+      // endpoint replaces it.
+      const sessionSubstagesData = await sessionService.getSubstages(detail.id)
+      setSessionSubstages(sessionSubstagesData)
+
       // Find current session stage
       let currentStage = detail.stages.find((s) => s.id === group.current_session_stage_id)
 
@@ -129,7 +137,10 @@ const GroupPage = () => {
               new Date(a.completed_at ?? a.entered_at ?? '').getTime(),
           )[0]
         if (latest) {
-          currentStage = detail.stages.find((s) => s.id === latest.session_stage_id)
+          const parentId = parentStageId(sessionSubstagesData, latest.session_substage_id)
+          if (parentId) {
+            currentStage = detail.stages.find((s) => s.id === parentId)
+          }
         }
       }
 
@@ -166,12 +177,30 @@ const GroupPage = () => {
     fetchData()
   }, [fetchData])
 
+  // Kegiatan leaves (session_substages) of the active SubTopik.
+  const activeLeaves = useMemo<SessionSubstage[]>(() => {
+    if (!groupDetail?.sessionStage) return []
+    return substagesOfStage(sessionSubstages, groupDetail.sessionStage.id)
+  }, [groupDetail?.sessionStage, sessionSubstages])
+
+  // Scored (participant, substage) pairs: assessment with star_rating >= 1.
+  // Built once so isAssessed stays O(1) per participant.
+  const scoredPairs = useMemo(() => {
+    const set = new Set<string>()
+    for (const a of assessments) {
+      if (a.star_rating >= 1) {
+        set.add(`${a.participant_id}|${a.session_substage_id}`)
+      }
+    }
+    return set
+  }, [assessments])
+
+  // C7 all-or-nothing: a child counts as assessed for the active SubTopik only
+  // when EVERY Kegiatan leaf has an assessment (star_rating >= 1) for them.
   const isAssessed = (participantId: string): boolean => {
-    if (!groupDetail?.sessionStage) return false
-    return assessments.some(
-      (a) =>
-        a.participant_id === participantId &&
-        a.session_stage_id === groupDetail.sessionStage!.id,
+    if (!groupDetail?.sessionStage || activeLeaves.length === 0) return false
+    return activeLeaves.every((leaf) =>
+      scoredPairs.has(`${participantId}|${leaf.id}`),
     )
   }
 
@@ -187,14 +216,22 @@ const GroupPage = () => {
 
   const confirmComplete = async () => {
     if (!groupDetail || !groupId || !groupDetail.sessionStage) return
+    if (activeLeaves.length === 0) {
+      addToast({ type: 'error', message: 'Kelompok belum memiliki kegiatan untuk diselesaikan.' })
+      return
+    }
     setCompleting(true)
     try {
-      await liveService.completeStage(groupId, groupDetail.sessionStage.id)
+      // Complete EVERY Kegiatan leaf of the active SubTopik (C7). Sequential so
+      // a mid-way failure surfaces; each call posts a Kegiatan id only.
+      for (const leaf of activeLeaves) {
+        await liveService.completeSessionSubstage(leaf.id)
+      }
       await liveService.addTimelineEvent(
         groupDetail.session.id,
         groupId,
         'group:completed',
-        `${group.name} menyelesaikan "${groupDetail.programStageName ?? 'Topik'}"`,
+        `${groupDetail.group.name} menyelesaikan "${groupDetail.programStageName ?? 'Topik'}"`,
         user?.id,
       )
       confirm.dismiss()

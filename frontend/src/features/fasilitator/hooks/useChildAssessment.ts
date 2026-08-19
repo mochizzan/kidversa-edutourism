@@ -3,9 +3,8 @@ import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
-import { apiRequest } from '../../../core/services/backendClient'
-import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { substagesOfStage } from '../../../core/utils/substage'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { useGroupOwnership } from './useGroupOwnership'
 import type {
@@ -49,26 +48,13 @@ async function findChildInSessions(childId: string): Promise<{ detail: ChildDeta
         detail.stages.find((s) => s.status === 'ACTIVE') ?? detail.stages[0]
     }
 
-    // Resolve Kegiatan leaves for the current session stage via the kiosk
-    // detail (the only read that exposes session_substages). Mint a token like
-    // the live monitor does, then read the per-stage session_substages.
+    // Resolve Kegiatan leaves for the current session stage via the new
+    // endpoint (no token mint needed).
     let sessionSubstages: SessionSubstage[] = []
     if (currentStage) {
       try {
-        const tokenRes = await apiRequest<{ data: { token: string } }>(
-          'POST',
-          API_ROUTES.AUTH.KIOSK,
-          { session_id: session.id },
-        )
-        const kiosk = await apiRequest<{
-          data: { stages: { stage: { id: string }; substages: { substage: SessionSubstage }[] }[] }
-        }>('GET', `${API_ROUTES.SESSIONS.KIOSK_ACCESS(session.id)}?token=${encodeURIComponent(tokenRes.data.token)}`)
-        const flat: SessionSubstage[] = []
-        for (const st of kiosk.data.stages) {
-          if (st.stage.id !== currentStage.id) continue
-          for (const sub of st.substages) flat.push(sub.substage)
-        }
-        sessionSubstages = flat
+        const all = await sessionService.getSubstages(session.id)
+        sessionSubstages = substagesOfStage(all, currentStage.id)
       } catch {
         sessionSubstages = []
       }
@@ -124,7 +110,7 @@ export function useChildAssessment(childId: string | undefined) {
         setSelectedSubstageId(picked.id)
 
         const assessments = await assessmentService.getByParticipant(childId)
-        const existing = assessments.find((a) => a.session_stage_id === picked.id)
+        const existing = assessments.find((a) => a.session_substage_id === picked.id)
         if (existing) {
           setExistingAssessment(existing)
           setStarRating(existing.star_rating)
@@ -136,7 +122,7 @@ export function useChildAssessment(childId: string | undefined) {
       } else if (detail.sessionStage) {
         // Fallback: no leaves resolved (e.g. legacy session) — score the stage.
         const assessments = await assessmentService.getByParticipant(childId)
-        const existing = assessments.find((a) => a.session_stage_id === detail.sessionStage!.id)
+        const existing = assessments.find((a) => a.session_substage_id === detail.sessionStage!.id)
         if (existing) {
           setExistingAssessment(existing)
           setStarRating(existing.star_rating)
@@ -188,7 +174,7 @@ export function useChildAssessment(childId: string | undefined) {
       const data: CreateAssessmentDTO = {
         participant_id: childId,
         session_id: sessionId,
-        session_stage_id: targetId,
+        session_substage_id: targetId,
         star_rating: starRating,
         comment: comment.trim() || undefined,
       }
@@ -210,7 +196,7 @@ export function useChildAssessment(childId: string | undefined) {
       if (!childId) return
       try {
         const assessments = await assessmentService.getByParticipant(childId)
-        const existing = assessments.find((a) => a.session_stage_id === substageId)
+        const existing = assessments.find((a) => a.session_substage_id === substageId)
         if (existing) {
           setExistingAssessment(existing)
           setStarRating(existing.star_rating)
