@@ -16,6 +16,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   kiosk_forbidden: 'Anda tidak memiliki akses ke sesi tersebut.',
   kiosk_expired: 'Tautan kiosk telah kedaluwarsa. Minta fasilitator membuka ulang sesi.',
   kiosk_cancelled: 'Sesi ini telah dibatalkan.',
+  group_required: 'Tautan kiosk tidak menyertakan kelompok. Minta admin membuka kiosk dari kartu kelompok.',
   session_not_found: 'Sesi tidak ditemukan.',
   session_not_deletable: 'Sesi ini tidak dapat dihapus.',
   participant_not_deletable: 'Peserta ini tidak dapat dihapus.',
