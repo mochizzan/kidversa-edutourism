@@ -83,7 +83,7 @@ func toKioskSessionDTO(s entity.Session) kioskSessionDTO {
 //
 // Errors: invalid/not-found or session-binding mismatch -> 401 kiosk_invalid; expired token
 // -> 401 kiosk_expired; tenant mismatch -> 401 kiosk_forbidden; cancelled session -> 401
-// kiosk_cancelled.
+// kiosk_cancelled. Grouped session accessed without groupId -> 400 group_required.
 func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
@@ -153,6 +153,10 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 		for i := range prog {
 			progressBySubstage[prog[i].SessionSubstageID] = prog[i].Status
 		}
+	} else if len(s.Groups) > 0 {
+		// Defense-in-depth: the session has groups but the kiosk did not identify
+		// one, so we must not serve locked Kegiatan as unlocked. Require group_id.
+		return appresp.Fail(c, http.StatusBadRequest, "group_required")
 	}
 
 	stages := make([]kioskStageContent, 0, len(s.Stages))
