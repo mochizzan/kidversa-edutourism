@@ -1,4 +1,4 @@
-import { SkipForward, RotateCcw, CheckCircle2, AlertTriangle, Users, Unlock, Flag } from 'lucide-react'
+import { Lock, Unlock, ArrowRight, CheckCircle2, AlertTriangle, Users, Flag } from 'lucide-react'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Button } from '../../../shared/components/ui/Button'
 import { cn } from '../../../core/utils'
@@ -17,20 +17,19 @@ interface LiveGroupCardProps {
   programStages: ProgramStage[]
   stageNames: Record<string, string>
   isKoordinator: boolean
-  allCompleted: boolean
   nextLockedStageId?: string
   sessionSubstages: SessionSubstage[]
   onComplete: (groupId: string, stageId: string) => void
   onUnlock: (groupId: string, stageId: string) => void
+  onLock: (groupId: string, stageId: string) => void
   onCompleteKegiatan: (sessionSubstageId: string) => void
-  onOverride: (groupId: string, action: 'skip' | 'jump' | 'reset') => void
 }
 
 const statusConfig: Record<GroupStatus, { label: string; variant: 'warning' | 'primary' | 'success' | 'neutral' }> = {
-  IN_PROGRESS: { label: '🟡 SEDANG', variant: 'warning' },
-  UNLOCKED: { label: '🟢 SIAP', variant: 'primary' },
-  COMPLETED: { label: '✅ SELESAI', variant: 'success' },
-  LOCKED: { label: '🔒 TERKUNCI', variant: 'neutral' },
+  LOCKED: { label: 'Terkunci', variant: 'neutral' },
+  UNLOCKED: { label: 'Terbuka', variant: 'primary' },
+  IN_PROGRESS: { label: 'Berlangsung', variant: 'warning' },
+  COMPLETED: { label: 'Selesai', variant: 'success' },
 }
 
 export const LiveGroupCard = ({
@@ -42,13 +41,12 @@ export const LiveGroupCard = ({
   programStages,
   stageNames,
   isKoordinator,
-  allCompleted,
   nextLockedStageId,
   sessionSubstages,
   onComplete,
   onUnlock,
+  onLock,
   onCompleteKegiatan,
-  onOverride,
 }: LiveGroupCardProps) => {
   // Kegiatan (session_substages) belonging to this group's current session stage.
   const kegiatanForStage = (stageId ? sessionSubstages.filter((s) => s.session_stage_id === stageId) : [])
@@ -146,10 +144,10 @@ export const LiveGroupCard = ({
       )}
 
       <div className="flex items-center gap-2 mt-4 flex-wrap">
-        {status === 'LOCKED' && nextLockedStageId && (
-          <Button variant="primary" size="sm" onClick={() => onUnlock(g.group.id, nextLockedStageId)}>
+        {status === 'LOCKED' && stageId && (
+          <Button variant="primary" size="sm" onClick={() => onUnlock(g.group.id, stageId)}>
             <Unlock className="w-4 h-4 mr-1" />
-            Buka Topik
+            Buka Konten
           </Button>
         )}
         {status === 'IN_PROGRESS' && (
@@ -158,30 +156,26 @@ export const LiveGroupCard = ({
             Selesai
           </Button>
         )}
-        {status === 'COMPLETED' && !allCompleted && nextLockedStageId && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => onUnlock(g.group.id, nextLockedStageId)}
-          >
-            Konfirmasi Pindah
-          </Button>
-        )}
-        {isKoordinator && (
-          <div className="flex items-center gap-1">
-            <Button variant="secondary" size="sm" onClick={() => onOverride(g.group.id, 'skip')}>
-              <SkipForward className="w-4 h-4 mr-1" />
-              Skip
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => onOverride(g.group.id, 'jump')}>
-              Jump
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => onOverride(g.group.id, 'reset')}>
-              <RotateCcw className="w-4 h-4 mr-1" />
-              Reset
-            </Button>
-          </div>
-        )}
+        {status === 'UNLOCKED' || status === 'IN_PROGRESS' ? (
+          <>
+            {stageId && (
+              <Button variant="secondary" size="sm" onClick={() => onLock(g.group.id, stageId)}>
+                <Lock className="w-4 h-4 mr-1" />
+                Kunci Konten
+              </Button>
+            )}
+            {nextLockedStageId && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => onUnlock(g.group.id, nextLockedStageId)}
+              >
+                <ArrowRight className="w-4 h-4 mr-1" />
+                Lanjut ke Topik Berikutnya
+              </Button>
+            )}
+          </>
+        ) : null}
       </div>
 
       {durationWarning}

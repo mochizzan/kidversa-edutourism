@@ -25,7 +25,6 @@ import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { kioskAccessPath } from '../../../core/constants/app'
 import { TimelineFeed } from '../components/TimelineFeed'
-import { ConfirmOverrideModal } from '../components/ConfirmOverrideModal'
 import { LiveGroupCard } from '../components/LiveGroupCard'
 import { useLiveMonitor } from '../hooks/useLiveMonitor'
 
@@ -55,16 +54,11 @@ const LiveMonitorPage = () => {
     getGroupStatus,
     getActiveStageIndex,
     getNextLockedStageId,
-    handleConfirm,
-    handleComplete,
     handleUnlock,
+    handleLock,
+    handleComplete,
     handleCompleteKegiatan,
   } = useLiveMonitor(urlSessionId)
-
-  const [overrideModal, setOverrideModal] = useState<{
-    groupId: string
-    action: 'skip' | 'jump' | 'reset'
-  } | null>(null)
 
   if (loading || liveLoading) {
     return (
@@ -293,13 +287,12 @@ const LiveMonitorPage = () => {
               programStages={programStages}
               stageNames={stageNames}
               isKoordinator={isKoordinator}
-              allCompleted={allCompleted}
               nextLockedStageId={getNextLockedStageId(g)}
               sessionSubstages={sessionSubstages}
               onComplete={handleComplete}
               onUnlock={handleUnlock}
+              onLock={handleLock}
               onCompleteKegiatan={handleCompleteKegiatan}
-              onOverride={(groupId, action) => setOverrideModal({ groupId, action })}
             />
           )
         })}
@@ -309,22 +302,6 @@ const LiveMonitorPage = () => {
         <h3 className="font-semibold text-on-surface mb-4">Timeline Aktivitas</h3>
         <TimelineFeed events={timeline} />
       </div>
-
-      {overrideModal && (
-        <ConfirmOverrideModal
-          open={true}
-          actionType={overrideModal.action}
-          availableStages={stages.map((s) => ({
-            value: s.id,
-            label: stageNames[s.id] || s.id,
-          }))}
-          onConfirm={async (reason, targetStageId) => {
-            await handleConfirm(overrideModal.groupId, overrideModal.action, reason, targetStageId)
-            setOverrideModal(null)
-          }}
-          onClose={() => setOverrideModal(null)}
-        />
-      )}
     </div>
   )
 }

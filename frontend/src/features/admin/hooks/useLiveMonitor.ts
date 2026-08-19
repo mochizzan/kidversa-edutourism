@@ -126,33 +126,41 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     fetchData()
   }, [fetchData])
 
+  const getNextLockedStageId = useCallback(
+    (g: LiveGroupWithProgress): string | undefined => {
+      const sorted = [...g.progress].sort((a, b) => {
+        const sa = stages.find((s) => s.id === a.session_stage_id)
+        const sb = stages.find((s) => s.id === b.session_stage_id)
+        const pa = programStages.find((p) => p.id === sa?.program_stage_id)
+        const pb = programStages.find((p) => p.id === sb?.program_stage_id)
+        return (pa?.sequence_order ?? 0) - (pb?.sequence_order ?? 0)
+      })
+      return sorted.find((p) => p.status === GroupStageProgressStatus.LOCKED)?.session_stage_id
+    },
+    [stages, programStages],
+  )
+
   const getGroupStatus = useCallback(
     (g: LiveGroupWithProgress): { status: GroupStatus; stageId?: string } => {
-      if (g.progress.length === 0) return { status: 'LOCKED', stageId: undefined }
-
+      if (g.progress.length === 0) {
+        // No progress yet: frontier is the first ordered stage.
+        const first = [...stages].sort((a, b) => {
+          const pa = programStages.find((p) => p.id === a.program_stage_id)
+          const pb = programStages.find((p) => p.id === b.program_stage_id)
+          return (pa?.sequence_order ?? 0) - (pb?.sequence_order ?? 0)
+        })[0]
+        return { status: 'LOCKED', stageId: first?.id }
+      }
       const active = g.progress.find((p) => p.status === GroupStageProgressStatus.IN_PROGRESS)
       if (active) return { status: 'IN_PROGRESS', stageId: active.session_stage_id }
-
       const unlocked = g.progress.find((p) => p.status === GroupStageProgressStatus.UNLOCKED)
       if (unlocked) return { status: 'UNLOCKED', stageId: unlocked.session_stage_id }
-
-      const allDone = g.progress.every(
-        (p) =>
-          p.status === GroupStageProgressStatus.COMPLETED ||
-          p.status === GroupStageProgressStatus.SKIPPED,
-      )
-      if (allDone) return { status: 'COMPLETED', stageId: undefined }
-
-      const hasDone = g.progress.some(
-        (p) =>
-          p.status === GroupStageProgressStatus.COMPLETED ||
-          p.status === GroupStageProgressStatus.SKIPPED,
-      )
-      if (hasDone) return { status: 'COMPLETED', stageId: undefined }
-
-      return { status: 'LOCKED', stageId: undefined }
+      const nextLocked = getNextLockedStageId(g)
+      if (nextLocked) return { status: 'LOCKED', stageId: nextLocked }
+      // All stages completed/skipped: no frontier (terminal state).
+      return { status: 'COMPLETED' }
     },
-    [],
+    [stages, getNextLockedStageId],
   )
 
   const getActiveStageIndex = useCallback(
@@ -172,58 +180,6 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     [stages, programStages],
   )
 
-  const getNextLockedStageId = useCallback(
-    (g: LiveGroupWithProgress): string | undefined => {
-      const sorted = [...g.progress].sort((a, b) => {
-        const sa = stages.find((s) => s.id === a.session_stage_id)
-        const sb = stages.find((s) => s.id === b.session_stage_id)
-        const pa = programStages.find((p) => p.id === sa?.program_stage_id)
-        const pb = programStages.find((p) => p.id === sb?.program_stage_id)
-        return (pa?.sequence_order ?? 0) - (pb?.sequence_order ?? 0)
-      })
-      return sorted.find((p) => p.status === GroupStageProgressStatus.LOCKED)?.session_stage_id
-    },
-    [stages, programStages],
-  )
-
-  const handleConfirm = useCallback(
-    async (
-      groupId: string,
-      action: 'skip' | 'jump' | 'reset',
-      reason: string,
-      targetStageId?: string,
-    ) => {
-      if (!activeSession || !user) return
-      try {
-        if (action === 'skip') {
-          const progressList = groups.find((g) => g.group.id === groupId)?.progress
-          const active = progressList?.find(
-            (p) =>
-              p.status === GroupStageProgressStatus.IN_PROGRESS ||
-              p.status === GroupStageProgressStatus.UNLOCKED,
-          )
-          if (active) await liveService.skipStage(groupId, active.session_stage_id, reason, user.id)
-        } else if (action === 'jump' && targetStageId) {
-          await liveService.jumpToStage(groupId, targetStageId, reason, user.id)
-        } else if (action === 'reset') {
-          await liveService.resetProgress(groupId, reason, user.id)
-        }
-        await liveService.addTimelineEvent(
-          activeSession.id,
-          groupId,
-          'override',
-          `Override: ${action} — ${reason}`,
-          user.id,
-        )
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 401) {
-          redirectToLogin()
-        }
-      }
-    },
-    [activeSession, user, groups],
-  )
-
   const handleUnlock = useCallback(
     async (groupId: string, sessionStageId: string) => {
       if (!user || !activeSession) return
@@ -237,6 +193,28 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
           groupId,
           'stage:unlock',
           `${group?.group.name || 'Kelompok'} di-unlock ke "${ps?.name || 'Stage'}"`,
+          user.id,
+        )
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) redirectToLogin()
+      }
+    },
+    [user, activeSession, groups, stages, programStages],
+  )
+
+  const handleLock = useCallback(
+    async (groupId: string, sessionStageId: string) => {
+      if (!user || !activeSession) return
+      try {
+        await liveService.lockStage(groupId, sessionStageId, user.id)
+        const group = groups.find((g) => g.group.id === groupId)
+        const ss = stages.find((s) => s.id === sessionStageId)
+        const ps = programStages.find((p) => p.id === ss?.program_stage_id)
+        await liveService.addTimelineEvent(
+          activeSession.id,
+          groupId,
+          'stage:lock',
+          `${group?.group.name || 'Kelompok'} dikunci "${ps?.name || 'Stage'}"`,
           user.id,
         )
       } catch (err) {
@@ -310,8 +288,8 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     getGroupStatus,
     getActiveStageIndex,
     getNextLockedStageId,
-    handleConfirm,
     handleUnlock,
+    handleLock,
     handleComplete,
     handleCompleteKegiatan,
   }
