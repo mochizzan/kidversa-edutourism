@@ -44,7 +44,19 @@ export const useTenantStore = create<TenantState>((set) => ({
   // For now this fetches tenants directly from the backend until the service
   // layer is built.
   fetchTenants: async () => {
-    const res = await apiRequest<TenantsResponse>('GET', API_ROUTES.PUBLIC.TENANTS)
+    // Cold-start seed race: backend may briefly return an empty tenant list
+    // right after bootstrap. For SUPER_ADMIN (who needs a tenant to operate)
+    // retry the GET with capped backoff; non-SA / no-auth paths are not
+    // retried since an empty list is a legitimate bootstrap state. Total wait
+    // stays under ~3s (400+800+1600ms = 2.8s).
+    const isSA = useAuthStore.getState().user?.role === UserRole.SUPER_ADMIN
+    let res = await apiRequest<TenantsResponse>('GET', API_ROUTES.PUBLIC.TENANTS)
+    const backoffs = [400, 800, 1600]
+    for (let i = 0; i < backoffs.length && res.data.length === 0 && isSA; i++) {
+      await new Promise((r) => setTimeout(r, backoffs[i]))
+      res = await apiRequest<TenantsResponse>('GET', API_ROUTES.PUBLIC.TENANTS)
+    }
+
     const tenants = res.data
     const savedId = localStorage.getItem(ACTIVE_TENANT_KEY)
     let active = tenants.find((t) => t.id === savedId) || null
