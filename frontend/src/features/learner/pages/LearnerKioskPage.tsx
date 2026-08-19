@@ -223,7 +223,7 @@ const LearnerKioskPage = () => {
       <div className="h-screen w-screen bg-surface flex flex-col items-center justify-center text-on-surface p-8 text-center">
         <Lock className="w-16 h-16 text-warning mb-4" />
         <h1 className="text-xl font-bold mb-2">Konten Dikunci</h1>
-        <p className="text-on-surface-variant">Kegiatan ini sedang dikunci oleh fasilitator. Silakan tunggu hingga dibuka kembali.</p>
+        <p className="text-on-surface-variant">Kegiatan ini sedang dikunci oleh admin. Silakan tunggu hingga dibuka kembali.</p>
       </div>
     )
   }
