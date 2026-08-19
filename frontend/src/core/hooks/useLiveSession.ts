@@ -111,7 +111,7 @@ export function useLiveSession(sessionId: string | null | undefined) {
       const row = data as GroupStageProgress
       setState((prev) => {
         const progress = prev.progress.filter(
-          (p) => !(p.group_id === row.group_id && p.session_stage_id === row.session_stage_id),
+          (p) => !(p.group_id === row.group_id && p.session_substage_id === row.session_substage_id),
         )
         progress.push(row)
         return { ...prev, progress }

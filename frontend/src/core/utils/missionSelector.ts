@@ -21,8 +21,8 @@ export function selectMissionsForParticipant({
 
   const programStageRatings = new Map<string, number[]>()
   assessments.forEach((assessment) => {
-    if (!assessment.session_stage_id || assessment.star_rating == null) return
-    const programStageId = sessionToProgramStage.get(assessment.session_stage_id)
+    if (!assessment.session_substage_id || assessment.star_rating == null) return
+    const programStageId = sessionToProgramStage.get(assessment.session_substage_id)
     if (!programStageId) return
     if (!programStageRatings.has(programStageId)) {
       programStageRatings.set(programStageId, [])

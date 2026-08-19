@@ -88,7 +88,7 @@ export interface UpdateUserDTO extends Partial<CreateUserDTO> {
 export interface CreateAssessmentDTO {
   participant_id: string
   session_id: string
-  session_stage_id: string
+  session_substage_id: string
   star_rating: number
   comment?: string
 }

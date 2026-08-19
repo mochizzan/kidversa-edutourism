@@ -7,7 +7,7 @@ import { API_ROUTES } from '../constants/apiRoutes'
 interface AssessmentUpsertRequest {
   participant_id: string
   session_id: string
-  session_stage_id: string
+  session_substage_id: string
   star_rating: number
   comment?: string
   assessed_by: string
@@ -22,7 +22,7 @@ const upsert = async (data: CreateAssessmentDTO): Promise<Assessment> => {
   return itemRequest<Assessment>('POST', `${API_ROUTES.ASSESSMENTS.BASE}/upsert`, {
     participant_id: data.participant_id,
     session_id: data.session_id,
-    session_stage_id: data.session_stage_id,
+    session_substage_id: data.session_substage_id,
     star_rating: data.star_rating,
     comment: data.comment,
     assessed_by: useAuthStore.getState().user?.id ?? '',
@@ -35,7 +35,7 @@ const bulkUpsert = async (data: CreateAssessmentDTO[]): Promise<Assessment[]> =>
   const items: AssessmentUpsertRequest[] = data.map((d) => ({
     participant_id: d.participant_id,
     session_id: d.session_id,
-    session_stage_id: d.session_stage_id,
+    session_substage_id: d.session_substage_id,
     star_rating: d.star_rating,
     comment: d.comment,
     assessed_by: assessedBy,

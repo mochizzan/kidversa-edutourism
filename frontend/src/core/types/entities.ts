@@ -82,7 +82,10 @@ export interface ProgramSubstage {
 // Instantiated Kegiatan leaf within a session (session-substages).
 export interface SessionSubstage {
   id: string
+  created_at: string
+  updated_at: string
   session_id: string
+  /** Honest parent SubTopik FK (session_stages.id) — do NOT rename; this is a join key. */
   session_stage_id: string
   program_substage_id: string
   status: 'WAITING' | 'ACTIVE' | 'COMPLETED'
@@ -186,7 +189,8 @@ export interface SessionGroup {
 export interface GroupStageProgress {
   id: string
   group_id: string
-  session_stage_id: string
+  /** Kegiatan-level FK (session_substages.id). */
+  session_substage_id: string
   status: import('./enums').GroupStageProgressStatus
   entered_at?: string
   completed_at?: string
@@ -249,7 +253,8 @@ export interface ImportResult {
 export interface Assessment {
   id: string
   participant_id: string
-  session_stage_id: string
+  /** Kegiatan-level FK (session_substages.id). */
+  session_substage_id: string
   star_rating: number
   comment?: string
   assessed_by: string
