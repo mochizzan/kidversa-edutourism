@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
-import { liveService } from '../../../core/services/live'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { apiRequest } from '../../../core/services/backendClient'
@@ -44,21 +43,6 @@ async function findChildInSessions(childId: string): Promise<{ detail: ChildDeta
     if (!group) continue
 
     let currentStage = detail.stages.find((s) => s.id === group.current_session_stage_id)
-
-    if (!currentStage && detail.stages.length > 0) {
-      const allProgress = await liveService.getProgress(detail.id)
-      const groupProg = allProgress
-        .filter((p) => p.group_id === group.id)
-        .filter((p) => p.status === 'COMPLETED' || p.status === 'IN_PROGRESS')
-        .sort(
-          (a, b) =>
-            new Date(b.completed_at ?? b.entered_at ?? '').getTime() -
-            new Date(a.completed_at ?? a.entered_at ?? '').getTime(),
-        )
-      if (groupProg.length > 0) {
-        currentStage = detail.stages.find((s) => s.id === groupProg[0].session_stage_id)
-      }
-    }
 
     if (!currentStage && detail.stages.length > 0) {
       currentStage =
@@ -189,7 +173,7 @@ export function useChildAssessment(childId: string | undefined) {
       addToast({
         type: 'error',
         message:
-          'Kelompok belum memiliki stage aktif. Buka kelompok dari dashboard fasilitator, lalu mulai sesi agar stage terkunci dan dapat dinilai.',
+          'Kelompok belum memiliki stage aktif. Buka kelompok dari dashboard fasilitator, lalu mulai sesi agar anak dapat dinilai.',
       })
       return
     }
