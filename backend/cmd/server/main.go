@@ -96,7 +96,7 @@ func main() {
 	registry.SessionGroup = handler.NewSessionGroupHandler(sessionUC)
 	registry.SessionParticipant = handler.NewSessionParticipantHandler(sessionUC)
 	registry.SessionParticipantBulk = handler.NewSessionParticipantBulkHandler(sessionUC)
-	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, contentRepo, sessionSubstageRepo)
+	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, contentRepo, sessionSubstageRepo, liveRepo)
 	registry.ProgramSubstage = handler.NewProgramSubstageHandler(programSubstageRepo)
 	registry.SessionSubstage = handler.NewSessionSubstageHandler(badgeUC)
 	registry.Badge = handler.NewBadgeHandler(sessionSubstageRepo)

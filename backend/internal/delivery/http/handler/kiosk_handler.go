@@ -20,11 +20,12 @@ type KioskHandler struct {
 	sessionUC    *usecase.SessionUsecase
 	contentRepo  repository.ContentRepository
 	substageRepo repository.SessionSubstageRepository
+	liveRepo     repository.LiveRepository
 }
 
 // NewKioskHandler builds the kiosk handler.
-func NewKioskHandler(authUC *auth.Usecase, sessionUC *usecase.SessionUsecase, contentRepo repository.ContentRepository, substageRepo repository.SessionSubstageRepository) *KioskHandler {
-	return &KioskHandler{authUC: authUC, sessionUC: sessionUC, contentRepo: contentRepo, substageRepo: substageRepo}
+func NewKioskHandler(authUC *auth.Usecase, sessionUC *usecase.SessionUsecase, contentRepo repository.ContentRepository, substageRepo repository.SessionSubstageRepository, liveRepo repository.LiveRepository) *KioskHandler {
+	return &KioskHandler{authUC: authUC, sessionUC: sessionUC, contentRepo: contentRepo, substageRepo: substageRepo, liveRepo: liveRepo}
 }
 
 // kioskStageContent bundles a session stage with its Kegiatan (substage) leaves
@@ -38,6 +39,7 @@ type kioskStageContent struct {
 type kioskSubstageContent struct {
 	Substage entity.SessionSubstage `json:"substage"`
 	Contents []entity.StageContent  `json:"contents"`
+	Locked   bool                   `json:"locked"`
 }
 
 // kioskSessionDTO is the minimal, PII-free session view returned to the public kiosk.
@@ -53,6 +55,7 @@ type kioskSessionDTO struct {
 type kioskResponse struct {
 	Session kioskSessionDTO     `json:"session"`
 	Stages  []kioskStageContent `json:"stages"`
+	GroupID string              `json:"group_id,omitempty"`
 }
 
 // kioskSubstage returns a session substage with an empty content list.
@@ -87,6 +90,7 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 		return nil
 	}
 	token := (*c).QueryParam("token")
+	groupId := (*c).QueryParam("groupId")
 	if token == "" {
 		return appresp.Fail(c, http.StatusUnauthorized, "token_required")
 	}
@@ -132,6 +136,25 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 	// Per stage, load each instantiated Kegiatan (session_substage) with its
 	// per-Kegiatan content (content now lives on the program_substage leaf).
 	// Falls back to an empty substage list when substage cloning has not run.
+	// When the kiosk identifies its group, derive per-substage lock state from
+	// the group's live progress. The group must belong to this session; otherwise
+	// it is a forbidden cross-session access.
+	var progressBySubstage map[string]entity.GroupStageProgressStatus
+	if groupId != "" {
+		g, gErr := h.liveRepo.GetGroup((*c).Request().Context(), groupId)
+		if gErr != nil || g.SessionID != s.Session.ID {
+			return appresp.Fail(c, http.StatusUnauthorized, "kiosk_forbidden")
+		}
+		prog, pErr := h.liveRepo.GetProgressByGroup((*c).Request().Context(), groupId)
+		if pErr != nil {
+			return apperrors.Internal("internal_error", pErr)
+		}
+		progressBySubstage = make(map[string]entity.GroupStageProgressStatus, len(prog))
+		for i := range prog {
+			progressBySubstage[prog[i].SessionStageID] = prog[i].Status
+		}
+	}
+
 	stages := make([]kioskStageContent, 0, len(s.Stages))
 	for i := range s.Stages {
 		ksc := kioskStageContent{Stage: s.Stages[i], Substages: []kioskSubstageContent{}}
@@ -149,6 +172,10 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 					}
 					ks := kioskSubstage(subs[j])
 					ks.Contents = contents
+					if st, ok := progressBySubstage[subs[j].ID]; ok && st == entity.ProgressLocked {
+						ks.Locked = true
+						ks.Contents = []entity.StageContent{}
+					}
 					ksc.Substages = append(ksc.Substages, ks)
 				}
 			}
@@ -156,5 +183,5 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 		stages = append(stages, ksc)
 	}
 
-	return appresp.OK(c, &kioskResponse{Session: toKioskSessionDTO(s.Session), Stages: stages})
+	return appresp.OK(c, &kioskResponse{Session: toKioskSessionDTO(s.Session), Stages: stages, GroupID: groupId})
 }
