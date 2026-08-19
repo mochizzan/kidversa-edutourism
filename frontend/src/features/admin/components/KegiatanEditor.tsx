@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Loader2, Camera } from 'lucide-react'
 import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
@@ -16,6 +16,8 @@ interface KegiatanEditorProps {
   onChange: (items: ProgramSubstage[]) => void
   onReload: () => Promise<void>
   onRequestDelete: (item: ProgramSubstage) => void
+  /** Renders the Konten belonging to a Kegiatan, nested beneath it. */
+  contentSlot?: (kegiatan: ProgramSubstage) => ReactNode
 }
 
 interface DraftState {
@@ -41,6 +43,7 @@ export function KegiatanEditor({
   onChange,
   onReload,
   onRequestDelete,
+  contentSlot,
 }: KegiatanEditorProps) {
   const { addToast } = useGlobalToast()
   const [draft, setDraft] = useState<DraftState>(emptyDraft())
@@ -130,55 +133,55 @@ export function KegiatanEditor({
           <EmptyState
             icon={<Plus className="w-12 h-12" />}
             title="Belum ada kegiatan"
-            description="Tambahkan kegiatan (Kegiatan) untuk SubTopik ini. Setiap kegiatan dapat dinilai per anak dan memicu badge SubTopik."
+            description="Tambahkan kegiatan untuk SubTopik ini. Konten (materi) ditambahkan di dalam masing-masing kegiatan."
           />
         </Card>
       ) : (
         <div className="space-y-2">
           {items.map((k, i) => (
-            <div
-              key={k.id}
-              className="flex items-center justify-between p-3 bg-surface-variant rounded-lg"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-on-surface">{k.name}</p>
-                <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant">
-                  <span>{k.duration_minutes} menit</span>
-                  {k.is_photo_stage && (
-                    <span className="flex items-center gap-1">
-                      <Camera className="w-3.5 h-3.5" /> Foto
-                    </span>
-                  )}
+            <div key={k.id} className="rounded-lg bg-surface-variant">
+              <div className="flex items-center justify-between p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-on-surface">{k.name}</p>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant">
+                    <span>{k.duration_minutes} menit</span>
+                    {k.is_photo_stage && (
+                      <span className="flex items-center gap-1">
+                        <Camera className="w-3.5 h-3.5" /> Foto
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => move(i, -1)}
+                    disabled={i === 0}
+                    aria-label="Naik"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => move(i, 1)}
+                    disabled={i === items.length - 1}
+                    aria-label="Turun"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => startEdit(k)}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => onRequestDelete(k)}
+                    className="text-error"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost" size="sm"
-                  onClick={() => move(i, -1)}
-                  disabled={i === 0}
-                  aria-label="Naik"
-                >
-                  <ChevronUp className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost" size="sm"
-                  onClick={() => move(i, 1)}
-                  disabled={i === items.length - 1}
-                  aria-label="Turun"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => startEdit(k)}>
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost" size="sm"
-                  onClick={() => onRequestDelete(k)}
-                  className="text-error"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
+              {contentSlot && <div className="px-3 pb-3">{contentSlot(k)}</div>}
             </div>
           ))}
         </div>

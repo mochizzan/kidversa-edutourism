@@ -15,14 +15,16 @@ import (
 
 // ProgramHandler serves /api/programs/* (SUPER_ADMIN, ADMIN, KOORDINATOR).
 type ProgramHandler struct {
-	repo        repository.ProgramRepository
-	contentRepo repository.ContentRepository
+	repo         repository.ProgramRepository
+	contentRepo  repository.ContentRepository
+	substageRepo repository.ProgramSubstageRepository
 }
 
-// NewProgramHandler builds the program handler. It owns the stage-scoped content
-// ops (list/assign/unassign/reorder) via the shared ContentRepository (CRIT-5).
-func NewProgramHandler(repo repository.ProgramRepository, contentRepo repository.ContentRepository) *ProgramHandler {
-	return &ProgramHandler{repo: repo, contentRepo: contentRepo}
+// NewProgramHandler builds the program handler. It owns the substage-scoped
+// content ops (list/assign/unassign/reorder) via the shared ContentRepository
+// (CRIT-5). substageRepo guards Kegiatan existence and resolves tenant scope.
+func NewProgramHandler(repo repository.ProgramRepository, contentRepo repository.ContentRepository, substageRepo repository.ProgramSubstageRepository) *ProgramHandler {
+	return &ProgramHandler{repo: repo, contentRepo: contentRepo, substageRepo: substageRepo}
 }
 
 // List handles GET /api/programs (paginated; ?search=, ?is_active=).

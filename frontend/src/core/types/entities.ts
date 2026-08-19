@@ -178,6 +178,8 @@ export interface SessionGroup {
   status: import('./enums').GroupStatus
   current_session_stage_id?: string
   facilitator_id?: string
+  /** Resolved name of facilitator_id; populated by the backend (Opsi B). */
+  facilitator_name?: string
   created_at: string
 }
 

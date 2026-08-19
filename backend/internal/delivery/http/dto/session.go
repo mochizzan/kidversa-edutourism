@@ -82,9 +82,11 @@ type LinkParticipantResponse struct {
 }
 
 // GroupWithParticipants groups a session group with its participants (GET detail).
+// FacilitatorName mirrors repository.GroupWithParticipants.FacilitatorName.
 type GroupWithParticipants struct {
 	entity.SessionGroup
-	Participants []entity.Participant `json:"participants"`
+	Participants    []entity.Participant `json:"participants"`
+	FacilitatorName string               `json:"facilitator_name"`
 }
 
 // SessionDetail is the expanded session view returned by GET /api/sessions/:id.

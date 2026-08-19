@@ -48,10 +48,10 @@ export interface ProgramService {
   deleteStage(programId: string, stageId: string): Promise<void>
   reorderStages(programId: string, stageIds: string[]): Promise<void>
 
-  getContents(stageId: string): Promise<StageContent[]>
-  reorderContents(stageId: string, contentIds: string[]): Promise<void>
-  assignContent(stageId: string, contentId: string): Promise<void>
-  unassignContent(stageId: string, contentId: string): Promise<void>
+  getContents(substageId: string): Promise<StageContent[]>
+  reorderContents(substageId: string, contentIds: string[]): Promise<void>
+  assignContent(substageId: string, contentId: string): Promise<void>
+  unassignContent(substageId: string, contentId: string): Promise<void>
 }
 
 // Standalone, tenant-scoped content CRUD + usage/assign (Content Single-Source).

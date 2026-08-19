@@ -30,6 +30,7 @@ type SessionUsecase struct {
 	programSubstages ProgramSubstageReader
 	sessionSubstages repository.SessionSubstageRepository
 	assessmentRepo   repository.AssessmentRepository
+	userRepo         repository.UserRepository
 }
 
 // NewSessionUsecase builds the session usecase.
@@ -49,6 +50,12 @@ func (u *SessionUsecase) SetSubstageRepos(programSubstages ProgramSubstageReader
 // when a participant migrates to a new session (LinkParticipant).
 func (u *SessionUsecase) SetAssessmentRepo(assessmentRepo repository.AssessmentRepository) {
 	u.assessmentRepo = assessmentRepo
+}
+
+// SetUserRepo injects the user repo used to resolve a group's facilitator name
+// for the session detail view (so non-admin callers don't need GET /api/users).
+func (u *SessionUsecase) SetUserRepo(userRepo repository.UserRepository) {
+	u.userRepo = userRepo
 }
 
 // CreateSession creates a new DRAFT session owned by the tenant.
@@ -136,7 +143,13 @@ func (u *SessionUsecase) GetSession(ctx context.Context, id, tenantID string) (*
 		if err != nil {
 			return nil, err
 		}
-		gwp = append(gwp, repository.GroupWithParticipants{SessionGroup: groups[i], Participants: ps})
+		g := repository.GroupWithParticipants{SessionGroup: groups[i], Participants: ps}
+		if groups[i].FacilitatorID != nil && u.userRepo != nil {
+			if f, ferr := u.userRepo.GetByID(ctx, *groups[i].FacilitatorID); ferr == nil && f != nil {
+				g.FacilitatorName = f.Name
+			}
+		}
+		gwp = append(gwp, g)
 	}
 	return &repository.SessionDetail{Session: *s, Stages: stages, Groups: gwp}, nil
 }
@@ -215,27 +228,36 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) 
 			}
 		}
 	}
-	// Seed a LOCKED progress row for every (group, session_stage) pair so the
+	// Seed a LOCKED progress row for every (group, session_substage) pair so the
 	// live monitor renders real per-stage state instead of treating every group
-	// as locked. Skip entirely if progress was already seeded (idempotent).
-	if len(stages) > 0 {
-		existing, eerr := u.sessionRepo.ListGroupStageProgress(ctx, stages[0].ID)
-		if eerr != nil {
-			return nil, eerr
+	// as locked. group_stage_progress.session_substage_id is an FK to
+	// session_substages (the Kegiatan leaf), so seed per substage — not per
+	// session_stage. session_substages is populated on CreateSession via
+	// cloneSubstages; skip gracefully when it is unwired or empty (idempotent).
+	if u.sessionSubstages != nil {
+		subs, serr := u.sessionSubstages.ListSessionSubstages(ctx, id)
+		if serr != nil {
+			return nil, serr
 		}
-		if len(existing) == 0 {
-			groups, gerr := u.sessionRepo.ListSessionGroups(ctx, id)
-			if gerr != nil {
-				return nil, gerr
+		if len(subs) > 0 {
+			existing, eerr := u.sessionRepo.ListGroupStageProgress(ctx, subs[0].ID)
+			if eerr != nil {
+				return nil, eerr
 			}
-			for i := range groups {
-				for j := range stages {
-					if cerr := u.sessionRepo.CreateGroupStageProgress(ctx, &entity.GroupStageProgress{
-						GroupID:        groups[i].ID,
-						SessionStageID: stages[j].ID,
-						Status:         entity.ProgressLocked,
-					}); cerr != nil {
-						return nil, cerr
+			if len(existing) == 0 {
+				groups, gerr := u.sessionRepo.ListSessionGroups(ctx, id)
+				if gerr != nil {
+					return nil, gerr
+				}
+				for i := range groups {
+					for j := range subs {
+						if cerr := u.sessionRepo.CreateGroupStageProgress(ctx, &entity.GroupStageProgress{
+							GroupID:        groups[i].ID,
+							SessionStageID: subs[j].ID,
+							Status:         entity.ProgressLocked,
+						}); cerr != nil {
+							return nil, cerr
+						}
 					}
 				}
 			}
@@ -610,6 +632,30 @@ func (u *SessionUsecase) GetParticipantGlobal(ctx context.Context, participantID
 // DeleteParticipant removes a participant.
 func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID, _ string) error {
 	return u.sessionRepo.DeleteParticipant(ctx, participantID)
+}
+
+// EnsureSessionSubstages guarantees a session has its Kegiatan leaves
+// (session_substages) cloned from the program, so the kiosk/live monitor always
+// have per-leaf content to render. Sessions created before substage cloning
+// landed (or whose clone was skipped) would otherwise show an empty kiosk.
+// Idempotent: when session_substages already exist it returns immediately.
+// No-op when the substage repos are unwired.
+func (u *SessionUsecase) EnsureSessionSubstages(ctx context.Context, sessionID string) error {
+	if u.programSubstages == nil || u.sessionSubstages == nil {
+		return nil
+	}
+	existing, err := u.sessionSubstages.ListSessionSubstages(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		return nil
+	}
+	s, gerr := u.sessionRepo.GetSessionByID(ctx, sessionID, "")
+	if gerr != nil {
+		return gerr
+	}
+	return u.cloneSubstages(ctx, sessionID, s.ProgramID)
 }
 
 // cloneSubstages materializes one session_substages row (status WAITING) per

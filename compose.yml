@@ -18,7 +18,10 @@ services:
     ports:
       - "3307:3306"
     volumes:
-      # Bind mount — data langsung terlihat di File Explorer
+      # Bind mount — data langsung terlihat di File Explorer (root project).
+      # NOTE: `compose down` never touches this; to reset the DB, empty the
+      # folder via File Explorer / WSL2, not `down -v` (bind mounts aren't
+      # removed by Docker).
       - ./data/mariadb:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]

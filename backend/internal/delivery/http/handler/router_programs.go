@@ -33,10 +33,11 @@ func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManage
 	g.DELETE("/:id/stages/:stageId", h.DeleteStage, authMW, roleMWAdmin, scopeMW)
 	g.POST("/:id/stages/reorder", h.ReorderStages, authMW, roleMWAdmin, scopeMW)
 
-	// Contents keyed directly by stage (list for kiosk/learner; reorder + assign/
-	// unassign are admin write operations). All four share the /programs prefix.
-	g.GET("/program-stages/:stageId/contents", h.ListContents, authMW, roleMWAdmin, scopeMW)
-	g.POST("/program-stages/:stageId/contents/reorder", h.ReorderContents, authMW, roleMWAdmin, scopeMW)
-	g.POST("/program-stages/:stageId/contents/assign", h.AssignContent, authMW, roleMWAdmin, scopeMW)
-	g.DELETE("/program-stages/:stageId/contents/:contentId", h.UnassignContent, authMW, roleMWAdmin, scopeMW)
+	// Contents keyed directly by substage (Kegiatan). list for kiosk/learner;
+	// reorder + assign/unassign are admin write operations. All four share the
+	// /programs prefix. A missing Kegiatan returns 404 (substage_not_found).
+	g.GET("/program-substages/:substageId/contents", h.ListContents, authMW, roleMWAdmin, scopeMW)
+	g.POST("/program-substages/:substageId/contents/reorder", h.ReorderContents, authMW, roleMWAdmin, scopeMW)
+	g.POST("/program-substages/:substageId/contents/assign", h.AssignContent, authMW, roleMWAdmin, scopeMW)
+	g.DELETE("/program-substages/:substageId/contents/:contentId", h.UnassignContent, authMW, roleMWAdmin, scopeMW)
 }

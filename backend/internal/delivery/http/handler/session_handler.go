@@ -76,8 +76,9 @@ func toSessionDetailResponse(d *repository.SessionDetail) dto.SessionDetail {
 	groups := make([]dto.GroupWithParticipants, len(d.Groups))
 	for i, g := range d.Groups {
 		groups[i] = dto.GroupWithParticipants{
-			SessionGroup: g.SessionGroup,
-			Participants: g.Participants,
+			SessionGroup:    g.SessionGroup,
+			Participants:    g.Participants,
+			FacilitatorName: g.FacilitatorName,
 		}
 	}
 	return dto.SessionDetail{

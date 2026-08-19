@@ -30,9 +30,9 @@ type ContentRequest struct {
 	DurationSeconds int                         `json:"duration_seconds,omitempty"`
 }
 
-// AssignContentRequest carries the content_id to assign to a stage.
+// AssignContentRequest carries the content_id to assign to a substage (Kegiatan).
 type AssignContentRequest struct {
-	ContentID string `json:"content_id" validate:"required"`
+	ContentID string `json:"content_id" validate:"required,uuid"`
 }
 
 // ReorderRequest carries an ordered list of IDs to re-sequence.

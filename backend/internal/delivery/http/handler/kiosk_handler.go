@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/labstack/echo/v5"
@@ -118,6 +119,14 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 	// A cancelled session must reject kiosk access even with a valid token.
 	if s.Session.Status == entity.SessionCancelled {
 		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_cancelled")
+	}
+
+	// Self-heal: sessions created before substage cloning (or whose clone was
+	// skipped) have no session_substages, leaving the kiosk empty. Clone the
+	// Kegiatan leaves now (idempotent) so content renders. Failure is
+	// non-fatal — the kiosk still shows whatever stages/substages exist.
+	if err := h.sessionUC.EnsureSessionSubstages((*c).Request().Context(), id); err != nil {
+		log.Printf("kiosk: ensure session_substages failed for %s: %v", id, err)
 	}
 
 	// Per stage, load each instantiated Kegiatan (session_substage) with its

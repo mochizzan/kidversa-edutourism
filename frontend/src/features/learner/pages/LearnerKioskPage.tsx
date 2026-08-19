@@ -124,7 +124,12 @@ const LearnerKioskPage = () => {
         inflightRef.current = true
         // PUBLIC endpoint — the kiosk token (not a JWT) is the sole auth.
         const url = `${getApiBaseUrl()}${API_ROUTES.SESSIONS.KIOSK_ACCESS(sessionId)}?token=${encodeURIComponent(token)}`
-        const res = await fetch(url, { credentials: 'omit' })
+        const res = await fetch(url, {
+          credentials: 'omit',
+          // Bound the wait so a non-responsive backend surfaces an error
+          // instead of an endless spinner.
+          signal: AbortSignal.timeout(15000),
+        })
         if (!res.ok) {
           const body = await res.json().catch(() => null)
           const code = body?.error?.code ?? 'internal_error'

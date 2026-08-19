@@ -7,17 +7,22 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
-// ListContents handles GET /api/program-stages/:stageId/contents.
+// ListContents handles GET /api/program-substages/:substageId/contents.
 // Returns the JOIN-shaped StageContent list (kiosk/learner shape, E22/CRIT-7).
 func (h *ProgramHandler) ListContents(c *echo.Context) error {
-	stageID, ok := bindUUID(c, "stageId")
+	substageID, ok := bindUUID(c, "substageId")
 	if !ok {
 		return nil
 	}
-	items, err := h.contentRepo.ListStageContents((*c).Request().Context(), stageID)
+	substage, err := h.substageRepo.GetSubstageByID((*c).Request().Context(), substageID)
+	if err != nil {
+		return appresp.Fail(c, http.StatusNotFound, "substage_not_found")
+	}
+	items, err := h.contentRepo.ListStageContents((*c).Request().Context(), substage.ID)
 	if err != nil {
 		return err
 	}
@@ -40,57 +45,75 @@ func (h *ProgramHandler) stageTenantID(ctx context.Context, stageID string) stri
 	return *program.TenantID
 }
 
-// AssignContent handles POST /api/program-stages/:stageId/contents/assign.
-// Assigns an existing standalone Content to the stage (junction insert, A6a one-per-stage).
+// substageTenantID resolves the owning tenant of a substage via
+// substage -> stage -> program.
+func (h *ProgramHandler) substageTenantID(ctx context.Context, substage *entity.ProgramSubstage) string {
+	return h.stageTenantID(ctx, substage.ProgramStageID)
+}
+
+// AssignContent handles POST /api/program-substages/:substageId/contents/assign.
+// Assigns an existing standalone Content to the Kegiatan (junction insert, A6a one-per-stage).
 func (h *ProgramHandler) AssignContent(c *echo.Context) error {
-	stageID, ok := bindUUID(c, "stageId")
+	substageID, ok := bindUUID(c, "substageId")
 	if !ok {
 		return nil
+	}
+	substage, err := h.substageRepo.GetSubstageByID((*c).Request().Context(), substageID)
+	if err != nil {
+		return appresp.Fail(c, http.StatusNotFound, "substage_not_found")
 	}
 	var req dto.AssignContentRequest
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	tenantID := h.stageTenantID((*c).Request().Context(), stageID)
-	// E13: the content must belong to the same tenant as the stage.
+	tenantID := h.substageTenantID((*c).Request().Context(), substage)
+	// E13: the content must belong to the same tenant as the substage's program.
 	if !h.contentBelongsToTenant((*c).Request().Context(), req.ContentID, tenantID) {
 		return appresp.Fail(c, http.StatusForbidden, "content_tenant_mismatch")
 	}
-	if err := h.contentRepo.AssignContentToStage((*c).Request().Context(), stageID, req.ContentID); err != nil {
+	if err := h.contentRepo.AssignContentToStage((*c).Request().Context(), substage.ID, req.ContentID); err != nil {
 		// A6a: idempotent if already assigned.
 		return err
 	}
-	return appresp.Created(c, map[string]string{"content_id": req.ContentID, "stage_id": stageID})
+	return appresp.Created(c, map[string]string{"content_id": req.ContentID, "substage_id": substage.ID})
 }
 
-// UnassignContent handles DELETE /api/program-stages/:stageId/contents/:contentId.
+// UnassignContent handles DELETE /api/program-substages/:substageId/contents/:contentId.
 // Removes the junction only — the Content itself is NOT deleted (A4a/CRIT-5).
 func (h *ProgramHandler) UnassignContent(c *echo.Context) error {
-	stageID, ok := bindUUID(c, "stageId")
+	substageID, ok := bindUUID(c, "substageId")
 	if !ok {
 		return nil
+	}
+	substage, err := h.substageRepo.GetSubstageByID((*c).Request().Context(), substageID)
+	if err != nil {
+		return appresp.Fail(c, http.StatusNotFound, "substage_not_found")
 	}
 	contentID, ok := bindUUID(c, "contentId")
 	if !ok {
 		return nil
 	}
-	if err := h.contentRepo.UnassignContentFromStage((*c).Request().Context(), stageID, contentID); err != nil {
+	if err := h.contentRepo.UnassignContentFromStage((*c).Request().Context(), substage.ID, contentID); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
 }
 
-// ReorderContents handles POST /api/program-stages/:stageId/contents/reorder.
+// ReorderContents handles POST /api/program-substages/:substageId/contents/reorder.
 func (h *ProgramHandler) ReorderContents(c *echo.Context) error {
-	stageID, ok := bindUUID(c, "stageId")
+	substageID, ok := bindUUID(c, "substageId")
 	if !ok {
 		return nil
+	}
+	substage, err := h.substageRepo.GetSubstageByID((*c).Request().Context(), substageID)
+	if err != nil {
+		return appresp.Fail(c, http.StatusNotFound, "substage_not_found")
 	}
 	var req dto.ReorderRequest
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	if err := h.contentRepo.ReorderStageContents((*c).Request().Context(), stageID, req.OrderedIDs); err != nil {
+	if err := h.contentRepo.ReorderStageContents((*c).Request().Context(), substage.ID, req.OrderedIDs); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)

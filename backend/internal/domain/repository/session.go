@@ -16,9 +16,14 @@ type SessionFilter struct {
 }
 
 // GroupWithParticipants bundles a session group with its participants.
+// FacilitatorName is the resolved name of SessionGroup.FacilitatorID (empty
+// when the group has no facilitator or the user no longer exists). It lets
+// non-admin callers (FASILITATOR/KOORDINATOR) display the PIC without calling
+// the admin-only GET /api/users endpoint.
 type GroupWithParticipants struct {
-	SessionGroup entity.SessionGroup
-	Participants []entity.Participant
+	SessionGroup    entity.SessionGroup
+	Participants    []entity.Participant
+	FacilitatorName string `json:"facilitator_name"`
 }
 
 // SessionDetail is the expanded session view (stages + groups + participants).

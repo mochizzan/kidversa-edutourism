@@ -6,7 +6,6 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Tabs } from '../../../shared/components/ui/Tabs'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
 import { programSubstageService } from '../../../core/services/programSubstages'
@@ -25,7 +24,173 @@ import { friendlyError } from '../../../core/utils/errorMessages'
 import { StageForm } from '../components/StageForm'
 import { ContentPickerModal } from '../components/ContentPickerModal'
 import { KegiatanEditor } from '../components/KegiatanEditor'
-import { Plus, FileText } from 'lucide-react'
+import { Plus } from 'lucide-react'
+
+interface KegiatanContentProps {
+  programId: string
+  stageId: string
+  kegiatan: ProgramSubstage
+}
+
+// Konten adalah anak dari Kegiatan: ditampilkan di dalam kartu kegiatan,
+// bukan sebagai tab terpisah. Urutan visual: Topik → Kegiatan → Konten.
+function KegiatanContent({ programId, stageId, kegiatan }: KegiatanContentProps) {
+  const navigate = useNavigate()
+  const { addToast } = useGlobalToast()
+  const [contents, setContents] = useState<StageContent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<StageContent | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const list = await programService.getContents(kegiatan.id)
+      setContents(list)
+      await syncStageMeta(programService, programId, stageId, kegiatan.id)
+    } catch {
+      setContents([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kegiatan.id])
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await programService.unassignContent(kegiatan.id, deleteTarget.id)
+      setDeleteTarget(null)
+      await load()
+      addToast({ type: 'success', message: 'Konten dihapus dari kegiatan' })
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="border-l-2 border-primary pl-3 space-y-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+        Konten
+      </p>
+      {loading ? (
+        <p className="text-xs text-on-surface-variant">Memuat konten…</p>
+      ) : contents.length === 0 ? (
+        <div className="rounded-lg bg-surface p-3">
+          <p className="text-sm text-on-surface-variant">
+            Konten belum ditambahkan ke kegiatan ini.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              variant="secondary" size="sm"
+              icon={<Plus className="w-4 h-4" />}
+              onClick={() => setPickerOpen(true)}
+            >
+              Tambah dari Perpustakaan
+            </Button>
+            <Button
+              size="sm"
+              icon={<Plus className="w-4 h-4" />}
+              onClick={() => navigate(contentNewPath({ programId, stageId }))}
+            >
+              Upload Konten Baru
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2">
+            {contents.map((content) => (
+              <div
+                key={content.id}
+                className="flex items-center justify-between p-3 bg-surface rounded-lg"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {STAGE_CONTENT_FILE_TYPE_ICONS[content.file_type]}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-on-surface truncate">{content.title}</p>
+                    <p className="text-xs text-on-surface-variant">
+                      {content.youtube_url
+                        ? YOUTUBE_LABEL
+                        : `${STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type]} · ${content.duration_seconds ?? 0}s`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {!content.is_active && <Badge variant="neutral">Nonaktif</Badge>}
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => navigate(contentEditPath(content.id))}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost" size="sm"
+                    onClick={() => setDeleteTarget(content)}
+                    className="text-error"
+                  >
+                    Hapus
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary" size="sm"
+              icon={<Plus className="w-4 h-4" />}
+              onClick={() => setPickerOpen(true)}
+            >
+              Tambah dari Perpustakaan
+            </Button>
+            <Button
+              size="sm"
+              icon={<Plus className="w-4 h-4" />}
+              onClick={() => navigate(contentNewPath({ programId, stageId }))}
+            >
+              Upload Konten Baru
+            </Button>
+          </div>
+        </>
+      )}
+
+      <ContentPickerModal
+        open={pickerOpen}
+        stageId={stageId}
+        onClose={() => setPickerOpen(false)}
+        onPicked={async (picked) => {
+          try {
+            await programService.assignContent(kegiatan.id, picked.id)
+            await load()
+            addToast({ type: 'success', message: 'Konten ditambahkan ke kegiatan' })
+          } catch (err) {
+            addToast({ type: 'error', message: friendlyError(err) })
+          } finally {
+            setPickerOpen(false)
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Hapus Konten"
+        message={`Yakin ingin menghapus konten "${deleteTarget?.title || ''}" dari kegiatan ini? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setDeleteTarget(null)}
+      />
+    </div>
+  )
+}
 
 const ProgramStagePage = () => {
   const { programId, stageId } = useParams<{ programId: string; stageId: string }>()
@@ -40,11 +205,7 @@ const ProgramStagePage = () => {
   const [deleteTarget, setDeleteTarget] = useState<ProgramStage | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'detail' | 'konten' | 'kegiatan'>('detail')
-  const [contents, setContents] = useState<StageContent[]>([])
-  const [deleteTargetContent, setDeleteTargetContent] = useState<StageContent | null>(null)
-  const [contentDeleting, setContentDeleting] = useState(false)
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'detail' | 'kegiatan'>('detail')
 
   const [kegiatan, setKegiatan] = useState<ProgramSubstage[]>([])
   const [kegiatanLoading, setKegiatanLoading] = useState(false)
@@ -70,28 +231,18 @@ const ProgramStagePage = () => {
     })()
   }, [programId, stageId, isNew])
 
-  const loadContents = async () => {
-    if (!stageId || isNew || !programId) return
-    const list = await programService.getContents(stageId)
-    setContents(list)
-    await syncStageMeta(programService, programId, stageId)
-  }
-
   const loadKegiatan = async () => {
     if (!stageId || isNew) return
     setKegiatanLoading(true)
     try {
-      setKegiatan(await programSubstageService.listByStage(stageId))
+      const list = await programSubstageService.listByStage(stageId)
+      setKegiatan(list)
     } catch {
       setKegiatan([])
     } finally {
       setKegiatanLoading(false)
     }
   }
-
-  useEffect(() => {
-    loadContents()
-  }, [stageId])
 
   useEffect(() => {
     loadKegiatan()
@@ -125,12 +276,14 @@ const ProgramStagePage = () => {
           })
         }
       } else if (stageId) {
-        const existingContents = await programService.getContents(stageId)
+        const allContents = (
+          await Promise.all(kegiatan.map((k) => programService.getContents(k.id)))
+        ).flat()
         await programService.updateStage(programId, stageId, {
           name: data.name,
           description: data.description,
           is_photo_stage: data.is_photo_stage,
-          duration_minutes: computeDurationMinutes(existingContents),
+          duration_minutes: computeDurationMinutes(allContents),
           badge_name: data.badge_name,
           badge_image_url: data.badge_image_url,
         })
@@ -154,23 +307,6 @@ const ProgramStagePage = () => {
     } finally {
       setDeleting(false)
       setDeleteTarget(null)
-    }
-  }
-
-  const handleContentDelete = async () => {
-    if (!stageId || !deleteTargetContent || !programId) return
-    setContentDeleting(true)
-    try {
-      // Detach the junction only — the standalone Content itself is untouched.
-      await programService.unassignContent(stageId, deleteTargetContent.id)
-      setDeleteTargetContent(null)
-      const updatedContents = await programService.getContents(stageId)
-      setContents(updatedContents)
-      await syncStageMeta(programService, programId, stageId)
-    } catch (err) {
-      addToast({ type: 'error', message: friendlyError(err) })
-    } finally {
-      setContentDeleting(false)
     }
   }
 
@@ -200,11 +336,10 @@ const ProgramStagePage = () => {
         <Tabs
           tabs={[
             { key: 'detail', label: 'Detail' },
-            { key: 'konten', label: 'Konten' },
             { key: 'kegiatan', label: `Kegiatan (${kegiatan.length})` },
           ]}
           activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as 'detail' | 'konten' | 'kegiatan')}
+          onChange={(key) => setActiveTab(key as 'detail' | 'kegiatan')}
         />
       )}
 
@@ -219,91 +354,6 @@ const ProgramStagePage = () => {
         </Card>
       )}
 
-      {!isNew && activeTab === 'konten' && (
-        <>
-          <div className="flex flex-wrap justify-between items-center gap-2">
-            <h4 className="text-lg font-semibold text-on-surface">Daftar Konten</h4>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                icon={<Plus className="w-4 h-4" />}
-                onClick={() => setPickerOpen(true)}
-              >
-                Tambah dari Perpustakaan
-              </Button>
-              <Button
-                icon={<Plus className="w-4 h-4" />}
-                onClick={() => navigate(contentNewPath({ programId, stageId }))}
-              >
-                Upload Konten Baru
-              </Button>
-            </div>
-          </div>
-
-          {contents.length === 0 ? (
-            <Card>
-              <EmptyState
-                icon={<FileText className="w-12 h-12" />}
-                title="Belum ada konten"
-                description="Tambahkan konten dari perpustakaan atau unggah konten baru ke stage ini."
-              />
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {contents.map((content) => (
-                <div key={content.id} className="flex items-center justify-between p-3 bg-surface-variant rounded-lg">
-                  <div className="flex items-center gap-3">
-                    {STAGE_CONTENT_FILE_TYPE_ICONS[content.file_type]}
-                    <div>
-                      <p className="text-sm font-medium text-on-surface">{content.title}</p>
-                      <p className="text-xs text-on-surface-variant">
-                        {content.youtube_url
-                          ? YOUTUBE_LABEL
-                          : `${STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type]} · ${content.duration_seconds ?? 0}s`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!content.is_active && <Badge variant="neutral">Nonaktif</Badge>}
-                    <Button
-                      variant="ghost" size="sm"
-                      onClick={() => navigate(contentEditPath(content.id))}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost" size="sm"
-                      onClick={() => setDeleteTargetContent(content)}
-                      className="text-error"
-                    >
-                      Hapus
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <ContentPickerModal
-            open={pickerOpen}
-            stageId={stageId!}
-            onClose={() => setPickerOpen(false)}
-            onPicked={async (picked) => {
-              if (!stageId) return
-              try {
-                await programService.assignContent(stageId, picked.id)
-                await loadContents()
-                addToast({ type: 'success', message: 'Konten ditambahkan ke stage' })
-              } catch (err) {
-                addToast({ type: 'error', message: friendlyError(err) })
-              } finally {
-                setPickerOpen(false)
-              }
-            }}
-          />
-        </>
-      )}
-
       {!isNew && activeTab === 'kegiatan' && stageId && (
         <KegiatanEditor
           programStageId={stageId}
@@ -312,6 +362,9 @@ const ProgramStagePage = () => {
           onChange={setKegiatan}
           onReload={loadKegiatan}
           onRequestDelete={(k) => setDeleteTargetKegiatan(k)}
+          contentSlot={(k) => (
+            <KegiatanContent programId={programId!} stageId={stageId} kegiatan={k} />
+          )}
         />
       )}
 
@@ -326,19 +379,9 @@ const ProgramStagePage = () => {
       />
 
       <ConfirmDialog
-        open={!!deleteTargetContent}
-        title="Hapus Konten"
-        message={`Yakin ingin menghapus konten "${deleteTargetContent?.title || ''}"? Tindakan ini tidak dapat dibatalkan.`}
-        confirmLabel="Hapus"
-        loading={contentDeleting}
-        onConfirm={handleContentDelete}
-        onClose={() => setDeleteTargetContent(null)}
-      />
-
-      <ConfirmDialog
         open={!!deleteTargetKegiatan}
         title="Hapus Kegiatan"
-        message={`Yakin ingin menghapus kegiatan "${deleteTargetKegiatan?.name || ''}"? Tindakan ini tidak dapat dibatalkan.`}
+        message={`Yakin ingin menghapus kegiatan "${deleteTargetKegiatan?.name || ''}"? Konten di dalam kegiatan ini juga akan dilepas. Tindakan ini tidak dapat dibatalkan.`}
         confirmLabel="Hapus Kegiatan"
         loading={kegiatanDeleting}
         onConfirm={async () => {

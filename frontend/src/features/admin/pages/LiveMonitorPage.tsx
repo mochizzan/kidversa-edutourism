@@ -140,9 +140,13 @@ const LiveMonitorPage = () => {
       const { status } = getGroupStatus(g)
       return status === 'IN_PROGRESS' || status === 'UNLOCKED'
     })
+    // Open the active group's stage when one exists; otherwise fall back to the
+    // session's first stage so the kiosk can display content even before any
+    // group is unlocked (the kiosk page itself defaults to the first stage too).
     const { stageId } = activeGroup ? getGroupStatus(activeGroup) : { stageId: undefined }
-    if (!activeGroup || !stageId) {
-      addToast({ type: 'error', message: 'Belum ada kelompok yang aktif untuk dibuka di kiosk.' })
+    const targetStageId = stageId ?? stages[0]?.id
+    if (!targetStageId) {
+      addToast({ type: 'error', message: 'Belum ada topik untuk sesi ini.' })
       return
     }
     setKioskLoading(true)
@@ -153,7 +157,7 @@ const LiveMonitorPage = () => {
         { session_id: activeSession.id },
       )
       const token = res.data.token
-      window.open(`${kioskAccessPath(activeSession.id, stageId)}?token=${encodeURIComponent(token)}`, '_blank')
+      window.open(`${kioskAccessPath(activeSession.id, targetStageId)}?token=${encodeURIComponent(token)}`, '_blank')
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
     } finally {
@@ -207,7 +211,7 @@ const LiveMonitorPage = () => {
             variant="secondary"
             size="sm"
             onClick={handleOpenKiosk}
-            disabled={!hasActiveGroup || kioskLoading}
+            disabled={kioskLoading || !activeSession || stages.length === 0}
           >
             <Monitor className="w-4 h-4 mr-1" />
             {kioskLoading ? 'Membuka…' : 'Buka Kiosk'}

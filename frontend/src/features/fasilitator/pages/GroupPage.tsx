@@ -8,9 +8,11 @@ import { kioskAccessPath } from '../../../core/constants/app'
 import { apiRequest } from '../../../core/services/backendClient'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { assessmentService } from '../../../core/services/assessments'
-import { userService } from '../../../core/services/users'
 import { programService } from '../../../core/services/programs'
 import { useConfirmDialog } from '../../../shared/hooks/useConfirmDialog'
+// NOTE: GroupPage intentionally does NOT call userService — GET /api/users is
+// admin-only (RequireRole SUPER_ADMIN, ADMIN). The facilitator PIC name comes
+// from the backend's `facilitator_name` field on each group (Opsi B).
 import { useAuth } from '../../../core/hooks/useAuth'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -86,7 +88,6 @@ const GroupPage = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [completing, setCompleting] = useState(false)
   const [kioskLoading, setKioskLoading] = useState(false)
-  const [facilitatorName, setFacilitatorName] = useState<string | undefined>(undefined)
 
   const fetchData = useCallback(async () => {
     if (!groupId) return
@@ -154,23 +155,6 @@ const GroupPage = () => {
         sessionStage: currentStage,
         isPhotoStage: programStage?.is_photo_stage ?? false,
       })
-
-      // Resolve the group's facilitator name for the info card (Opsi A).
-      if (group.facilitator_id) {
-        try {
-          const users = await userService.getAll({
-            filters: { role: 'FASILITATOR' },
-            limit: 200,
-          })
-          setFacilitatorName(
-            users.data.find((f) => f.id === group.facilitator_id)?.name,
-          )
-        } catch {
-          setFacilitatorName(undefined)
-        }
-      } else {
-        setFacilitatorName(undefined)
-      }
     } catch (err) {
       setError(friendlyError(err))
     } finally {
@@ -305,6 +289,9 @@ const GroupPage = () => {
 
   const { group, participants, programStageName, isPhotoStage } = groupDetail
   const openableStageId = groupDetail.sessionStage?.id ?? groupDetail.group.current_session_stage_id
+  // PIC name is resolved server-side (Opsi B) and sent on each group, so it is
+  // safe for any role that can open this page — no admin-only call needed.
+  const facilitatorName = group.facilitator_name
 
   // Opsi A: a FASILITATOR may act only on groups they own (group.facilitator_id).
   // ADMIN/KOORDINATOR/SUPER_ADMIN bypass (full access). Drives the read-only UI.

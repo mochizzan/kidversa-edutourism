@@ -77,6 +77,7 @@ func main() {
 	// clones Kegiatan into session_substages and LinkParticipant clones scores.
 	sessionUC.SetSubstageRepos(programSubstageRepo, sessionSubstageRepo)
 	sessionUC.SetAssessmentRepo(assessmentRepo)
+	sessionUC.SetUserRepo(userRepo)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, badgeUC)
@@ -87,7 +88,7 @@ func main() {
 	registry := handler.NewRegistry(authHandler)
 	registry.User = handler.NewUserHandler(userUC, jwt, liveSvc)
 	registry.Tenant = handler.NewTenantHandler(tenantUC, jwt)
-	registry.Program = handler.NewProgramHandler(programRepo, contentRepo)
+	registry.Program = handler.NewProgramHandler(programRepo, contentRepo, programSubstageRepo)
 	registry.Content = handler.NewContentHandler(cfg, contentRepo)
 	registry.Session = handler.NewSessionHandler(sessionUC)
 	registry.SessionLifecycle = handler.NewSessionLifecycleHandler(sessionUC)

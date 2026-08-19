@@ -50,8 +50,9 @@ export async function syncStageMeta(
   programService: ProgramService,
   programId: string,
   stageId: string,
+  substageId: string,
 ): Promise<void> {
-  const contents = await programService.getContents(stageId)
+  const contents = await programService.getContents(substageId)
   await programService.updateStage(programId, stageId, {
     content_type: detectContentType(contents),
     duration_minutes: computeDurationMinutes(contents),

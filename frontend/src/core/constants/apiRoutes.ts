@@ -74,12 +74,12 @@ export const API_ROUTES = {
       `/api/programs/${encodeURIComponent(programId)}/stages/reorder`,
     TOGGLE_ACTIVE: (id: string) =>
       `/api/programs/${encodeURIComponent(id)}/toggle-active`,
-    CONTENTS: (stageId: string) =>
-      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents`,
-    CONTENT_DETAIL: (stageId: string, contentId: string) =>
-      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/${encodeURIComponent(contentId)}`,
-    REORDER_CONTENTS: (stageId: string) =>
-      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/reorder`,
+    CONTENTS: (substageId: string) =>
+      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents`,
+    CONTENT_DETAIL: (substageId: string, contentId: string) =>
+      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/${encodeURIComponent(contentId)}`,
+    REORDER_CONTENTS: (substageId: string) =>
+      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/reorder`,
   },
 
   USERS: {
@@ -209,13 +209,11 @@ export const API_ROUTES = {
     UPLOAD: '/api/contents/upload',
     REPLACE_FILE: (id: string) => `/api/contents/${encodeURIComponent(id)}/replace-file`,
     USAGE: (id: string) => `/api/contents/${encodeURIComponent(id)}/usage`,
-    ASSIGN: (stageId: string) =>
-      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/assign`,
-    UNASSIGN: (stageId: string, contentId: string) =>
-      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/${encodeURIComponent(contentId)}`,
-    STAGE_CONTENTS: (stageId: string) =>
-      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents`,
-    REORDER_CONTENTS: (stageId: string) =>
-      `/api/programs/program-stages/${encodeURIComponent(stageId)}/contents/reorder`,
+    ASSIGN: (substageId: string) =>
+      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/assign`,
+    UNASSIGN: (substageId: string, contentId: string) =>
+      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/${encodeURIComponent(contentId)}`,
+    REORDER_CONTENTS: (substageId: string) =>
+      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/reorder`,
   },
 } as const

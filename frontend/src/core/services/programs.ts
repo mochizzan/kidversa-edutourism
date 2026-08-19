@@ -97,18 +97,18 @@ export const programService: ProgramService = {
   reorderStages: (programId, stageIds) =>
     voidRequest('POST', API_ROUTES.PROGRAMS.REORDER_STAGES(programId), { ordered_ids: stageIds }),
 
-  getContents: (stageId) =>
-    arrayRequest<StageContent>('GET', API_ROUTES.PROGRAMS.CONTENTS(stageId)),
+  getContents: (substageId) =>
+    arrayRequest<StageContent>('GET', API_ROUTES.PROGRAMS.CONTENTS(substageId)),
 
-  reorderContents: (stageId, contentIds) =>
-    voidRequest('POST', API_ROUTES.PROGRAMS.REORDER_CONTENTS(stageId), {
+  reorderContents: (substageId, contentIds) =>
+    voidRequest('POST', API_ROUTES.PROGRAMS.REORDER_CONTENTS(substageId), {
       ordered_ids: contentIds,
     }),
 
-  // Junction assignment: attach/detach an existing standalone Content to a stage.
-  assignContent: (stageId, contentId) =>
-    voidRequest('POST', API_ROUTES.CONTENTS.ASSIGN(stageId), { content_id: contentId }),
+  // Junction assignment: attach/detach an existing standalone Content to a Kegiatan (substage).
+  assignContent: (substageId, contentId) =>
+    voidRequest('POST', API_ROUTES.CONTENTS.ASSIGN(substageId), { content_id: contentId }),
 
-  unassignContent: (stageId, contentId) =>
-    voidRequest('DELETE', API_ROUTES.CONTENTS.UNASSIGN(stageId, contentId)),
+  unassignContent: (substageId, contentId) =>
+    voidRequest('DELETE', API_ROUTES.CONTENTS.UNASSIGN(substageId, contentId)),
 }

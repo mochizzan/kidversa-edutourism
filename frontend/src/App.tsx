@@ -159,6 +159,7 @@ function App() {
   useEffect(() => {
     if (isPublicKiosk) {
       setSplashDone(true)
+      setTenantReady(true)
       useAuthStore.setState({ isLoading: false })
       return
     }
