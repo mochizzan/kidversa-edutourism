@@ -151,7 +151,7 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 		}
 		progressBySubstage = make(map[string]entity.GroupStageProgressStatus, len(prog))
 		for i := range prog {
-			progressBySubstage[prog[i].SessionStageID] = prog[i].Status
+			progressBySubstage[prog[i].SessionSubstageID] = prog[i].Status
 		}
 	}
 

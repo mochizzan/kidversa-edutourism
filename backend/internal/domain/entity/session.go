@@ -38,18 +38,18 @@ type SessionGroup struct {
 	FacilitatorID         *string     `json:"facilitator_id,omitempty"`
 }
 
-// GroupStageProgress is the live progress of one group through one session stage.
+// GroupStageProgress is the live progress of one group through one session substage (Kegiatan).
 type GroupStageProgress struct {
 	BaseModel
-	GroupID        string                   `json:"group_id"`
-	SessionStageID string                   `json:"session_stage_id" gorm:"column:session_substage_id"`
-	Status         GroupStageProgressStatus `json:"status"`
-	EnteredAt      *time.Time               `json:"entered_at,omitempty"`
-	CompletedAt    *time.Time               `json:"completed_at,omitempty"`
-	UnlockedBy     *string                  `json:"unlocked_by,omitempty"`
-	UnlockReason   string                   `json:"unlock_reason,omitempty"`
-	LockedBy       *string                  `json:"locked_by,omitempty"`
-	LockedAt       *time.Time               `json:"locked_at,omitempty"`
+	GroupID           string                   `json:"group_id"`
+	SessionSubstageID string                   `json:"session_substage_id" gorm:"column:session_substage_id"`
+	Status            GroupStageProgressStatus `json:"status"`
+	EnteredAt         *time.Time               `json:"entered_at,omitempty"`
+	CompletedAt       *time.Time               `json:"completed_at,omitempty"`
+	UnlockedBy        *string                  `json:"unlocked_by,omitempty"`
+	UnlockReason      string                   `json:"unlock_reason,omitempty"`
+	LockedBy          *string                  `json:"locked_by,omitempty"`
+	LockedAt          *time.Time               `json:"locked_at,omitempty"`
 }
 
 // GroupStageProgressHistory is the append-only audit trail of lock/unlock

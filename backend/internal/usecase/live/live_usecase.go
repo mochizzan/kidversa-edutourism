@@ -88,12 +88,12 @@ const (
 	ActionSkip     OverrideAction = "skip"
 )
 
-// OverrideStage applies a facilitator override to a group-stage and broadcasts it.
-// The session is resolved from the group's owning session. callerTenant is the
-// resolved tenant from the JWT/scope; an owning-tenant mismatch is rejected.
-// actorRole gates the write to the group's owner when the actor is a FASILITATOR
-// (ADMIN/KOORDINATOR/SUPER_ADMIN bypass the ownership check).
-func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, action OverrideAction, actorID, actorRole, callerTenant string) (*entity.GroupStageProgress, error) {
+// OverrideStage applies a facilitator override to a session substage (Kegiatan)
+// and broadcasts it. The session is resolved from the group's owning session.
+// callerTenant is the resolved tenant from the JWT/scope; an owning-tenant
+// mismatch is rejected. actorRole gates the write to the group's owner when the
+// actor is a FASILITATOR (ADMIN/KOORDINATOR/SUPER_ADMIN bypass the ownership check).
+func (s *Service) OverrideStage(ctx context.Context, groupID, substageID string, action OverrideAction, actorID, actorRole, callerTenant string) (*entity.GroupStageProgress, error) {
 	g, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil {
 		return nil, err
@@ -105,9 +105,9 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, stageID string, ac
 		return nil, err
 	}
 	progress, _ := s.repo.GetProgressByGroup(ctx, groupID)
-	p := findProgress(progress, stageID)
+	p := findProgress(progress, substageID)
 	if p == nil {
-		p = &entity.GroupStageProgress{GroupID: groupID, SessionStageID: stageID, Status: entity.ProgressLocked}
+		p = &entity.GroupStageProgress{GroupID: groupID, SessionSubstageID: substageID, Status: entity.ProgressLocked}
 	}
 	now := apputil.Now()
 	p.UnlockedBy = &actorID
@@ -210,7 +210,7 @@ func (s *Service) LockStage(ctx context.Context, groupID, actorID, actorRole, ca
 		if err := s.repo.CreateProgressHistory(ctx, &entity.GroupStageProgressHistory{
 			GroupID:           g.ID,
 			SessionID:         g.SessionID,
-			SessionSubstageID: p.SessionStageID,
+			SessionSubstageID: p.SessionSubstageID,
 			FromStatus:        fromStatus,
 			ToStatus:          string(entity.ProgressLocked),
 			ActorID:           &actorID,
@@ -299,9 +299,9 @@ func (s *Service) publishNotif(ctx context.Context, userID string, ev sse.Event)
 	}
 }
 
-func findProgress(list []entity.GroupStageProgress, stageID string) *entity.GroupStageProgress {
+func findProgress(list []entity.GroupStageProgress, substageID string) *entity.GroupStageProgress {
 	for i := range list {
-		if list[i].SessionStageID == stageID {
+		if list[i].SessionSubstageID == substageID {
 			return &list[i]
 		}
 	}

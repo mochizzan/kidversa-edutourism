@@ -155,8 +155,8 @@ func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, se
 			continue
 		}
 		scored, lerr := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
-			ParticipantID:  participantID,
-			SessionStageID: allSubs[i].ID,
+			ParticipantID:     participantID,
+			SessionSubstageID: allSubs[i].ID,
 		}, 1, 10)
 		if lerr != nil || len(scored.Items) == 0 {
 			allScored = false

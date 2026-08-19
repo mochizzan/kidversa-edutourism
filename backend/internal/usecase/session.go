@@ -252,9 +252,9 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) 
 				for i := range groups {
 					for j := range subs {
 						if cerr := u.sessionRepo.CreateGroupStageProgress(ctx, &entity.GroupStageProgress{
-							GroupID:        groups[i].ID,
-							SessionStageID: subs[j].ID,
-							Status:         entity.ProgressLocked,
+							GroupID:           groups[i].ID,
+							SessionSubstageID: subs[j].ID,
+							Status:            entity.ProgressLocked,
 						}); cerr != nil {
 							return nil, cerr
 						}
@@ -728,7 +728,7 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 		if a.StarRating < 1 {
 			continue
 		}
-		oldSub, gerr := u.sessionSubstages.GetSessionSubstage(ctx, a.SessionStageID)
+		oldSub, gerr := u.sessionSubstages.GetSessionSubstage(ctx, a.SessionSubstageID)
 		if gerr != nil {
 			continue
 		}
@@ -737,14 +737,14 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 			continue
 		}
 		clone := &entity.Assessment{
-			ParticipantID:  participantID,
-			SessionID:      newSessionID,
-			SessionStageID: newSub.ID,
-			StarRating:     a.StarRating,
-			Comment:        a.Comment,
-			AssessedBy:     a.AssessedBy,
-			AssessedAt:     a.AssessedAt,
-			SyncStatus:     entity.SyncSynced,
+			ParticipantID:     participantID,
+			SessionID:         newSessionID,
+			SessionSubstageID: newSub.ID,
+			StarRating:        a.StarRating,
+			Comment:           a.Comment,
+			AssessedBy:        a.AssessedBy,
+			AssessedAt:        a.AssessedAt,
+			SyncStatus:        entity.SyncSynced,
 		}
 		if cerr := u.assessmentRepo.Create(ctx, clone); cerr != nil && !isConflict(cerr) {
 			return cerr

@@ -29,12 +29,12 @@ func NewUsecase(repo repository.AssessmentRepository, badgeUC BadgeEvaluator) *U
 	return &Usecase{repo: repo, badgeUC: badgeUC}
 }
 
-// Upsert creates or updates an assessment keyed on (participant_id, session_stage_id).
+// Upsert creates or updates an assessment keyed on (participant_id, session_substage_id).
 // starRating 0 is a valid "absent/not-yet-scored" marker (DB DEFAULT 1); the
 // contract treats >=1 as scored. actorRole gates the write to the participant's
 // group owner when the actor is a FASILITATOR; ADMIN/KOORDINATOR/SUPER_ADMIN bypass.
 func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy, actorID, actorRole string, assessedAt time.Time, syncStatus string) (*entity.Assessment, error) {
-	if req.ParticipantID == "" || req.SessionStageID == "" {
+	if req.ParticipantID == "" || req.SessionSubstageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
 	}
 	if err := u.assertOwnership(ctx, req.ParticipantID, actorID, actorRole); err != nil {
@@ -47,7 +47,7 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	// participate. It is persisted as 0 (the column allows 0; DEFAULT 1 only
 	// applies when the field is omitted on INSERT). 0 must NOT be coerced to 1 —
 	// that would wrongly mark an absent child as scored and risk awarding badges.
-	existing, err := u.repo.GetByParticipantStage(ctx, req.ParticipantID, req.SessionStageID)
+	existing, err := u.repo.GetByParticipantStage(ctx, req.ParticipantID, req.SessionSubstageID)
 	if err == nil && existing != nil {
 		existing.StarRating = starRating
 		if comment != "" {
@@ -68,14 +68,14 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 		return u.afterUpsert(ctx, existing)
 	}
 	a := &entity.Assessment{
-		ParticipantID:  req.ParticipantID,
-		SessionID:      req.SessionID,
-		SessionStageID: req.SessionStageID,
-		StarRating:     starRating,
-		Comment:        comment,
-		AssessedBy:     assessedBy,
-		AssessedAt:     assessedAt,
-		SyncStatus:     entity.SyncStatus(syncStatus),
+		ParticipantID:     req.ParticipantID,
+		SessionID:         req.SessionID,
+		SessionSubstageID: req.SessionSubstageID,
+		StarRating:        starRating,
+		Comment:           comment,
+		AssessedBy:        assessedBy,
+		AssessedAt:        assessedAt,
+		SyncStatus:        entity.SyncStatus(syncStatus),
 	}
 	if a.AssessedAt.IsZero() {
 		a.AssessedAt = apputil.Now()
@@ -96,7 +96,7 @@ func (u *Usecase) afterUpsert(ctx context.Context, a *entity.Assessment) (*entit
 	if u.badgeUC == nil || a.StarRating < 1 {
 		return a, nil
 	}
-	if err := u.badgeUC.EvaluateAfterAssessment(ctx, a.ParticipantID, a.SessionStageID); err != nil {
+	if err := u.badgeUC.EvaluateAfterAssessment(ctx, a.ParticipantID, a.SessionSubstageID); err != nil {
 		return a, err
 	}
 	return a, nil
@@ -109,7 +109,7 @@ func (u *Usecase) BulkUpsert(ctx context.Context, items []entity.Assessment, act
 	for i := range items {
 		it := items[i]
 		res, err := u.Upsert(ctx,
-			repository.AssessmentFilter{ParticipantID: it.ParticipantID, SessionID: it.SessionID, SessionStageID: it.SessionStageID},
+			repository.AssessmentFilter{ParticipantID: it.ParticipantID, SessionID: it.SessionID, SessionSubstageID: it.SessionSubstageID},
 			it.StarRating, it.Comment, it.AssessedBy, actorID, actorRole, it.AssessedAt, string(it.SyncStatus))
 		if err != nil {
 			return nil, err

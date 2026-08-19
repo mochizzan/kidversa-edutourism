@@ -29,7 +29,7 @@ func (h *AssessmentHandler) Upsert(c *echo.Context) error {
 		return err
 	}
 	a, err := h.uc.Upsert((*c).Request().Context(),
-		repository.AssessmentFilter{ParticipantID: req.ParticipantID, SessionID: req.SessionID, SessionStageID: req.SessionStageID},
+		repository.AssessmentFilter{ParticipantID: req.ParticipantID, SessionID: req.SessionID, SessionSubstageID: req.SessionSubstageID},
 		req.StarRating, req.Comment, req.AssessedBy, appmiddleware.GetUserID(c), appmiddleware.GetRole(c), apputil.ParseISOOrNow(req.AssessedAt), req.SyncStatus)
 	if err != nil {
 		return err
@@ -47,14 +47,14 @@ func (h *AssessmentHandler) BulkUpsert(c *echo.Context) error {
 	for i := range req.Items {
 		it := req.Items[i]
 		items = append(items, entity.Assessment{
-			ParticipantID:  it.ParticipantID,
-			SessionID:      it.SessionID,
-			SessionStageID: it.SessionStageID,
-			StarRating:     it.StarRating,
-			Comment:        it.Comment,
-			AssessedBy:     it.AssessedBy,
-			AssessedAt:     apputil.ParseISOOrNow(it.AssessedAt),
-			SyncStatus:     entity.SyncStatus(it.SyncStatus),
+			ParticipantID:     it.ParticipantID,
+			SessionID:         it.SessionID,
+			SessionSubstageID: it.SessionSubstageID,
+			StarRating:        it.StarRating,
+			Comment:           it.Comment,
+			AssessedBy:        it.AssessedBy,
+			AssessedAt:        apputil.ParseISOOrNow(it.AssessedAt),
+			SyncStatus:        entity.SyncStatus(it.SyncStatus),
 		})
 	}
 	out, err := h.uc.BulkUpsert((*c).Request().Context(), items, appmiddleware.GetUserID(c), appmiddleware.GetRole(c))
@@ -67,9 +67,9 @@ func (h *AssessmentHandler) BulkUpsert(c *echo.Context) error {
 // List handles GET /api/assessments (filter by ?participant_id= or ?session_id=).
 func (h *AssessmentHandler) List(c *echo.Context) error {
 	f := repository.AssessmentFilter{
-		ParticipantID:  (*c).QueryParam("participant_id"),
-		SessionID:      (*c).QueryParam("session_id"),
-		SessionStageID: (*c).QueryParam("session_stage_id"),
+		ParticipantID:     (*c).QueryParam("participant_id"),
+		SessionID:         (*c).QueryParam("session_id"),
+		SessionSubstageID: (*c).QueryParam("session_substage_id"),
 	}
 	page, limit := pagination(c)
 	res, err := h.uc.List((*c).Request().Context(), f, page, limit)

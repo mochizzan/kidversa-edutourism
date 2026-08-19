@@ -2,17 +2,17 @@ package entity
 
 import "time"
 
-// Assessment is a star-rating + comment given to a participant at a session stage.
+// Assessment is a star-rating + comment given to a participant per Kegiatan (session substage).
 type Assessment struct {
 	BaseModel
-	ParticipantID  string     `json:"participant_id"`
-	SessionID      string     `json:"session_id"`
-	SessionStageID string     `json:"session_stage_id" gorm:"column:session_substage_id"`
-	StarRating     int        `json:"star_rating"`
-	Comment        string     `json:"comment,omitempty"`
-	AssessedBy     string     `json:"assessed_by"`
-	AssessedAt     time.Time  `json:"assessed_at"`
-	SyncStatus     SyncStatus `json:"sync_status"`
+	ParticipantID     string     `json:"participant_id"`
+	SessionID         string     `json:"session_id"`
+	SessionSubstageID string     `json:"session_substage_id" gorm:"column:session_substage_id"`
+	StarRating        int        `json:"star_rating"`
+	Comment           string     `json:"comment,omitempty"`
+	AssessedBy        string     `json:"assessed_by"`
+	AssessedAt        time.Time  `json:"assessed_at"`
+	SyncStatus        SyncStatus `json:"sync_status"`
 }
 
 // SmartPhoto is a captured photo of a participant, optionally framed.
