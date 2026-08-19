@@ -19,6 +19,7 @@ type LiveRepository interface {
 	GetProgressBySession(ctx context.Context, sessionID string) ([]entity.GroupStageProgress, error)
 	GetProgressByGroup(ctx context.Context, groupID string) ([]entity.GroupStageProgress, error)
 	UpsertProgress(ctx context.Context, p *entity.GroupStageProgress) error
+	CreateProgressHistory(ctx context.Context, h *entity.GroupStageProgressHistory) error
 
 	// Groups (for current stage + status).
 	GetGroup(ctx context.Context, groupID string) (*entity.SessionGroup, error)
@@ -31,6 +32,13 @@ type LiveRepository interface {
 
 	// TenantIDForSession resolves the owning tenant of a session (for SSE scope checks).
 	TenantIDForSession(ctx context.Context, sessionID string) (string, error)
+
+	// GetSessionStatus returns the lifecycle status of a session (for the
+	// ACTIVE-only guard on lock/unlock writes).
+	GetSessionStatus(ctx context.Context, sessionID string) (entity.SessionStatus, error)
+
+	// ListSessionStagesOrdered returns a session's stages ordered by program sequence.
+	ListSessionStagesOrdered(ctx context.Context, sessionID string) ([]entity.SessionStage, error)
 
 	// Timeline.
 	ListTimeline(ctx context.Context, sessionID string, limit int) ([]entity.TimelineEvent, error)

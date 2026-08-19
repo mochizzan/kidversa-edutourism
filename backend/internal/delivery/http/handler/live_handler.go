@@ -83,6 +83,16 @@ func (h *LiveHandler) Reset(c *echo.Context) error {
 	return appresp.NoContent(c)
 }
 
+// Lock handles POST /groups/:groupId/lock.
+func (h *LiveHandler) Lock(c *echo.Context) error {
+	groupID := (*c).Param("groupId")
+	actorID := appmiddleware.GetUserID(c)
+	if err := h.svc.LockStage((*c).Request().Context(), groupID, actorID, appmiddleware.GetRole(c), appmiddleware.GetTenantID(c)); err != nil {
+		return err
+	}
+	return appresp.NoContent(c)
+}
+
 // PublishEvent handles POST /events (create + broadcast a timeline event).
 func (h *LiveHandler) PublishEvent(c *echo.Context) error {
 	var req dto.LiveEventRequest

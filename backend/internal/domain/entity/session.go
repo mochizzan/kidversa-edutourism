@@ -48,6 +48,21 @@ type GroupStageProgress struct {
 	CompletedAt    *time.Time               `json:"completed_at,omitempty"`
 	UnlockedBy     *string                  `json:"unlocked_by,omitempty"`
 	UnlockReason   string                   `json:"unlock_reason,omitempty"`
+	LockedBy       *string                  `json:"locked_by,omitempty"`
+	LockedAt       *time.Time               `json:"locked_at,omitempty"`
+}
+
+// GroupStageProgressHistory is the append-only audit trail of lock/unlock
+// transitions on a group's session-substage progress.
+type GroupStageProgressHistory struct {
+	BaseModel
+	GroupID           string  `json:"group_id"`
+	SessionID         string  `json:"session_id"`
+	SessionSubstageID string  `json:"session_substage_id"`
+	FromStatus        string  `json:"from_status,omitempty"`
+	ToStatus          string  `json:"to_status"`
+	ActorID           *string `json:"actor_id,omitempty"`
+	Reason            string  `json:"reason,omitempty"`
 }
 
 // Participant is a child (and their parent/guardian) in a session group.

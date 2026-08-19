@@ -128,13 +128,14 @@ const (
 	TimelineGroupProgress  TimelineEventType = "group:progress"
 	TimelineGroupCompleted TimelineEventType = "group:completed"
 	TimelineStageUnlock    TimelineEventType = "stage:unlock"
+	TimelineStageLock      TimelineEventType = "stage:lock"
 	TimelineOverride       TimelineEventType = "override"
 )
 
 // Valid reports whether the timeline event type is one of the schema-enforced values.
 func (t TimelineEventType) Valid() bool {
 	switch t {
-	case TimelineGroupProgress, TimelineGroupCompleted, TimelineStageUnlock, TimelineOverride:
+	case TimelineGroupProgress, TimelineGroupCompleted, TimelineStageUnlock, TimelineStageLock, TimelineOverride:
 		return true
 	}
 	return false

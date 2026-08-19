@@ -136,6 +136,23 @@ func groupStageProgressModelFromEntity(e *entity.GroupStageProgress) *GroupStage
 	return &GroupStageProgressModel{GroupStageProgress: *e}
 }
 
+// GroupStageProgressHistoryModel is the GORM model for lock/unlock audit rows.
+type GroupStageProgressHistoryModel struct {
+	entity.GroupStageProgressHistory
+	DeletedAt gorm.DeletedAt `gorm:"type:datetime(3);index" json:"-"`
+}
+
+func (GroupStageProgressHistoryModel) TableName() string { return "group_stage_progress_history" }
+
+func (m *GroupStageProgressHistoryModel) ToEntity() *entity.GroupStageProgressHistory {
+	e := m.GroupStageProgressHistory
+	return &e
+}
+
+func groupStageProgressHistoryModelFromEntity(e *entity.GroupStageProgressHistory) *GroupStageProgressHistoryModel {
+	return &GroupStageProgressHistoryModel{GroupStageProgressHistory: *e}
+}
+
 // ParticipantModel is the GORM persistence model for participants.
 type ParticipantModel struct {
 	entity.Participant

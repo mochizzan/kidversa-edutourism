@@ -171,6 +171,58 @@ func (s *Service) Reset(ctx context.Context, groupID, actorID, actorRole, caller
 	return nil
 }
 
+// LockStage locks every unlocked session-substage progress row for a group and
+// broadcasts it. Lock/unlock writes are only permitted while the group's owning
+// session is ACTIVE. The operation is idempotent: rows already LOCKED are left
+// untouched. Each transition is recorded in the append-only progress history.
+func (s *Service) LockStage(ctx context.Context, groupID, actorID, actorRole, callerTenant string) error {
+	g, err := s.repo.GetGroup(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
+		return err
+	}
+	if err := assertOwnership(actorRole, g.FacilitatorID, actorID); err != nil {
+		return err
+	}
+	status, err := s.repo.GetSessionStatus(ctx, g.SessionID)
+	if err != nil {
+		return err
+	}
+	if status != entity.SessionActive {
+		return apperrors.Forbidden("session_not_active", errors.New("lock/unlock only allowed in ACTIVE session"))
+	}
+	progress, _ := s.repo.GetProgressByGroup(ctx, groupID)
+	for i := range progress {
+		p := &progress[i]
+		if p.Status == entity.ProgressLocked {
+			continue
+		}
+		fromStatus := string(p.Status)
+		p.Status = entity.ProgressLocked
+		now := apputil.Now()
+		p.LockedAt = &now
+		p.LockedBy = &actorID
+		if err := s.repo.UpsertProgress(ctx, p); err != nil {
+			return err
+		}
+		if err := s.repo.CreateProgressHistory(ctx, &entity.GroupStageProgressHistory{
+			GroupID:           g.ID,
+			SessionID:         g.SessionID,
+			SessionSubstageID: p.SessionStageID,
+			FromStatus:        fromStatus,
+			ToStatus:          string(entity.ProgressLocked),
+			ActorID:           &actorID,
+			Reason:            "lock",
+		}); err != nil {
+			return err
+		}
+		s.publish(ctx, g.SessionID, "stage:lock", p)
+	}
+	return nil
+}
+
 // PublishEvent records + broadcasts an arbitrary live event for a session.
 // callerTenant is the resolved tenant from the JWT/scope; an owning-tenant
 // mismatch is rejected (consistent with Override/Jump/Reset).

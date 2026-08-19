@@ -71,6 +71,8 @@ func (r *GormLiveRepository) UpsertProgress(ctx context.Context, p *entity.Group
 	existing.UnlockReason = m.UnlockReason
 	existing.CompletedAt = m.CompletedAt
 	existing.EnteredAt = m.EnteredAt
+	existing.LockedBy = m.LockedBy
+	existing.LockedAt = m.LockedAt
 	if uerr := r.db.WithContext(ctx).Save(&existing).Error; uerr != nil {
 		return apperrors.Internal("internal_error", uerr)
 	}
@@ -161,5 +163,39 @@ func (r *GormLiveRepository) CreateTimeline(ctx context.Context, e *entity.Timel
 		return apperrors.Internal("internal_error", err)
 	}
 	*e = *m.ToEntity()
+	return nil
+}
+
+func (r *GormLiveRepository) GetSessionStatus(ctx context.Context, sessionID string) (entity.SessionStatus, error) {
+	var st entity.SessionStatus
+	if err := r.db.WithContext(ctx).Raw(
+		"SELECT status FROM sessions WHERE id = ? AND deleted_at IS NULL LIMIT 1",
+		sessionID,
+	).Scan(&st).Error; err != nil {
+		return "", apperrors.Internal("internal_error", err)
+	}
+	return st, nil
+}
+
+func (r *GormLiveRepository) ListSessionStagesOrdered(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
+	var models []SessionStageModel
+	if err := r.db.WithContext(ctx).
+		Joins("JOIN program_stages ON program_stages.id = session_stages.program_stage_id").
+		Where("session_stages.session_id = ?", sessionID).
+		Order("program_stages.sequence_order ASC").
+		Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	out := make([]entity.SessionStage, 0, len(models))
+	for i := range models {
+		out = append(out, *models[i].ToEntity())
+	}
+	return out, nil
+}
+
+func (r *GormLiveRepository) CreateProgressHistory(ctx context.Context, h *entity.GroupStageProgressHistory) error {
+	if err := r.db.WithContext(ctx).Create(groupStageProgressHistoryModelFromEntity(h)).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
 	return nil
 }

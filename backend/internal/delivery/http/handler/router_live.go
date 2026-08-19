@@ -31,6 +31,7 @@ func RegisterLiveRoutes(g *echo.Group, h *LiveHandler, jm *auth.JWTManager, _ *s
 	g.POST("/groups/:groupId/stages/:stageId/skip", h.overrideAction(live.ActionSkip), ov, roles, scope)
 	g.POST("/groups/:groupId/jump", h.Jump, ov, roles, scope)
 	g.POST("/groups/:groupId/reset", h.Reset, ov, roles, scope)
+	g.POST("/groups/:groupId/lock", h.Lock, ov, roles, scope)
 	g.POST("/events", h.PublishEvent, bearer, scope)
 }
 
