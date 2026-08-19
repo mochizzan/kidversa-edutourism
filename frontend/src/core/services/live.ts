@@ -28,7 +28,7 @@ export interface TimelineEventRow {
   id: string
   session_id: string
   group_id: string
-  type: 'group:progress' | 'group:completed' | 'stage:unlock' | 'override'
+  type: 'group:progress' | 'group:completed' | 'stage:unlock' | 'stage:lock' | 'override'
   message: string
   user_id?: string
   created_at: string
@@ -121,29 +121,19 @@ export const liveService = {
     return timeline
   },
 
-  // Facilitator overrides — POST /api/live/groups/:groupId/stages/:stageId/{unlock,complete,skip}
+  // Facilitator overrides — POST /api/live/groups/:groupId/stages/:stageId/{unlock,lock,complete}
   unlockStage: async (groupId: string, sessionStageId: string, userId: string): Promise<void> => {
     await apiRequest('POST', API_ROUTES.LIVE.UNLOCK_STAGE(groupId, sessionStageId), { userId })
     invalidateSnapshot()
   },
 
+  lockStage: async (groupId: string, sessionStageId: string, userId: string): Promise<void> => {
+    await apiRequest('POST', API_ROUTES.LIVE.LOCK_STAGE(groupId, sessionStageId), { userId })
+    invalidateSnapshot()
+  },
+
   completeStage: async (groupId: string, sessionStageId: string): Promise<void> => {
     await apiRequest('POST', API_ROUTES.LIVE.COMPLETE_STAGE(groupId, sessionStageId))
-    invalidateSnapshot()
-  },
-
-  skipStage: async (groupId: string, sessionStageId: string, reason: string, userId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.SKIP_STAGE(groupId, sessionStageId), { reason, userId })
-    invalidateSnapshot()
-  },
-
-  jumpToStage: async (groupId: string, targetStageId: string, reason: string, userId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.JUMP(groupId), { stage_id: targetStageId, reason, userId })
-    invalidateSnapshot()
-  },
-
-  resetProgress: async (groupId: string, reason: string, userId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.RESET(groupId), { reason, userId })
     invalidateSnapshot()
   },
 

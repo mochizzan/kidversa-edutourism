@@ -3,6 +3,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Unlock,
+  Lock,
   AlertTriangle,
 } from 'lucide-react'
 import { cn } from '../../../core/utils'
@@ -32,6 +33,11 @@ const typeConfig: Record<
     dotColor: 'bg-amber-500',
     bgColor: 'bg-amber-100',
     icon: <Unlock className="w-3 h-3 text-amber-600" />,
+  },
+  'stage:lock': {
+    dotColor: 'bg-slate-500',
+    bgColor: 'bg-slate-100',
+    icon: <Lock className="w-3 h-3 text-slate-600" />,
   },
   override: {
     dotColor: 'bg-red-500',

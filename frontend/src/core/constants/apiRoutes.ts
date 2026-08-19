@@ -190,12 +190,10 @@ export const API_ROUTES = {
     TIMELINE: (sessionId: string) => `/api/live/${encodeURIComponent(sessionId)}/timeline`,
     UNLOCK_STAGE: (groupId: string, stageId: string) =>
       `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/unlock`,
+    LOCK_STAGE: (groupId: string, stageId: string) =>
+      `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/lock`,
     COMPLETE_STAGE: (groupId: string, stageId: string) =>
       `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/complete`,
-    SKIP_STAGE: (groupId: string, stageId: string) =>
-      `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/skip`,
-    JUMP: (groupId: string) => `/api/live/groups/${encodeURIComponent(groupId)}/jump`,
-    RESET: (groupId: string) => `/api/live/groups/${encodeURIComponent(groupId)}/reset`,
     EVENTS: '/api/live/events',
   },
 

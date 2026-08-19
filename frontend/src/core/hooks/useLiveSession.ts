@@ -39,8 +39,8 @@ interface SnapshotData {
 
 // The backend SSE channel emits named events. `source.onmessage` only fires for
 // unnamed events, so we must register a listener per event type.
-const STAGE_EVENTS = ['stage:unlock', 'stage:complete', 'stage:skip'] as const
-const GROUP_EVENTS = ['group:jump', 'group:reset'] as const
+const STAGE_EVENTS = ['stage:unlock', 'stage:complete', 'stage:lock'] as const
+const GROUP_EVENTS = [] as const
 const TIMELINE_EVENTS = ['timeline:override', 'timeline:group:progress', 'timeline:group:completed', 'timeline:stage:unlock'] as const
 
 // Best-effort per-group participant map (the SSE snapshot does not include
