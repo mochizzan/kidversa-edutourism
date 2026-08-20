@@ -167,6 +167,10 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	if err := tenantGuard(c, tenantID); err != nil {
 		return err
 	}
+	if !h.tryBeginGenerate(req.SessionID) {
+		return appresp.Fail(c, http.StatusConflict, "already_generating")
+	}
+	defer h.endGenerate(req.SessionID)
 	participants, err := h.sessionRepo.ListParticipants((*c).Request().Context(), req.SessionID, "", tenantID)
 	if err != nil {
 		return err
