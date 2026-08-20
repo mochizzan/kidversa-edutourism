@@ -102,5 +102,6 @@ type ReportApproveRequest struct {
 // ReportGenerateSessionRequest triggers narrative generation for all participants
 // in a session. Creates DRAFT reports for participants that don't have one yet.
 type ReportGenerateSessionRequest struct {
-	SessionID string `json:"session_id" validate:"required,uuid"`
+	SessionID     string `json:"session_id" validate:"required,uuid"`
+	ParticipantID string `json:"participant_id,omitempty" validate:"omitempty,uuid"`
 }
