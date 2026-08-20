@@ -159,6 +159,10 @@ const maxSessionReports = 1000
 // already have one, then runs the narrative generator for all reports in the
 // session concurrently. Returns the full list of reports after generation.
 func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID string, participants []entity.Participant) ([]entity.Report, error) {
+	targetIDs := make(map[string]bool, len(participants))
+	for _, p := range participants {
+		targetIDs[p.ID] = true
+	}
 	if _, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, maxSessionReports); err != nil {
 		return nil, err
 	}
@@ -183,6 +187,9 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 
 	for _, r := range all.Items {
 		if r.AINarrativeDraft != "" {
+			continue
+		}
+		if !targetIDs[r.ParticipantID] {
 			continue
 		}
 		wg.Add(1)
