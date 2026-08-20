@@ -17,6 +17,11 @@ type ReportFilter struct {
 // ReportRepository is the persistence contract for reports + parent access tokens.
 type ReportRepository interface {
 	Create(ctx context.Context, r *entity.Report) error
+	// GetOrCreateDraft returns the existing report (any status) for the given
+	// participant+session, or creates a DRAFT if none exists. The existence check
+	// and insert are a single atomic DB op (ON CONFLICT DO NOTHING) so concurrent
+	// GenerateForSession calls cannot both insert and hit uq_reports_session_participant.
+	GetOrCreateDraft(ctx context.Context, participantID, sessionID string) (*entity.Report, error)
 	GetByID(ctx context.Context, id, tenantID string) (*entity.Report, error)
 	// GetByToken resolves a report by a valid, unrevoked, unexpired parent token.
 	GetByToken(ctx context.Context, token string) (*entity.Report, error)
