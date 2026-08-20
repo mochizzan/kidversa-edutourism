@@ -135,7 +135,7 @@ export function useReportSession(sessionId: string | undefined) {
     }
   }, [sessionId, reports, loadData])
 
-  const handleGenerateOne = useCallback(async (): Promise<boolean> => {
+  const handleGenerateOne = useCallback(async (participantId: string): Promise<boolean> => {
     if (generatingRef.current) return false
     generatingRef.current = true
     if (!sessionId) {
@@ -145,7 +145,7 @@ export function useReportSession(sessionId: string | undefined) {
     setGenError(null)
     setGenerating(true)
     try {
-      await reportService.generate(sessionId)
+      await reportService.generateOne(sessionId, participantId)
       await loadData()
       return true
     } catch (e) {
