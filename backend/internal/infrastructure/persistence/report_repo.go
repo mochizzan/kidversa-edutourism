@@ -43,6 +43,11 @@ func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participant
 			Status:        entity.ReportDraft,
 		},
 	}
+	tok, err := generateConsentToken()
+	if err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	m.ParentAccessToken = tok
 	// Atomic: if (session_id, participant_id) already exists, the insert is skipped
 	// (ON CONFLICT DO NOTHING on uq_reports_session_participant), avoiding the TOCTOU
 	// of the old List->Create pattern.
