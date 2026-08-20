@@ -198,6 +198,13 @@ func (r *GormReportRepository) Update(ctx context.Context, rep *entity.Report) e
 	return nil
 }
 
+// Delete soft-deletes a report. WARNING: because uq_reports_session_participant
+// is a physical unique index, a soft-deleted row still occupies the (session_id,
+// participant_id) slot, while List() filters deleted_at IS NULL and therefore
+// cannot see it. Any future caller that soft-deletes a report will make
+// subsequent GenerateForSession for that participant hit ER_DUP_ENTRY (409).
+// If DELETE /api/reports is ever exposed, this MUST become a HARD delete
+// (db.Unscoped().Delete) or the unique row must be explicitly cleared.
 func (r *GormReportRepository) Delete(ctx context.Context, id string) error {
 	if err := r.db.WithContext(ctx).Delete(&ReportModel{}, "id = ?", id).Error; err != nil {
 		return apperrors.Internal("internal_error", err)

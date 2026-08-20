@@ -35,5 +35,9 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	g.GET("/:id/generate/stream", h.GenerateStreamSSE, streamAuth, scopeMW)
 	g.POST("/:id/approve", h.Approve, authMW, scopeMW)
 	g.POST("/:id/send", h.Send, authMW, scopeMW)
+	// TODO: DELETE /api/reports/:id is not yet exposed. If added, it MUST use a
+	// HARD delete (db.Unscoped().Delete) — the soft-delete in GormReportRepository.Delete
+	// leaves the (session_id, participant_id) row in uq_reports_session_participant and
+	// would make a later GenerateForSession hit ER_DUP_ENTRY (409). See Task 7 invariant.
 	g.POST("/:id/revoke-token", h.RevokeToken, authMW, scopeMW)
 }

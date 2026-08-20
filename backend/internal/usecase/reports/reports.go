@@ -163,6 +163,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 		return nil, err
 	}
 
+	// Atomic via GetOrCreateDraft (Task 2/3); soft-delete invariant documented in Task 7.
 	for _, p := range participants {
 		if _, err := u.repo.GetOrCreateDraft(ctx, p.ID, sessionID); err != nil {
 			return nil, err
