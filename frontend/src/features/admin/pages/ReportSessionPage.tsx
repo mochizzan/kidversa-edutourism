@@ -311,7 +311,7 @@ const ReportSessionPage = () => {
                       <Button
                         size="sm"
                         variant="primary"
-                        disabled={generating}
+                        disabled={generating || item.status !== 'ready_to_generate' || allFinalized}
                         onClick={(e) => {
                           e?.preventDefault()
                           e?.stopPropagation()
