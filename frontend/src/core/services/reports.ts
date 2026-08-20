@@ -29,6 +29,13 @@ const generate = async (sessionId: string): Promise<Report[]> => {
   })
 }
 
+const generateOne = async (sessionId: string, participantId: string): Promise<Report[]> => {
+  return itemsRequest<Report>('POST', API_ROUTES.REPORTS.GENERATE_SESSION, {
+    session_id: sessionId,
+    participant_id: participantId,
+  })
+}
+
 const approve = async (
   reportId: string,
   data?: { narrative_final?: string; mission_ids?: string[] },
@@ -73,6 +80,7 @@ export const reportService: ReportService = {
   getBySession,
   getById,
   generate,
+  generateOne,
   approve,
   send,
   generateNarrativeStream,

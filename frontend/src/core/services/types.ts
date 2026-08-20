@@ -147,6 +147,7 @@ export interface ReportService {
   getBySession(sessionId: string): Promise<Report[]>
   getById(id: string): Promise<Report | null>
   generate(sessionId: string): Promise<Report[]>
+  generateOne: (sessionId: string, participantId: string) => Promise<Report[]>
   approve(
     reportId: string,
     data?: { narrative_final?: string; mission_ids?: string[] },
