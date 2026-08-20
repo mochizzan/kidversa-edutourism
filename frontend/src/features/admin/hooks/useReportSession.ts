@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { sessionService } from '../../../core/services/sessions'
 import { reportService } from '../../../core/services/reports'
 import { assessmentService } from '../../../core/services/assessments'
@@ -36,6 +36,7 @@ export function useReportSession(sessionId: string | undefined) {
   const [generating, setGenerating] = useState(false)
   const [sending, setSending] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+  const generatingRef = useRef(false)
 
   const loadData = useCallback(async () => {
     if (!sessionId) return
@@ -102,7 +103,12 @@ export function useReportSession(sessionId: string | undefined) {
     generatedCount: number
     skippedParticipants: Participant[]
   }> => {
-    if (!sessionId) return { ok: false, generatedCount: 0, skippedParticipants: [] }
+    if (generatingRef.current) return { ok: false, generatedCount: 0, skippedParticipants: [] }
+    generatingRef.current = true
+    if (!sessionId) {
+      generatingRef.current = false
+      return { ok: false, generatedCount: 0, skippedParticipants: [] }
+    }
     setGenError(null)
 
     const eligible = reports.filter((r) => r.status === 'ready_to_generate')
@@ -124,12 +130,18 @@ export function useReportSession(sessionId: string | undefined) {
       setGenError(e instanceof Error ? e.message : 'Gagal generate laporan.')
       return { ok: false, generatedCount: 0, skippedParticipants: skipped }
     } finally {
+      generatingRef.current = false
       setGenerating(false)
     }
   }, [sessionId, reports, loadData])
 
   const handleGenerateOne = useCallback(async (): Promise<boolean> => {
-    if (!sessionId) return false
+    if (generatingRef.current) return false
+    generatingRef.current = true
+    if (!sessionId) {
+      generatingRef.current = false
+      return false
+    }
     setGenError(null)
     setGenerating(true)
     try {
@@ -140,6 +152,7 @@ export function useReportSession(sessionId: string | undefined) {
       setGenError(e instanceof Error ? e.message : 'Gagal generate laporan.')
       return false
     } finally {
+      generatingRef.current = false
       setGenerating(false)
     }
   }, [sessionId, loadData])
