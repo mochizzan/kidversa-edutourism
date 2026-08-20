@@ -433,7 +433,7 @@ const GroupPage = () => {
       >
         <p className="text-sm text-on-surface-variant">
           Apakah Anda yakin ingin menyelesaikan kelompok ini? Semua penilaian akan disimpan dan
-          kelompok akan melanjutkan ke stage berikutnya.
+          kelompok akan melanjutkan ke Topik berikutnya.
         </p>
       </Modal>
     </div>

@@ -247,7 +247,7 @@ const ContentPage = () => {
         {usage.length > 0 && (
           <div className="mt-4 rounded-xl bg-surface-container-low p-3">
             <p className="text-xs font-medium text-on-surface-variant mb-2">
-              Konten ini masih digunakan di {usage.length} stage:
+              Konten ini masih digunakan di {usage.length} topik:
             </p>
             <ul className="space-y-1 text-xs text-on-surface">
               {usage.map((u) => (
@@ -259,7 +259,7 @@ const ContentPage = () => {
               ))}
             </ul>
             <p className="mt-2 text-xs text-on-surface-variant">
-              Menghapus konten akan melepasnya dari semua stage tersebut.
+              Menghapus konten akan melepasnya dari semua topik tersebut.
             </p>
           </div>
         )}

@@ -106,7 +106,7 @@ export function BadgeList({ participantId }: BadgeListProps) {
         <Card>
           <h3 className="text-sm font-semibold text-on-surface mb-3 flex items-center gap-2">
             <Star className="w-4 h-4 text-accent" />
-            Badge SubTopik
+            Badge Topik
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {subtopik.map((b) => (

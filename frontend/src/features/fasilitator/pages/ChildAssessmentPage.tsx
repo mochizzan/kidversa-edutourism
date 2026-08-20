@@ -191,7 +191,7 @@ const ChildAssessmentPage = () => {
         {childDetail.sessionSubstages.length > 0 && (
           <div className="mb-6">
             <label className="block text-sm font-medium text-on-surface mb-2">
-              Kegiatan (SubTopik)
+              Kegiatan
             </label>
             <div className="flex flex-wrap gap-2">
               {childDetail.sessionSubstages.map((k, idx) => {
@@ -260,7 +260,7 @@ const ChildAssessmentPage = () => {
             <Button
               onClick={handleSave}
               loading={saving}
-              disabled={(!isDirty || saving) && isMine}
+              disabled={((!isDirty || saving) || !selectedSubstageId) && isMine}
               icon={<Save className="w-4 h-4" />}
             >
               Simpan Penilaian

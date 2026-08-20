@@ -190,7 +190,7 @@ const MissionFormPage = () => {
           {stages.length > 0 && (
             <div className="w-full">
               <label className="block text-sm font-medium text-on-surface mb-2">
-                Stage Terkait
+                Topik Terkait
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {stages.map((stage) => {

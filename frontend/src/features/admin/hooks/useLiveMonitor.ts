@@ -264,7 +264,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
           activeSession.id,
           '',
           'override',
-          'Lanjut SubTopik — kegiatan diselesaikan',
+          'Kegiatan diselesaikan',
           user.id,
         )
       } catch (err) {

@@ -23,7 +23,7 @@ var systemPromptOnce sync.Once
 // cannot be resolved to a real name (orphaned stage, deleted program stage, or
 // empty name). It must never be an internal ID — leaking UUIDs into the prompt
 // makes the AI echo them back to the reader.
-const defaultStageLabel = "Tahap"
+const defaultStageLabel = "Kegiatan"
 
 // buildAssessmentText renders the assessment block fed to the narrative prompt.
 // It maps each assessment (keyed by its session-substage ID) to its parent
@@ -52,7 +52,7 @@ func buildAssessmentText(assessments *repository.Paginated[entity.Assessment], s
 		if a.StarRating == 0 && a.Comment == "" {
 			continue
 		}
-		text := fmt.Sprintf("Tahap %s: %d bintang", name, a.StarRating)
+		text := fmt.Sprintf("Kegiatan %s: %d bintang", name, a.StarRating)
 		if a.Comment != "" {
 			text += fmt.Sprintf(" — %q", a.Comment)
 		}

@@ -133,7 +133,7 @@ export function KegiatanEditor({
           <EmptyState
             icon={<Plus className="w-12 h-12" />}
             title="Belum ada kegiatan"
-            description="Tambahkan kegiatan untuk SubTopik ini. Konten (materi) ditambahkan di dalam masing-masing kegiatan."
+            description="Tambahkan kegiatan untuk Topik ini. Konten (materi) ditambahkan di dalam masing-masing kegiatan."
           />
         </Card>
       ) : (

@@ -179,7 +179,7 @@ const ParticipantsPage = () => {
           return <Badge variant="neutral">Belum masuk sesi</Badge>
         }
         if (item.assessedCount > 0) {
-          return <Badge variant="success">{item.assessedCount} tahap dinilai</Badge>
+          return <Badge variant="success">{item.assessedCount} topik dinilai</Badge>
         }
         return <Badge variant="warning">Belum dinilai</Badge>
       },

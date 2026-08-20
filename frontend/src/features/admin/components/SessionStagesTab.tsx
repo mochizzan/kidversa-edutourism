@@ -103,7 +103,7 @@ export function SessionStagesTab({ stages, groups, facilitators, stageMap }: Ses
                           {facilitators.find((f) => f.id === id)?.name ?? 'Belum ada fasilitator'}
                           {isFirstStage && waitingIdSet.has(id) && (
                             <span className="text-xs text-on-surface-variant">
-                              (belum di-jump)
+                              (belum masuk Topik)
                             </span>
                           )}
                         </span>

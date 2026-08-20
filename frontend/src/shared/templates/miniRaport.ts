@@ -56,7 +56,7 @@ function stageRowHTML(
           <i class="${iconClass}"></i>
         </div>
         <div>
-          <div class="${cfg.label} font-bold text-[13px] leading-tight">Tahap ${stage.sequenceOrder}</div>
+          <div class="${cfg.label} font-bold text-[13px] leading-tight">Topik ${stage.sequenceOrder}</div>
           <div class="text-brand-purple font-black text-[15px] leading-tight">${stage.name}</div>
         </div>
       </div>
@@ -91,7 +91,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
     ? data.stages
         .map((s, i) => stageRowHTML(s, i, i === data.stages.length - 1))
         .join('')
-    : '<p class="text-sm text-gray-500 italic">Belum ada data tahapan.</p>'
+    : '<p class="text-sm text-gray-500 italic">Belum ada data topik.</p>'
 
   const facilitatorAvatar = data.facilitatorPhotoUrl
     ? `<img src="${data.facilitatorPhotoUrl}" alt="${data.facilitatorName}" class="w-full h-full object-cover rounded-full" />`

@@ -242,7 +242,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
           setFileError(null)
         }}
         options={fileTypes}
-        hint="Format media dari satu konten; boleh berbeda dari Tipe Aktivitas stage."
+        hint="Format media dari satu konten; boleh berbeda dari Tipe Aktivitas topik."
       />
 
       {form.file_type === StageContentFileTypeEnum.VIDEO && (

@@ -139,7 +139,7 @@ export const LiveGroupCard = ({
                     onClick={() => onCompleteKegiatan(k.id)}
                     icon={<Flag className="w-3.5 h-3.5" />}
                   >
-                    Lanjut SubTopik
+                    Selesaikan Kegiatan
                   </Button>
                 )}
               </div>

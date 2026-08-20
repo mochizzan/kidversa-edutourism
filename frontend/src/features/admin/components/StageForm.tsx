@@ -65,7 +65,7 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
       </div>
 
       <BadgeEditor
-        title="Badge SubTopik"
+        title="Badge Topik"
         variant="subtopik"
         name={badgeName}
         imageUrl={badgeImageUrl}
