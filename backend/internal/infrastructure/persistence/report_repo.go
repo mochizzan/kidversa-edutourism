@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -32,6 +33,39 @@ func (r *GormReportRepository) Create(ctx context.Context, rep *entity.Report) e
 	}
 	*rep = *m.ToEntity()
 	return nil
+}
+
+func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participantID, sessionID string) (*entity.Report, error) {
+	m := &ReportModel{
+		Report: entity.Report{
+			ParticipantID: participantID,
+			SessionID:     sessionID,
+			Status:        entity.ReportDraft,
+		},
+	}
+	// Atomic: if (session_id, participant_id) already exists, the insert is skipped
+	// (ON CONFLICT DO NOTHING on uq_reports_session_participant), avoiding the TOCTOU
+	// of the old List->Create pattern.
+	if err := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(m).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	var got ReportModel
+	if err := r.db.WithContext(ctx).
+		Where("session_id = ? AND participant_id = ?", sessionID, participantID).
+		First(&got).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	e := got.ToEntity()
+	reports := []entity.Report{*e}
+	if err := r.loadMissionIDs(ctx, reports); err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return &reports[0], nil
 }
 
 // missionIDRow is a lightweight projection of participant_missions used only to
