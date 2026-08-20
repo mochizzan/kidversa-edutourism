@@ -156,7 +156,7 @@ func (h *BadgeHandler) List(c *echo.Context) error {
 	return appresp.OK(c, items)
 }
 
-// SessionSubstageHandler serves the Live Monitor "Lanjut SubTopik" override at
+// SessionSubstageHandler serves the Live Monitor "Selesaikan Kegiatan" override at
 // POST /api/session-substages/:id/complete (marks a Kegiatan leaf COMPLETED and
 // re-runs per-child badge evaluation) and the facilitator-reachable read route
 // GET /api/session-substages?session_id= (returns the Kegiatan leaves of a
@@ -186,7 +186,7 @@ func (h *SessionSubstageHandler) Complete(c *echo.Context) error {
 }
 
 // ListBySession handles GET /api/session-substages?session_id=: it returns the
-// Kegiatan (session_substages) leaves of a session. The caller must be in the
+// Kegiatan (session Kegiatan) leaves of a session. The caller must be in the
 // session's tenant, and a FASILITATOR must own at least one group in it.
 func (h *SessionSubstageHandler) ListBySession(c *echo.Context) error {
 	sessionID := (*c).QueryParam("session_id")

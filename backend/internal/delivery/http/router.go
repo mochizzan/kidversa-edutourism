@@ -82,7 +82,7 @@ func NewRouter(d Deps) *echo.Echo {
 	// Participant badges (read-only).
 	handler.RegisterBadgesRoutes(api.Group("/badges"), h.Badge, d.JWT, d.Revoker)
 
-	// Session substages (Live Monitor "Lanjut SubTopik" override).
+	// Session substages (Live Monitor "Selesaikan Kegiatan" override).
 	handler.RegisterSessionSubstagesRoutes(api.Group("/session-substages"), h.SessionSubstage, d.JWT, d.Revoker)
 
 	// Contents (standalone, single-source). Stage assign/unassign now live

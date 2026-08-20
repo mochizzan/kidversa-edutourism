@@ -10,7 +10,7 @@ import (
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
-// Usecase awards participant badges (per-Kegiatan SubTopik + cross-session Final).
+// Usecase awards participant badges (per-Kegiatan + cross-session Final).
 type Usecase struct {
 	substageRepo        repository.SessionSubstageRepository
 	programSubstageRepo repository.ProgramSubstageRepository
@@ -36,8 +36,8 @@ func NewUsecase(
 	}
 }
 
-// AwardSubtopikBadge awards (idempotently) a SUBTOPIK badge for the participant
-// on the given program_stage, using the stage's badge_name/badge_image_url. The
+// AwardSubtopikBadge awards (idempotently) a Kegiatan badge for the participant
+// on the given Topik, using the Topik's badge_name/badge_image_url. The
 // unique index uq_participant_subtopik_badge makes re-awarding a no-op.
 func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, programStageID string) (*entity.ParticipantBadge, error) {
 	if participantID == "" || programStageID == "" {
@@ -73,10 +73,10 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 }
 
 // RecomputeFinalBadge awards a FINAL badge for the participant on the program
-// once every SubTopik of the program has an awarded SUBTOPIK badge for the
+// once every Kegiatan of the program has an awarded Kegiatan badge for the
 // participant. Enforces exactly one FINAL per (participant, program). Returns
 // the badge (existing or newly created). Returns (nil, nil) when not all
-// SubTopik are completed yet (not an error).
+// Kegiatan are completed yet (not an error).
 func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, programID string) (*entity.ParticipantBadge, error) {
 	if participantID == "" || programID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
@@ -96,7 +96,7 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 	for i := range stages {
 		got, gerr := u.substageRepo.ListBadgesByParticipantStage(ctx, participantID, stages[i].ID)
 		if gerr != nil || len(got) == 0 {
-			// Not all SubTopik completed yet.
+			// Not all Kegiatan completed yet.
 			return nil, nil
 		}
 	}
@@ -125,10 +125,10 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 }
 
 // EvaluateAfterAssessment is called by the assessment usecase after a successful
-// upsert with star >= 1. It resolves the scored Kegiatan (session_substage) to
-// its SubTopik, checks whether ALL Kegiatan of that SubTopik (within the same
-// session stage) are now scored (star >= 1) for the participant, and if so
-// awards the SubTopik badge and recomputes the cross-session Final badge.
+// upsert with star >= 1. It resolves the scored Kegiatan (session Kegiatan) to
+// its Topik, checks whether ALL Kegiatan of that Topik (within the same
+// session Topik) are now scored (star >= 1) for the participant, and if so
+// awards the Kegiatan badge and recomputes the cross-session Final badge.
 // Errors are returned so the caller may log; the assessment itself already saved.
 func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, sessionSubstageID string) error {
 	if participantID == "" || sessionSubstageID == "" {
@@ -144,7 +144,7 @@ func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, se
 	}
 	programStageID := progSub.ProgramStageID
 
-	// All Kegiatan (session_substages) of this SubTopik in this session stage.
+	// All Kegiatan (session Kegiatan) of this Topik in this session Topik.
 	allSubs, err := u.substageRepo.ListSessionSubstages(ctx, sub.SessionID)
 	if err != nil {
 		return err
@@ -189,10 +189,10 @@ func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, se
 	return err
 }
 
-// CompleteSessionSubstage is the Live Monitor "Lanjut SubTopik" override: it
+// CompleteSessionSubstage is the Live Monitor "Selesaikan Kegiatan" override: it
 // marks a Kegiatan leaf (session_substage) COMPLETED and re-runs per-child badge
 // evaluation for every enrolled participant of the session. Completion is forced,
-// but fairness is preserved — a child only receives the SubTopik badge if ALL
+// but fairness is preserved — a child only receives the Kegiatan badge if ALL
 // their Kegiatan are actually scored (star >= 1); an absent child (0) gets none.
 // callerTenant enforces tenant isolation (a mismatch returns forbidden).
 func (u *Usecase) CompleteSessionSubstage(ctx context.Context, sessionSubstageID, callerTenant string) error {
