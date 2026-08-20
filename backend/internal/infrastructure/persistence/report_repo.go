@@ -53,12 +53,35 @@ func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participant
 	}
 	var got ReportModel
 	if err := r.db.WithContext(ctx).
+		Unscoped().
 		Where("session_id = ? AND participant_id = ?", sessionID, participantID).
 		First(&got).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.NotFound("not_found", err)
+			// True absence: create using the ORIGINALLY-built m (NOT the zero-value got) — A4 errata.
+			if cerr := r.db.WithContext(ctx).Create(m).Error; cerr != nil {
+				return nil, apperrors.Internal("internal_error", cerr)
+			}
+			got = *m
+		} else {
+			return nil, apperrors.Internal("internal_error", err)
 		}
-		return nil, apperrors.Internal("internal_error", err)
+	}
+	if got.DeletedAt.Valid {
+		// Tombstone: reactivate (free the physical unique slot, reset draft state).
+		if uerr := r.db.WithContext(ctx).
+			Model(&ReportModel{}).
+			Where("id = ?", got.ID).
+			Updates(map[string]interface{}{
+				"deleted_at":         gorm.DeletedAt{},
+				"status":             entity.ReportDraft,
+				"ai_narrative_draft": "",
+				"ai_narrative_final": "",
+			}).Error; uerr != nil {
+			return nil, apperrors.Internal("internal_error", uerr)
+		}
+		if rerr := r.db.WithContext(ctx).Where("id = ?", got.ID).First(&got).Error; rerr != nil {
+			return nil, apperrors.Internal("internal_error", rerr)
+		}
 	}
 	e := got.ToEntity()
 	reports := []entity.Report{*e}
@@ -198,15 +221,12 @@ func (r *GormReportRepository) Update(ctx context.Context, rep *entity.Report) e
 	return nil
 }
 
-// Delete soft-deletes a report. WARNING: because uq_reports_session_participant
-// is a physical unique index, a soft-deleted row still occupies the (session_id,
-// participant_id) slot, while List() filters deleted_at IS NULL and therefore
-// cannot see it. Any future caller that soft-deletes a report will make
-// subsequent GenerateForSession for that participant hit ER_DUP_ENTRY (409).
-// If DELETE /api/reports is ever exposed, this MUST become a HARD delete
-// (db.Unscoped().Delete) or the unique row must be explicitly cleared.
+// Delete hard-deletes a report so the physical (session_id, participant_id)
+// unique slot is freed. A soft-delete would leave the tombstone occupying the
+// slot (uq_reports_session_participant is a physical unique index), blocking a
+// later GenerateForSession for that participant with ER_DUP_ENTRY (409).
 func (r *GormReportRepository) Delete(ctx context.Context, id string) error {
-	if err := r.db.WithContext(ctx).Delete(&ReportModel{}, "id = ?", id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Unscoped().Delete(&ReportModel{}, "id = ?", id).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
