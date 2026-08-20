@@ -12,6 +12,7 @@ import (
 	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
@@ -166,6 +167,38 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	tenantID := appmiddleware.GetTenantID(c)
 	if err := tenantGuard(c, tenantID); err != nil {
 		return err
+	}
+	if req.ParticipantID != "" {
+		if !h.tryBeginGenerate(req.SessionID) {
+			return appresp.Fail(c, http.StatusConflict, "already_generating")
+		}
+		parts, lerr := h.sessionRepo.ListParticipants((*c).Request().Context(), req.SessionID, "", tenantID)
+		if lerr != nil {
+			h.endGenerate(req.SessionID)
+			return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
+		}
+		var one *entity.Participant
+		for i := range parts {
+			if parts[i].ID == req.ParticipantID {
+				one = &parts[i]
+				break
+			}
+		}
+		if one == nil {
+			h.endGenerate(req.SessionID)
+			return appresp.FailMsg(c, http.StatusNotFound, "participant_not_in_session", "Peserta tidak terdaftar di sesi ini")
+		}
+		if !h.tryBeginGenerate(req.SessionID + ":" + req.ParticipantID) {
+			h.endGenerate(req.SessionID)
+			return appresp.Fail(c, http.StatusConflict, "already_generating")
+		}
+		defer h.endGenerate(req.SessionID + ":" + req.ParticipantID)
+		defer h.endGenerate(req.SessionID)
+		reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, tenantID, []entity.Participant{*one})
+		if err != nil {
+			return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
+		}
+		return appresp.OK(c, dto.NewReportListResponse(reports))
 	}
 	if !h.tryBeginGenerate(req.SessionID) {
 		return appresp.Fail(c, http.StatusConflict, "already_generating")
