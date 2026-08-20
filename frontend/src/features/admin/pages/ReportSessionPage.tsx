@@ -63,6 +63,8 @@ const ReportSessionPage = () => {
         (r.report.status === ReportStatus.APPROVED || r.report.status === ReportStatus.SENT),
     )
 
+  const allHaveReport = reports.length > 0 && reports.every((r) => r.report)
+
   const [generateResult, setGenerateResult] = useState<{
     generatedCount: number
     skippedParticipants: Participant[]
@@ -79,18 +81,16 @@ const ReportSessionPage = () => {
     }
   }
 
-  const onGenerateOne = async (participantId: string) => {
-    const item = reports.find((r) => r.participant.id === participantId)
-    if (!item || item.report || item.status !== 'ready_to_generate') return
-    await handleGenerateOne()
+  const onGenerateOne = (participantId: string) => {
+    const item = reports.find((r) => r.participant?.id === participantId)
+    if (item?.report || item?.status !== 'ready_to_generate') return
+    handleGenerateOne(participantId)
   }
 
   const onSend = async () => {
     const ok = await handleSendAll()
     if (ok) setShowConfirmSend(false)
   }
-
-  const hasEligibleParticipants = reports.some((r) => r.status === 'ready_to_generate')
 
   if (loading) {
     return (
@@ -174,7 +174,7 @@ const ReportSessionPage = () => {
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={onGenerate}
-          disabled={generating || !hasEligibleParticipants || allFinalized}
+          disabled={generating || allFinalized || reports.length === 0}
         >
           {generating ? (
             <>
@@ -183,7 +183,11 @@ const ReportSessionPage = () => {
           ) : (
             <>
               <FileText className="w-4 h-4 mr-2" />
-              {reports.length === 0 ? 'Generate Laporan' : 'Generate Ulang'}
+              {reports.length === 0
+                ? 'Generate Semua'
+                : allHaveReport
+                  ? 'Generate Ulang'
+                  : 'Generate Semua'}
             </>
           )}
         </Button>
