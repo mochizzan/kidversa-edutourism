@@ -79,7 +79,7 @@ func (s *Service) Snapshot(ctx context.Context, sessionID, callerTenant string) 
 	return &LiveSnapshot{Groups: wrapped, Progress: progress, Timeline: timeline}, nil
 }
 
-// OverrideAction is a facilitator override on a group-stage.
+// OverrideAction is a facilitator override on a group Kegiatan.
 type OverrideAction string
 
 const (
@@ -88,7 +88,7 @@ const (
 	ActionSkip     OverrideAction = "skip"
 )
 
-// OverrideStage applies a facilitator override to a session substage (Kegiatan)
+// OverrideStage applies a facilitator override to a session Kegiatan
 // and broadcasts it. The session is resolved from the group's owning session.
 // callerTenant is the resolved tenant from the JWT/scope; an owning-tenant
 // mismatch is rejected. actorRole gates the write to the group's owner when the
@@ -128,7 +128,7 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, substageID string,
 	return p, nil
 }
 
-// Jump moves a group to a session stage (updates its current stage).
+// Jump moves a group to a session Topik (updates its current Topik).
 // actorRole gates the write to the group's owner when the actor is a FASILITATOR.
 func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID, actorRole, callerTenant string) error {
 	g, err := s.repo.GetGroup(ctx, groupID)
@@ -149,7 +149,7 @@ func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID, actorRole
 	return nil
 }
 
-// Reset clears a group's current stage (back to waiting).
+// Reset clears a group's current Topik (back to waiting).
 // actorRole gates the write to the group's owner when the actor is a FASILITATOR.
 func (s *Service) Reset(ctx context.Context, groupID, actorID, actorRole, callerTenant string) error {
 	g, err := s.repo.GetGroup(ctx, groupID)
@@ -171,7 +171,7 @@ func (s *Service) Reset(ctx context.Context, groupID, actorID, actorRole, caller
 	return nil
 }
 
-// LockStage locks every unlocked session-substage progress row for a group and
+// LockStage locks every unlocked session Kegiatan progress row for a group and
 // broadcasts it. Lock/unlock writes are only permitted while the group's owning
 // session is ACTIVE. The operation is idempotent: rows already LOCKED are left
 // untouched. Each transition is recorded in the append-only progress history.

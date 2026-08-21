@@ -19,15 +19,15 @@ var promptFS embed.FS
 var systemPromptCached string
 var systemPromptOnce sync.Once
 
-// defaultStageLabel is the fallback label used when an assessment's stage
-// cannot be resolved to a real name (orphaned stage, deleted program stage, or
+// defaultStageLabel is the fallback label used when an assessment's Kegiatan
+// cannot be resolved to a real name (orphaned Kegiatan, deleted Topik, or
 // empty name). It must never be an internal ID — leaking UUIDs into the prompt
 // makes the AI echo them back to the reader.
 const defaultStageLabel = "Kegiatan"
 
 // buildAssessmentText renders the assessment block fed to the narrative prompt.
-// It maps each assessment (keyed by its session-substage ID) to its parent
-// program stage for a human-readable name and stable ordering, and drops
+// It maps each assessment (keyed by its session Kegiatan ID) to its parent
+// Topik for a human-readable name and stable ordering, and drops
 // uninformative rows (no rating and no comment). The mapping is built by the
 // callers from sessionStages + sessionSubstages + programStages so no internal
 // UUIDs leak.
@@ -70,10 +70,10 @@ func buildAssessmentText(assessments *repository.Paginated[entity.Assessment], s
 	return strings.Join(out, "\n")
 }
 
-// buildStageBySubstageID resolves each session substage (Kegiatan) of a session
-// to its parent program stage (SubTopik). Assessments are keyed by
-// session-substage ID, so this lets buildAssessmentText print the real stage
-// name instead of the "Tahap" fallback. Returns an empty (non-nil) map when
+// buildStageBySubstageID resolves each session Kegiatan of a session
+// to its parent Topik. Assessments are keyed by
+// session Kegiatan ID, so this lets buildAssessmentText print the real
+// Topik name instead of the "Kegiatan" fallback. Returns an empty (non-nil) map when
 // the substage repo is unwired, preserving prior behaviour.
 func (g *OpenRouterNarrativeGenerator) buildStageBySubstageID(ctx context.Context, sessionID, programID string) (map[string]entity.ProgramStage, error) {
 	stageBySubstageID := make(map[string]entity.ProgramStage)
@@ -88,8 +88,8 @@ func (g *OpenRouterNarrativeGenerator) buildStageBySubstageID(ctx context.Contex
 	for _, ps := range programStages {
 		stageByProgramID[ps.ID] = ps
 	}
-	// sub.SessionStageID is a session_stages ID, so it must be bridged through
-	// the session stage to reach its program_stages row.
+	// sub.SessionStageID is a session Topik ID, so it must be bridged through
+	// the session Topik to reach its program Topik row.
 	sessionStages, err := g.sessionRepo.ListSessionStages(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("fetch session stages: %w", err)
@@ -159,9 +159,9 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID, t
 		return "", fmt.Errorf("fetch session: %w", err)
 	}
 
-	// Bridge session-substage IDs -> their parent program stage so each
-	// assessment (keyed by session-substage ID) resolves to a real name + order
-	// instead of the fallback "Tahap" label.
+	// Bridge session Kegiatan IDs -> their parent Topik so each
+	// assessment (keyed by session Kegiatan ID) resolves to a real name + order
+	// instead of the fallback "Kegiatan" label.
 	stageBySubstageID, err := g.buildStageBySubstageID(ctx, r.SessionID, session.ProgramID)
 	if err != nil {
 		return "", err
@@ -221,9 +221,9 @@ func (g *OpenRouterNarrativeGenerator) StreamGenerate(ctx context.Context, repor
 		return "", fmt.Errorf("fetch session: %w", err)
 	}
 
-	// Bridge session-substage IDs -> their parent program stage so each
-	// assessment (keyed by session-substage ID) resolves to a real name + order
-	// instead of the fallback "Tahap" label.
+	// Bridge session Kegiatan IDs -> their parent Topik so each
+	// assessment (keyed by session Kegiatan ID) resolves to a real name + order
+	// instead of the fallback "Kegiatan" label.
 	stageBySubstageID, err := g.buildStageBySubstageID(ctx, r.SessionID, session.ProgramID)
 	if err != nil {
 		return "", err

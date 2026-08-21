@@ -67,7 +67,6 @@ export function SessionStagesTab({ stages, groups, facilitators, stageMap }: Ses
             )
           : []
         const facilitatorIds = Array.from(new Set([...atStageIds, ...waitingIds]))
-        const waitingIdSet = new Set(waitingIds)
           return (
             <Card key={stage.id} padding="sm">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -101,11 +100,6 @@ export function SessionStagesTab({ stages, groups, facilitators, stageMap }: Ses
                         >
                           <UserIcon className="w-3.5 h-3.5 text-on-surface-variant" />
                           {facilitators.find((f) => f.id === id)?.name ?? 'Belum ada fasilitator'}
-                          {isFirstStage && waitingIdSet.has(id) && (
-                            <span className="text-xs text-on-surface-variant">
-                              (belum masuk Topik)
-                            </span>
-                          )}
                         </span>
                       ))}
                     </div>

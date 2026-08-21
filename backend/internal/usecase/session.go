@@ -9,21 +9,21 @@ import (
 	"kidversa-edutourism-backend/internal/pkg/util"
 )
 
-// ProgramStageReader provides read-only access to program stages.
-// SessionUsecase uses this to clone program stages into session stages
+// ProgramStageReader provides read-only access to Topik.
+// SessionUsecase uses this to clone Topik into session Topik
 // during session creation (Interface Segregation Principle).
 type ProgramStageReader interface {
 	ListStages(ctx context.Context, programID string) ([]entity.ProgramStage, error)
 }
 
-// ProgramSubstageReader provides read-only access to program substages (Kegiatan).
-// SessionUsecase uses this to clone program substages into session substages
+// ProgramSubstageReader provides read-only access to Kegiatan.
+// SessionUsecase uses this to clone Kegiatan into session Kegiatan
 // during session creation.
 type ProgramSubstageReader interface {
 	ListSubstages(ctx context.Context, programStageID string) ([]entity.ProgramSubstage, error)
 }
 
-// SessionUsecase orchestrates session + stages + groups + participants business logic.
+// SessionUsecase orchestrates session + Topik + groups + participants business logic.
 type SessionUsecase struct {
 	sessionRepo      repository.SessionRepository
 	programStages    ProgramStageReader
@@ -38,9 +38,9 @@ func NewSessionUsecase(sessionRepo repository.SessionRepository, programStages P
 	return &SessionUsecase{sessionRepo: sessionRepo, programStages: programStages}
 }
 
-// SetSubstageRepos injects the program-substage reader and session-substage repo
-// used for substage cloning in CreateSession. Kept separate from the constructor
-// to avoid perturbing existing call sites while the substage feature lands.
+// SetSubstageRepos injects the program Kegiatan reader and session Kegiatan repo
+// used for Kegiatan cloning in CreateSession. Kept separate from the constructor
+// to avoid perturbing existing call sites while the Kegiatan feature lands.
 func (u *SessionUsecase) SetSubstageRepos(programSubstages ProgramSubstageReader, sessionSubstages repository.SessionSubstageRepository) {
 	u.programSubstages = programSubstages
 	u.sessionSubstages = sessionSubstages
@@ -110,9 +110,9 @@ func (u *SessionUsecase) CreateSession(ctx context.Context, tenantID, createdBy 
 	if err != nil {
 		return nil, err
 	}
-	// Clone program substages (Kegiatan) into session_substages so each
+	// Clone Kegiatan into session Kegiatan so each
 	// participant has a concrete leaf to assess. Runs after the session tx
-	// commits (s.ID is now populated); the substage repos are wired
+	// commits (s.ID is now populated); the Kegiatan repos are wired
 	// optionally, so a missing wiring simply skips cloning.
 	if u.programSubstages != nil && u.sessionSubstages != nil {
 		if cerr := u.cloneSubstages(ctx, s.ID, programID); cerr != nil {
@@ -200,7 +200,7 @@ func (u *SessionUsecase) UpdateSession(ctx context.Context, id, tenantID, progra
 	return s, nil
 }
 
-// StartSession transitions a session DRAFT -> ACTIVE (cascades stages to ACTIVE).
+// StartSession transitions a session DRAFT -> ACTIVE (cascades Topik to ACTIVE).
 func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
 	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
@@ -228,11 +228,11 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) 
 			}
 		}
 	}
-	// Seed a LOCKED progress row for every (group, session_substage) pair so the
-	// live monitor renders real per-stage state instead of treating every group
+	// Seed a LOCKED progress row for every (group, session Kegiatan) pair so the
+	// live monitor renders real per-Kegiatan state instead of treating every group
 	// as locked. group_stage_progress.session_substage_id is an FK to
-	// session_substages (the Kegiatan leaf), so seed per substage — not per
-	// session_stage. session_substages is populated on CreateSession via
+	// session Kegiatan (the Kegiatan leaf), so seed per Kegiatan — not per
+	// session Topik. session Kegiatan is populated on CreateSession via
 	// cloneSubstages; skip gracefully when it is unwired or empty (idempotent).
 	if u.sessionSubstages != nil {
 		subs, serr := u.sessionSubstages.ListSessionSubstages(ctx, id)
@@ -302,7 +302,7 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID strin
 	return s, nil
 }
 
-// CancelSession transitions a session to CANCELLED and cancels its stages.
+// CancelSession transitions a session to CANCELLED and cancels its Topik.
 func (u *SessionUsecase) CancelSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
 	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
@@ -347,7 +347,7 @@ func (u *SessionUsecase) DeleteSession(ctx context.Context, id, tenantID string)
 	return u.sessionRepo.DeleteSession(ctx, id)
 }
 
-// GetStages lists the session stages.
+// GetStages lists the session Topik.
 func (u *SessionUsecase) GetStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
 	return u.sessionRepo.ListSessionStages(ctx, sessionID)
 }
@@ -545,7 +545,7 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	}
 	// Audit-friendly migration: clone the old participant's already-scored
 	// (star >= 1) assessments onto the new participant in the new session,
-	// remapped to the new session's session_substages (same Kegiatan leaf).
+	// remapped to the new session's session Kegiatan (same Kegiatan leaf).
 	// Best-effort and non-fatal: the link already succeeded, so a clone error
 	// must not lose the result. Only runs when both repos are wired.
 	_ = u.cloneScoredAssessments(ctx, participantID, prevSessionID, sessionID)
@@ -635,11 +635,11 @@ func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID, _
 }
 
 // EnsureSessionSubstages guarantees a session has its Kegiatan leaves
-// (session_substages) cloned from the program, so the kiosk/live monitor always
-// have per-leaf content to render. Sessions created before substage cloning
+// (session Kegiatan) cloned from the program, so the kiosk/live monitor always
+// have per-leaf content to render. Sessions created before Kegiatan cloning
 // landed (or whose clone was skipped) would otherwise show an empty kiosk.
-// Idempotent: when session_substages already exist it returns immediately.
-// No-op when the substage repos are unwired.
+// Idempotent: when session Kegiatan already exist it returns immediately.
+// No-op when the Kegiatan repos are unwired.
 func (u *SessionUsecase) EnsureSessionSubstages(ctx context.Context, sessionID string) error {
 	if u.programSubstages == nil || u.sessionSubstages == nil {
 		return nil
@@ -658,10 +658,10 @@ func (u *SessionUsecase) EnsureSessionSubstages(ctx context.Context, sessionID s
 	return u.cloneSubstages(ctx, sessionID, s.ProgramID)
 }
 
-// cloneSubstages materializes one session_substages row (status WAITING) per
-// program_substage of every cloned session stage. It lists the freshly created
-// session stages for the session, then for each program stage's Kegiatan creates
-// a WAITING session_substage under the matching session stage. Idempotent: a
+// cloneSubstages materializes one session Kegiatan row (status WAITING) per
+// program Kegiatan of every cloned session Topik. It lists the freshly created
+// session Topik for the session, then for each Topik's Kegiatan creates
+// a WAITING session Kegiatan under the matching session Topik. Idempotent: a
 // duplicate-key conflict (unique (session_id, program_substage_id)) is ignored.
 func (u *SessionUsecase) cloneSubstages(ctx context.Context, sessionID, programID string) error {
 	programStages, err := u.programStages.ListStages(ctx, programID)

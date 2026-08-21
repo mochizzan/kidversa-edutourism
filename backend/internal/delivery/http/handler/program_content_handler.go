@@ -29,7 +29,7 @@ func (h *ProgramHandler) ListContents(c *echo.Context) error {
 	return appresp.OK(c, items)
 }
 
-// stageTenantID resolves the owning tenant of a stage via stage -> program.
+// stageTenantID resolves the owning tenant of a Topik via Topik -> program.
 func (h *ProgramHandler) stageTenantID(ctx context.Context, stageID string) string {
 	stage, err := h.repo.GetStageByID(ctx, stageID)
 	if err != nil {
@@ -45,8 +45,8 @@ func (h *ProgramHandler) stageTenantID(ctx context.Context, stageID string) stri
 	return *program.TenantID
 }
 
-// substageTenantID resolves the owning tenant of a substage via
-// substage -> stage -> program.
+// substageTenantID resolves the owning tenant of a Kegiatan via
+// Kegiatan -> Topik -> program.
 func (h *ProgramHandler) substageTenantID(ctx context.Context, substage *entity.ProgramSubstage) string {
 	return h.stageTenantID(ctx, substage.ProgramStageID)
 }
@@ -67,7 +67,7 @@ func (h *ProgramHandler) AssignContent(c *echo.Context) error {
 		return err
 	}
 	tenantID := h.substageTenantID((*c).Request().Context(), substage)
-	// E13: the content must belong to the same tenant as the substage's program.
+	// E13: the content must belong to the same tenant as the Kegiatan's program.
 	if !h.contentBelongsToTenant((*c).Request().Context(), req.ContentID, tenantID) {
 		return appresp.Fail(c, http.StatusForbidden, "content_tenant_mismatch")
 	}
@@ -120,8 +120,8 @@ func (h *ProgramHandler) ReorderContents(c *echo.Context) error {
 }
 
 // contentBelongsToTenant reports whether the standalone content's owning tenant
-// matches the stage's tenant (E13 cross-tenant guard). An unassigned content
-// (no stage) resolves to an empty tenant and is rejected by the mismatch check.
+// matches the Topik's tenant (E13 cross-tenant guard). An unassigned content
+// (no Topik) resolves to an empty tenant and is rejected by the mismatch check.
 func (h *ProgramHandler) contentBelongsToTenant(ctx context.Context, contentID, stageTenant string) bool {
 	if stageTenant == "" {
 		return false

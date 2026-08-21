@@ -2,7 +2,7 @@ package entity
 
 import "time"
 
-// SessionSubstageStatus is the lifecycle state of a session substage.
+// SessionSubstageStatus is the lifecycle state of a session Kegiatan.
 type SessionSubstageStatus string
 
 const (
@@ -11,7 +11,7 @@ const (
 	SessionSubstageCompleted SessionSubstageStatus = "COMPLETED"
 )
 
-// ProgramSubstage is an assessed leaf ("Kegiatan") under a program stage.
+// ProgramSubstage is an assessed leaf ("Kegiatan") under a Topik.
 type ProgramSubstage struct {
 	BaseModel
 	ProgramStageID  string `json:"program_stage_id"`
@@ -22,7 +22,7 @@ type ProgramSubstage struct {
 	IsPhotoStage    bool   `json:"is_photo_stage"`
 }
 
-// SessionSubstage is an instantiation of a program substage within a session.
+// SessionSubstage is an instantiation of a Kegiatan within a session.
 type SessionSubstage struct {
 	BaseModel
 	SessionID         string                `json:"session_id"`
@@ -33,7 +33,7 @@ type SessionSubstage struct {
 	CompletedAt       *time.Time            `json:"completed_at,omitempty"`
 }
 
-// BadgeType discriminates a participant badge as a per-SubTopik award or the
+// BadgeType discriminates a participant badge as a per-Kegiatan award or the
 // cross-session Final program award.
 const (
 	BadgeTypeSubtopik = "SUBTOPIK"

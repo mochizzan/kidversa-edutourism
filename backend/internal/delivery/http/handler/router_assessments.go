@@ -11,8 +11,9 @@ import (
 func RegisterAssessmentRoutes(g *echo.Group, h *AssessmentHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	scopeMW := appmiddleware.TenantScope()
-	g.POST("/upsert", h.Upsert, authMW, scopeMW)
-	g.POST("/bulk-upsert", h.BulkUpsert, authMW, scopeMW)
-	g.GET("", h.List, authMW, scopeMW)
-	g.DELETE("/:id", h.Delete, authMW, scopeMW)
+	roleMW := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR", "FASILITATOR")
+	g.POST("/upsert", h.Upsert, authMW, roleMW, scopeMW)
+	g.POST("/bulk-upsert", h.BulkUpsert, authMW, roleMW, scopeMW)
+	g.GET("", h.List, authMW, roleMW, scopeMW)
+	g.DELETE("/:id", h.Delete, authMW, roleMW, scopeMW)
 }

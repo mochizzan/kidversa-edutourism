@@ -41,3 +41,13 @@ func isDuplicate(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "duplicate") || strings.Contains(msg, "1062") || strings.Contains(msg, "er_dup_entry")
 }
+
+// isSchemaDrift reports whether err is a MySQL/MariaDB schema-drift error
+// (e.g. unknown column after a migration was skipped).
+func isSchemaDrift(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "1054") || strings.Contains(msg, "unknown column")
+}

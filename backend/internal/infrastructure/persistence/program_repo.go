@@ -178,10 +178,10 @@ func (r *GormProgramRepository) ReorderStages(ctx context.Context, _ string, ord
 }
 
 // ListStageContents returns the JOIN-shaped StageContent list for a program
-// substage (Kegiatan). Content ownership lives in ContentRepository; this
+// Kegiatan. Content ownership lives in ContentRepository; this
 // reuses the stage_contents + contents JOIN logic against the v4 column
 // program_substage_id (content is now owned by the Kegiatan leaf, not the
-// SubTopik stage). stageID is the program_substage_id.
+// Topik). stageID is the program_substage_id.
 func (r *GormProgramRepository) ListStageContents(ctx context.Context, substageID string) ([]entity.StageContent, error) {
 	type joinRow struct {
 		ContentID         string

@@ -7,11 +7,11 @@ import (
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
-// RegisterProgramsRoutes mounts /api/programs/* and /api/programs/program-stages/* on the given echo group.
-// Write operations require SUPER_ADMIN, ADMIN, or KOORDINATOR; read-only GETs on a program
-// (detail and stages) also allow FASILITATOR. Tenant scope is enforced
-// by TenantScope (programs filtered by GetTenantID; stages/contents scoped through their program).
-// Stage-content assign/unassign live here (under /api/programs) alongside list/reorder.
+// RegisterProgramsRoutes mounts /api/programs/* and /api/programs/Topik/* on the given echo group.
+// Write operations require SUPER_ADMINISTRATOR, ADMIN, or KOORDINATOR; read-only GETs on a program
+// (detail and Topik) also allow FASILITATOR. Tenant scope is enforced
+// by TenantScope (programs filtered by GetTenantID; Topik/contents scoped through their program).
+// Kegiatan-content assign/unassign live here (under /api/programs) alongside list/reorder.
 func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMWAdmin := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR")
@@ -26,14 +26,14 @@ func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManage
 	g.POST("/:id/toggle-active", h.ToggleActive, authMW, roleMWAdmin, scopeMW)
 	g.DELETE("/:id", h.Delete, authMW, roleMWAdmin, scopeMW)
 
-	// Stages nested under a program.
+	// Topik nested under a program.
 	g.GET("/:id/stages", h.ListStages, authMW, roleMWRead, scopeMW)
 	g.POST("/:id/stages", h.CreateStage, authMW, roleMWAdmin, scopeMW)
 	g.PUT("/:id/stages/:stageId", h.UpdateStage, authMW, roleMWAdmin, scopeMW)
 	g.DELETE("/:id/stages/:stageId", h.DeleteStage, authMW, roleMWAdmin, scopeMW)
 	g.POST("/:id/stages/reorder", h.ReorderStages, authMW, roleMWAdmin, scopeMW)
 
-	// Contents keyed directly by substage (Kegiatan). list for kiosk/learner;
+	// Contents keyed directly by Kegiatan. list for kiosk/learner;
 	// reorder + assign/unassign are admin write operations. All four share the
 	// /programs prefix. A missing Kegiatan returns 404 (substage_not_found).
 	g.GET("/program-substages/:substageId/contents", h.ListContents, authMW, roleMWAdmin, scopeMW)

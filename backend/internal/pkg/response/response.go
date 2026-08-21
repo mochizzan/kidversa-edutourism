@@ -111,6 +111,8 @@ func MessageForCode(code string) string {
 		return "Sesi kiosk telah dibatalkan"
 	case "bad_request":
 		return "Permintaan tidak dapat diproses"
+	case "schema_drift":
+		return "Terjadi kesalahan pada struktur database. Hubungi administrator."
 	case "internal_error":
 		return "Terjadi kesalahan pada server"
 	default:

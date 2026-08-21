@@ -2,7 +2,7 @@ package entity
 
 import "time"
 
-// Assessment is a star-rating + comment given to a participant per Kegiatan (session substage).
+// Assessment is a star-rating + comment given to a participant per Kegiatan (session Kegiatan).
 type Assessment struct {
 	BaseModel
 	ParticipantID     string     `json:"participant_id"`
@@ -108,7 +108,7 @@ type PhotoFrame struct {
 }
 
 // Content is a standalone, tenant-scoped, reusable media asset. It is NOT owned
-// by a stage: many program stages can reference the same Content via the
+// by a Topik: many program Topik can reference the same Content via the
 // stage_contents junction (Model A / single-source refactor).
 type Content struct {
 	BaseModel
@@ -121,7 +121,7 @@ type Content struct {
 }
 
 // StageContentRef is one row of the stage_contents junction: a Content assigned
-// to a Stage with per-stage ordering + activation.
+// to a Kegiatan with per-Kegiatan ordering + activation.
 type StageContentRef struct {
 	ContentID      string    `json:"content_id"`
 	ProgramStageID string    `json:"program_stage_id" gorm:"column:program_substage_id"`

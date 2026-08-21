@@ -28,7 +28,7 @@ func NewKioskHandler(authUC *auth.Usecase, sessionUC *usecase.SessionUsecase, co
 	return &KioskHandler{authUC: authUC, sessionUC: sessionUC, contentRepo: contentRepo, substageRepo: substageRepo, liveRepo: liveRepo}
 }
 
-// kioskStageContent bundles a session stage with its Kegiatan (substage) leaves
+// kioskStageContent bundles a Topik with its Kegiatan leaves
 // and the content loaded per Kegiatan.
 type kioskStageContent struct {
 	Stage     entity.SessionStage    `json:"stage"`
@@ -58,7 +58,7 @@ type kioskResponse struct {
 	GroupID string              `json:"group_id,omitempty"`
 }
 
-// kioskSubstage returns a session substage with an empty content list.
+// kioskSubstage returns a session Kegiatan with an empty content list.
 func kioskSubstage(s entity.SessionSubstage) kioskSubstageContent {
 	return kioskSubstageContent{Substage: s, Contents: []entity.StageContent{}}
 }
@@ -79,7 +79,7 @@ func toKioskSessionDTO(s entity.Session) kioskSessionDTO {
 // is multi-use: it is never consumed, so the kiosk may retry freely (e.g. under React
 // StrictMode double-invocation). On success it confirms the token's session+tenant binding
 // matches the requested session and that the session is not cancelled, then returns the
-// session detail (stages + program contents).
+// session detail (Topik + program contents).
 //
 // Errors: invalid/not-found or session-binding mismatch -> 401 kiosk_invalid; expired token
 // -> 401 kiosk_expired; tenant mismatch -> 401 kiosk_forbidden; cancelled session -> 401
@@ -125,18 +125,18 @@ func (h *KioskHandler) KioskAccess(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusUnauthorized, "kiosk_cancelled")
 	}
 
-	// Self-heal: sessions created before substage cloning (or whose clone was
-	// skipped) have no session_substages, leaving the kiosk empty. Clone the
+	// Self-heal: sessions created before Kegiatan cloning (or whose clone was
+	// skipped) have no session Kegiatan, leaving the kiosk empty. Clone the
 	// Kegiatan leaves now (idempotent) so content renders. Failure is
-	// non-fatal — the kiosk still shows whatever stages/substages exist.
+	// non-fatal — the kiosk still shows whatever Topik/Kegiatan exist.
 	if err := h.sessionUC.EnsureSessionSubstages((*c).Request().Context(), id); err != nil {
 		log.Printf("kiosk: ensure session_substages failed for %s: %v", id, err)
 	}
 
-	// Per stage, load each instantiated Kegiatan (session_substage) with its
-	// per-Kegiatan content (content now lives on the program_substage leaf).
-	// Falls back to an empty substage list when substage cloning has not run.
-	// When the kiosk identifies its group, derive per-substage lock state from
+	// Per Topik, load each instantiated Kegiatan (session Kegiatan) with its
+	// per-Kegiatan content (content now lives on the program Kegiatan leaf).
+	// Falls back to an empty Kegiatan list when Kegiatan cloning has not run.
+	// When the kiosk identifies its group, derive per-Kegiatan lock state from
 	// the group's live progress. The group must belong to this session; otherwise
 	// it is a forbidden cross-session access.
 	var progressBySubstage map[string]entity.GroupStageProgressStatus

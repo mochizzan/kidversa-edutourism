@@ -119,18 +119,6 @@ export function useChildAssessment(childId: string | undefined) {
           setStarRating(1)
           setComment('')
         }
-      } else if (detail.sessionStage) {
-        // Fallback: no leaves resolved (e.g. legacy session) — score the stage.
-        const assessments = await assessmentService.getByParticipant(childId)
-        const existing = assessments.find((a) => a.session_substage_id === detail.sessionStage!.id)
-        if (existing) {
-          setExistingAssessment(existing)
-          setStarRating(existing.star_rating)
-          setComment(existing.comment ?? '')
-        } else {
-          setStarRating(1)
-          setComment('')
-        }
       }
     } catch (err) {
       setError(friendlyError(err))
@@ -149,17 +137,13 @@ export function useChildAssessment(childId: string | undefined) {
       return
     }
     // The assessment target is the selected Kegiatan leaf (session_substage).
-    // Fall back to the session stage only when no leaves were resolved.
-    const targetId = selectedSubstageId ?? childDetail.sessionStage?.id
-    const sessionId =
-      selectedSubstageId
-        ? childDetail.sessionSubstages.find((s) => s.id === selectedSubstageId)?.session_id
-        : childDetail.sessionStage?.session_id
+    const targetId = selectedSubstageId
+    const leaf = childDetail.sessionSubstages.find((s) => s.id === selectedSubstageId)
+    const sessionId = leaf?.session_id
     if (!targetId || !sessionId) {
       addToast({
         type: 'error',
-        message:
-          'Kelompok belum memiliki stage aktif. Buka kelompok dari dashboard fasilitator, lalu mulai sesi agar anak dapat dinilai.',
+        message: 'SubTopik ini belum memiliki Kegiatan. Minta admin atau koordinator membuat Kegiatan terlebih dahulu agar anak dapat dinilai.',
       })
       return
     }
@@ -182,8 +166,8 @@ export function useChildAssessment(childId: string | undefined) {
       setExistingAssessment(result)
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
-    } catch {
-      addToast({ type: 'error', message: 'Gagal menyimpan penilaian' })
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setSaving(false)
     }

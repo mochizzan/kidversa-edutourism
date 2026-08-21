@@ -10,7 +10,7 @@ type ProgramRequest struct {
 	IsActive     *bool   `json:"is_active,omitempty"`
 }
 
-// ProgramStageRequest is the create/update payload for program stages.
+// ProgramStageRequest is the create/update payload for Topik.
 type ProgramStageRequest struct {
 	SequenceOrder   int                `json:"sequence_order,omitempty"`
 	Name            string             `json:"name" validate:"required"`
@@ -21,7 +21,7 @@ type ProgramStageRequest struct {
 }
 
 // ContentRequest is the create/update payload for the standalone Content entity
-// (Model A). Global fields only; per-stage activation lives on the junction.
+// (Model A). Global fields only; per-Kegiatan activation lives on the junction.
 type ContentRequest struct {
 	Title           string                      `json:"title" validate:"required"`
 	FileURL         string                      `json:"file_url"`
@@ -30,7 +30,7 @@ type ContentRequest struct {
 	DurationSeconds int                         `json:"duration_seconds,omitempty"`
 }
 
-// AssignContentRequest carries the content_id to assign to a substage (Kegiatan).
+// AssignContentRequest carries the content_id to assign to a Kegiatan.
 type AssignContentRequest struct {
 	ContentID string `json:"content_id" validate:"required,uuid"`
 }

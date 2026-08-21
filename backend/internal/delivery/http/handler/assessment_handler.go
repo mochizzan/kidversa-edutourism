@@ -30,7 +30,7 @@ func (h *AssessmentHandler) Upsert(c *echo.Context) error {
 	}
 	a, err := h.uc.Upsert((*c).Request().Context(),
 		repository.AssessmentFilter{ParticipantID: req.ParticipantID, SessionID: req.SessionID, SessionSubstageID: req.SessionSubstageID},
-		req.StarRating, req.Comment, req.AssessedBy, appmiddleware.GetUserID(c), appmiddleware.GetRole(c), apputil.ParseISOOrNow(req.AssessedAt), req.SyncStatus)
+		req.StarRating, req.Comment, appmiddleware.GetUserID(c), appmiddleware.GetUserID(c), appmiddleware.GetRole(c), apputil.ParseISOOrNow(req.AssessedAt), req.SyncStatus, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -52,12 +52,12 @@ func (h *AssessmentHandler) BulkUpsert(c *echo.Context) error {
 			SessionSubstageID: it.SessionSubstageID,
 			StarRating:        it.StarRating,
 			Comment:           it.Comment,
-			AssessedBy:        it.AssessedBy,
+			AssessedBy:        appmiddleware.GetUserID(c),
 			AssessedAt:        apputil.ParseISOOrNow(it.AssessedAt),
 			SyncStatus:        entity.SyncStatus(it.SyncStatus),
 		})
 	}
-	out, err := h.uc.BulkUpsert((*c).Request().Context(), items, appmiddleware.GetUserID(c), appmiddleware.GetRole(c))
+	out, err := h.uc.BulkUpsert((*c).Request().Context(), items, appmiddleware.GetUserID(c), appmiddleware.GetRole(c), appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

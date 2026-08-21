@@ -1,6 +1,6 @@
 package dto
 
-// LiveOverrideRequest is the payload for POST /groups/:groupId/stages/:stageId/{unlock,complete,skip}.
+// LiveOverrideRequest is the payload for POST /groups/:groupId/kegiatan/:kegiatanId/{unlock,complete,skip}.
 type LiveOverrideRequest struct {
 	StageID string `json:"stage_id"`
 	Reason  string `json:"reason,omitempty"`

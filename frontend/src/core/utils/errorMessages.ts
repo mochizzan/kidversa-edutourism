@@ -21,6 +21,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   session_not_deletable: 'Sesi ini tidak dapat dihapus.',
   participant_not_deletable: 'Peserta ini tidak dapat dihapus.',
   bad_request: 'Permintaan tidak dapat diproses.',
+  schema_drift: 'Terjadi kesalahan pada struktur database. Hubungi administrator.',
   network: 'Gagal terhubung ke server. Periksa koneksi internet Anda.',
 }
 

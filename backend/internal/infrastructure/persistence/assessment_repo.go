@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 
 	"gorm.io/gorm"
 
@@ -28,6 +29,10 @@ func (r *GormAssessmentRepository) Create(ctx context.Context, a *entity.Assessm
 		if isDuplicate(err) {
 			return apperrors.Conflict("conflict", err)
 		}
+		if isSchemaDrift(err) {
+			log.Printf("schema_drift: assessments: %v", err)
+			return apperrors.Internal("schema_drift", err)
+		}
 		return apperrors.Internal("internal_error", err)
 	}
 	*a = *m.ToEntity()
@@ -51,13 +56,44 @@ func (r *GormAssessmentRepository) GetByID(ctx context.Context, id, tenantID str
 	return m.ToEntity(), nil
 }
 
-func (r *GormAssessmentRepository) GetByParticipantStage(ctx context.Context, participantID, sessionSubstageID string) (*entity.Assessment, error) {
+func (r *GormAssessmentRepository) GetByParticipantStage(ctx context.Context, participantID, sessionSubstageID, tenantID string) (*entity.Assessment, error) {
 	var m AssessmentModel
-	if err := r.db.WithContext(ctx).
-		Where("participant_id = ? AND session_substage_id = ?", participantID, sessionSubstageID).
-		First(&m).Error; err != nil {
+	q := r.db.WithContext(ctx).
+		Where("participant_id = ? AND session_substage_id = ?", participantID, sessionSubstageID)
+	// Tenant scoping: restrict to the assessment's owning session's tenant (joined
+	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
+	if tenantID != "" {
+		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
+		}
+		if isSchemaDrift(err) {
+			log.Printf("schema_drift: assessments: %v", err)
+			return nil, apperrors.Internal("schema_drift", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+func (r *GormAssessmentRepository) GetByParticipantStageIncludingDeleted(ctx context.Context, participantID, sessionSubstageID, tenantID string) (*entity.Assessment, error) {
+	var m AssessmentModel
+	q := r.db.WithContext(ctx).Unscoped().
+		Where("participant_id = ? AND session_substage_id = ?", participantID, sessionSubstageID)
+	// Tenant scoping: restrict to the assessment's owning session's tenant (joined
+	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
+	if tenantID != "" {
+		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		if isSchemaDrift(err) {
+			log.Printf("schema_drift: assessments: %v", err)
+			return nil, apperrors.Internal("schema_drift", err)
 		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
@@ -78,12 +114,20 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
+		if isSchemaDrift(err) {
+			log.Printf("schema_drift: assessments: %v", err)
+			return nil, apperrors.Internal("schema_drift", err)
+		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
 
 	var models []AssessmentModel
 	offset := (page - 1) * limit
 	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+		if isSchemaDrift(err) {
+			log.Printf("schema_drift: assessments: %v", err)
+			return nil, apperrors.Internal("schema_drift", err)
+		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.Assessment, 0, len(models))
@@ -94,10 +138,52 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 }
 
 func (r *GormAssessmentRepository) Update(ctx context.Context, a *entity.Assessment) error {
-	m := assessmentModelFromEntity(a)
-	if err := r.db.WithContext(ctx).Model(&AssessmentModel{}).Where("id = ?", a.ID).Updates(m).Error; err != nil {
+	// Map form so zero/false/empty values are NOT skipped by GORM (struct mode
+	// drops zero-values, breaking star_rating=0 and empty comment).
+	fields := map[string]interface{}{
+		"participant_id":      a.ParticipantID,
+		"session_id":          a.SessionID,
+		"session_substage_id": a.SessionSubstageID,
+		"star_rating":         a.StarRating,
+		"comment":             a.Comment,
+		"assessed_by":         a.AssessedBy,
+		"assessed_at":         a.AssessedAt,
+		"sync_status":         a.SyncStatus,
+	}
+	if err := r.db.WithContext(ctx).Model(&AssessmentModel{}).Where("id = ?", a.ID).Updates(fields).Error; err != nil {
 		if isDuplicate(err) {
 			return apperrors.Conflict("conflict", err)
+		}
+		if isSchemaDrift(err) {
+			log.Printf("schema_drift: assessments: %v", err)
+			return apperrors.Internal("schema_drift", err)
+		}
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+func (r *GormAssessmentRepository) Revive(ctx context.Context, a *entity.Assessment) error {
+	// Map form so zero/false/empty values are NOT skipped by GORM. Setting
+	// deleted_at = NULL lifts the soft-delete, restoring the row to active state.
+	fields := map[string]interface{}{
+		"participant_id":      a.ParticipantID,
+		"session_id":          a.SessionID,
+		"session_substage_id": a.SessionSubstageID,
+		"star_rating":         a.StarRating,
+		"comment":             a.Comment,
+		"assessed_by":         a.AssessedBy,
+		"assessed_at":         a.AssessedAt,
+		"sync_status":         a.SyncStatus,
+		"deleted_at":          nil,
+	}
+	if err := r.db.WithContext(ctx).Model(&AssessmentModel{}).Where("id = ?", a.ID).Updates(fields).Error; err != nil {
+		if isDuplicate(err) {
+			return apperrors.Conflict("conflict", err)
+		}
+		if isSchemaDrift(err) {
+			log.Printf("schema_drift: assessments: %v", err)
+			return apperrors.Internal("schema_drift", err)
 		}
 		return apperrors.Internal("internal_error", err)
 	}

@@ -6,8 +6,8 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 )
 
-// ProgramSubstageRepository is the persistence contract for program substages
-// (Kegiatan leaves under a SubTopik stage).
+// ProgramSubstageRepository is the persistence contract for Kegiatan
+// (assessed leaves under a Topik).
 type ProgramSubstageRepository interface {
 	CreateSubstage(ctx context.Context, s *entity.ProgramSubstage) error
 	GetSubstageByID(ctx context.Context, id string) (*entity.ProgramSubstage, error)
@@ -18,10 +18,10 @@ type ProgramSubstageRepository interface {
 	ReorderSubstages(ctx context.Context, programStageID string, orderedIDs []string) error
 }
 
-// SessionSubstageRepository is the persistence contract for session substages
+// SessionSubstageRepository is the persistence contract for session Kegiatan
 // (instantiated Kegiatan within a session) and participant badge awards.
 type SessionSubstageRepository interface {
-	// Session substages.
+	// Session Kegiatan.
 	CreateSessionSubstage(ctx context.Context, s *entity.SessionSubstage) error
 	ListSessionSubstages(ctx context.Context, sessionID string) ([]entity.SessionSubstage, error)
 	GetSessionSubstage(ctx context.Context, id string) (*entity.SessionSubstage, error)
@@ -33,8 +33,8 @@ type SessionSubstageRepository interface {
 	CreateBadge(ctx context.Context, b *entity.ParticipantBadge) error
 	GetBadge(ctx context.Context, id string) (*entity.ParticipantBadge, error)
 	ListBadgesByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantBadge, error)
-	// ListBadgesByParticipantStage returns the SUBTOPIK badge for a participant
-	// on a specific program_stage (unique per the uq_participant_subtopik_badge index).
+	// ListBadgesByParticipantStage returns the Kegiatan badge for a participant
+	// on a specific Topik (unique per the uq_participant_subtopik_badge index).
 	ListBadgesByParticipantStage(ctx context.Context, participantID, programStageID string) ([]entity.ParticipantBadge, error)
 	// ListFinalBadgesByParticipant returns FINAL badges for a participant (one per program).
 	ListFinalBadgesByParticipant(ctx context.Context, participantID, programID string) ([]entity.ParticipantBadge, error)

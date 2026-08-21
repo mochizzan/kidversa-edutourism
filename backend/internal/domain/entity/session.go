@@ -17,7 +17,7 @@ type Session struct {
 	CreatedBy   *string       `json:"created_by,omitempty"`
 }
 
-// SessionStage is an instantiation of a program stage within a session.
+// SessionStage is an instantiation of a Topik within a session.
 type SessionStage struct {
 	BaseModel
 	SessionID      string             `json:"session_id"`
@@ -38,7 +38,7 @@ type SessionGroup struct {
 	FacilitatorID         *string     `json:"facilitator_id,omitempty"`
 }
 
-// GroupStageProgress is the live progress of one group through one session substage (Kegiatan).
+// GroupStageProgress is the live progress of one group through one Kegiatan.
 type GroupStageProgress struct {
 	BaseModel
 	GroupID           string                   `json:"group_id"`
@@ -53,7 +53,7 @@ type GroupStageProgress struct {
 }
 
 // GroupStageProgressHistory is the append-only audit trail of lock/unlock
-// transitions on a group's session-substage progress.
+// transitions on a group's session Kegiatan progress.
 type GroupStageProgressHistory struct {
 	BaseModel
 	GroupID           string  `json:"group_id"`

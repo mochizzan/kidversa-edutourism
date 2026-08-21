@@ -17,9 +17,15 @@ type AssessmentFilter struct {
 type AssessmentRepository interface {
 	Create(ctx context.Context, a *entity.Assessment) error
 	GetByID(ctx context.Context, id, tenantID string) (*entity.Assessment, error)
-	GetByParticipantStage(ctx context.Context, participantID, sessionSubstageID string) (*entity.Assessment, error)
+	GetByParticipantStage(ctx context.Context, participantID, sessionSubstageID, tenantID string) (*entity.Assessment, error)
+	GetByParticipantStageIncludingDeleted(ctx context.Context, participantID, sessionSubstageID, tenantID string) (*entity.Assessment, error)
 	List(ctx context.Context, f AssessmentFilter, page, limit int) (*Paginated[entity.Assessment], error)
 	Update(ctx context.Context, a *entity.Assessment) error
+	// Revive restores a soft-deleted assessment (clears deleted_at) and writes
+	// the new values in one pass. Used by the upsert path so re-assessing a child
+	// after a delete does not collide on the unique key (OQ3, Option A: keep
+	// soft-delete, no generated column).
+	Revive(ctx context.Context, a *entity.Assessment) error
 	Delete(ctx context.Context, id string) error
 	// GetGroupFacilitatorIDByParticipant resolves the facilitator_id of the group a
 	// participant belongs to (via participants.group_id -> session_groups.facilitator_id).

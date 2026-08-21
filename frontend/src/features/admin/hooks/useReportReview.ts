@@ -25,6 +25,7 @@ import {
 } from '../../../core/utils/raportCapture'
 import { extractFirstSentence } from '../../../core/utils/reportNarrative'
 import { substagesOfStage } from '../../../core/utils/substage'
+import { programSubstageService } from '../../../core/services/programSubstages'
 import type {
   Report,
   Participant,
@@ -33,12 +34,19 @@ import type {
   SmartPhoto,
   ProgramStage,
   MissionBank,
+  SessionSubstage,
 } from '../../../core/types'
+
+export interface KegiatanRow {
+  sessionSubstage: SessionSubstage
+  programSubstageName: string
+  assessment?: Assessment
+}
 
 export interface StageInfo {
   programStage: ProgramStage
   sessionStageId: string
-  assessment?: Assessment
+  kegiatan: KegiatanRow[]
 }
 
 export function useReportReview(sessionId: string | undefined, reportId: string | undefined) {
@@ -110,26 +118,25 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       const partAssessments = stageAssessments.filter((a) => a.participant_id === rpt.participant_id)
 
       const programStages = await programService.getStages(sess.program_id)
+      const progSubs = (await Promise.all(programStages.map((ps) => programSubstageService.listByStage(ps.id)))).flat()
+      const nameById = new Map<string, string>(progSubs.map((s) => [s.id, s.name]))
       const builtStageInfos: StageInfo[] = sessStages
         .map((ss) => {
           const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
           if (!pgStage) return null
-          // Assessments are keyed at Kegiatan level, so resolve down to this
-          // SubTopik's leaves. A SubTopik holds several Kegiatan but the raport
-          // renders ONE star row per SubTopik, so pick a representative: the
-          // first leaf (in stable leaf order) actually scored (star_rating >= 1),
-          // else the first leaf assessed at all (0 = "tidak hadir"), else none.
-          const leafAssessments = substagesOfStage(sessSubstages, ss.id)
-            .map((k) => partAssessments.find((a) => a.session_substage_id === k.id))
-            .filter((a): a is Assessment => a !== undefined)
-          const assessment: Assessment | undefined =
-            leafAssessments.find((a) => a.star_rating >= 1) || leafAssessments[0]
-          return { programStage: pgStage, sessionStageId: ss.id, assessment } as StageInfo
+          const kegiatan: KegiatanRow[] = substagesOfStage(sessSubstages, ss.id).map((k) => ({
+            sessionSubstage: k,
+            programSubstageName: nameById.get(k.program_substage_id) ?? k.program_substage_id,
+            assessment: partAssessments.find((a) => a.session_substage_id === k.id),
+          }))
+          return { programStage: pgStage, sessionStageId: ss.id, kegiatan }
         })
         .filter((s): s is NonNullable<typeof s> => s !== null) as StageInfo[]
       setStageInfos(builtStageInfos)
 
-      const hasNoAssessment = builtStageInfos.every((si) => !si.assessment)
+      const hasNoAssessment = builtStageInfos
+        .flatMap((si) => si.kegiatan)
+        .every((k) => !k.assessment || k.assessment.star_rating < 1)
       setHasNoAssessment(hasNoAssessment)
 
       const reportPhoto =
@@ -277,11 +284,16 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       sessionDate: formatDate(session.session_date),
       photoUrl: photo?.framed_file_url || photo?.original_file_url,
       quote,
-      stages: stageInfos.map((si, i) => ({
-        name: si.programStage.name,
-        sequenceOrder: i + 1,
-        starRating: si.assessment?.star_rating ?? 0,
-      })),
+      stages: stageInfos.map((si, i) => {
+        const rep =
+          si.kegiatan.find((k) => k.assessment && k.assessment.star_rating >= 1)?.assessment ||
+          si.kegiatan.find((k) => k.assessment)?.assessment
+        return {
+          name: si.programStage.name,
+          sequenceOrder: i + 1,
+          starRating: rep?.star_rating ?? 0,
+        }
+      }),
       narrative: narrativeText,
       facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
       missions: missions
