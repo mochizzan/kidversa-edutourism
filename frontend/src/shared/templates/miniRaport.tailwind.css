@@ -15,3 +15,40 @@
   --color-brand-star: #ffc107;
   --color-brand-text: #334155;
 }
+
+/* Batas lebar lembar A4. Ditulis di sini, bukan sebagai utility
+   `max-w-[${A4_SHEET_WIDTH}px]` di template: nilai itu diinterpolasi saat runtime
+   sehingga @source (baris 2) tidak pernah melihat literalnya dan utility-nya tidak
+   ikut ter-generate — kelas tersebut no-op. */
+.a4-sheet {
+  max-width: 794px;
+}
+
+@media (max-width: 480px) {
+  .a4-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+    font-size: clamp(11px, 2.6vw, 13px);
+  }
+  .a4-sheet main.grid {
+    grid-template-columns: 1fr !important;
+  }
+  .a4-sheet [class*="col-span-"] {
+    grid-column: 1 / -1 !important;
+  }
+  /* Mode card: narasi, judul misi, dan pesan fasilitator tampil UTUH —
+     clamp hanya melindungi anggaran tinggi lembar A4 cetak. */
+  .a4-sheet .line-clamp-2,
+  .a4-sheet .line-clamp-4,
+  .a4-sheet .line-clamp-5 {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    overflow: visible !important;
+  }
+  /* Blok berbagi baris grid tidak lagi perlu tinggi minimum A4. */
+  .a4-sheet main.grid > * {
+    min-height: 0 !important;
+    grid-row: auto !important;
+  }
+}

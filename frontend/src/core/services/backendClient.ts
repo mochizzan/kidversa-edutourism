@@ -138,7 +138,11 @@ export function subscribeConnection(cb: (s: ConnectionState) => void): () => voi
 // ---------------------------------------------------------------------------
 
 export function getApiBaseUrl(): string {
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+  // Relative by default so the SPA always calls its own origin (the nginx
+  // reverse proxy), which forwards /api to the backend — no CORS, and identical
+  // behaviour on :8002 (local) and :80 (server). Override with VITE_API_BASE_URL
+  // only when calling the backend directly (e.g. dev without the proxy).
+  return import.meta.env.VITE_API_BASE_URL ?? ''
 }
 
 export async function healthCheck(): Promise<boolean> {

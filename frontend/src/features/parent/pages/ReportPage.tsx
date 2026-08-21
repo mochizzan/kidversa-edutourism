@@ -11,7 +11,6 @@ import {
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 import { DEFAULT_FACILITATOR_MESSAGE, DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
-import { extractFirstSentence } from '../../../core/utils/reportNarrative'
 import { participantMissionService } from '../../../core/services/missions'
 import { BadgeList } from '../components/BadgeList'
 
@@ -28,17 +27,7 @@ function ReportView() {
 
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth)
   const [iframeHeight, setIframeHeight] = useState(0)
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  const scaleFactor = Math.min(1, windowWidth / A4_SHEET_WIDTH)
-  const scaledHeight = iframeHeight * scaleFactor
 
   // Derive the participant id (for badge display) from the report's missions.
   useEffect(() => {
@@ -58,20 +47,27 @@ function ReportView() {
 
     const buildHtml = () => {
       // The public report payload is an anti-IDOR view: it exposes the final
-      // narrative, its mission id list, and the (optional) PDF url — never PII.
+      // narrative only — never PII. The DTO has no participant name, school,
+      // group, stages, badges, or gallery info, so we pass the official
+      // degraded defaults the template knows how to render (—, empty states).
       const narrative = pub.ai_narrative_final || ''
-      const missions: string[] = pub.mission_ids ?? []
 
+      // BUG-2 fix: the parent side never fetches MissionBank, so the UUIDs in
+      // mission_ids cannot be resolved to titles. Passing them would expose raw
+      // UUIDs to parents; the template's empty-state covers this instead.
       return generateMiniRaportHTML({
         childName: 'Ananda',
         childAge: 0,
+        childSchool: undefined,
+        childGroup: undefined,
         sessionDate: '',
         photoUrl: undefined,
-        quote: extractFirstSentence(narrative),
         stages: [],
         narrative,
         facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
-        missions,
+        missions: [],
+        badges: [],
+        galleryTitle: 'Galeri Peserta',
         facilitatorName: DEFAULT_FACILITATOR_NAME,
         facilitatorPhotoUrl: undefined,
       })
@@ -168,18 +164,8 @@ function ReportView() {
   /* ── Render: mini raport fills viewport + floating toolbar ── */
   return (
     <div className="relative min-h-screen bg-gray-200 print-report">
-      <div
-        className="mx-auto overflow-hidden"
-        style={{ width: '100%', maxWidth: A4_SHEET_WIDTH }}
-      >
-        <div
-          style={{
-            width: A4_SHEET_WIDTH,
-            transform: `scale(${scaleFactor})`,
-            transformOrigin: 'top center',
-            height: scaledHeight || 'auto',
-          }}
-        >
+      <div className="mx-auto w-full max-w-full overflow-x-auto">
+        <div style={{ width: A4_SHEET_WIDTH, height: iframeHeight || 'auto' }}>
           <iframe
             ref={iframeRef}
             srcDoc={raportHtml}

@@ -1,3 +1,16 @@
-uploads/
+# Build-context exclusions — keep secrets/artifacts out of the image.
 .env
+.env.example
+uploads/
+Dockerfile.dev
+.air.toml
 *.exe
+bin/
+data/
+docs/
+*.md
+.git
+.idea
+.vscode
+.serena/
+# NOTE: migrations/, go.mod, go.sum, cmd/, internal/ are intentionally NOT excluded.

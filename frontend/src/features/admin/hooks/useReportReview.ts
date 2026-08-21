@@ -5,6 +5,7 @@ import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { photoService } from '../../../core/services/photos'
+import { badgeService } from '../../../core/services/badges'
 import { missionService } from '../../../core/services/missions'
 import { programService } from '../../../core/services/programs'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
@@ -13,6 +14,7 @@ import { useAuth } from '../../../core/hooks/useAuth'
 import { isSuperAdmin } from '../../../core/utils/permissions'
 import { getActiveTenantId } from '../../../core/utils/tenant'
 import { formatDate } from '../../../core/utils'
+import { getMediaUrl } from '../../../core/utils/media'
 import {
   DEFAULT_FACILITATOR_MESSAGE,
   DEFAULT_FACILITATOR_NAME,
@@ -23,19 +25,22 @@ import {
   captureRaportAsBlob,
   downloadBlob,
 } from '../../../core/utils/raportCapture'
-import { extractFirstSentence } from '../../../core/utils/reportNarrative'
 import { substagesOfStage } from '../../../core/utils/substage'
+import { selectMissionsForParticipant } from '../../../core/utils/missionSelector'
 import { programSubstageService } from '../../../core/services/programSubstages'
 import type {
   Report,
   Participant,
+  ParticipantBadge,
   Session,
   Assessment,
   SmartPhoto,
   ProgramStage,
   MissionBank,
   SessionSubstage,
+  SessionGroup,
 } from '../../../core/types'
+import { SessionStageStatus } from '../../../core/types/enums'
 
 export interface KegiatanRow {
   sessionSubstage: SessionSubstage
@@ -60,6 +65,8 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
   const [stageInfos, setStageInfos] = useState<StageInfo[]>([])
   const [missions, setMissions] = useState<MissionBank[]>([])
   const [assignedMissionIds, setAssignedMissionIds] = useState<string[]>([])
+  const [groups, setGroups] = useState<SessionGroup[]>([])
+  const [badges, setBadges] = useState<ParticipantBadge[]>([])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -82,14 +89,16 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     setError(null)
 
     try {
-      const [rpt, sess, stageAssessments, sessStages, sessSubstages, partPhotos] = await Promise.all([
-        reportService.getById(reportId),
-        sessionService.getById(sessionId),
-        assessmentService.getBySession(sessionId),
-        sessionService.getStages(sessionId),
-        sessionService.getSubstages(sessionId),
-        photoService.getBySession(sessionId),
-      ])
+      const [rpt, sess, stageAssessments, sessStages, sessSubstages, partPhotos, sessGroups] =
+        await Promise.all([
+          reportService.getById(reportId),
+          sessionService.getById(sessionId),
+          assessmentService.getBySession(sessionId),
+          sessionService.getStages(sessionId),
+          sessionService.getSubstages(sessionId),
+          photoService.getBySession(sessionId),
+          sessionService.getGroups(sessionId),
+        ])
 
       if (!rpt) {
         setError('Laporan tidak ditemukan.')
@@ -114,6 +123,14 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
         return
       }
       setParticipant(part)
+      setGroups(sessGroups ?? [])
+
+      // Soft-fail: badge fetch must never break loadData. Degrade to [] on error.
+      try {
+        setBadges(await badgeService.listByParticipant(part.id))
+      } catch {
+        setBadges([])
+      }
 
       const partAssessments = stageAssessments.filter((a) => a.participant_id === rpt.participant_id)
 
@@ -276,33 +293,73 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
 
   const buildRaportHtml = useCallback((): string | null => {
     if (!participant || !session) return null
-    const quote = extractFirstSentence(narrativeText)
+
+    const groupName = participant.group_id
+      ? groups.find((g) => g.id === participant.group_id)?.name
+      : undefined
+
+    const detailStages = stageInfos.slice(0, 4)
+    const extraTopicsCount = Math.max(0, stageInfos.length - 4)
+
+    const stagedStages = detailStages.map((si, i) => ({
+      name: si.programStage.name,
+      sequenceOrder: si.programStage.sequence_order ?? i + 1,
+      kegiatan: si.kegiatan.slice(0, 3).map((k) => ({
+        name: k.programSubstageName,
+        starRating: k.assessment?.star_rating ?? 0,
+      })),
+    }))
+
+    const narrative = narrativeText.length > 260 ? `${narrativeText.slice(0, 260)}…` : narrativeText
+
+    const selectedMissionIds = assignedMissionIds.slice(0, 4)
+    let missionTitles = missions
+      .filter((m) => selectedMissionIds.includes(m.id))
+      .map((m) => m.title_child)
+    if (missionTitles.length === 0) {
+      const picked = selectMissionsForParticipant({
+        participantId: participant.id,
+        assessments: stageInfos.flatMap((si) =>
+          si.kegiatan.map((k) => k.assessment).filter((a): a is NonNullable<typeof a> => !!a),
+        ),
+        availableMissions: missions,
+        sessionStages: stageInfos.map((si) => ({
+          id: si.sessionStageId,
+          session_id: sessionId ?? '',
+          program_stage_id: si.programStage.id,
+          status: SessionStageStatus.COMPLETED,
+          created_at: '',
+        })),
+      })
+      const pickedIds = picked.slice(0, 4)
+      missionTitles = missions
+        .filter((m) => pickedIds.includes(m.id))
+        .map((m) => m.title_child)
+    }
+
+    const mappedBadges = badges.slice(0, 4).map((b) => ({
+      badgeName: b.badge_name,
+      badgeImageUrl: b.badge_image_url ? getMediaUrl('content', b.badge_image_url) : undefined,
+    }))
 
     return generateMiniRaportHTML({
       childName: participant.child_name,
       childAge: participant.child_age,
+      childSchool: participant.school_name || undefined,
+      childGroup: groupName || undefined,
       sessionDate: formatDate(session.session_date),
-      photoUrl: photo?.framed_file_url || photo?.original_file_url,
-      quote,
-      stages: stageInfos.map((si, i) => {
-        const rep =
-          si.kegiatan.find((k) => k.assessment && k.assessment.star_rating >= 1)?.assessment ||
-          si.kegiatan.find((k) => k.assessment)?.assessment
-        return {
-          name: si.programStage.name,
-          sequenceOrder: i + 1,
-          starRating: rep?.star_rating ?? 0,
-        }
-      }),
-      narrative: narrativeText,
+      photoUrl: photo ? getMediaUrl('photo', photo.id) : undefined,
+      stages: stagedStages,
+      extraTopicsCount: extraTopicsCount > 0 ? extraTopicsCount : undefined,
+      narrative,
       facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
-      missions: missions
-        .filter((m) => assignedMissionIds.includes(m.id))
-        .map((m) => m.title_child),
+      missions: missionTitles,
+      badges: mappedBadges,
       facilitatorName: user?.name || DEFAULT_FACILITATOR_NAME,
       facilitatorPhotoUrl: user?.avatar_url,
+      galleryTitle: `Galeri ${participant.child_name}`,
     })
-  }, [participant, session, narrativeText, photo, stageInfos, missions, assignedMissionIds, user])
+  }, [participant, session, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, user])
 
   const handleCetak = useCallback(() => {
     const html = buildRaportHtml()
@@ -311,13 +368,28 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     if (!win) return
     win.document.write(html)
     win.document.close()
-    setTimeout(() => {
+
+    // RISK-1: poll until FontAwesome converts <i> → <svg> before printing.
+    // Non-fatal: on timeout, proceed with print anyway rather than hanging.
+    const start = Date.now()
+    const poll = () => {
       try {
-        if (!win.closed) win.print()
+        if (win.closed) return
       } catch {
-        /* window closed */
+        return
       }
-    }, 1500)
+      const remaining = win.document.querySelectorAll('i[class*="fa-"]')
+      if (remaining.length === 0 || Date.now() - start >= 3000) {
+        try {
+          if (!win.closed) win.print()
+        } catch {
+          /* window closed */
+        }
+        return
+      }
+      setTimeout(poll, 50)
+    }
+    poll()
   }, [buildRaportHtml])
 
   const handleDownloadPdf = useCallback(async () => {
