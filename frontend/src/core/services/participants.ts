@@ -1,6 +1,6 @@
 import type { ParticipantService } from './types'
 import type { Participant, CreateParticipantDTO } from '../types'
-import { listRequest, itemRequest } from './apiEnvelope'
+import { listRequest, itemRequest, nullableItemRequest } from './apiEnvelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export const participantService: ParticipantService = {
@@ -11,14 +11,7 @@ export const participantService: ParticipantService = {
 
   // Global GET /api/participants/:id (tenant-scoped); matches the backend route.
   getById: async (id) => {
-    try {
-      return await itemRequest<Participant>('GET', API_ROUTES.PARTICIPANTS.DETAIL(id))
-    } catch (err) {
-      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
-        return null
-      }
-      throw err
-    }
+    return nullableItemRequest<Participant>('GET', API_ROUTES.PARTICIPANTS.DETAIL(id))
   },
 
   // Global POST /api/participants — creates a standalone participant not yet
@@ -36,7 +29,3 @@ export const participantService: ParticipantService = {
       consent_photo: false,
     }),
 }
-
-// Re-export the canonical way to create/update/delete participants so existing
-// importers can switch with a one-line import change if needed.
-export { sessionService } from './sessions'

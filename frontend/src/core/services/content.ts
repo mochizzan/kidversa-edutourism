@@ -1,6 +1,6 @@
 import type { ContentService } from './types'
 import type { Content, ContentUsage } from '../types'
-import { listRequest, itemRequest, voidRequest, arrayRequest } from './apiEnvelope'
+import { listRequest, itemRequest, voidRequest, arrayRequest, nullableItemRequest } from './apiEnvelope'
 import { uploadMultipart } from './uploadMultipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 
@@ -9,14 +9,7 @@ export const contentService: ContentService = {
     listRequest<Content>(API_ROUTES.CONTENTS.BASE, params),
 
   getById: async (id) => {
-    try {
-      return await itemRequest<Content>('GET', API_ROUTES.CONTENTS.DETAIL(id))
-    } catch (err) {
-      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
-        return null
-      }
-      throw err
-    }
+    return nullableItemRequest<Content>('GET', API_ROUTES.CONTENTS.DETAIL(id))
   },
 
   create: (data) =>

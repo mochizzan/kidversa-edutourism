@@ -9,7 +9,7 @@ import type {
   UpdateStageDTO,
   ToggleActiveResult,
 } from '../types'
-import { listRequest, itemRequest, voidRequest, arrayRequest } from './apiEnvelope'
+import { listRequest, itemRequest, voidRequest, arrayRequest, nullableItemRequest } from './apiEnvelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 // Program stages are ordered by sequence_order. The list endpoint returns them
@@ -23,25 +23,19 @@ export const programService: ProgramService = {
     listRequest<Program & { stages?: ProgramStage[] }>(API_ROUTES.PROGRAMS.BASE, params),
 
   getById: async (id) => {
-    try {
-      const program = await itemRequest<Program & { stages?: ProgramStage[] }>(
-        'GET',
-        API_ROUTES.PROGRAMS.DETAIL(id),
-      )
-      // Hydrate nested stages (the plan requires stages hydrated with pagination-loop).
-      let stages = program.stages
-      if (!stages) {
-        stages = sortStages(await arrayRequest<ProgramStage>('GET', API_ROUTES.PROGRAMS.STAGES(id)))
-      } else {
-        stages = sortStages(stages)
-      }
-      return { ...program, stages }
-    } catch (err) {
-      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
-        return null
-      }
-      throw err
+    const program = await nullableItemRequest<Program & { stages?: ProgramStage[] }>(
+      'GET',
+      API_ROUTES.PROGRAMS.DETAIL(id),
+    )
+    if (!program) return null
+    // Hydrate nested stages (the plan requires stages hydrated with pagination-loop).
+    let stages = program.stages
+    if (!stages) {
+      stages = sortStages(await arrayRequest<ProgramStage>('GET', API_ROUTES.PROGRAMS.STAGES(id)))
+    } else {
+      stages = sortStages(stages)
     }
+    return { ...program, stages }
   },
 
   create: (data: CreateProgramDTO) =>

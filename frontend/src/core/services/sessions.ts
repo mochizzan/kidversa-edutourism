@@ -12,34 +12,28 @@ import type {
   LinkParticipantResponse,
   ImportResult,
 } from '../types'
-import { listRequest, itemRequest, voidRequest, arrayRequest, normalizeTenantId } from './apiEnvelope'
+import { listRequest, itemRequest, voidRequest, arrayRequest, normalizeTenantId, nullableItemRequest } from './apiEnvelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export const sessionService: SessionService = {
   getAll: (params) => listRequest<Session>(API_ROUTES.SESSIONS.BASE, params),
 
   getById: async (id) => {
-    try {
-      const detail = await itemRequest<{
-        session: Session
-        stages: SessionStage[]
-        groups: (SessionGroup & { participants: Participant[] })[]
-      }>('GET', API_ROUTES.SESSIONS.DETAIL(id))
-      // EC3: default stages to [] if the backend omits them.
-      const session = normalizeTenantId(detail.session)
-      return {
-        ...session,
-        stages: (detail.stages ?? []).map(normalizeTenantId),
-        groups: (detail.groups ?? []).map((g) => ({
-          ...normalizeTenantId(g),
-          participants: (g.participants ?? []).map(normalizeTenantId),
-        })),
-      }
-    } catch (err) {
-      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
-        return null
-      }
-      throw err
+    const detail = await nullableItemRequest<{
+      session: Session
+      stages: SessionStage[]
+      groups: (SessionGroup & { participants: Participant[] })[]
+    }>('GET', API_ROUTES.SESSIONS.DETAIL(id))
+    if (!detail) return null
+    // EC3: default stages to [] if the backend omits them.
+    const session = normalizeTenantId(detail.session)
+    return {
+      ...session,
+      stages: (detail.stages ?? []).map(normalizeTenantId),
+      groups: (detail.groups ?? []).map((g) => ({
+        ...normalizeTenantId(g),
+        participants: (g.participants ?? []).map(normalizeTenantId),
+      })),
     }
   },
 
@@ -97,14 +91,7 @@ export const sessionService: SessionService = {
     arrayRequest<Participant>('GET', API_ROUTES.SESSIONS.PARTICIPANTS(sessionId, groupId)),
 
   getParticipantById: async (participantId) => {
-    try {
-      return await itemRequest<Participant>('GET', API_ROUTES.PARTICIPANTS.DETAIL(participantId))
-    } catch (err) {
-      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
-        return null
-      }
-      throw err
-    }
+    return nullableItemRequest<Participant>('GET', API_ROUTES.PARTICIPANTS.DETAIL(participantId))
   },
 
   addParticipant: (sessionId, groupId, data: CreateParticipantDTO) =>

@@ -1,7 +1,7 @@
 import { apiRequest } from './backendClient'
 import type { UserService } from './types'
 import type { User, CreateUserDTO, UpdateUserDTO } from '../types'
-import { listRequest, itemRequest, voidRequest } from './apiEnvelope'
+import { listRequest, itemRequest, voidRequest, nullableItemRequest } from './apiEnvelope'
 import { normalizePhone } from '../utils/phone'
 import { uploadMultipart } from './uploadMultipart'
 import { API_ROUTES } from '../constants/apiRoutes'
@@ -10,15 +10,8 @@ export const userService: UserService = {
   getAll: (params) => listRequest<User>(API_ROUTES.USERS.BASE, params),
 
   getById: async (id) => {
-    try {
-      return await itemRequest<User>('GET', API_ROUTES.USERS.DETAIL(id))
-    } catch (err) {
-      // 404 → not found (idb always returned null).
-      if (err instanceof Error && 'status' in err && (err as { status: number }).status === 404) {
-        return null
-      }
-      throw err
-    }
+    // 404 → not found (idb always returned null).
+    return nullableItemRequest<User>('GET', API_ROUTES.USERS.DETAIL(id))
   },
 
   create: (data: CreateUserDTO) =>

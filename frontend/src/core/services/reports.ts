@@ -1,7 +1,7 @@
 import type { Report } from '../types'
 import type { ReportService, ReportTokenResponse } from './types'
 import { apiRequest } from './backendClient'
-import { itemsRequest, itemRequest, nullableItemRequest } from './apiEnvelope'
+import { itemRequest, itemsRequest, nullableItemRequest } from './apiEnvelope'
 import { useAuthStore } from '../stores/authStore'
 import { API_ROUTES } from '../constants/apiRoutes'
 
@@ -72,8 +72,8 @@ const generateNarrativeStream = async (
 
 // getPublicReport fetches a report via its parent access token (public endpoint).
 const getPublicReport = async (token: string): Promise<PublicReportResponse | null> => {
-  const res = await apiRequest<{ data: PublicReportResponse }>('GET', `${API_ROUTES.REPORTS.ACCESS}?token=${encodeURIComponent(token)}`)
-  return res.data ?? null
+  const res = await itemRequest<PublicReportResponse>('GET', `${API_ROUTES.REPORTS.ACCESS}?token=${encodeURIComponent(token)}`)
+  return res ?? null
 }
 
 export const reportService: ReportService = {

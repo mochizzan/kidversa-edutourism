@@ -1,12 +1,6 @@
 import type { Tenant, TenantStats } from '../types'
-import { apiRequest } from './backendClient'
-import { itemRequest } from './apiEnvelope'
+import { arrayRequest, itemRequest } from './apiEnvelope'
 import { API_ROUTES } from '../constants/apiRoutes'
-
-interface TenantsEnvelope {
-  data: Tenant[]
-  meta?: { page: number; limit: number; total: number }
-}
 
 export interface TenantService {
   getAll(): Promise<Tenant[]>
@@ -16,10 +10,9 @@ export interface TenantService {
 // getAll returns every tenant the caller is allowed to see. SUPER_ADMIN sees
 // all tenants; ADMIN sees only their own tenant (enforced by the backend's
 // TenantScope / usecase layer). The endpoint returns a paginated envelope; we
-// unwrap the `data` array.
+// unwrap the `data` array via the shared arrayRequest helper.
 const getAll = async (): Promise<Tenant[]> => {
-  const res = await apiRequest<TenantsEnvelope>('GET', API_ROUTES.TENANTS.BASE)
-  return res.data ?? []
+  return arrayRequest<Tenant>('GET', API_ROUTES.TENANTS.BASE)
 }
 
 // getStats returns per-tenant user counts computed server-side. This avoids a
