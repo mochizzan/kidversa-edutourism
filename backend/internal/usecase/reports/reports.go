@@ -12,8 +12,8 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/ai"
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/pkg/constants"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
 // NarrativeGenerator produces a full AI narrative for a report. tenantID is the

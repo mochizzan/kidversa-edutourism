@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
-	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/pkg/constants"
+	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
 // bindUUID pulls a path param, validates it is a UUID, and responds 400 if not.

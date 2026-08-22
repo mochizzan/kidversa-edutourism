@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 
 	"kidversa-edutourism-backend/internal/config"
-	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/pkg/constants"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
 // DB wraps *gorm.DB with a helper Ping for readiness checks.
