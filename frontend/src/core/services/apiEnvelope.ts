@@ -14,6 +14,7 @@
 import { ApiError, apiRequest } from './backendClient'
 import type { ListParams, PaginatedResponse } from '../types'
 import { getActiveTenantId } from '../utils/tenant'
+import { PAGE_SIZE } from '../constants/api'
 
 interface ListEnvelope<T> {
   data: T[]
@@ -55,7 +56,7 @@ export function normalizeTenantId<T>(item: T): T {
 }
 
 function buildQuery(path: string, params?: ListParams): string {
-  const limit = Math.max(1, params?.limit ?? 10)
+  const limit = Math.max(1, params?.limit ?? PAGE_SIZE)
   const page = Math.max(1, params?.page ?? 1)
   const query = new URLSearchParams()
   query.set('page', String(page))
@@ -79,7 +80,7 @@ export async function listRequest<T>(
   path: string,
   params?: ListParams,
 ): Promise<PaginatedResponse<T>> {
-  const limit = Math.max(1, params?.limit ?? 10)
+  const limit = Math.max(1, params?.limit ?? PAGE_SIZE)
   const page = Math.max(1, params?.page ?? 1)
   const url = buildQuery(path, params)
 

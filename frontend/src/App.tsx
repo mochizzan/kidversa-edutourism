@@ -4,6 +4,7 @@ import { router } from './app/router'
 import { useAuthStore, redirectToLogin } from './core/stores/authStore'
 import { healthCheck, registerUnauthorizedHandler } from './core/services/backendClient'
 import { ROUTES } from './core/constants/app'
+import { TIMING } from './core/constants/timing'
 import { UserRole } from './core/types/enums'
 import { ErrorBoundary } from './shared/components/feedback/ErrorBoundary'
 import { ToastProvider } from './shared/components/feedback/Toast'
@@ -16,11 +17,11 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase('text'), 700),
+      setTimeout(() => setPhase('text'), TIMING.SPLASH_POP_MS),
       setTimeout(() => {
         setPhase('exit')
-        setTimeout(onFinish, 500)
-      }, 3200),
+        setTimeout(onFinish, TIMING.SPLASH_EXIT_MS)
+      }, TIMING.SPLASH_TEXT_MS),
     ]
     return () => timers.forEach(clearTimeout)
   }, [onFinish])

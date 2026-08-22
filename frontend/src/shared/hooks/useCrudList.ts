@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { ListParams, PaginatedResponse } from '../../core/types'
 import { ApiError } from '../../core/services/backendClient'
+import { PAGE_SIZE } from '../../core/constants/api'
 import { useGlobalToast } from '../../shared/components/feedback/Toast'
 import { useTenantScope } from '../../core/hooks/useTenantScope'
 
@@ -39,7 +40,7 @@ const _inflight = new Map<string, Promise<{ data: unknown[]; total: number }>>()
 export function useCrudList<T extends { id: string }>(
   options: UseCrudListOptions<T>,
 ): UseCrudListResult<T> {
-  const { fetchFn, pageSize = 10, enableCache = true, additionalFilters, scopeToTenant = false } = options
+  const { fetchFn, pageSize = PAGE_SIZE, enableCache = true, additionalFilters, scopeToTenant = false } = options
 
   // Keep the latest fetchFn/additionalFilters/search without making them effect
   // deps. They are recreated every render at the call site; depending on their

@@ -1,6 +1,6 @@
 export { cn } from '../../core/utils/cn'
 
-const WIB_TIME_ZONE = 'Asia/Jakarta'
+import { WIB } from '../../core/constants/timezone'
 
 export function formatDate(date: string | Date) {
   const d = new Date(date)
@@ -9,7 +9,7 @@ export function formatDate(date: string | Date) {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-    timeZone: WIB_TIME_ZONE,
+    timeZone: WIB,
   }).format(d)
 }
 
@@ -22,7 +22,7 @@ export function formatDateTime(date: string | Date) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: WIB_TIME_ZONE,
+    timeZone: WIB,
   }).format(d)
   return `${formatted} WIB`
 }

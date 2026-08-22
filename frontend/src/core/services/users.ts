@@ -61,7 +61,7 @@ export const userService: UserService = {
 // Self-service password change — used by the force-change-password flow for
 // seeded/bootstrap demo accounts flagged `must_change_password`.
 export const changePassword = (oldPassword: string, newPassword: string) =>
-  apiRequest('POST', '/api/auth/change-password', {
+  apiRequest('POST', API_ROUTES.AUTH.CHANGE_PASSWORD, {
     old_password: oldPassword,
     new_password: newPassword,
   })

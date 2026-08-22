@@ -3,6 +3,7 @@ import type { User } from '../types'
 import type { CreateUserDTO } from '../types'
 import { UserRole } from '../types'
 import { ROUTES } from '../constants/app'
+import { API_ROUTES } from '../constants/apiRoutes'
 import {
   apiRequest,
   setTokens,
@@ -69,7 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   login: async (email: string, password: string) => {
     const res = await apiRequest<{ data: LoginResponseData }>(
       'POST',
-      '/api/auth/login',
+      API_ROUTES.AUTH.LOGIN,
       { email, password },
     )
     const { access_token, refresh_token, user } = res.data
@@ -90,7 +91,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   register: async (data: CreateUserDTO) => {
     // Transform Indonesian phone numbers to E.164 (+62...) at the service boundary.
     const phone = normalizePhone(data.phone)
-    const res = await apiRequest<{ data: User }>('POST', '/api/auth/register', {
+    const res = await apiRequest<{ data: User }>('POST', API_ROUTES.AUTH.REGISTER, {
       name: data.name,
       email: data.email,
       password: data.password,
@@ -107,7 +108,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // already dead (e.g. refresh failed on reload).
     if (getTokens().accessToken || get().isAuthenticated) {
       try {
-        await apiRequest('POST', '/api/auth/logout')
+        await apiRequest('POST', API_ROUTES.AUTH.LOGOUT)
       } catch {
         // Ignore network/401 — local cleanup still happens.
       }
@@ -185,7 +186,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Validate the session against the backend. /me returns only a minimal
         // user — we do NOT replace our full stored user with it.
         try {
-          await apiRequest('GET', '/api/auth/me')
+          await apiRequest('GET', API_ROUTES.AUTH.ME)
           set({ isLoading: false })
         } catch (err) {
           // A 401 means the session is no longer valid → clear it.

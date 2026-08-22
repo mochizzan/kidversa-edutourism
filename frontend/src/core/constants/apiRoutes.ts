@@ -14,6 +14,9 @@ export const API_ROUTES = {
     REGISTER: '/api/auth/register',
     REFRESH: '/api/auth/refresh',
     KIOSK: '/api/auth/kiosk',
+    ME: '/api/auth/me',
+    LOGOUT: '/api/auth/logout',
+    CHANGE_PASSWORD: '/api/auth/change-password',
   },
 
   CONSENT: {
@@ -183,6 +186,7 @@ export const API_ROUTES = {
 
   NOTIFICATIONS: {
     BASE: '/api/notifications',
+    STREAM: '/api/notifications/stream',
     READ_ALL: '/api/notifications/read-all',
     READ: (id: string) => `/api/notifications/${encodeURIComponent(id)}/read`,
   },

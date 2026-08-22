@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { reportPublicService } from '../../../core/services/reports'
 import { ApiError } from '../../../core/services/backendClient'
 import type { Participant } from '../../../core/types'
+import { SUPPORT_EMAIL } from '../../../core/constants/timezone'
 
 /* ── Public report shape (anti-IDOR DTO from GET /api/reports/access) ──
    Mirrors backend PublicReportDTO. PII and the raw token are intentionally
@@ -123,7 +124,7 @@ export function ParentTokenGuard({ children, kind = 'report' }: ParentTokenGuard
           <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
             <span>Butuh bantuan?</span>
             <a
-              href={`mailto:support@kidversa.id`}
+              href={`mailto:${SUPPORT_EMAIL}`}
               className="text-primary font-medium hover:underline"
             >
               Hubungi Kami
@@ -149,7 +150,7 @@ export function ParentTokenGuard({ children, kind = 'report' }: ParentTokenGuard
           <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
             <span>Butuh bantuan?</span>
             <a
-              href={`mailto:support@kidversa.id`}
+              href={`mailto:${SUPPORT_EMAIL}`}
               className="text-primary font-medium hover:underline"
             >
               Hubungi Kami

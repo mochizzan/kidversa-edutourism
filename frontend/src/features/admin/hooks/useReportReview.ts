@@ -18,6 +18,7 @@ import { getMediaUrl } from '../../../core/utils/media'
 import {
   DEFAULT_FACILITATOR_MESSAGE,
   DEFAULT_FACILITATOR_NAME,
+  RAPORT_LAYOUT,
 } from '../../../core/constants/report'
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import {
@@ -298,21 +299,21 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       ? groups.find((g) => g.id === participant.group_id)?.name
       : undefined
 
-    const detailStages = stageInfos.slice(0, 4)
-    const extraTopicsCount = Math.max(0, stageInfos.length - 4)
+    const detailStages = stageInfos.slice(0, RAPORT_LAYOUT.MAX_DETAIL_STAGES)
+    const extraTopicsCount = Math.max(0, stageInfos.length - RAPORT_LAYOUT.MAX_DETAIL_STAGES)
 
     const stagedStages = detailStages.map((si, i) => ({
       name: si.programStage.name,
       sequenceOrder: si.programStage.sequence_order ?? i + 1,
-      kegiatan: si.kegiatan.slice(0, 3).map((k) => ({
+      kegiatan: si.kegiatan.slice(0, RAPORT_LAYOUT.MAX_KEGIATAN_PER_STAGE).map((k) => ({
         name: k.programSubstageName,
         starRating: k.assessment?.star_rating ?? 0,
       })),
     }))
 
-    const narrative = narrativeText.length > 260 ? `${narrativeText.slice(0, 260)}…` : narrativeText
+    const narrative = narrativeText.length > RAPORT_LAYOUT.MAX_NARRATIVE_CHARS ? `${narrativeText.slice(0, RAPORT_LAYOUT.MAX_NARRATIVE_CHARS)}…` : narrativeText
 
-    const selectedMissionIds = assignedMissionIds.slice(0, 4)
+    const selectedMissionIds = assignedMissionIds.slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
     let missionTitles = missions
       .filter((m) => selectedMissionIds.includes(m.id))
       .map((m) => m.title_child)
@@ -331,13 +332,13 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
           created_at: '',
         })),
       })
-      const pickedIds = picked.slice(0, 4)
+      const pickedIds = picked.slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
       missionTitles = missions
         .filter((m) => pickedIds.includes(m.id))
         .map((m) => m.title_child)
     }
 
-    const mappedBadges = badges.slice(0, 4).map((b) => ({
+    const mappedBadges = badges.slice(0, RAPORT_LAYOUT.MAX_BADGES_PREVIEW).map((b) => ({
       badgeName: b.badge_name,
       badgeImageUrl: b.badge_image_url ? getMediaUrl('content', b.badge_image_url) : undefined,
     }))

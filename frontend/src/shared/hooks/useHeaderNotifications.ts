@@ -5,6 +5,7 @@ import { isSuperAdmin } from '../../core/utils/permissions'
 import { openSSE, refreshAccessToken } from '../../core/services/backendClient'
 import { notifications } from '../../core/services/notifications'
 import { ROUTES } from '../../core/constants/app'
+import { API_ROUTES } from '../../core/constants/apiRoutes'
 import type { Notification } from '../../core/types'
 
 export interface HeaderNotification {
@@ -98,7 +99,7 @@ export function useHeaderNotifications() {
       const onEvent = () => {
         void refresh()
       }
-      source = openSSE('/api/notifications/stream', onEvent, {
+      source = openSSE(API_ROUTES.NOTIFICATIONS.STREAM, onEvent, {
         onError: () => {
           // EventSource auto-reconnects, but on a 401 it would loop forever.
           // Close it and retry with backoff (capped).
