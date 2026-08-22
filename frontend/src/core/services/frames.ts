@@ -1,51 +1,17 @@
 import type { PaginatedResponse, ListParams, PhotoFrame } from '../types'
 import type { FrameService } from './types'
 import { apiRequest } from './backendClient'
-import { withTenantHeader, normalizeTenantId, itemRequest } from './apiEnvelope'
+import { itemRequest, fetchAllPages, normalizeTenantId, type ItemsListEnvelope } from './apiEnvelope'
 import { uploadMultipart } from './uploadMultipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 // Frame service — backed by /api/frames (NOT /api/photo-frames) (C3).
 // Replaces the IndexedDB barrel. Preserves the `frameService` export name and
 // the FrameService signature. Backend list is paginated (max 100/page), so we
-// loop pages (EC9) to return the full working set the callers expect.
-
-interface FrameListEnvelope {
-  data: { items: PhotoFrame[] }
-  meta?: { page: number; limit: number; total: number }
-}
+// loop pages (EC9) via the shared fetchAllPages helper to return the full
+// working set the callers expect.
 
 const PAGE_SIZE = 100
-
-const fetchAllPages = async (
-  basePath: string,
-  extra: Record<string, string>,
-): Promise<PhotoFrame[]> => {
-  const all: PhotoFrame[] = []
-  let page = 1
-  // Loop until we have everything (EC9). Guard with a sane upper bound.
-  for (let safety = 0; safety < 1000; safety++) {
-    const qs = new URLSearchParams()
-    qs.set('page', String(page))
-    qs.set('limit', String(PAGE_SIZE))
-    for (const [k, v] of Object.entries(extra)) {
-      if (v !== '' && v !== undefined) qs.set(k, v)
-    }
-    const res = await apiRequest<FrameListEnvelope>(
-      'GET',
-      `${basePath}?${qs.toString()}`,
-      undefined,
-      { headers: withTenantHeader() },
-    )
-    const items = (res.data?.items ?? []).map((f) => normalizeTenantId(f))
-    all.push(...items)
-    const meta = res.meta
-    if (!meta || items.length === 0 || all.length >= meta.total) break
-    if (items.length < PAGE_SIZE) break
-    page += 1
-  }
-  return all
-}
 
 const getAll = async (
   params?: ListParams,
@@ -58,7 +24,24 @@ const getAll = async (
   if (params?.filters?.program_id)
     extra.program_id = String(params.filters.program_id)
 
-  const all = await fetchAllPages(API_ROUTES.FRAMES.BASE, extra)
+  const all = await fetchAllPages<PhotoFrame>(
+    (page) => {
+      const qs = new URLSearchParams()
+      qs.set('page', String(page))
+      qs.set('limit', String(PAGE_SIZE))
+      for (const [k, v] of Object.entries(extra)) {
+        if (v !== '' && v !== undefined) qs.set(k, v)
+      }
+      return apiRequest<ItemsListEnvelope<PhotoFrame>>(
+        'GET',
+        `${API_ROUTES.FRAMES.BASE}?${qs.toString()}`,
+      ).then((res) => ({
+        data: (res.data?.items ?? []).map((f) => normalizeTenantId(f)),
+        meta: res.meta,
+      }))
+    },
+    1,
+  )
 
   const page = params?.page ?? 1
   const limit = params?.limit ?? 10
