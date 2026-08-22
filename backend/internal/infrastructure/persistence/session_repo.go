@@ -521,22 +521,36 @@ func (r *GormSessionRepository) FindDuplicateParticipants(ctx context.Context, p
 		SessionName   string `gorm:"column:session_name"`
 	}
 
-	var dupRows []dupRow
-	for _, row := range rows {
-		var found []dupRow
-		q := r.db.WithContext(ctx).
-			Table("participants AS p").
-			Select("p.id AS participant_id, p.child_name, p.parent_phone, s.name AS session_name").
-			Joins("INNER JOIN sessions AS s ON s.id = p.session_id AND s.deleted_at IS NULL").
-			Where("s.program_id = ? AND s.deleted_at IS NULL", programID).
-			Where("LOWER(p.child_name) = LOWER(?) AND LOWER(p.parent_phone) = LOWER(?)", row.ChildName, row.ParentPhone)
+	// One query instead of N: match every import row at once via a row-value IN
+	// on (LOWER(child_name), LOWER(parent_phone), program_id, tenant_id).
+	var tupleArgs []interface{}
+	var tuples strings.Builder
+	for i, row := range rows {
+		if i > 0 {
+			tuples.WriteString(", ")
+		}
 		if tenantID != "" {
-			q = q.Where("p.tenant_id = ?", tenantID)
+			tuples.WriteString("(LOWER(?), LOWER(?), ?, ?)")
+			tupleArgs = append(tupleArgs, row.ChildName, row.ParentPhone, programID, tenantID)
+		} else {
+			tuples.WriteString("(LOWER(?), LOWER(?), ?)")
+			tupleArgs = append(tupleArgs, row.ChildName, row.ParentPhone, programID)
 		}
-		if err := q.Find(&found).Error; err != nil {
-			return nil, apperrors.Internal("internal_error", err)
-		}
-		dupRows = append(dupRows, found...)
+	}
+	tupleCols := "LOWER(p.child_name), LOWER(p.parent_phone), s.program_id"
+	if tenantID != "" {
+		tupleCols += ", p.tenant_id"
+	}
+	inClause := "(" + tupleCols + ") IN (" + tuples.String() + ")"
+
+	var dupRows []dupRow
+	if err := r.db.WithContext(ctx).
+		Table("participants AS p").
+		Select("p.id AS participant_id, p.child_name, p.parent_phone, s.name AS session_name").
+		Joins("INNER JOIN sessions AS s ON s.id = p.session_id AND s.deleted_at IS NULL").
+		Where(inClause, tupleArgs...).
+		Find(&dupRows).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
 	}
 
 	out := make([]repository.DuplicateParticipantInfo, 0, len(dupRows))
