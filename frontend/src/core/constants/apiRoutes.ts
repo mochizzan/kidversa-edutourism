@@ -149,7 +149,6 @@ export const API_ROUTES = {
       `/api/participant-missions?report_id=${encodeURIComponent(reportId)}`,
     BY_PARTICIPANT: (participantId: string) =>
       `/api/participant-missions?participant_id=${encodeURIComponent(participantId)}`,
-    REPLACE: '/api/participant-missions/replace',
   },
 
   ASSESSMENTS: {
