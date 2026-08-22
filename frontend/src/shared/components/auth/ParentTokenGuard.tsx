@@ -4,19 +4,7 @@ import { reportPublicService } from '../../../core/services/reports'
 import { ApiError } from '../../../core/services/backendClient'
 import type { Participant } from '../../../core/types'
 import { SUPPORT_EMAIL } from '../../../core/constants/timezone'
-
-/* ── Public report shape (anti-IDOR DTO from GET /api/reports/access) ──
-   Mirrors backend PublicReportDTO. PII and the raw token are intentionally
-   absent — the parent flow only ever sees this stripped payload. */
-export interface PublicReport {
-  id: string
-  participant_id: string
-  session_id: string
-  status: string
-  ai_narrative_final?: string
-  mission_ids?: string[]
-  report_pdf_url?: string
-}
+import type { PublicReport } from '../../../core/types'
 
 export type ParentGuardKind = 'report' | 'consent'
 

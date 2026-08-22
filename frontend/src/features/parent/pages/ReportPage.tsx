@@ -6,8 +6,8 @@ import { Loader2 } from 'lucide-react'
 import {
   ParentTokenGuard,
   useParentToken,
-  type PublicReport,
 } from '../../../shared/components/auth/ParentTokenGuard'
+import type { PublicReport } from '../../../core/types'
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 import { DEFAULT_FACILITATOR_MESSAGE, DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'

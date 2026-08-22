@@ -24,10 +24,9 @@
  *  • Entrance stagger: each group item is offset by groupIndex * 60 ms
  *
  * Architecture:
- *  ToastProvider   — context holder; renders ToastContainer + injects keyframe styles
- *  ToastRegistry   — singleton ref exposed so components can call
- *                    toastRegistry.current.show(...) imperatively
- *  useGlobalToast() — convenience hook for components already in a Provider
+ *  ToastProvider   — render shell; reads the global toast store + injects keyframe styles
+ *  useGlobalToast() — convenience hook for components; reads core/stores/toastStore
+ *  toastRegistry   — imperative escape hatch exported from the toast store
  *
  * @module Toast
  *
@@ -58,11 +57,9 @@
  *   export type ToastType
  *   export interface Toast          — shape is stable; `_createdAt` is internal.
  *   export function ToastProvider   — wrap your app (or root layout) in this.
- *   export function useGlobalToast  — call inside a Provider tree; falls back to
- *                                    ToastRegistry when outside.
- *   export const ToastRegistry      — { current: ToastContextValue | null }.
- *                                    Set by ToastProvider; read from anywhere.
- *   export function useToast        — legacy local-state hook; backward-compat.
+ *   export function useGlobalToast  — call inside a Provider tree; reads the
+ *                                    global Zustand toast store (core/stores/toastStore).
+ *   export const toastRegistry      — imperative escape hatch (store-backed).
  *
  * Adding a new toast type
  * -----------------------
@@ -112,12 +109,10 @@
 
 import {
   useState,
-  useCallback,
   useEffect,
   useRef,
   useMemo,
-  createContext,
-  useContext,
+  useCallback,
   type ReactNode,
   type CSSProperties,
 } from 'react'
@@ -131,6 +126,7 @@ import {
   Pause,
 } from 'lucide-react'
 import { cn } from '../../../core/utils'
+import { useToastStore } from '../../../core/stores/toastStore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -152,11 +148,16 @@ export interface Toast {
   _createdAt?: number
 }
 
-interface ToastContextValue {
-  addToast: (toast: Omit<Toast, 'id'>) => string
-  removeToast: (id: string) => void
-  dismissAll: () => void
-  toasts: Toast[]
+// ─── Global toast API ─────────────────────────────────────────────────────────
+// State lives in core/stores/toastStore (Zustand). This hook is the read/dispatch
+// surface used across the app; it re-renders consumers on toast-list changes.
+
+export function useGlobalToast() {
+  const addToast = useToastStore((s) => s.addToast)
+  const removeToast = useToastStore((s) => s.removeToast)
+  const dismissAll = useToastStore((s) => s.dismissAll)
+  const toasts = useToastStore((s) => s.toasts)
+  return { addToast, removeToast, dismissAll, toasts }
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -213,63 +214,6 @@ function useToastStyles() {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function generateId(): string {
-  return `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-// ─── Context ──────────────────────────────────────────────────────────────────
-
-const ToastContext = createContext<ToastContextValue | null>(null)
-
-// ---------------------------------------------------------------------------
-// ToastRegistry
-// ---------------------------------------------------------------------------
-// Module-level singleton that ToastProvider updates on every render.
-// Allows non-Provider consumers (e.g. hot-path event handlers, utility
-// functions) to post toasts imperatively without a React context.
-
-/**
- * Imperative singleton registry.
- *
- * Populated automatically by `ToastProvider` — no manual setup required.
- * Read from anywhere (even outside the React tree) to access the current
- * `addToast` / `removeToast` / `dismissAll` methods.
- *
- * @example
- * // From anywhere (even outside a component):
- * ToastRegistry.current?.addToast({ type: 'info', message: 'Saved!' })
- *
- * @see useGlobalToast for a hook-based alternative inside components.
- */
-export const ToastRegistry = { current: null as ToastContextValue | null }
-
-// ---------------------------------------------------------------------------
-// useGlobalToast
-// ---------------------------------------------------------------------------
-
-/**
- * Hook that returns the current toast context.
- *
- * Inside a `ToastProvider` tree: returns the live context (re-renders on
- * toast list changes).
- * Outside a `ToastProvider` tree: falls back to `ToastRegistry.current` so
- * toast calls don't throw (graceful degradation). If the registry is also
- * null, throws with an instructive error message.
- *
- * @returns The `ToastContextValue` from context or registry.
- * @throws If called outside a provider tree AND `ToastRegistry.current` is null.
- */
-export function useGlobalToast() {
-  const ctx = useContext(ToastContext)
-  if (!ctx) {
-    // Fall back to the singleton registry so toast calls don't throw
-    // outside of a Provider tree (graceful degradation).
-    if (ToastRegistry.current) return ToastRegistry.current
-    throw new Error('useGlobalToast() harus digunakan di dalam <ToastProvider>')
-  }
-  return ctx
-}
 
 // ─── Per-type visual configuration ────────────────────────────────────────────
 
@@ -836,10 +780,10 @@ function ToastContainer({
  * Root provider that manages toast state and renders the `ToastContainer`.
  *
  * Wrap your app (or a top-level layout) in this component once. It:
- *   1. Holds the toast list in React state.
+ *   1. Reads the toast list from the global Zustand store (core/stores/toastStore).
  *   2. Injects keyframe styles into `<head>` (once, via `useToastStyles`).
- *   3. Syncs `ToastRegistry.current` so `useGlobalToast` and imperative calls work.
- *   4. Renders `ToastContainer` as a portal-friendly fixed overlay.
+ *   3. Renders `ToastContainer` as a fixed overlay driven by the store.
+ *   4. All mutations go through the store actions (addToast/removeToast/dismissAll).
  *
  * @example
  * // In App.tsx:
@@ -858,91 +802,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // Must run before children mount so animations are available immediately.
   useToastStyles()
 
-  const [toasts, setToasts] = useState<Toast[]>([])
-
-  const addToast = useCallback((raw: Omit<Toast, 'id'>) => {
-    const id = generateId()
-    const now = Date.now()
-    const newToast: Toast = {
-      ...raw,
-      id,
-      // Timestamp captured here so relative-time ("baru saja", "2 menit lalu")
-      // renders correctly across re-renders. Do NOT mutate this field later.
-      _createdAt: now,
-    }
-    setToasts((prev) => {
-      const isDuplicate = prev.some(
-        (t) =>
-          t.type === raw.type &&
-          t.message === raw.message &&
-          t._createdAt !== undefined &&
-          now - t._createdAt < 3000,
-      )
-      if (isDuplicate) return prev
-      return [newToast, ...prev]
-    })
-    return id
-  }, [])
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
-  }, [])
-
-  const dismissAll = useCallback(() => {
-    setToasts([])
-  }, [])
-
-  const ctxValue = useMemo<ToastContextValue>(
-    () => ({ addToast, removeToast, dismissAll, toasts }),
-    [addToast, removeToast, dismissAll, toasts],
-  )
-
-  // Sync the singleton registry so useGlobalToast works even when
-  // the consumer is rendered outside the Provider subtree.
-  ToastRegistry.current = ctxValue
+  // Global toast state now lives in core/stores/toastStore (Zustand). The
+  // provider is a thin render shell that subscribes to the store and paints
+  // the container; all mutations go through useToastStore actions.
+  const toasts = useToastStore((s) => s.toasts)
+  const removeToast = useToastStore((s) => s.removeToast)
 
   return (
-    <ToastContext.Provider value={ctxValue}>
+    <>
       {children}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
-    </ToastContext.Provider>
+    </>
   )
-}
-
-// ─── Local Toast Hook (component-scoped, backward-compatible) ──────────────────
-// Renders its own local container; useGlobalToast / ToastProvider preferred.
-
-/**
- * Legacy component-scoped toast hook.
- *
- * Manages its own toast list with `useState` — does NOT participate in the
- * global `ToastProvider` tree. Returned `addToast` / `removeToast` only
- * affect the calling component's container.
- *
- * **Prefer `useGlobalToast()` + `ToastProvider`** for new code. This hook
- * exists for backward compatibility and isolated component use-cases.
- *
- * @returns `{ toasts, addToast, removeToast }` — local state, not shared.
- */
-export function useToast() {
-  const [toasts, setToasts] = useState<Toast[]>([])
-
-  const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
-    const id = generateId()
-    const newToast = { ...toast, id } as Toast
-    setToasts((prev) => [newToast, ...prev])
-    if (toast.duration !== 0) {
-      const duration = toast.duration ?? DEFAULT_DURATION
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id))
-      }, duration + 400)
-    }
-    return id
-  }, [])
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
-  }, [])
-
-  return { toasts, addToast, removeToast }
 }
