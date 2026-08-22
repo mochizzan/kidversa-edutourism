@@ -14,6 +14,9 @@ import (
 
 const openRouterMaxBodySize = 64 * 1024
 
+// openRouterHTTPReferer is sent as the HTTP-Referer header on OpenRouter requests.
+const openRouterHTTPReferer = "https://kidversa.id"
+
 type openRouterRequest struct {
 	Model       string              `json:"model"`
 	Messages    []openRouterMessage `json:"messages"`
@@ -69,29 +72,10 @@ func NewOpenRouterClient(apiKey, model, baseURL string) *OpenRouterClient {
 
 // ChatCompletion sends a chat completion request and returns the assistant's response text.
 func (c *OpenRouterClient) ChatCompletion(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
-	body := openRouterRequest{
-		Model:       c.model,
-		Temperature: c.temperature,
-		MaxTokens:   c.maxTokens,
-		Messages: []openRouterMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: userPrompt},
-		},
-	}
-
-	buf, err := json.Marshal(body)
+	req, err := c.buildRequest(ctx, systemPrompt, userPrompt, false)
 	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
+		return "", err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(buf))
-	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("HTTP-Referer", "https://kidversa.id")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -99,23 +83,8 @@ func (c *OpenRouterClient) ChatCompletion(ctx context.Context, systemPrompt, use
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 401 {
-		return "", fmt.Errorf("openrouter: invalid API key")
-	}
-	if resp.StatusCode == 429 {
-		return "", fmt.Errorf("openrouter: rate limit exceeded")
-	}
-	if resp.StatusCode == 402 {
-		return "", fmt.Errorf("openrouter: insufficient credits")
-	}
-	if resp.StatusCode == 408 || resp.StatusCode == 524 {
-		return "", fmt.Errorf("openrouter: request timeout")
-	}
-	if resp.StatusCode == 502 || resp.StatusCode == 529 {
-		return "", fmt.Errorf("openrouter: provider temporarily unavailable")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("openrouter: unexpected status %d", resp.StatusCode)
+	if err := mapStatusError(resp.StatusCode); err != nil {
+		return "", err
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, openRouterMaxBodySize))
@@ -142,30 +111,10 @@ func (c *OpenRouterClient) ChatCompletion(ctx context.Context, systemPrompt, use
 
 // StreamChatCompletion streams a chat completion, invoking onToken for each token delta.
 func (c *OpenRouterClient) StreamChatCompletion(ctx context.Context, systemPrompt, userPrompt string, onToken func(string) error) error {
-	body := openRouterRequest{
-		Model:       c.model,
-		Temperature: c.temperature,
-		MaxTokens:   c.maxTokens,
-		Stream:      true,
-		Messages: []openRouterMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: userPrompt},
-		},
-	}
-
-	buf, err := json.Marshal(body)
+	req, err := c.buildRequest(ctx, systemPrompt, userPrompt, true)
 	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+		return err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(buf))
-	if err != nil {
-		return fmt.Errorf("build request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("HTTP-Referer", "https://kidversa.id")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -173,23 +122,8 @@ func (c *OpenRouterClient) StreamChatCompletion(ctx context.Context, systemPromp
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 401 {
-		return fmt.Errorf("openrouter: invalid API key")
-	}
-	if resp.StatusCode == 429 {
-		return fmt.Errorf("openrouter: rate limit exceeded")
-	}
-	if resp.StatusCode == 402 {
-		return fmt.Errorf("openrouter: insufficient credits")
-	}
-	if resp.StatusCode == 408 || resp.StatusCode == 524 {
-		return fmt.Errorf("openrouter: request timeout")
-	}
-	if resp.StatusCode == 502 || resp.StatusCode == 529 {
-		return fmt.Errorf("openrouter: provider temporarily unavailable")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("openrouter: unexpected status %d", resp.StatusCode)
+	if err := mapStatusError(resp.StatusCode); err != nil {
+		return err
 	}
 
 	reader := bufio.NewReaderSize(resp.Body, 4096)
@@ -226,4 +160,56 @@ func (c *OpenRouterClient) StreamChatCompletion(ctx context.Context, systemPromp
 	}
 
 	return nil
+}
+
+// buildRequest constructs an OpenRouter chat-completions HTTP request with the
+// client's configured model, temperature, and max-token settings. stream toggles
+// the SSE streaming flag. The HTTP-Referer is set from the shared site constant.
+func (c *OpenRouterClient) buildRequest(ctx context.Context, systemPrompt, userPrompt string, stream bool) (*http.Request, error) {
+	body := openRouterRequest{
+		Model:       c.model,
+		Temperature: c.temperature,
+		MaxTokens:   c.maxTokens,
+		Stream:      stream,
+		Messages: []openRouterMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+	}
+
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(buf))
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("HTTP-Referer", openRouterHTTPReferer)
+
+	return req, nil
+}
+
+// mapStatusError converts a non-2xx OpenRouter HTTP status into a typed error.
+func mapStatusError(code int) error {
+	switch code {
+	case http.StatusUnauthorized:
+		return fmt.Errorf("openrouter: invalid API key")
+	case http.StatusTooManyRequests:
+		return fmt.Errorf("openrouter: rate limit exceeded")
+	case 402:
+		return fmt.Errorf("openrouter: insufficient credits")
+	case 408, 524:
+		return fmt.Errorf("openrouter: request timeout")
+	case 502, 529:
+		return fmt.Errorf("openrouter: provider temporarily unavailable")
+	case http.StatusOK:
+		return nil
+	default:
+		return fmt.Errorf("openrouter: unexpected status %d", code)
+	}
 }
