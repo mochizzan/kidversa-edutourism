@@ -1,8 +1,8 @@
 import type { PaginatedResponse, ListParams, PhotoFrame } from '../types'
 import type { FrameService } from './types'
-import { apiRequest } from './backendClient'
-import { itemRequest, fetchAllPages, normalizeTenantId, type ItemsListEnvelope } from './apiEnvelope'
-import { uploadMultipart } from './uploadMultipart'
+import { apiRequest } from './backend-client'
+import { itemRequest, fetchAllPages, normalizeTenantId, type ItemsListEnvelope } from './api-envelope'
+import { uploadMultipart } from './upload-multipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 // Frame service — backed by /api/frames (NOT /api/photo-frames) (C3).

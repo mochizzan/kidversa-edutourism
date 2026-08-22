@@ -1,5 +1,5 @@
 import type { Tenant, TenantStats } from '../types'
-import { arrayRequest, itemRequest } from './apiEnvelope'
+import { arrayRequest, itemRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export interface TenantService {

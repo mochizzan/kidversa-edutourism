@@ -1,9 +1,9 @@
-import { apiRequest } from './backendClient'
+import { apiRequest } from './backend-client'
 import type { UserService } from './types'
 import type { User, CreateUserDTO, UpdateUserDTO } from '../types'
-import { listRequest, itemRequest, voidRequest, nullableItemRequest } from './apiEnvelope'
+import { listRequest, itemRequest, voidRequest, nullableItemRequest } from './api-envelope'
 import { normalizePhone } from '../utils/phone'
-import { uploadMultipart } from './uploadMultipart'
+import { uploadMultipart } from './upload-multipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export const userService: UserService = {

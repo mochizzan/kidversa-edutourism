@@ -1,5 +1,5 @@
 import type { Notification } from '../types'
-import { listRequest, voidRequest } from './apiEnvelope'
+import { listRequest, voidRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export interface NotificationListResult {

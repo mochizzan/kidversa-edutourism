@@ -6,7 +6,7 @@
 // unwrap) so auth/tenant scoping is identical to every other service.
 
 import type { ProgramSubstage } from '../types'
-import { arrayRequest, itemRequest, voidRequest } from './apiEnvelope'
+import { arrayRequest, itemRequest, voidRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export interface ProgramSubstageService {

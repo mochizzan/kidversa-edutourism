@@ -1,12 +1,12 @@
 import type { MissionBank, CreateMissionBankDTO } from '../types'
 import type { MissionBankService } from './types'
-import { apiRequest } from './backendClient'
+import { apiRequest } from './backend-client'
 import {
   itemRequest,
   voidRequest,
   normalizeTenantId,
   type ItemsListEnvelope,
-} from './apiEnvelope'
+} from './api-envelope'
 import { getActiveTenantId } from '../utils/tenant'
 import { parseRawJSON } from '../utils/rawJson'
 import { API_ROUTES } from '../constants/apiRoutes'
@@ -130,4 +130,4 @@ export const missionService: MissionBankService = {
 }
 
 // Participant missions are served by a separate shim (participantMissions.ts).
-export { participantMissionService } from './participantMissions'
+export { participantMissionService } from './participant-missions'

@@ -10,7 +10,7 @@
 // match the backend entity JSON (see backend/internal/domain/entity).
 
 import { GroupStageProgressStatus, type SessionGroup, type Participant } from '../types'
-import { apiRequest } from './backendClient'
+import { apiRequest } from './backend-client'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export interface GroupStageProgressRow {

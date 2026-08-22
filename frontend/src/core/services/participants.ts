@@ -1,6 +1,6 @@
 import type { ParticipantService } from './types'
 import type { Participant, CreateParticipantDTO } from '../types'
-import { listRequest, itemRequest, nullableItemRequest } from './apiEnvelope'
+import { listRequest, itemRequest, nullableItemRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export const participantService: ParticipantService = {

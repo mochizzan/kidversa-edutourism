@@ -11,7 +11,7 @@
 // error-handling layer (which checks `instanceof ApiError`) can surface the
 // status/code/message consistently.
 
-import { getApiBaseUrl, getTokens, ApiError } from './backendClient'
+import { getApiBaseUrl, getTokens, ApiError } from './backend-client'
 
 export interface UploadMultipartOptions {
   // Called with a 0–100 percentage as the request body uploads.

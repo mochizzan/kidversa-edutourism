@@ -1,7 +1,7 @@
 import type { Assessment, CreateAssessmentDTO } from '../types'
 import { SyncStatus } from '../types'
 import type { AssessmentService } from './types'
-import { arrayRequest, itemRequest, listRequest } from './apiEnvelope'
+import { arrayRequest, itemRequest, listRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 interface AssessmentUpsertRequest {

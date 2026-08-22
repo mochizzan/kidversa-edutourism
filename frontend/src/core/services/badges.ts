@@ -5,7 +5,7 @@
 // JWT + TenantScope guarded by the backend; uses the shared envelope helpers.
 
 import type { ParticipantBadge } from '../types'
-import { arrayRequest } from './apiEnvelope'
+import { arrayRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 const listByParticipant = async (participantId: string): Promise<ParticipantBadge[]> => {

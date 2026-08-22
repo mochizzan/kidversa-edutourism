@@ -12,7 +12,7 @@ import type {
   LinkParticipantResponse,
   ImportResult,
 } from '../types'
-import { listRequest, itemRequest, voidRequest, arrayRequest, normalizeTenantId, nullableItemRequest } from './apiEnvelope'
+import { listRequest, itemRequest, voidRequest, arrayRequest, normalizeTenantId, nullableItemRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export const sessionService: SessionService = {

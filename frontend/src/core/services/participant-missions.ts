@@ -1,5 +1,5 @@
 import type { ParticipantMission } from '../types'
-import { itemsRequest, itemRequest } from './apiEnvelope'
+import { itemsRequest, itemRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export interface ParticipantMissionsService {

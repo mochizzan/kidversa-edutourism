@@ -1,7 +1,7 @@
 import type { ContentService } from './types'
 import type { Content, ContentUsage } from '../types'
-import { listRequest, itemRequest, voidRequest, arrayRequest, nullableItemRequest } from './apiEnvelope'
-import { uploadMultipart } from './uploadMultipart'
+import { listRequest, itemRequest, voidRequest, arrayRequest, nullableItemRequest } from './api-envelope'
+import { uploadMultipart } from './upload-multipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export const contentService: ContentService = {

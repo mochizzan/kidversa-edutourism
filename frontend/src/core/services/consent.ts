@@ -6,8 +6,8 @@ import type {
 } from './types'
 
 export type { ConsentInfo }
-import { apiRequest } from './backendClient'
-import { itemRequest, itemsRequest } from './apiEnvelope'
+import { apiRequest } from './backend-client'
+import { itemRequest, itemsRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 interface ConsentSummarySession {

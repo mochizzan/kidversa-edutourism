@@ -11,7 +11,7 @@
 //  - normalize `tenant_id` null/undefined → '' (C7),
 //  - attach the `X-Tenant-Id` header for SUPER_ADMIN (backend TenantScope requires it).
 
-import { ApiError, apiRequest } from './backendClient'
+import { ApiError, apiRequest } from './backend-client'
 import type { ListParams, PaginatedResponse } from '../types'
 import { PAGE_SIZE } from '../constants/api'
 

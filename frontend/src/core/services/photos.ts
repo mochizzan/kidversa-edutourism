@@ -1,7 +1,7 @@
 import type { SmartPhoto } from '../types'
 import type { PhotoService } from './types'
-import { itemsRequest, itemRequest, voidRequest } from './apiEnvelope'
-import { uploadMultipart } from './uploadMultipart'
+import { itemsRequest, itemRequest, voidRequest } from './api-envelope'
+import { uploadMultipart } from './upload-multipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 // Photo service — backed by /api/photos (+ /api/photos/upload multipart) (B5).
