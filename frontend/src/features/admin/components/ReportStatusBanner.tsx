@@ -1,6 +1,7 @@
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Button } from '../../../shared/components/ui/Button'
-import { cn, formatDate } from '../../../core/utils'
+import { cn } from '../../../core/utils'
+import { formatDate } from '../../../shared/utils'
 import { ReportStatus } from '../../../core/types/enums'
 import {
   reportStatusBadge,

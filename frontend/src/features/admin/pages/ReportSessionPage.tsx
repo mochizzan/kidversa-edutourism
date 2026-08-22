@@ -23,7 +23,8 @@ import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
 import { ReportStatus } from '../../../core/types/enums'
-import { formatDate, cn } from '../../../core/utils'
+import { cn } from '../../../core/utils'
+import { formatDate } from '../../../shared/utils'
 import {
   reportStatusBadge,
   reportStatusLabel,

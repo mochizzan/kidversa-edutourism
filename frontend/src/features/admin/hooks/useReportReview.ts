@@ -13,7 +13,7 @@ import { friendlyError, ERROR_MESSAGES } from '../../../core/utils/errorMessages
 import { useAuth } from '../../../core/hooks/useAuth'
 import { isSuperAdmin } from '../../../core/utils/permissions'
 import { getActiveTenantId } from '../../../core/utils/tenant'
-import { formatDate } from '../../../core/utils'
+import { formatDate } from '../../../shared/utils'
 import { getMediaUrl } from '../../../core/utils/media'
 import {
   DEFAULT_FACILITATOR_MESSAGE,

@@ -10,7 +10,8 @@ import { sessionService } from '../../../core/services/sessions'
 import { reportService } from '../../../core/services/reports'
 import type { Session, Report } from '../../../core/types'
 import { ReportStatus } from '../../../core/types/enums'
-import { formatDate, cn } from '../../../core/utils'
+import { cn } from '../../../core/utils'
+import { formatDate } from '../../../shared/utils'
 
 /* ── Helpers ── */
 const statusVariant: Record<string, 'primary' | 'success' | 'neutral' | 'danger' | 'warning'> = {

@@ -3,7 +3,8 @@ import { Upload, ArrowRight } from 'lucide-react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { validateImageFile } from '../../../core/utils/image'
-import { formatFileSize, truncate, cn } from '../../../core/utils'
+import { cn } from '../../../core/utils'
+import { formatFileSize, truncate } from '../../../shared/utils'
 
 interface AvatarUploadModalProps {
   open: boolean
