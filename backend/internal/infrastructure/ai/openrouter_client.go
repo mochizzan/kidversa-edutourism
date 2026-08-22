@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"kidversa-edutourism-backend/internal/config"
 )
 
 const openRouterMaxBodySize = 64 * 1024
@@ -56,17 +58,19 @@ type OpenRouterClient struct {
 	maxTokens   int
 }
 
-// NewOpenRouterClient builds an OpenRouter HTTP client.
-func NewOpenRouterClient(apiKey, model, baseURL string) *OpenRouterClient {
+// NewOpenRouterClient builds an OpenRouter HTTP client from configuration.
+// Model parameters (temperature, max tokens) are sourced from cfg; missing
+// values are defaulted by config.Load (temperature 0.7, max tokens 1024).
+func NewOpenRouterClient(cfg *config.Config) *OpenRouterClient {
 	return &OpenRouterClient{
-		apiKey:  apiKey,
-		model:   model,
-		baseURL: baseURL,
+		apiKey:  cfg.OpenRouterAPIKey,
+		model:   cfg.OpenRouterModel,
+		baseURL: cfg.OpenRouterBaseURL,
 		client: &http.Client{
 			Timeout: 90 * time.Second,
 		},
-		temperature: 0.7,
-		maxTokens:   1024,
+		temperature: cfg.Temperature,
+		maxTokens:   cfg.OpenRouterMaxTokens,
 	}
 }
 

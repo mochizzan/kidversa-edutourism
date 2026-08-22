@@ -65,7 +65,7 @@ func main() {
 	sessionSubstageRepo := persistence.NewSessionSubstageRepository(db.DB)
 
 	// AI clients.
-	openRouterClient := ai.NewOpenRouterClient(cfg.OpenRouterAPIKey, cfg.OpenRouterModel, cfg.OpenRouterBaseURL)
+	openRouterClient := ai.NewOpenRouterClient(cfg)
 	narrativeGen := ai.NewOpenRouterNarrativeGenerator(openRouterClient, reportRepo, sessionRepo, assessmentRepo, programRepo, sessionSubstageRepo)
 
 	// Usecases.

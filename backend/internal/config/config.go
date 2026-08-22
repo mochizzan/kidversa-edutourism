@@ -76,6 +76,7 @@ type Config struct {
 	OpenRouterModel     string
 	OpenRouterBaseURL   string
 	OpenRouterMaxTokens int
+	Temperature         float64
 }
 
 // Load reads configuration from the environment (optionally via .env) and validates the critical fields.
@@ -134,6 +135,7 @@ func Load() *Config {
 		OpenRouterModel:     getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),
 		OpenRouterBaseURL:   getEnv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
 		OpenRouterMaxTokens: getEnvInt("OPENROUTER_MAX_TOKENS", 1024),
+		Temperature:         getEnvFloat("OPENROUTER_TEMPERATURE", 0.7),
 	}
 
 	// Warn if OpenRouter API key is not set — server starts but AI features will fail.
@@ -233,6 +235,18 @@ func getEnvInt(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+func getEnvFloat(key string, def float64) float64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return def
+	}
+	return f
 }
 
 func getEnvBool(key string, def bool) bool {
