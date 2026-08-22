@@ -11,6 +11,7 @@ import (
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	"kidversa-edutourism-backend/internal/infrastructure/ai"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 )
 
@@ -226,7 +227,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			genCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+			genCtx, cancel := context.WithTimeout(ctx, ai.OpenRouterRequestTimeout)
 			defer cancel()
 
 			text, err := u.gen.Generate(genCtx, report.ID, tenantID)

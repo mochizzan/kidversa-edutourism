@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"kidversa-edutourism-backend/internal/config"
 )
@@ -67,7 +66,7 @@ func NewOpenRouterClient(cfg *config.Config) *OpenRouterClient {
 		model:   cfg.OpenRouterModel,
 		baseURL: cfg.OpenRouterBaseURL,
 		client: &http.Client{
-			Timeout: 90 * time.Second,
+			Timeout: OpenRouterRequestTimeout,
 		},
 		temperature: cfg.Temperature,
 		maxTokens:   cfg.OpenRouterMaxTokens,
