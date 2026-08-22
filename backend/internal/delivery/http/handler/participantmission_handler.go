@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
@@ -28,6 +29,10 @@ func (h *ParticipantMissionHandler) Create(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
 	m := &entity.ParticipantMission{
 		ReportID:      req.ReportID,
 		MissionBankID: req.MissionBankID,
@@ -37,7 +42,7 @@ func (h *ParticipantMissionHandler) Create(c *echo.Context) error {
 		now := apputil.Now()
 		m.CompletedAt = &now
 	}
-	if err := h.repo.Create((*c).Request().Context(), m); err != nil {
+	if err := h.repo.Create((*c).Request().Context(), tenantID, m); err != nil {
 		return err
 	}
 	return appresp.Created(c, dto.NewParticipantMissionResponse(m))
@@ -62,7 +67,11 @@ func (h *ParticipantMissionHandler) ListByReport(c *echo.Context) error {
 	if reportID == "" {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
-	items, err := h.repo.GetByReport((*c).Request().Context(), reportID)
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	items, err := h.repo.GetByReport((*c).Request().Context(), tenantID, reportID)
 	if err != nil {
 		return err
 	}
@@ -75,7 +84,11 @@ func (h *ParticipantMissionHandler) ListByParticipant(c *echo.Context) error {
 	if participantID == "" {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
-	items, err := h.repo.ListByParticipant((*c).Request().Context(), participantID)
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	items, err := h.repo.ListByParticipant((*c).Request().Context(), tenantID, participantID)
 	if err != nil {
 		return err
 	}
@@ -87,6 +100,10 @@ func (h *ParticipantMissionHandler) ListByParticipant(c *echo.Context) error {
 func (h *ParticipantMissionHandler) Replace(c *echo.Context) error {
 	var req dto.ParticipantMissionBulkRequest
 	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
 		return err
 	}
 	items := make([]entity.ParticipantMission, 0, len(req.Items))
@@ -103,10 +120,10 @@ func (h *ParticipantMissionHandler) Replace(c *echo.Context) error {
 		}
 		items = append(items, m)
 	}
-	if err := h.repo.ReplaceByReport((*c).Request().Context(), req.ReportID, items); err != nil {
+	if err := h.repo.ReplaceByReport((*c).Request().Context(), tenantID, req.ReportID, items); err != nil {
 		return err
 	}
-	replaced, err := h.repo.GetByReport((*c).Request().Context(), req.ReportID)
+	replaced, err := h.repo.GetByReport((*c).Request().Context(), tenantID, req.ReportID)
 	if err != nil {
 		return err
 	}
@@ -119,7 +136,11 @@ func (h *ParticipantMissionHandler) GetByID(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	m, err := h.repo.GetByID((*c).Request().Context(), id)
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	m, err := h.repo.GetByID((*c).Request().Context(), tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -132,7 +153,11 @@ func (h *ParticipantMissionHandler) Toggle(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	m, err := h.repo.GetByID((*c).Request().Context(), id)
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	m, err := h.repo.GetByID((*c).Request().Context(), tenantID, id)
 	if err != nil {
 		return err
 	}
@@ -143,7 +168,7 @@ func (h *ParticipantMissionHandler) Toggle(c *echo.Context) error {
 	} else {
 		m.CompletedAt = nil
 	}
-	if err := h.repo.Update((*c).Request().Context(), m); err != nil {
+	if err := h.repo.Update((*c).Request().Context(), tenantID, m); err != nil {
 		return err
 	}
 	return appresp.OK(c, dto.NewParticipantMissionResponse(m))
@@ -155,7 +180,11 @@ func (h *ParticipantMissionHandler) Delete(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := h.repo.Delete((*c).Request().Context(), id); err != nil {
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	if err := h.repo.Delete((*c).Request().Context(), tenantID, id); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
