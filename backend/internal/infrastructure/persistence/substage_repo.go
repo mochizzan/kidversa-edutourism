@@ -78,24 +78,9 @@ func (r *GormProgramSubstageRepository) DeleteSubstage(ctx context.Context, id s
 }
 
 func (r *GormProgramSubstageRepository) ReorderSubstages(ctx context.Context, _ string, orderedIDs []string) error {
-	return r.reorderSubstage(ctx, &ProgramSubstageModel{}, "sequence_order", orderedIDs)
-}
-
-func (r *GormProgramSubstageRepository) reorderSubstage(ctx context.Context, model interface{}, column string, orderedIDs []string) error {
-	tx := r.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return apperrors.Internal("internal_error", tx.Error)
-	}
-	for i, id := range orderedIDs {
-		if err := tx.Model(model).Where("id = ?", id).Update(column, i+1).Error; err != nil {
-			tx.Rollback()
-			return apperrors.Internal("internal_error", err)
-		}
-	}
-	if err := tx.Commit().Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
+	return InTx(ctx, r.db, func(tx *gorm.DB) error {
+		return reorderByIDs(tx, &ProgramSubstageModel{}, orderedIDs, "id", "sequence_order")
+	})
 }
 
 // GormSessionSubstageRepository implements repository.SessionSubstageRepository.

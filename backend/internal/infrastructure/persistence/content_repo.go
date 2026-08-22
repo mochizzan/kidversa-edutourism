@@ -265,18 +265,7 @@ func (r *GormContentRepository) ReorderStageContents(ctx context.Context, _ stri
 // reorderByContentID updates sort_order of junction rows to match orderedContentIDs
 // (1-based sequence), keyed on content_id (the PK).
 func (r *GormContentRepository) reorderByContentID(ctx context.Context, orderedContentIDs []string) error {
-	tx := r.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return apperrors.Internal("internal_error", tx.Error)
-	}
-	for i, id := range orderedContentIDs {
-		if err := tx.Model(&StageContentRefModel{}).Where("content_id = ?", id).Update("sort_order", i+1).Error; err != nil {
-			tx.Rollback()
-			return apperrors.Internal("internal_error", err)
-		}
-	}
-	if err := tx.Commit().Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
+	return InTx(ctx, r.db, func(tx *gorm.DB) error {
+		return reorderByIDs(tx, &StageContentRefModel{}, orderedContentIDs, "content_id", "sort_order")
+	})
 }
