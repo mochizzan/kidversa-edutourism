@@ -1,5 +1,3 @@
-import { MissionCategory } from '../types/enums'
-
 export const A4_SHEET_WIDTH = 794 // px — A4 at 96dpi
 
 export const DEFAULT_FACILITATOR_MESSAGE =
@@ -20,15 +18,3 @@ export const RAPORT_LAYOUT = {
   MAX_MISSIONS_PREVIEW: 4,
   MAX_BADGES_PREVIEW: 4,
 } as const
-
-export const missionCategoryLabels: Record<MissionCategory, string> = {
-  [MissionCategory.HOME]: 'Di Rumah',
-  [MissionCategory.PARENT]: 'Bersama Orang Tua',
-  [MissionCategory.SCHOOL]: 'Di Sekolah',
-}
-
-export const missionCategoryIcons: Record<MissionCategory, string> = {
-  [MissionCategory.HOME]: '\u{1F3E0}',
-  [MissionCategory.PARENT]: '\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}',
-  [MissionCategory.SCHOOL]: '\u{1F3EB}',
-}

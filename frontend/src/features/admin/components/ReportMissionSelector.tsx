@@ -1,7 +1,9 @@
 import { Card } from '../../../shared/components/ui/Card'
 import { cn } from '../../../core/utils'
-import { MissionCategory } from '../../../core/types/enums'
-import { missionCategoryLabels, missionCategoryIcons } from '../../../core/constants/report'
+import {
+  MISSION_CATEGORY_META,
+  MISSION_CATEGORY_ORDER,
+} from '../../../core/constants/missionCategory'
 import type { MissionBank } from '../../../core/types'
 
 interface ReportMissionSelectorProps {
@@ -22,15 +24,16 @@ export const ReportMissionSelector = ({
       </p>
     ) : (
       <div className="space-y-4">
-        {[MissionCategory.HOME, MissionCategory.PARENT, MissionCategory.SCHOOL].map((cat) => {
+        {MISSION_CATEGORY_ORDER.map((cat) => {
           const catMissions = missions.filter((m) => m.category === cat)
           if (catMissions.length === 0) return null
 
+          const meta = MISSION_CATEGORY_META[cat]
           return (
             <div key={cat}>
               <p className="text-sm font-medium text-on-surface mb-2 flex items-center gap-2">
-                <span>{missionCategoryIcons[cat]}</span>
-                {missionCategoryLabels[cat]}
+                <span>{meta.emoji}</span>
+                {meta.label}
               </p>
               <div className="space-y-2">
                 {catMissions.map((mission) => (

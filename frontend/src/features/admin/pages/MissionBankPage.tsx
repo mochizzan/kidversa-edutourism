@@ -7,9 +7,6 @@ import {
   ChevronRight,
   Loader2,
   AlertCircle,
-  Home,
-  Users,
-  School,
   FileText,
 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -18,23 +15,25 @@ import { Select } from '../../../shared/components/ui/Select'
 import { Input } from '../../../shared/components/ui/Input'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
-import { MissionCategory } from '../../../core/types'
 import { cn } from '../../../core/utils'
+import {
+  MISSION_CATEGORY_META,
+  MISSION_CATEGORY_ORDER,
+} from '../../../core/constants/missionCategory'
 import { useMissionBank } from '../hooks/useMissionBank'
 import { MissionCard } from '../components/MissionCard'
 
-const CATEGORY_CONFIG = [
-  { key: '', label: 'Semua', icon: null },
-  { key: MissionCategory.HOME, label: 'HOME', icon: <Home className="w-4 h-4" /> },
-  { key: MissionCategory.PARENT, label: 'PARENT', icon: <Users className="w-4 h-4" /> },
-  { key: MissionCategory.SCHOOL, label: 'SCHOOL', icon: <School className="w-4 h-4" /> },
+// Filter tabs: an "all" pseudo-category followed by the canonical order. Labels
+// and icons come from MISSION_CATEGORY_META so the tab strip, the summary row
+// and MissionCard can never drift apart again.
+const CATEGORY_TABS = [
+  { key: '', label: 'Semua', Icon: null },
+  ...MISSION_CATEGORY_ORDER.map((key) => ({
+    key,
+    label: key,
+    Icon: MISSION_CATEGORY_META[key].Icon,
+  })),
 ]
-
-const CATEGORY_META: Record<string, { icon: string }> = {
-  HOME: { icon: '🏠' },
-  PARENT: { icon: '👨‍👩‍👧' },
-  SCHOOL: { icon: '🏫' },
-}
 
 const MissionBankPage = () => {
   const navigate = useNavigate()
@@ -84,14 +83,13 @@ const MissionBankPage = () => {
       <div className="bg-surface-container-low rounded-2xl px-6 py-4">
         <div className="flex items-center gap-6 flex-wrap">
           <span className="text-sm text-on-surface-variant">Ringkasan Misi:</span>
-          {CATEGORY_CONFIG.filter((c) => c.key).map((cat) => {
-            const meta = CATEGORY_META[cat.key]
-            const count = stats[cat.key] || 0
+          {MISSION_CATEGORY_ORDER.map((cat) => {
+            const count = stats[cat] || 0
             return (
-              <span key={cat.key} className="flex items-center gap-1.5 text-sm">
-                <span>{meta.icon}</span>
+              <span key={cat} className="flex items-center gap-1.5 text-sm">
+                <span>{MISSION_CATEGORY_META[cat].emoji}</span>
                 <span className="font-medium text-on-surface">{count}</span>
-                <span className="text-on-surface-variant">misi {cat.label}</span>
+                <span className="text-on-surface-variant">misi {cat}</span>
               </span>
             )
           })}
@@ -122,19 +120,19 @@ const MissionBankPage = () => {
       </div>
 
       <div className="flex gap-1 border-b border-outline-variant">
-        {CATEGORY_CONFIG.map((cat) => (
+        {CATEGORY_TABS.map(({ key, label, Icon }) => (
           <button
-            key={cat.key}
-            onClick={() => setSelectedCategory(cat.key)}
+            key={key}
+            onClick={() => setSelectedCategory(key)}
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
-              selectedCategory === cat.key
+              selectedCategory === key
                 ? 'border-primary text-primary'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface hover:border-outline-variant',
             )}
           >
-            {cat.icon}
-            {cat.label}
+            {Icon && <Icon className="w-4 h-4" />}
+            {label}
           </button>
         ))}
       </div>

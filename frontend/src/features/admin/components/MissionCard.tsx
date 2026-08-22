@@ -2,12 +2,7 @@ import { Pencil, Power, PowerOff } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import type { MissionBank, ProgramStage } from '../../../core/types'
-
-const CATEGORY_META: Record<string, { icon: string; color: string }> = {
-  HOME: { icon: '🏠', color: 'bg-blue-100 text-blue-700' },
-  PARENT: { icon: '👨‍👩‍👧', color: 'bg-purple-100 text-purple-700' },
-  SCHOOL: { icon: '🏫', color: 'bg-amber-100 text-amber-700' },
-}
+import { missionCategoryMeta } from '../../../core/constants/missionCategory'
 
 interface MissionCardProps {
   mission: MissionBank
@@ -18,7 +13,7 @@ interface MissionCardProps {
 }
 
 export const MissionCard = ({ mission, stageMap, onEdit, onToggleActive, onActivate }: MissionCardProps) => {
-  const meta = CATEGORY_META[mission.category] || CATEGORY_META.HOME
+  const meta = missionCategoryMeta(mission.category)
 
   const stageLabel = (stageId: string) => {
     const stage = stageMap?.[stageId]
@@ -29,7 +24,7 @@ export const MissionCard = ({ mission, stageMap, onEdit, onToggleActive, onActiv
     <div className="bg-surface rounded-2xl border border-outline-variant p-5 hover:shadow-sm transition-shadow">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
-          <span className="text-2xl shrink-0">{meta.icon}</span>
+          <span className="text-2xl shrink-0">{meta.emoji}</span>
           <div className="min-w-0">
             <h3 className="font-semibold text-on-surface truncate">{mission.title_child}</h3>
             <p className="text-sm text-on-surface-variant mt-0.5">{mission.title_parent}</p>
