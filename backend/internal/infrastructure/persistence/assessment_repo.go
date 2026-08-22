@@ -45,7 +45,7 @@ func (r *GormAssessmentRepository) GetByID(ctx context.Context, id, tenantID str
 	// Tenant scoping: restrict to the assessment's owning session's tenant (joined
 	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
 	if tenantID != "" {
-		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+		q = scopeByTenant(q, tenantID)
 	}
 	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -63,7 +63,7 @@ func (r *GormAssessmentRepository) GetByParticipantStage(ctx context.Context, pa
 	// Tenant scoping: restrict to the assessment's owning session's tenant (joined
 	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
 	if tenantID != "" {
-		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+		q = scopeByTenant(q, tenantID)
 	}
 	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -85,7 +85,7 @@ func (r *GormAssessmentRepository) GetByParticipantStageIncludingDeleted(ctx con
 	// Tenant scoping: restrict to the assessment's owning session's tenant (joined
 	// via sessions) unless tenantID is empty (tenant-less SUPER_ADMIN).
 	if tenantID != "" {
-		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+		q = scopeByTenant(q, tenantID)
 	}
 	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -116,7 +116,7 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 	if f.TenantID == "" {
 		return nil, apperrors.BadRequest("tenant_required", errors.New("tenant ID is required"))
 	}
-	q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", f.TenantID)
+	q = scopeByTenant(q, f.TenantID)
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -128,8 +128,7 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 	}
 
 	var models []AssessmentModel
-	offset := (page - 1) * limit
-	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+	if err := paginate(q, page, limit, "created_at DESC").Find(&models).Error; err != nil {
 		if isSchemaDrift(err) {
 			log.Printf("schema_drift: assessments: %v", err)
 			return nil, apperrors.Internal("schema_drift", err)

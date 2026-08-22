@@ -86,8 +86,7 @@ func (r *GormSessionRepository) ListSessions(ctx context.Context, f repository.S
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	var models []SessionModel
-	offset := (page - 1) * limit
-	if err := q.Order("session_date DESC, created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+	if err := paginate(q, page, limit, "session_date DESC, created_at DESC").Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.Session, 0, len(models))
@@ -169,7 +168,7 @@ func (r *GormSessionRepository) GetSessionGroupByID(ctx context.Context, id, ten
 	// Tenant scoping: restrict to the session's owning tenant (resolved via the
 	// group's session) unless tenantID is empty (tenant-less SUPER_ADMIN).
 	if tenantID != "" {
-		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+		q = scopeByTenant(q, tenantID)
 	}
 	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -324,8 +323,7 @@ func (r *GormSessionRepository) ListParticipantsPaginated(ctx context.Context, t
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	var models []ParticipantModel
-	offset := (page - 1) * limit
-	if err := q.Order("created_at ASC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+	if err := paginate(q, page, limit, "created_at ASC").Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.Participant, 0, len(models))
