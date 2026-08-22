@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v5"
+
+	"kidversa-edutourism-backend/internal/pkg/constants"
 )
 
 // securityHeaders applies baseline hardening headers to every response.
@@ -33,15 +35,15 @@ func RateLimit(perMin int) echo.MiddlewareFunc {
 	var mu sync.Mutex
 	buckets := make(map[string]*tokenBucket)
 
-	// Evict idle buckets every 5 minutes to prevent unbounded memory growth.
+	// Evict idle buckets periodically to prevent unbounded memory growth.
 	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
+		ticker := time.NewTicker(constants.RateLimitEvictionInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			now := time.Now()
 			mu.Lock()
 			for ip, b := range buckets {
-				if now.Sub(b.lastRefill) > 5*time.Minute {
+				if now.Sub(b.lastRefill) > constants.RateLimitEvictionInterval {
 					delete(buckets, ip)
 				}
 			}

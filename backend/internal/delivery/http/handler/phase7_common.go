@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
+	"kidversa-edutourism-backend/internal/pkg/constants"
 )
 
 // bindUUID pulls a path param, validates it is a UUID, and responds 400 if not.
@@ -53,15 +54,15 @@ func queryInt(c *echo.Context, name string, def int) int {
 // pagination extracts page/limit from the query, clamped to safe bounds.
 func pagination(c *echo.Context) (page, limit int) {
 	page = queryInt(c, "page", 1)
-	limit = queryInt(c, "limit", 20)
+	limit = queryInt(c, "limit", constants.DefaultPageLimit)
 	if page < 1 {
 		page = 1
 	}
 	if limit < 1 {
-		limit = 20
+		limit = constants.DefaultPageLimit
 	}
-	if limit > 100 {
-		limit = 100
+	if limit > constants.MaxPageLimit {
+		limit = constants.MaxPageLimit
 	}
 	return page, limit
 }

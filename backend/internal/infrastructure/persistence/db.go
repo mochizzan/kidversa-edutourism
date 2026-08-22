@@ -10,6 +10,7 @@ import (
 
 	"kidversa-edutourism-backend/internal/config"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/pkg/constants"
 )
 
 // DB wraps *gorm.DB with a helper Ping for readiness checks.
@@ -30,10 +31,10 @@ func OpenDB(cfg *config.Config) (*DB, error) {
 	sqlDB.SetMaxOpenConns(cfg.DBMaxOpen)
 	sqlDB.SetMaxIdleConns(cfg.DBMaxIdle)
 	sqlDB.SetConnMaxLifetime(cfg.DBLifetime)
-	// Close idle connections after 5 minutes — well before MariaDB's
+	// Close idle connections after a safe idle window — well before MariaDB's
 	// wait_timeout (28800s) and before any network intermediary drops them.
 	// This prevents the "first request after idle hangs" problem.
-	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(constants.DBConnMaxIdleTime)
 	return &DB{DB: db}, nil
 }
 
@@ -43,7 +44,7 @@ func (d *DB) Ping() error {
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), constants.DBPingTimeout)
 	defer cancel()
 	return sqlDB.PingContext(ctx)
 }
@@ -63,7 +64,7 @@ func HealthPing(ctx context.Context, db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	c, cancel := context.WithTimeout(ctx, 3*time.Second)
+	c, cancel := context.WithTimeout(ctx, constants.DBPingTimeout)
 	defer cancel()
 	return sqlDB.PingContext(c)
 }
@@ -89,7 +90,7 @@ func StartKeepalive(db *gorm.DB, interval time.Duration) func() {
 				if err != nil {
 					continue
 				}
-				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), constants.DBPingTimeout)
 				_ = sqlDB.PingContext(ctx)
 				cancel()
 			}

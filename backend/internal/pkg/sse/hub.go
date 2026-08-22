@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"kidversa-edutourism-backend/internal/pkg/constants"
 )
 
 // Event is a single SSE message published on a channel.
@@ -70,7 +72,7 @@ func (h *Hub) getOrCreate(ch string) *perChannelState {
 	defer h.mu.Unlock()
 	pc, ok := h.channels[ch]
 	if !ok {
-		pc = &perChannelState{cap: 64, buf: make([]Event, 0, 64), clients: make(map[string]chan Event)}
+		pc = &perChannelState{cap: constants.SSEBufferSize, buf: make([]Event, 0, constants.SSEBufferSize), clients: make(map[string]chan Event)}
 		h.channels[ch] = pc
 	}
 	return pc
@@ -93,7 +95,7 @@ func (h *Hub) cleanupEmptyChannels() {
 func (h *Hub) Subscribe(_ context.Context, ch string) (<-chan Event, func(), error) {
 	pc := h.getOrCreate(ch)
 	cid := uuid.NewString()
-	ec := make(chan Event, 256)
+	ec := make(chan Event, constants.SSEChannelBuffer)
 	pc.mu.Lock()
 	pc.clients[cid] = ec
 	pc.mu.Unlock()

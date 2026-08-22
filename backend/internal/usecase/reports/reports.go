@@ -13,6 +13,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/ai"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/pkg/constants"
 )
 
 // NarrativeGenerator produces a full AI narrative for a report. tenantID is the
@@ -179,11 +180,6 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 	return text, nil
 }
 
-// maxSessionReports is the upper bound for listing reports in a single
-// session during batch generation. A session with more participants than
-// this would require paginated processing.
-const maxSessionReports = 1000
-
 // GenerateForSession creates a DRAFT report for each participant that does not
 // already have one, then runs the narrative generator for all reports in the
 // session concurrently. Returns the full list of reports after generation.
@@ -192,7 +188,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 	for _, p := range participants {
 		targetIDs[p.ID] = true
 	}
-	if _, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, maxSessionReports); err != nil {
+	if _, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, constants.MaxSessionReports); err != nil {
 		return nil, err
 	}
 
@@ -203,13 +199,12 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 		}
 	}
 
-	all, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, maxSessionReports)
+	all, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, constants.MaxSessionReports)
 	if err != nil {
 		return nil, err
 	}
 
-	const maxConcurrent = 3
-	sem := make(chan struct{}, maxConcurrent)
+	sem := make(chan struct{}, constants.ReportNarrativeConcurrency)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var errs []error
@@ -252,7 +247,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			fmt.Errorf("%d dari %d laporan gagal dibuatkan narasi: %v", len(errs), len(all.Items), errors.Join(errs...)))
 	}
 
-	all, err = u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, maxSessionReports)
+	all, err = u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, constants.MaxSessionReports)
 	if err != nil {
 		return nil, err
 	}

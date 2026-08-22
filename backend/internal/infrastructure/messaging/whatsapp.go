@@ -8,10 +8,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"time"
 
 	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	"kidversa-edutourism-backend/internal/pkg/constants"
 )
 
 // WhatsAppGateway is an OpenWA self-hosted gateway adapter. It implements
@@ -30,7 +30,7 @@ func NewWhatsAppGateway(cfg *config.Config) repository.MessagingService {
 		baseURL:    cfg.WhatsAppGatewayURL,
 		apiKey:     cfg.WhatsAppAPIKey,
 		sessionID:  cfg.WhatsAppSessionID,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		httpClient: &http.Client{Timeout: constants.WhatsAppRequestTimeout},
 	}
 }
 
@@ -46,7 +46,7 @@ func (g *WhatsAppGateway) SendTextMessage(ctx context.Context, chatID, text stri
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s/api/sessions/%s/messages/send-text", g.baseURL, g.sessionID)
+	url := fmt.Sprintf("%s"+constants.WhatsAppSendTextPath, g.baseURL, g.sessionID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err
