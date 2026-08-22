@@ -110,20 +110,16 @@ func (r *GormContentRepository) DeleteContent(ctx context.Context, id string) (s
 	}
 	fileURL := m.FileURL
 
-	tx := r.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return "", apperrors.Internal("internal_error", tx.Error)
-	}
-	// Drop junctions first (also covered by FK ON DELETE CASCADE, but explicit for clarity/ordering).
-	if err := tx.Where("content_id = ?", id).Delete(&StageContentRefModel{}).Error; err != nil {
-		tx.Rollback()
-		return "", apperrors.Internal("internal_error", err)
-	}
-	if err := tx.Where("id = ?", id).Delete(&ContentModel{}).Error; err != nil {
-		tx.Rollback()
-		return "", apperrors.Internal("internal_error", err)
-	}
-	if err := tx.Commit().Error; err != nil {
+	if err := InTx(ctx, r.db, func(tx *gorm.DB) error {
+		// Drop junctions first (also covered by FK ON DELETE CASCADE, but explicit for clarity/ordering).
+		if err := tx.Where("content_id = ?", id).Delete(&StageContentRefModel{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", id).Delete(&ContentModel{}).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		return "", apperrors.Internal("internal_error", err)
 	}
 	return fileURL, nil

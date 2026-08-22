@@ -36,64 +36,72 @@ func (r *GormReportRepository) Create(ctx context.Context, rep *entity.Report) e
 }
 
 func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participantID, sessionID string) (*entity.Report, error) {
-	m := &ReportModel{
-		Report: entity.Report{
-			ParticipantID: participantID,
-			SessionID:     sessionID,
-			Status:        entity.ReportDraft,
-		},
-	}
-	tok, err := generateConsentToken()
-	if err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	m.ParentAccessToken = tok
-	// Atomic: if (session_id, participant_id) already exists, the insert is skipped
-	// (ON CONFLICT DO NOTHING on uq_reports_session_participant), avoiding the TOCTOU
-	// of the old List->Create pattern.
-	if err := r.db.WithContext(ctx).
-		Clauses(clause.OnConflict{DoNothing: true}).
-		Create(m).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	var got ReportModel
-	if err := r.db.WithContext(ctx).
-		Unscoped().
-		Where("session_id = ? AND participant_id = ?", sessionID, participantID).
-		First(&got).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// True absence: create using the ORIGINALLY-built m (NOT the zero-value got) — A4 errata.
-			if cerr := r.db.WithContext(ctx).Create(m).Error; cerr != nil {
-				return nil, apperrors.Internal("internal_error", cerr)
+	var res *entity.Report
+	err := InTx(ctx, r.db, func(tx *gorm.DB) error {
+		m := &ReportModel{
+			Report: entity.Report{
+				ParticipantID: participantID,
+				SessionID:     sessionID,
+				Status:        entity.ReportDraft,
+			},
+		}
+		tok, terr := generateConsentToken()
+		if terr != nil {
+			return apperrors.Internal("internal_error", terr)
+		}
+		m.ParentAccessToken = tok
+		// Atomic: if (session_id, participant_id) already exists, the insert is skipped
+		// (ON CONFLICT DO NOTHING on uq_reports_session_participant), avoiding the TOCTOU
+		// of the old List->Create pattern.
+		if cerr := tx.
+			Clauses(clause.OnConflict{DoNothing: true}).
+			Create(m).Error; cerr != nil {
+			return apperrors.Internal("internal_error", cerr)
+		}
+		var got ReportModel
+		if ferr := tx.
+			Unscoped().
+			Where("session_id = ? AND participant_id = ?", sessionID, participantID).
+			First(&got).Error; ferr != nil {
+			if errors.Is(ferr, gorm.ErrRecordNotFound) {
+				// True absence: create using the ORIGINALLY-built m (NOT the zero-value got) — A4 errata.
+				if cerr := tx.Create(m).Error; cerr != nil {
+					return apperrors.Internal("internal_error", cerr)
+				}
+				got = *m
+			} else {
+				return apperrors.Internal("internal_error", ferr)
 			}
-			got = *m
-		} else {
-			return nil, apperrors.Internal("internal_error", err)
 		}
-	}
-	if got.DeletedAt.Valid {
-		// Tombstone: reactivate (free the physical unique slot, reset draft state).
-		if uerr := r.db.WithContext(ctx).
-			Model(&ReportModel{}).
-			Where("id = ?", got.ID).
-			Updates(map[string]interface{}{
-				"deleted_at":         gorm.DeletedAt{},
-				"status":             entity.ReportDraft,
-				"ai_narrative_draft": "",
-				"ai_narrative_final": "",
-			}).Error; uerr != nil {
-			return nil, apperrors.Internal("internal_error", uerr)
+		if got.DeletedAt.Valid {
+			// Tombstone: reactivate (free the physical unique slot, reset draft state).
+			if uerr := tx.
+				Model(&ReportModel{}).
+				Where("id = ?", got.ID).
+				Updates(map[string]interface{}{
+					"deleted_at":         gorm.DeletedAt{},
+					"status":             entity.ReportDraft,
+					"ai_narrative_draft": "",
+					"ai_narrative_final": "",
+				}).Error; uerr != nil {
+				return apperrors.Internal("internal_error", uerr)
+			}
+			if rerr := tx.Where("id = ?", got.ID).First(&got).Error; rerr != nil {
+				return apperrors.Internal("internal_error", rerr)
+			}
 		}
-		if rerr := r.db.WithContext(ctx).Where("id = ?", got.ID).First(&got).Error; rerr != nil {
-			return nil, apperrors.Internal("internal_error", rerr)
+		e := got.ToEntity()
+		reports := []entity.Report{*e}
+		if lerr := r.loadMissionIDs(ctx, reports); lerr != nil {
+			return apperrors.Internal("internal_error", lerr)
 		}
+		res = &reports[0]
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	e := got.ToEntity()
-	reports := []entity.Report{*e}
-	if err := r.loadMissionIDs(ctx, reports); err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	return &reports[0], nil
+	return res, nil
 }
 
 // missionIDRow is a lightweight projection of participant_missions used only to
@@ -139,7 +147,7 @@ func (r *GormReportRepository) GetByID(ctx context.Context, id, tenantID string)
 	if tenantID == "" {
 		return nil, apperrors.BadRequest("tenant_required", errors.New("tenant ID is required"))
 	}
-	q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", tenantID)
+	q = scopeByTenant(q, tenantID)
 	if err := q.First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.NotFound("not_found", err)
@@ -191,7 +199,7 @@ func (r *GormReportRepository) List(ctx context.Context, f repository.ReportFilt
 		q = q.Where("session_id = ?", f.SessionID)
 	}
 	if f.TenantID != "" {
-		q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", f.TenantID)
+		q = scopeByTenant(q, f.TenantID)
 	}
 	if f.Status != "" {
 		q = q.Where("status = ?", f.Status)
@@ -201,8 +209,7 @@ func (r *GormReportRepository) List(ctx context.Context, f repository.ReportFilt
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	var models []ReportModel
-	offset := (page - 1) * limit
-	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+	if err := paginate(q, page, limit, "created_at DESC").Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.Report, 0, len(models))
