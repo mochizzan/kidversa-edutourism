@@ -111,6 +111,12 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 	if f.SessionSubstageID != "" {
 		q = q.Where("session_substage_id = ?", f.SessionSubstageID)
 	}
+	// Tenant scoping (cross-tenant READ IDOR defense): scope to the tenant owning
+	// the assessment's session. Empty TenantID is rejected as a required scope.
+	if f.TenantID == "" {
+		return nil, apperrors.BadRequest("tenant_required", errors.New("tenant ID is required"))
+	}
+	q = q.Where("session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", f.TenantID)
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {

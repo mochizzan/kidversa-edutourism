@@ -66,10 +66,15 @@ func (h *AssessmentHandler) BulkUpsert(c *echo.Context) error {
 
 // List handles GET /api/assessments (filter by ?participant_id= or ?session_id=).
 func (h *AssessmentHandler) List(c *echo.Context) error {
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
 	f := repository.AssessmentFilter{
 		ParticipantID:     (*c).QueryParam("participant_id"),
 		SessionID:         (*c).QueryParam("session_id"),
 		SessionSubstageID: (*c).QueryParam("session_substage_id"),
+		TenantID:          tenantID,
 	}
 	page, limit := pagination(c)
 	res, err := h.uc.List((*c).Request().Context(), f, page, limit)

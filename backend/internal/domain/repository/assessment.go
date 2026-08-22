@@ -11,6 +11,11 @@ type AssessmentFilter struct {
 	ParticipantID     string
 	SessionID         string
 	SessionSubstageID string
+	// TenantID scopes the list to a tenant via session_id->sessions.tenant_id.
+	// It must be set by the handler (populated from the JWT/scope); an empty
+	// TenantID is rejected at the repo as defense-in-depth against cross-tenant
+	// READ IDOR (GET /api/assessments?participant_id=<any-uuid>).
+	TenantID string
 }
 
 // AssessmentRepository is the persistence contract for assessments.
