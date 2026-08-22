@@ -45,10 +45,12 @@ type openRouterChoice struct {
 
 // OpenRouterClient calls the OpenRouter chat completions API.
 type OpenRouterClient struct {
-	apiKey  string
-	model   string
-	baseURL string
-	client  *http.Client
+	apiKey      string
+	model       string
+	baseURL     string
+	client      *http.Client
+	temperature float64
+	maxTokens   int
 }
 
 // NewOpenRouterClient builds an OpenRouter HTTP client.
@@ -60,6 +62,8 @@ func NewOpenRouterClient(apiKey, model, baseURL string) *OpenRouterClient {
 		client: &http.Client{
 			Timeout: 90 * time.Second,
 		},
+		temperature: 0.7,
+		maxTokens:   1024,
 	}
 }
 
@@ -67,8 +71,8 @@ func NewOpenRouterClient(apiKey, model, baseURL string) *OpenRouterClient {
 func (c *OpenRouterClient) ChatCompletion(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	body := openRouterRequest{
 		Model:       c.model,
-		Temperature: 0.7,
-		MaxTokens:   1024,
+		Temperature: c.temperature,
+		MaxTokens:   c.maxTokens,
 		Messages: []openRouterMessage{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},
@@ -140,8 +144,8 @@ func (c *OpenRouterClient) ChatCompletion(ctx context.Context, systemPrompt, use
 func (c *OpenRouterClient) StreamChatCompletion(ctx context.Context, systemPrompt, userPrompt string, onToken func(string) error) error {
 	body := openRouterRequest{
 		Model:       c.model,
-		Temperature: 0.7,
-		MaxTokens:   1024,
+		Temperature: c.temperature,
+		MaxTokens:   c.maxTokens,
 		Stream:      true,
 		Messages: []openRouterMessage{
 			{Role: "system", Content: systemPrompt},
