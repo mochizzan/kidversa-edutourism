@@ -69,8 +69,7 @@ func (r *GormTenantRepository) List(ctx context.Context, f repository.TenantFilt
 	}
 
 	var models []TenantModel
-	offset := (page - 1) * limit
-	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+	if err := paginate(q, page, limit, "created_at DESC").Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.Tenant, 0, len(models))
