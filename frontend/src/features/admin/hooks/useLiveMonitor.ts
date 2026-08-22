@@ -193,7 +193,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     async (groupId: string, sessionSubstageId: string) => {
       if (!user || !activeSession) return
       try {
-        await liveService.unlockStage(groupId, sessionSubstageId, user.id)
+        await liveService.unlockStage(groupId, sessionSubstageId)
         const group = groups.find((g) => g.group.id === groupId)
         const ss = stages.find((s) => s.id === parentStageId(sessionSubstages, sessionSubstageId))
         const ps = programStages.find((p) => p.id === ss?.program_stage_id)
@@ -216,7 +216,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     async (groupId: string) => {
       if (!user || !activeSession) return
       try {
-        await liveService.lockStage(groupId, user.id)
+        await liveService.lockStage(groupId)
         const group = groups.find((g) => g.group.id === groupId)
         await liveService.addTimelineEvent(
           activeSession.id,

@@ -124,13 +124,14 @@ export const liveService = {
   // Facilitator overrides. Unlock/complete are stage-scoped Kegiatan routes
   // (POST /api/live/groups/:groupId/stages/:stageId/{unlock,complete}); lock is
   // group-scoped (POST /api/live/groups/:groupId/lock), so it takes no stageId.
-  unlockStage: async (groupId: string, sessionStageId: string, userId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.UNLOCK_STAGE(groupId, sessionStageId), { userId })
+  // Actor identity is taken from the JWT server-side; no client userId is sent.
+  unlockStage: async (groupId: string, sessionStageId: string): Promise<void> => {
+    await apiRequest('POST', API_ROUTES.LIVE.UNLOCK_STAGE(groupId, sessionStageId))
     invalidateSnapshot()
   },
 
-  lockStage: async (groupId: string, userId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.LOCK_STAGE(groupId), { userId })
+  lockStage: async (groupId: string): Promise<void> => {
+    await apiRequest('POST', API_ROUTES.LIVE.LOCK_STAGE(groupId))
     invalidateSnapshot()
   },
 
