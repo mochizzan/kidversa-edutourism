@@ -1,7 +1,7 @@
 import { lazy } from 'react'
 import { Navigate, type RouteObject } from 'react-router-dom'
 import FasilitatorLayout from '../../shared/layouts/FasilitatorLayout'
-import ProtectedRoute from '../../shared/components/auth/ProtectedRoute'
+import { RouteGuard } from '../../shared/components/auth/RouteGuard'
 import { UserRole } from '../../core/types/enums'
 import { lazyRoute } from './helpers'
 
@@ -16,7 +16,7 @@ const FasilitatorProfilePage = lazy(() => import('../../features/fasilitator/pag
 
 export const fasilitatorRoutes: RouteObject[] = [
   {
-    element: <ProtectedRoute allowedRoles={[UserRole.FASILITATOR]} />,
+    element: <RouteGuard allowedRoles={[UserRole.FASILITATOR]} />,
     children: [
       {
         path: '/fasilitator',

@@ -1,5 +1,6 @@
 import { lazy } from 'react'
 import type { RouteObject } from 'react-router-dom'
+import { RouteGuard } from '../../shared/components/auth/RouteGuard'
 import { SuspenseWrapper } from './helpers'
 import { ErrorBoundary } from '../../shared/components/feedback/ErrorBoundary'
 
@@ -8,11 +9,13 @@ const LearnerKioskPage = lazy(() => import('../../features/learner/pages/Learner
 export const learnerRoute: RouteObject = {
   path: '/learner/:groupId?/:sessionId/:stageId/:substageId?',
   element: (
-    <ErrorBoundary>
-      <SuspenseWrapper>
-        <LearnerKioskPage />
-      </SuspenseWrapper>
-    </ErrorBoundary>
+    <RouteGuard public>
+      <ErrorBoundary>
+        <SuspenseWrapper>
+          <LearnerKioskPage />
+        </SuspenseWrapper>
+      </ErrorBoundary>
+    </RouteGuard>
   ),
 }
 
@@ -22,10 +25,12 @@ export const learnerRoute: RouteObject = {
 export const kioskRoute: RouteObject = {
   path: '/kiosk/session/:groupId?/:sessionId/:stageId/:substageId?',
   element: (
-    <ErrorBoundary>
-      <SuspenseWrapper>
-        <LearnerKioskPage />
-      </SuspenseWrapper>
-    </ErrorBoundary>
+    <RouteGuard public>
+      <ErrorBoundary>
+        <SuspenseWrapper>
+          <LearnerKioskPage />
+        </SuspenseWrapper>
+      </ErrorBoundary>
+    </RouteGuard>
   ),
 }

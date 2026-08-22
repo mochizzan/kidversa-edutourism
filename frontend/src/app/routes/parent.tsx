@@ -1,6 +1,7 @@
 import { lazy } from 'react'
 import { Navigate, type RouteObject } from 'react-router-dom'
 import ParentLayout from '../../shared/layouts/ParentLayout'
+import { RouteGuard } from '../../shared/components/auth/RouteGuard'
 import { lazyRoute, SuspenseWrapper } from './helpers'
 
 // Public, unauthenticated parent routes (token in the query string).
@@ -30,6 +31,7 @@ export const parentRoutes: RouteObject[] = [
   },
   {
     path: '/parent',
+    element: <RouteGuard public />,
     children: [
       { index: true, element: <Navigate to="/parent/report" replace /> },
       lazyRoute('report', ParentReportPage),
