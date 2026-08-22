@@ -7,9 +7,9 @@ import { STORAGE_KEYS } from '../constants/storage'
  * Returns null for non-SA roles or when no tenant is selected.
  *
  * Used by:
- * - withTenantHeader (HTTP header X-Tenant-Id)
+ * - apiRequest (built-in X-Tenant-Id header injection for SUPER_ADMIN)
  * - openSSE (query param ?tenant_id=)
- * - missions.ts getActiveTenantId (write DTOs)
+ * - missions.ts write DTOs (tenant_id field)
  */
 export function getActiveTenantId(): string | null {
   const user = getStoredUser<{ role?: string }>()
