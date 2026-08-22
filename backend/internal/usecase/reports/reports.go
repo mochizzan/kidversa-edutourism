@@ -24,13 +24,14 @@ type NarrativeGenerator interface {
 
 // Usecase implements report business logic: anti-IDOR parent tokens + narrative.
 type Usecase struct {
-	repo repository.ReportRepository
-	gen  NarrativeGenerator
+	repo                   repository.ReportRepository
+	gen                    NarrativeGenerator
+	participantMissionRepo repository.ParticipantMissionRepository
 }
 
 // NewUsecase builds the reports usecase.
-func NewUsecase(repo repository.ReportRepository, gen NarrativeGenerator) *Usecase {
-	return &Usecase{repo: repo, gen: gen}
+func NewUsecase(repo repository.ReportRepository, gen NarrativeGenerator, participantMissionRepo repository.ParticipantMissionRepository) *Usecase {
+	return &Usecase{repo: repo, gen: gen, participantMissionRepo: participantMissionRepo}
 }
 
 // Repo exposes the report repository (used by handlers for token lookups).
@@ -64,7 +65,34 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 	if err := u.repo.Update(ctx, r); err != nil {
 		return nil, err
 	}
+	// Persist the approved mission selections into participant_missions (the
+	// single source of truth; r.MissionIDs is read-derived from that join).
+	// Without this, the mission ids were previously discarded (a no-op).
+	if missionIDs != nil {
+		if err := u.participantMissionRepo.ReplaceByReport(ctx, tenantID, reportID, buildItems(reportID, missionIDs)); err != nil {
+			return nil, err
+		}
+	}
+	// loadMissionIDs runs only on List/GetByID read paths, so re-fetch to
+	// hydrate r.MissionIDs from the freshly written rows before responding.
+	r, err = u.repo.GetByID(ctx, reportID, tenantID)
+	if err != nil {
+		return nil, err
+	}
 	return r, nil
+}
+
+// buildItems constructs participant-mission rows for a report from mission ids.
+func buildItems(reportID string, missionIDs []string) []entity.ParticipantMission {
+	items := make([]entity.ParticipantMission, 0, len(missionIDs))
+	for _, mid := range missionIDs {
+		items = append(items, entity.ParticipantMission{
+			ReportID:      reportID,
+			MissionBankID: mid,
+			IsCompleted:   true,
+		})
+	}
+	return items
 }
 
 // Send generates a fresh unguessable parent access token (anti-IDOR) and marks

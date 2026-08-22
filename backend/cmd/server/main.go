@@ -58,7 +58,7 @@ func main() {
 	photoRepo := persistence.NewPhotoRepository(db.DB)
 	reportRepo := persistence.NewReportRepository(db.DB)
 	missionBankRepo := persistence.NewMissionBankRepository(db.DB)
-	participantMissionRepo := persistence.NewParticipantMissionRepository(db.DB)
+	participantMissionRepo := persistence.NewParticipantMissionRepository(db.DB, reportRepo)
 	consentRepo := persistence.NewConsentRepository(db.DB, cfg.ConsentTokenTTL)
 	frameRepo := persistence.NewFrameRepository(db.DB)
 	programSubstageRepo := persistence.NewProgramSubstageRepository(db.DB)
@@ -81,7 +81,7 @@ func main() {
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, badgeUC)
-	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen)
+	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, participantMissionRepo)
 
 	// Handlers.
 	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite, sessionRepo)
