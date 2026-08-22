@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
@@ -63,15 +64,15 @@ func extractToken(c *echo.Context, sseCookieName string) string {
 }
 
 // RequireRole restricts access to the given roles. Must run after JWTAuth.
-func RequireRole(roles ...string) echo.MiddlewareFunc {
-	allowed := make(map[string]bool, len(roles))
+func RequireRole(roles ...entity.UserRole) echo.MiddlewareFunc {
+	allowed := make(map[entity.UserRole]bool, len(roles))
 	for _, r := range roles {
 		allowed[r] = true
 	}
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			role, _ := (*c).Get(CtxRole).(string)
-			if !allowed[role] {
+			if !allowed[entity.UserRole(role)] {
 				return appresp.Fail(c, http.StatusForbidden, "forbidden")
 			}
 			return next(c)
@@ -89,7 +90,7 @@ func TenantScope() echo.MiddlewareFunc {
 			claimsTenant, _ := (*c).Get(CtxTenantID).(string)
 			headerTenant := (*c).Request().Header.Get("X-Tenant-Id")
 
-			if role == "SUPER_ADMIN" {
+			if role == string(entity.RoleSuperAdmin) {
 				if headerTenant != "" {
 					(*c).Set(CtxTenantID, headerTenant)
 					return next(c)

@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
@@ -11,7 +12,7 @@ import (
 // All tenant operations require SUPER_ADMIN.
 func RegisterTenantsRoutes(g *echo.Group, h *TenantHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
-	roleMW := appmiddleware.RequireRole("SUPER_ADMIN")
+	roleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin)
 
 	g.GET("", h.List, authMW, roleMW)
 	g.POST("", h.Create, authMW, roleMW)

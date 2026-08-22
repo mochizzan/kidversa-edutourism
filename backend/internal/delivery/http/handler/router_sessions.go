@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
@@ -14,7 +15,7 @@ func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecyc
 	ph *SessionParticipantHandler, bh *SessionParticipantBulkHandler, jm *auth.JWTManager, revoker auth.TokenRevoker, kioskH *KioskHandler,
 	participantsGroup *echo.Group) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
-	roleMW := appmiddleware.RequireRole("FASILITATOR", "ADMIN", "KOORDINATOR", "SUPER_ADMIN")
+	roleMW := appmiddleware.RequireRole(entity.RoleFasilitator, entity.RoleAdmin, entity.RoleKoordinator, entity.RoleSuperAdmin)
 
 	g.GET("", h.List, authMW, roleMW, appmiddleware.TenantScope())
 	g.GET("/participants", ph.ListParticipantsGlobal, authMW, roleMW, appmiddleware.TenantScope())

@@ -25,7 +25,7 @@ func RegisterLiveRoutes(g *echo.Group, h *LiveHandler, jm *auth.JWTManager, _ *s
 
 	// Facilitator overrides (FASILITATOR/ADMIN/SUPER_ADMIN only).
 	ov := bearer
-	roles := appmiddleware.RequireRole(string(entity.RoleFasilitator), string(entity.RoleAdmin), string(entity.RoleSuperAdmin))
+	roles := appmiddleware.RequireRole(entity.RoleFasilitator, entity.RoleAdmin, entity.RoleSuperAdmin)
 	g.POST("/groups/:groupId/stages/:stageId/unlock", h.overrideAction(live.ActionUnlock), ov, roles, scope)
 	g.POST("/groups/:groupId/stages/:stageId/complete", h.overrideAction(live.ActionComplete), ov, roles, scope)
 	g.POST("/groups/:groupId/stages/:stageId/skip", h.overrideAction(live.ActionSkip), ov, roles, scope)

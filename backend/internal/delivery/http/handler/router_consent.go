@@ -4,13 +4,14 @@ import (
 	"github.com/labstack/echo/v5"
 
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
 // RegisterConsentRoutes mounts /api/consent/* on the given echo group.
 func RegisterConsentRoutes(g *echo.Group, h *ConsentHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
-	roleMW := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR")
+	roleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator)
 	scopeMW := appmiddleware.TenantScope()
 
 	// Send consent via WhatsApp (JWT, tenant-scoped, async batch).

@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
@@ -14,8 +15,8 @@ import (
 // Kegiatan-content assign/unassign live here (under /api/programs) alongside list/reorder.
 func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
-	roleMWAdmin := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR")
-	roleMWRead := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR", "FASILITATOR")
+	roleMWAdmin := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator)
+	roleMWRead := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator, entity.RoleFasilitator)
 	scopeMW := appmiddleware.TenantScope()
 
 	// Programs.

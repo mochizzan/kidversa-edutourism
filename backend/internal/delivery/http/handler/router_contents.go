@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 )
 
@@ -20,7 +21,7 @@ import (
 // stage-content endpoints (list, reorder).
 func RegisterContentsRoutes(g *echo.Group, h *ContentHandler, uploadH *UploadHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
-	roleMW := appmiddleware.RequireRole("SUPER_ADMIN", "ADMIN", "KOORDINATOR")
+	roleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator)
 	scopeMW := appmiddleware.TenantScope()
 
 	// Standalone content CRUD (tenant-scoped via JWT/scope).
