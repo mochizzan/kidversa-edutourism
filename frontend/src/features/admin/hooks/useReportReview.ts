@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { reportService } from '../../../core/services/reports'
-import { openSSE } from '../../../core/services/backendClient'
+import { openSSE } from '../../../core/services/backend-client'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
@@ -28,7 +28,7 @@ import {
 } from '../../../core/utils/raportCapture'
 import { substagesOfStage } from '../../../core/utils/substage'
 import { selectMissionsForParticipant } from '../../../core/utils/missionSelector'
-import { programSubstageService } from '../../../core/services/programSubstages'
+import { programSubstageService } from '../../../core/services/program-substages'
 import type {
   Report,
   Participant,

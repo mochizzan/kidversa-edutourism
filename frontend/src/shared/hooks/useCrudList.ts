@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { ListParams, PaginatedResponse } from '../../core/types'
-import { ApiError } from '../../core/services/backendClient'
+import { ApiError } from '../../core/services/backend-client'
 import { PAGE_SIZE } from '../../core/constants/api'
 import { useGlobalToast } from '../../shared/components/feedback/Toast'
 import { useTenantScope } from '../../core/hooks/useTenantScope'

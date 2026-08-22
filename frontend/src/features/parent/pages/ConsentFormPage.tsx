@@ -19,7 +19,7 @@ import {
   useParentToken,
 } from '../../../shared/components/auth/ParentTokenGuard'
 import { consentService, type ConsentInfo } from '../../../core/services/consent'
-import { ApiError } from '../../../core/services/backendClient'
+import { ApiError } from '../../../core/services/backend-client'
 import { cn } from '../../../core/utils/cn'
 import { formatDate } from '../../../shared/utils'
 

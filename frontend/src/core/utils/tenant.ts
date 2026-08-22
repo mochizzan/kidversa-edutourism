@@ -1,4 +1,4 @@
-import { getStoredUser } from '../services/backendClient'
+import { getStoredUser } from '../services/backend-client'
 import { UserRole } from '../types/enums'
 import { STORAGE_KEYS } from '../constants/storage'
 

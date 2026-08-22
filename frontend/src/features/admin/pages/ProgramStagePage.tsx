@@ -8,7 +8,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
-import { programSubstageService } from '../../../core/services/programSubstages'
+import { programSubstageService } from '../../../core/services/program-substages'
 import type { Program, ProgramStage, StageContent, ProgramSubstage } from '../../../core/types'
 import { ContentType as ContentTypeEnum } from '../../../core/types'
 import {

@@ -1,4 +1,4 @@
-import { ApiError } from '../services/backendClient'
+import { ApiError } from '../services/backend-client'
 
 export const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: 'Email atau password salah. Periksa kembali data Anda.',

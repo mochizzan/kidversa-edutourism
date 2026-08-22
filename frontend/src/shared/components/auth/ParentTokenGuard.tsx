@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { reportPublicService } from '../../../core/services/reports'
-import { ApiError } from '../../../core/services/backendClient'
+import { ApiError } from '../../../core/services/backend-client'
 import type { Participant } from '../../../core/types'
 import { SUPPORT_EMAIL } from '../../../core/constants/timezone'
 import type { PublicReport } from '../../../core/types'

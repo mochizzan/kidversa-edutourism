@@ -14,7 +14,7 @@ import {
   clearStoredUser,
   refreshAccessToken,
   fireUnauthorized,
-} from '../services/backendClient'
+} from '../services/backend-client'
 import { normalizePhone } from '../utils/phone'
 import { decodeJwtClaims } from '../utils/jwtClaims'
 

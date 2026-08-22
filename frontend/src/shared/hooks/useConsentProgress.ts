@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { openSSE } from '../../core/services/backendClient'
+import { openSSE } from '../../core/services/backend-client'
 import type { ConsentProgressEvent } from '../../core/services/types'
 
 // useConsentProgress subscribes to the WhatsApp consent-delivery SSE stream for a

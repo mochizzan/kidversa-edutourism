@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-import { openSSE, subscribeConnection, type ConnectionState } from '../services/backendClient'
-import { arrayRequest } from '../services/apiEnvelope'
+import { openSSE, subscribeConnection, type ConnectionState } from '../services/backend-client'
+import { arrayRequest } from '../services/api-envelope'
 import type { TimelineEventRow } from '../services/live'
 import type {
   SessionGroup,

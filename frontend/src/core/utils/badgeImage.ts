@@ -7,7 +7,7 @@
 // scoped media endpoint (kind "content"). This mirrors how frames/content
 // images are stored (a relative id resolved via getMediaUrl).
 
-import { uploadMultipart } from '../services/uploadMultipart'
+import { uploadMultipart } from '../services/upload-multipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 import type { Content } from '../types'
 

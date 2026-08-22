@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Tenant } from '../types'
 import { UserRole } from '../types'
-import { apiRequest } from '../services/backendClient'
+import { apiRequest } from '../services/backend-client'
 import { useAuthStore } from './authStore'
 import { STORAGE_KEYS } from '../constants/storage'
 import { API_ROUTES } from '../constants/apiRoutes'

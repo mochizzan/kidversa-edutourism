@@ -5,7 +5,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Input } from '../../../shared/components/ui/Input'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
-import { programSubstageService } from '../../../core/services/programSubstages'
+import { programSubstageService } from '../../../core/services/program-substages'
 import type { ProgramSubstage } from '../../../core/types'
 import { friendlyError } from '../../../core/utils/errorMessages'
 

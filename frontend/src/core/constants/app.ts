@@ -109,7 +109,7 @@ export const kioskSessionPath = (sessionId: string, stageId: string, substageId?
 
 // API
 // NOTE: API_BASE_URL was removed — all callers must use getApiBaseUrl() from
-// ./core/services/backendClient instead. (Previously duplicated the env read
+// ./core/services/backend-client instead. (Previously duplicated the env read
 // in backendClient.ts:114 and was never imported anywhere.)
 
 // Custom DOM events (consumed by useHeaderNotifications)

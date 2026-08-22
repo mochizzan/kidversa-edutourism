@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { backendClient } from '../../core/services/backendClient'
+import { backendClient } from '../../core/services/backend-client'
 
 interface UseConnectionStatusResult {
   status: 'online' | 'degraded' | 'reconnecting'
