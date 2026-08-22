@@ -11,6 +11,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // GormReportRepository implements repository.ReportRepository.
@@ -45,7 +46,7 @@ func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participant
 				Status:        entity.ReportDraft,
 			},
 		}
-		tok, terr := generateConsentToken()
+		tok, terr := util.RandomToken()
 		if terr != nil {
 			return apperrors.Internal("internal_error", terr)
 		}

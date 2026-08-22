@@ -2,8 +2,6 @@ package reports
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -14,6 +12,7 @@ import (
 	"kidversa-edutourism-backend/internal/infrastructure/ai"
 	"kidversa-edutourism-backend/internal/pkg/constants"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // NarrativeGenerator produces a full AI narrative for a report. tenantID is the
@@ -38,15 +37,6 @@ func NewUsecase(repo repository.ReportRepository, gen NarrativeGenerator, partic
 
 // Repo exposes the report repository (used by handlers for token lookups).
 func (u *Usecase) Repo() repository.ReportRepository { return u.repo }
-
-// generateToken returns a cryptographically random 64-char hex string.
-func generateToken() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
 
 // Approve marks a report approved and persists the approver.
 func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy string, narrativeFinal string, missionIDs []string) (*entity.Report, error) {
@@ -105,7 +95,7 @@ func (u *Usecase) Send(ctx context.Context, reportID, tenantID string, ttlHours 
 	if err != nil {
 		return nil, err
 	}
-	tok, err := generateToken()
+	tok, err := util.RandomToken()
 	if err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}

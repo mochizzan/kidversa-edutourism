@@ -55,11 +55,6 @@ func NewPublicReportDTO(r *entity.Report) *PublicReportDTO {
 	}
 }
 
-// ReportGenerateRequest triggers async narrative generation (placeholder).
-type ReportGenerateRequest struct {
-	Draft bool `json:"draft"`
-}
-
 // ReportSendRequest carries the token TTL in hours when sending a report.
 type ReportSendRequest struct {
 	TTLHours int `json:"ttl_hours"`

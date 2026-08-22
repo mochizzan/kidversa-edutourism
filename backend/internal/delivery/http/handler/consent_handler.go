@@ -17,10 +17,10 @@ import (
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
-	"kidversa-edutourism-backend/internal/infrastructure/persistence"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/pkg/sse"
+	"kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // ConsentHandler serves /api/consent/* (parent responses + lookups + delivery).
@@ -116,9 +116,9 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 	// Generate + persist a combined token per eligible participant. Each update
 	// uses an atomic WHERE guard: only persist if no active token exists, preventing
 	// concurrent requests from overwriting each other's tokens.
-	batchID := persistence.NewUUID()
+	batchID := util.NewUUID()
 	for i := range eligible {
-		token, terr := persistence.GenerateConsentToken()
+		token, terr := util.RandomToken()
 		if terr != nil {
 			return apperrors.Internal("internal_error", terr)
 		}

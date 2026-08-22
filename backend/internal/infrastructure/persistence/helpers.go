@@ -2,12 +2,11 @@ package persistence
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"strings"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"kidversa-edutourism-backend/internal/pkg/util"
 )
 
 // paginate applies consistent ordering and page-slice math (Offset/Limit) to a
@@ -55,28 +54,10 @@ func reorderByIDs(tx *gorm.DB, model interface{}, ids []string, keyCol, orderCol
 }
 
 // newUUID returns a random UUID v4 string (used for CHAR(36) primary keys).
+// Package-local shorthand for the shared util.NewUUID, kept because the model
+// files call it on nearly every Create.
 func newUUID() string {
-	return uuid.NewString()
-}
-
-// NewUUID is the exported alias of newUUID (for cross-package callers).
-func NewUUID() string {
-	return newUUID()
-}
-
-// GenerateConsentToken is the exported alias of generateConsentToken (64-hex
-// cryptographically-random consent token).
-func GenerateConsentToken() (string, error) {
-	return generateConsentToken()
-}
-
-// generateConsentToken returns a 64-char hex (32-byte) cryptographically-random token.
-func generateConsentToken() (string, error) {
-	var buf [32]byte
-	if _, err := rand.Read(buf[:]); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf[:]), nil
+	return util.NewUUID()
 }
 
 // isDuplicate reports whether err is a MySQL/MariaDB duplicate-entry (unique constraint) error.
