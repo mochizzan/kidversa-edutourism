@@ -31,15 +31,19 @@ type ReportRepository interface {
 }
 
 // ParticipantMissionRepository links reports to completed missions.
+// Every method is tenant-scoped: operations assert report ownership via
+// reportRepo.GetByID(reportID, tenantID) (returns 404 for cross-tenant) before
+// acting by report_id. This keeps participant_missions 3NF off report_id with no
+// denormalized tenant_id column.
 type ParticipantMissionRepository interface {
-	Create(ctx context.Context, m *entity.ParticipantMission) error
-	GetByID(ctx context.Context, id string) (*entity.ParticipantMission, error)
-	GetByReport(ctx context.Context, reportID string) ([]entity.ParticipantMission, error)
-	Update(ctx context.Context, m *entity.ParticipantMission) error
+	Create(ctx context.Context, tenantID string, m *entity.ParticipantMission) error
+	GetByID(ctx context.Context, tenantID, id string) (*entity.ParticipantMission, error)
+	GetByReport(ctx context.Context, tenantID, reportID string) ([]entity.ParticipantMission, error)
+	Update(ctx context.Context, tenantID string, m *entity.ParticipantMission) error
 	// ReplaceByReport atomically replaces all participant missions for a report
 	// within a single transaction (delete existing, insert the given items).
-	ReplaceByReport(ctx context.Context, reportID string, items []entity.ParticipantMission) error
+	ReplaceByReport(ctx context.Context, tenantID, reportID string, items []entity.ParticipantMission) error
 	// ListByParticipant returns all participant missions for a participant.
-	ListByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantMission, error)
-	Delete(ctx context.Context, id string) error
+	ListByParticipant(ctx context.Context, tenantID, participantID string) ([]entity.ParticipantMission, error)
+	Delete(ctx context.Context, tenantID, id string) error
 }
