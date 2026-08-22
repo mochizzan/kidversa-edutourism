@@ -13,7 +13,6 @@
 
 import { ApiError, apiRequest } from './backendClient'
 import type { ListParams, PaginatedResponse } from '../types'
-import { getActiveTenantId } from '../utils/tenant'
 import { PAGE_SIZE } from '../constants/api'
 
 interface ListEnvelope<T> {
@@ -26,21 +25,18 @@ interface ItemEnvelope<T> {
 }
 
 // Some list endpoints wrap the array one level deeper as `{ data: { items: [] } }`
-// (reports, consent, participant-missions). This envelope models that shape.
+// (reports, consent, participant-missions, mission-banks). This envelope models
+// that shape.
 interface ItemsEnvelope<T> {
   data: { items: T[] }
 }
 
-// For SUPER_ADMIN the backend requires an explicit X-Tenant-Id header to scope
-// tenant data; other roles are scoped strictly from the JWT and MUST NOT send it
-// (the middleware rejects it). The active tenant lives in localStorage (set by
-// tenantStore); the current role comes from the persisted auth user. A caller can
-// override the scope via `apiRequest`'s `tenantId` option (used by the report flow
-// to pin the resource-owned `session.tenant_id`).
-export function withTenantHeader(headers: Record<string, string> = {}): Record<string, string> {
-  const tid = getActiveTenantId()
-  if (tid) return { ...headers, 'X-Tenant-Id': tid }
-  return headers
+// Like ItemsEnvelope, but the list endpoint also carries top-level pagination
+// meta (e.g. /api/mission-banks). Exported so service shims reuse the shared
+// type instead of re-declaring a divergent local envelope.
+export interface ItemsListEnvelope<T> {
+  data: { items: T[] }
+  meta?: { page: number; limit: number; total: number }
 }
 
 // C7: the backend omits `tenant_id` (omitempty) for tenant-less scopes; the FE
@@ -73,6 +69,30 @@ function buildQuery(path: string, params?: ListParams): string {
   return qs ? `${path}?${qs}` : path
 }
 
+// Single source of truth for pagination traversal (EC9). Given a `requestFn`
+// that fetches one page (by 1-based page number) and resolves to `{ data, meta? }`,
+// loop until the full working set is gathered. Stops when the page is empty,
+// shorter than the requested limit, or once `meta.total` items have accumulated.
+// `startPage` lets a caller that already fetched page 1 resume from page 2+.
+export async function fetchAllPages<T>(
+  requestFn: (page: number) => Promise<{ data: T[]; meta?: { page: number; limit: number; total: number } }>,
+  startPage = 1,
+): Promise<T[]> {
+  const all: T[] = []
+  let page = startPage
+  // Guard with a sane upper bound so a misbehaving backend can never loop forever.
+  for (let safety = 0; safety < 1000; safety++) {
+    const res = await requestFn(page)
+    const items = res.data ?? []
+    all.push(...items)
+    const meta = res.meta
+    if (!meta || items.length === 0 || all.length >= meta.total) break
+    if (items.length < meta.limit) break
+    page += 1
+  }
+  return all
+}
+
 // GET a paginated list, honoring the FE pagination contract. When the caller
 // requests a large page (>=100, the backend's hard cap) we loop every page so
 // callers that rely on "fetch all" (e.g. limit:1000) actually receive everything.
@@ -84,33 +104,18 @@ export async function listRequest<T>(
   const page = Math.max(1, params?.page ?? 1)
   const url = buildQuery(path, params)
 
-  const first = await apiRequest<ListEnvelope<T>>('GET', url, undefined, {
-    headers: withTenantHeader(),
-  })
+  const first = await apiRequest<ListEnvelope<T>>('GET', url, undefined)
 
   if (limit >= 100 && first.meta && first.meta.total > first.data.length) {
-    const totalPages = Math.ceil(first.meta.total / first.meta.limit)
-    const rest: T[] = []
-    const BATCH = 5
-    for (let batch = page + 1; batch <= totalPages; batch += BATCH) {
-      const end = Math.min(batch + BATCH - 1, totalPages)
-      const promises: Promise<ListEnvelope<T>>[] = []
-      for (let p = batch; p <= end; p++) {
-        const q = new URLSearchParams(
-          url.includes('?') ? url.slice(url.indexOf('?') + 1) : '',
-        )
-        q.set('page', String(p))
-        promises.push(
-          apiRequest<ListEnvelope<T>>('GET', `${path}?${q.toString()}`, undefined, {
-            headers: withTenantHeader(),
-          }),
-        )
-      }
-      const results = await Promise.all(promises)
-      for (const r of results) {
-        rest.push(...r.data)
-      }
-    }
+    const rest = await fetchAllPages<T>(
+      (p) =>
+        apiRequest<ListEnvelope<T>>(
+          'GET',
+          buildQuery(path, { ...params, page: p }),
+          undefined,
+        ),
+      page + 1,
+    )
     const all = [...first.data, ...rest].map(normalizeTenantId)
     return { data: all, total: first.meta.total, page: 1, limit: all.length, totalPages: 1 }
   }
@@ -126,19 +131,16 @@ export async function listRequest<T>(
 
 // GET an array (sub-resource list, e.g. stages/contents/groups/participants).
 export async function arrayRequest<T>(method: string, path: string, body?: unknown): Promise<T[]> {
-  const res = await apiRequest<ItemEnvelope<T[]>>(method, path, body, {
-    headers: withTenantHeader(),
-  })
+  const res = await apiRequest<ItemEnvelope<T[]>>(method, path, body)
   return (res.data ?? []).map(normalizeTenantId)
 }
 
 // GET/POST a list wrapped as `{ data: { items: [] } }` (reports, consent,
 // participant-missions). Unwraps the nested `items` array and normalizes
-// tenant_id. Routes through withTenantHeader so tenant scoping is applied.
+// tenant_id. Tenant scoping is applied by apiRequest's built-in X-Tenant-Id
+// injection (SUPER_ADMIN), so no header plumbing is needed here.
 export async function itemsRequest<T>(method: string, path: string, body?: unknown): Promise<T[]> {
-  const res = await apiRequest<ItemsEnvelope<T>>(method, path, body, {
-    headers: withTenantHeader(),
-  })
+  const res = await apiRequest<ItemsEnvelope<T>>(method, path, body)
   return (res.data?.items ?? []).map(normalizeTenantId)
 }
 
@@ -151,7 +153,6 @@ export async function itemRequest<T>(
   tenantId?: string | null,
 ): Promise<T> {
   const res = await apiRequest<ItemEnvelope<T>>(method, path, body, {
-    headers: withTenantHeader(),
     tenantId: tenantId ?? undefined,
   })
   return normalizeTenantId(res.data)
@@ -169,5 +170,5 @@ export async function nullableItemRequest<T>(method: string, path: string): Prom
 
 // DELETE / mutation with no body of interest.
 export async function voidRequest(method: string, path: string, body?: unknown): Promise<void> {
-  await apiRequest<unknown>(method, path, body, { headers: withTenantHeader() })
+  await apiRequest<unknown>(method, path, body)
 }

@@ -1,9 +1,13 @@
 import type { MissionBank, CreateMissionBankDTO } from '../types'
 import type { MissionBankService } from './types'
 import { apiRequest } from './backendClient'
-import { withTenantHeader, normalizeTenantId } from './apiEnvelope'
-import { useTenantStore } from '../stores/tenantStore'
-import { STORAGE_KEYS } from '../constants/storage'
+import {
+  itemRequest,
+  voidRequest,
+  normalizeTenantId,
+  type ItemsListEnvelope,
+} from './apiEnvelope'
+import { getActiveTenantId } from '../utils/tenant'
 import { parseRawJSON } from '../utils/rawJson'
 import { API_ROUTES } from '../constants/apiRoutes'
 
@@ -13,16 +17,6 @@ import { API_ROUTES } from '../constants/apiRoutes'
 
 // The active tenant drives the tenant-scoped writes. The backend derives the
 // real tenant from the JWT; we still send it because the write DTOs require it.
-function getActiveTenantId(): string | undefined {
-  const { activeTenant } = useTenantStore.getState()
-  if (activeTenant?.id) return activeTenant.id
-  const tid =
-    typeof localStorage !== 'undefined'
-      ? localStorage.getItem(STORAGE_KEYS.ACTIVE_TENANT_ID)
-      : null
-  return tid ?? undefined
-}
-
 function normalizeMission(raw: MissionBank): MissionBank {
   return {
     ...raw,
@@ -34,16 +28,10 @@ function normalizeMission(raw: MissionBank): MissionBank {
   }
 }
 
-interface Envelope<T> {
-  data: T
-  meta?: { page: number; limit: number; total: number }
-}
-
-interface MissionBankListEnvelope {
-  data: { items: MissionBank[] }
-  meta?: { page: number; limit: number; total: number }
-}
-
+// GET /api/mission-banks — list endpoint. The backend wraps the page as
+// `{ data: { items: [] } }` (ItemsEnvelope). Reuses the shared itemsRequest
+// unwrap + tenant_id normalization; the MissionBankService consumer expects the
+// `{ data, total, page, limit, totalPages }` shape, so we flatten meta here.
 const getAll = async (
   params?: {
     page?: number
@@ -73,11 +61,9 @@ const getAll = async (
     }
   }
 
-  const res = await apiRequest<MissionBankListEnvelope>(
+  const res = await apiRequest<ItemsListEnvelope<MissionBank>>(
     'GET',
     `${API_ROUTES.MISSIONS.BASE}?${qs.toString()}`,
-    undefined,
-    { headers: withTenantHeader() },
   )
   const items = (res.data?.items ?? []).map((m) => normalizeTenantId(normalizeMission(m)))
   const total = res.meta?.total ?? items.length
@@ -91,35 +77,22 @@ const getAll = async (
 }
 
 const getById = async (id: string): Promise<MissionBank | null> => {
-  const res = await apiRequest<Envelope<MissionBank>>(
-    'GET',
-    API_ROUTES.MISSIONS.DETAIL(id),
-    undefined,
-    { headers: withTenantHeader() },
-  )
-  return res.data ? normalizeMission(res.data) : null
+  return itemRequest<MissionBank>('GET', API_ROUTES.MISSIONS.DETAIL(id))
 }
 
 const create = async (data: CreateMissionBankDTO): Promise<MissionBank> => {
-  const body: Record<string, unknown> = {
-    tenant_id: getActiveTenantId(),
+  return itemRequest<MissionBank>('POST', API_ROUTES.MISSIONS.BASE, {
+    tenant_id: getActiveTenantId() ?? undefined,
     program_id: data.program_id,
     category: data.category,
     title_child: data.title_child,
     title_parent: data.title_parent,
     description_parent: data.description_parent ?? '',
     is_active: true,
-  }
-  if (data.related_stage_ids && data.related_stage_ids.length > 0) {
-    body.related_stage_ids = data.related_stage_ids
-  }
-  const res = await apiRequest<Envelope<MissionBank>>(
-    'POST',
-    API_ROUTES.MISSIONS.BASE,
-    body,
-    { headers: withTenantHeader() },
-  )
-  return normalizeMission(res.data)
+    ...(data.related_stage_ids && data.related_stage_ids.length > 0
+      ? { related_stage_ids: data.related_stage_ids }
+      : {}),
+  })
 }
 
 const update = async (
@@ -136,29 +109,15 @@ const update = async (
   if (data.related_stage_ids !== undefined) {
     body.related_stage_ids = data.related_stage_ids
   }
-  const res = await apiRequest<Envelope<MissionBank>>(
-    'PUT',
-    API_ROUTES.MISSIONS.DETAIL(id),
-    body,
-    { headers: withTenantHeader() },
-  )
-  return normalizeMission(res.data)
+  return itemRequest<MissionBank>('PUT', API_ROUTES.MISSIONS.DETAIL(id), body)
 }
 
 const remove = async (id: string): Promise<void> => {
-  await apiRequest<void>('DELETE', API_ROUTES.MISSIONS.DETAIL(id), undefined, {
-    headers: withTenantHeader(),
-  })
+  await voidRequest('DELETE', API_ROUTES.MISSIONS.DETAIL(id))
 }
 
 const toggleActive = async (id: string): Promise<MissionBank> => {
-  const res = await apiRequest<Envelope<MissionBank>>(
-    'POST',
-    API_ROUTES.MISSIONS.TOGGLE_ACTIVE(id),
-    undefined,
-    { headers: withTenantHeader() },
-  )
-  return normalizeMission(res.data)
+  return itemRequest<MissionBank>('POST', API_ROUTES.MISSIONS.TOGGLE_ACTIVE(id))
 }
 
 export const missionService: MissionBankService = {
