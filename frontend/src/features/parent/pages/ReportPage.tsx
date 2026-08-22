@@ -12,7 +12,7 @@ import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 import { DEFAULT_FACILITATOR_MESSAGE, DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
 import { participantMissionService } from '../../../core/services/missions'
-import { BadgeList } from '../components/BadgeList'
+import { BadgeList } from '../../../shared/components/data/BadgeList'
 
 /* ── Inner report component ── */
 function ReportView() {

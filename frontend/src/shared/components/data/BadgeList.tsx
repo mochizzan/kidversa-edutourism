@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Award, Loader2, Star } from 'lucide-react'
-import { Card } from '../../../shared/components/ui/Card'
+import { Card } from '../ui/Card'
 import { badgeService } from '../../../core/services/badges'
 import { getMediaUrl } from '../../../core/utils/media'
 import type { ParticipantBadge } from '../../../core/types'

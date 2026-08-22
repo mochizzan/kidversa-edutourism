@@ -19,7 +19,7 @@ import { missionService } from '../../../core/services/missions'
 import { participantMissionService } from '../../../core/services/missions'
 import type { MissionBank, ParticipantMission } from '../../../core/types'
 import { cn } from '../../../core/utils/cn'
-import { BadgeList } from '../components/BadgeList'
+import { BadgeList } from '../../../shared/components/data/BadgeList'
 
 /* ── Inner component ── */
 function MissionsView() {
