@@ -1,13 +1,11 @@
 import { create } from 'zustand'
-import type { Toast } from '../../shared/components/feedback/Toast'
+import type { Toast } from '../types/toast'
 
 // Global toast state, centralized in core/stores (the innermost application
 // layer) so any feature can post toasts without importing the shared UI
 // component. The shared <ToastProvider> renders from this store; useGlobalToast
 // reads from it. ToastRegistry / legacy useToast were removed — this store is
 // the single source of truth.
-
-const DEFAULT_DURATION = 5000
 
 function generateId(): string {
   return `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -53,5 +51,3 @@ export const toastRegistry = {
     return { addToast, removeToast, dismissAll, toasts }
   },
 }
-
-export { DEFAULT_DURATION }
