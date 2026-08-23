@@ -64,9 +64,9 @@ func main() {
 	programSubstageRepo := persistence.NewProgramSubstageRepository(db.DB)
 	sessionSubstageRepo := persistence.NewSessionSubstageRepository(db.DB)
 
-	// AI clients.
-	openRouterClient := ai.NewOpenRouterClient(cfg)
-	narrativeGen := ai.NewOpenRouterNarrativeGenerator(openRouterClient, reportRepo, sessionRepo, assessmentRepo, programRepo, sessionSubstageRepo)
+	// AI clients — provider selected via AI_PROVIDER (openrouter | gemini).
+	aiClient := ai.NewClient(cfg)
+	narrativeGen := ai.NewNarrativeGeneratorForProvider(cfg, reportRepo, sessionRepo, assessmentRepo, programRepo, sessionSubstageRepo)
 
 	// Usecases.
 	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, auth.NewKioskStore(db.DB), cfg.BcryptCost)
@@ -81,7 +81,7 @@ func main() {
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, badgeUC)
-	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, openRouterClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo)
+	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo)
 
 	// Handlers.
 	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite, sessionRepo)

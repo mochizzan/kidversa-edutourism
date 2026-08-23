@@ -71,12 +71,22 @@ type Config struct {
 	WhatsAppSessionID    string
 	ParentConsentBaseURL string
 
+	// AI provider selection: "openrouter" (default) or "gemini".
+	// Drives which LLM backend the narrative generator + mission recommender use.
+	AIProvider string
+
 	// OpenRouter AI (narrative generation)
 	OpenRouterAPIKey    string
 	OpenRouterModel     string
 	OpenRouterBaseURL   string
 	OpenRouterMaxTokens int
 	Temperature         float64
+
+	// Google AI Studio (Gemini) — alternative provider with higher rate limits.
+	GeminiAPIKey         string
+	GeminiModel          string
+	GeminiBaseURL        string
+	GeminiMinIntervalSec int // min seconds between Gemini calls (throttle)
 }
 
 // Load reads configuration from the environment (optionally via .env) and validates the critical fields.
@@ -136,6 +146,12 @@ func Load() *Config {
 		OpenRouterBaseURL:   getEnv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
 		OpenRouterMaxTokens: getEnvInt("OPENROUTER_MAX_TOKENS", 1024),
 		Temperature:         getEnvFloat("OPENROUTER_TEMPERATURE", 0.7),
+
+		AIProvider:           getEnv("AI_PROVIDER", "gemini"),
+		GeminiAPIKey:         getEnv("GEMINI_API_KEY", ""),
+		GeminiModel:          getEnv("GEMINI_MODEL", "gemini-3.5-flash-lite"),
+		GeminiBaseURL:        getEnv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"),
+		GeminiMinIntervalSec: getEnvInt("GEMINI_MIN_INTERVAL_SEC", 15),
 	}
 
 	// Warn if OpenRouter API key is not set — server starts but AI features will fail.

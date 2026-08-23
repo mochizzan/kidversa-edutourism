@@ -71,6 +71,7 @@ func (h *MissionBankHandler) List(c *echo.Context) error {
 		TenantID:  appmiddleware.GetTenantID(c),
 		ProgramID: (*c).QueryParam("program_id"),
 		Category:  (*c).QueryParam("category"),
+		TopicID:   (*c).QueryParam("topic_id"),
 	}
 	if v := (*c).QueryParam("is_active"); v == "true" {
 		t := true

@@ -112,10 +112,10 @@ func (g *OpenRouterNarrativeGenerator) buildStageBySubstageID(ctx context.Contex
 	return stageBySubstageID, nil
 }
 
-// OpenRouterNarrativeGenerator implements reports.NarrativeGenerator using
-// the OpenRouter chat completions API.
+// OpenRouterNarrativeGenerator implements reports.NarrativeGenerator using a
+// chat-completions LLM client (OpenRouter or Gemini — both satisfy LLMClient).
 type OpenRouterNarrativeGenerator struct {
-	client         *OpenRouterClient
+	client         LLMClient
 	reportRepo     repository.ReportRepository
 	sessionRepo    repository.SessionRepository
 	substageRepo   repository.SessionSubstageRepository
@@ -123,9 +123,11 @@ type OpenRouterNarrativeGenerator struct {
 	programRepo    repository.ProgramRepository
 }
 
-// NewOpenRouterNarrativeGenerator builds a narrative generator backed by OpenRouter.
-func NewOpenRouterNarrativeGenerator(
-	client *OpenRouterClient,
+// NewNarrativeGenerator builds a narrative generator backed by an LLMClient.
+// Accepts any client implementing ai.LLMClient (OpenRouter or Gemini), so the
+// active provider is selected via configuration rather than code.
+func NewNarrativeGenerator(
+	client LLMClient,
 	reportRepo repository.ReportRepository,
 	sessionRepo repository.SessionRepository,
 	assessmentRepo repository.AssessmentRepository,

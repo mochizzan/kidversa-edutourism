@@ -79,7 +79,14 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 		return nil, err
 	}
 	r.Status = entity.ReportApproved
-	r.ApprovedBy = &approvedBy
+	// Empty approver (e.g. when the client doesn't supply one) must be stored as
+	// NULL, never as an empty string — fk_reports_approved_by references
+	// users(id), so "" would violate the FK.
+	if approvedBy != "" {
+		r.ApprovedBy = &approvedBy
+	} else {
+		r.ApprovedBy = nil
+	}
 	if narrativeFinal != "" {
 		r.AINarrativeFinal = narrativeFinal
 	}

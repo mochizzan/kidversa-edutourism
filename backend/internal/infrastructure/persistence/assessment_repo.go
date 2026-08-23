@@ -106,7 +106,7 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 		q = q.Where("participant_id = ?", f.ParticipantID)
 	}
 	if f.SessionID != "" {
-		q = q.Where("session_id = ?", f.SessionID)
+		q = q.Where("assessments.session_id = ?", f.SessionID)
 	}
 	if f.SessionSubstageID != "" {
 		q = q.Where("session_substage_id = ?", f.SessionSubstageID)
@@ -125,7 +125,14 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 	if f.TenantID == "" {
 		return nil, apperrors.BadRequest("tenant_required", errors.New("tenant ID is required"))
 	}
-	q = scopeByTenant(q, f.TenantID)
+	// When the Topic join is active, session_substages/session_stages also carry
+	// session_id, so qualify the tenant scope to the base table to avoid the
+	// "Column 'session_id' is ambiguous" error.
+	if f.ProgramStageID != "" {
+		q = q.Where("assessments.session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", f.TenantID)
+	} else {
+		q = scopeByTenant(q, f.TenantID)
+	}
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {

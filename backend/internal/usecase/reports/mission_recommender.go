@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -126,7 +127,11 @@ func (u *Usecase) suggestViaLLM(ctx context.Context, r *entity.Report, session *
 		return nil, fmt.Errorf("execute user prompt: %w", err)
 	}
 
-	raw, err := u.aiClient.ChatCompletion(ctx, string(systemPrompt), sb.String())
+	// Bound the LLM call so a stalled upstream (e.g. OpenRouter) fails fast and
+	// we fall back to the deterministic heuristic instead of hanging the request.
+	llmCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	raw, err := u.aiClient.ChatCompletion(llmCtx, string(systemPrompt), sb.String())
 	if err != nil {
 		return nil, err
 	}

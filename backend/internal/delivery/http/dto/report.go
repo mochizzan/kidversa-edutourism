@@ -89,7 +89,7 @@ func NewReportTokenResponse(r *entity.Report) *ReportTokenResponse {
 // ReportApproveRequest carries the approver identity plus optional finalized
 // narrative and mission selections.
 type ReportApproveRequest struct {
-	ApprovedBy     string   `json:"approved_by" validate:"required"`
+	ApprovedBy     string   `json:"approved_by,omitempty" validate:"omitempty"`
 	NarrativeFinal string   `json:"narrative_final"`
 	MissionIDs     []string `json:"mission_ids"`
 }
