@@ -116,6 +116,15 @@ func (r *GormMissionBankRepository) List(ctx context.Context, f repository.Missi
 	if f.IsActive != nil {
 		q = q.Where("is_active = ?", *f.IsActive)
 	}
+	// Per-Topic scoping: only missions linked via mission_bank_stages to the
+	// given program_stage (Topic). DISTINCT avoids row multiplication when a
+	// mission links to multiple stages (and across the count + find).
+	if f.TopicID != "" {
+		q = q.
+			Joins("JOIN mission_bank_stages mbs ON mbs.mission_bank_id = mission_banks.id").
+			Where("mbs.program_stage_id = ?", f.TopicID).
+			Distinct("mission_banks.id")
+	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)

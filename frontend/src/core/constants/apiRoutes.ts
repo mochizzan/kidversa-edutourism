@@ -129,6 +129,8 @@ export const API_ROUTES = {
     GENERATE_STREAM: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
     GENERATE_STREAM_SSE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
     GENERATE_SESSION: '/api/reports/generate',
+    SUGGEST_MISSIONS: (id: string) =>
+      `/api/reports/${encodeURIComponent(id)}/suggest-missions`,
     APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
     SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
     REVOKE_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-token`,

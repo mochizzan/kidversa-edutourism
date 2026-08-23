@@ -159,7 +159,9 @@ func (h *ReportHandler) runNarrativeStream(ctx context.Context, id, tenantID str
 
 // GenerateForSession handles POST /api/reports/generate.
 // Creates DRAFT reports for all participants in the session that don't have one
-// yet, then triggers narrative generation for every report.
+// yet, then triggers narrative generation for every report. Reports are created
+// per (participant, topic) so the invariant 1 Report = 1 Topic = 1 Participant
+// holds; the session's Topics are resolved from its session_stages.
 func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	var req dto.ReportGenerateSessionRequest
 	if err := bindAndValidate(c, &req); err != nil {
@@ -168,6 +170,11 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	tenantID := appmiddleware.GetTenantID(c)
 	if err := tenantGuard(c, tenantID); err != nil {
 		return err
+	}
+	// Resolve the session's Topics (program_stage_ids) to scope per-Topic reports.
+	topicIDs, terr := h.resolveSessionTopics((*c).Request().Context(), req.SessionID)
+	if terr != nil {
+		return terr
 	}
 	if req.ParticipantID != "" {
 		if !h.tryBeginGenerate(req.SessionID) {
@@ -195,7 +202,7 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 		}
 		defer h.endGenerate(req.SessionID + ":" + req.ParticipantID)
 		defer h.endGenerate(req.SessionID)
-		reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, tenantID, []entity.Participant{*one})
+		reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, tenantID, []entity.Participant{*one}, topicIDs)
 		if err != nil {
 			return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
 		}
@@ -209,11 +216,25 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, tenantID, participants)
+	reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, tenantID, participants, topicIDs)
 	if err != nil {
 		return err
 	}
 	return appresp.OK(c, dto.NewReportListResponse(reports))
+}
+
+// resolveSessionTopics returns the program_stage_ids of the session's
+// session_stages (one per Topic the session instantiates).
+func (h *ReportHandler) resolveSessionTopics(ctx context.Context, sessionID string) ([]string, error) {
+	stages, err := h.sessionRepo.ListSessionStages(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(stages))
+	for i := range stages {
+		ids = append(ids, stages[i].ProgramStageID)
+	}
+	return ids, nil
 }
 
 // Approve handles POST /api/reports/:id/approve.
@@ -277,6 +298,26 @@ func (h *ReportHandler) RevokeToken(c *echo.Context) error {
 		return err
 	}
 	return appresp.OK(c, dto.NewReportResponse(r))
+}
+
+// SuggestMissions handles POST /api/reports/:id/suggest-missions.
+// Returns up to MaxReportMissions mission IDs recommended for the report's
+// Topic (program_stage), scoped strictly to that Topic's active missions. No
+// persistence — the caller pre-fills the manual selector and persists on Approve.
+func (h *ReportHandler) SuggestMissions(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	ids, err := h.uc.SuggestMissions((*c).Request().Context(), id, tenantID)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, map[string]interface{}{"mission_ids": ids})
 }
 
 // ListReports handles GET /api/reports?session_id= (tenant-scoped via TenantScope).

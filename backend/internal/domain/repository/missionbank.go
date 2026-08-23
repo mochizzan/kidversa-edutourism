@@ -11,7 +11,10 @@ type MissionBankFilter struct {
 	TenantID  string
 	ProgramID string
 	Category  string
-	IsActive  *bool
+	// TopicID filters missions to those linked via mission_bank_stages to the
+	// given program_stage (Topic). Empty = no Topic scoping.
+	TopicID  string
+	IsActive *bool
 }
 
 // MissionBankRepository is the persistence contract for mission templates.

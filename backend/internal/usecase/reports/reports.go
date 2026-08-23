@@ -23,16 +23,50 @@ type NarrativeGenerator interface {
 	StreamGenerate(ctx context.Context, reportID, tenantID string, onDelta func(string) error) (string, error)
 }
 
-// Usecase implements report business logic: anti-IDOR parent tokens + narrative.
+// MissionLLMClient is the minimal LLM surface the mission recommender needs.
+// Satisfied by *ai.OpenRouterClient. Declared here so the reports package does
+// not import the ai package (keeps the dependency boundary clean).
+type MissionLLMClient interface {
+	ChatCompletion(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+}
+
+// MaxReportMissions caps the number of recommended/selected missions per report.
+const MaxReportMissions = 4
+
+// Usecase implements report business logic: anti-IDOR parent tokens + narrative
+// + AI mission recommendation.
 type Usecase struct {
 	repo                   repository.ReportRepository
 	gen                    NarrativeGenerator
+	aiClient               MissionLLMClient
+	missionRepo            repository.MissionBankRepository
+	assessmentRepo         repository.AssessmentRepository
+	sessionRepo            repository.SessionRepository
+	programRepo            repository.ProgramRepository
 	participantMissionRepo repository.ParticipantMissionRepository
 }
 
 // NewUsecase builds the reports usecase.
-func NewUsecase(repo repository.ReportRepository, gen NarrativeGenerator, participantMissionRepo repository.ParticipantMissionRepository) *Usecase {
-	return &Usecase{repo: repo, gen: gen, participantMissionRepo: participantMissionRepo}
+func NewUsecase(
+	repo repository.ReportRepository,
+	gen NarrativeGenerator,
+	aiClient MissionLLMClient,
+	missionRepo repository.MissionBankRepository,
+	assessmentRepo repository.AssessmentRepository,
+	sessionRepo repository.SessionRepository,
+	programRepo repository.ProgramRepository,
+	participantMissionRepo repository.ParticipantMissionRepository,
+) *Usecase {
+	return &Usecase{
+		repo:                   repo,
+		gen:                    gen,
+		aiClient:               aiClient,
+		missionRepo:            missionRepo,
+		assessmentRepo:         assessmentRepo,
+		sessionRepo:            sessionRepo,
+		programRepo:            programRepo,
+		participantMissionRepo: participantMissionRepo,
+	}
 }
 
 // Repo exposes the report repository (used by handlers for token lookups).
@@ -50,6 +84,11 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 		r.AINarrativeFinal = narrativeFinal
 	}
 	if missionIDs != nil {
+		// Cap persisted missions at MaxReportMissions (defense-in-depth even if a
+		// client sends more); the UI also enforces the limit.
+		if len(missionIDs) > MaxReportMissions {
+			missionIDs = missionIDs[:MaxReportMissions]
+		}
 		r.MissionIDs = missionIDs
 	}
 	now := time.Now().UTC()
@@ -170,10 +209,14 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 	return text, nil
 }
 
-// GenerateForSession creates a DRAFT report for each participant that does not
-// already have one, then runs the narrative generator for all reports in the
-// session concurrently. Returns the full list of reports after generation.
-func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID string, participants []entity.Participant) ([]entity.Report, error) {
+// GenerateForSession creates a DRAFT report for each (participant, topic)
+// pair that does not already have one, then runs the narrative generator for
+// every report in the session concurrently. topicIDs is the set of
+// program_stage_ids instantiated by the session (resolved by the caller via
+// sessionRepo.ListSessionStages). Passing an empty topicIDs creates only the
+// legacy whole-session report (program_stage_id = "") for backward
+// compatibility. Returns the full list of reports after generation.
+func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID string, participants []entity.Participant, topicIDs []string) ([]entity.Report, error) {
 	targetIDs := make(map[string]bool, len(participants))
 	for _, p := range participants {
 		targetIDs[p.ID] = true
@@ -182,10 +225,14 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 		return nil, err
 	}
 
-	// Atomic via GetOrCreateDraft (Task 2/3); soft-delete invariant documented in Task 7.
+	// Atomic per (participant, topic) via GetOrCreateDraft; soft-delete invariant
+	// documented in report_repo.go. Legacy rows (empty topicID) and per-Topic rows
+	// coexist under uq_reports_session_participant_topic.
 	for _, p := range participants {
-		if _, err := u.repo.GetOrCreateDraft(ctx, p.ID, sessionID); err != nil {
-			return nil, err
+		for _, tid := range topicIDs {
+			if _, err := u.repo.GetOrCreateDraft(ctx, p.ID, sessionID, tid); err != nil {
+				return nil, err
+			}
 		}
 	}
 

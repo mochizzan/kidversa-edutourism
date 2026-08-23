@@ -55,12 +55,21 @@ export interface StageInfo {
   kegiatan: KegiatanRow[]
 }
 
-export function useReportReview(sessionId: string | undefined, reportId: string | undefined) {
+export interface TopicTab {
+  programStageId: string
+  name: string
+}
+
+const MAX_MISSIONS = 4
+
+export function useReportReview(sessionId: string | undefined, participantId: string | undefined) {
   const { user } = useAuth()
   const { tenantId } = useTenantScope()
   const { addToast } = useGlobalToast()
 
-  const [report, setReport] = useState<Report | null>(null)
+  const [reportsByTopic, setReportsByTopic] = useState<Record<string, Report>>({})
+  const [topics, setTopics] = useState<TopicTab[]>([])
+  const [activeTopicId, setActiveTopicId] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [participant, setParticipant] = useState<Participant | null>(null)
   const [photo, setPhoto] = useState<SmartPhoto | null>(null)
@@ -76,27 +85,24 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
   const [narrativeText, setNarrativeText] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [hasNoAssessment, setHasNoAssessment] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
 
   const prevTextRef = useRef('')
 
-  // SUPER_ADMIN must pin the request to the active tenant so the flow works even
-  // when the global tenant selector is empty or switched. Source it from the
-  // canonical Zustand store via useTenantScope (activeTenant?.id) — NOT the legacy
-  // localStorage path. Non-SA roles never send a tenant header (the middleware
-  // rejects it with 401), so saTenant stays undefined for them and their JWT tid
-  // carries the scope instead.
   const saTenant = isSuperAdmin(user) ? (tenantId ?? undefined) : undefined
 
+  const report = activeTopicId ? reportsByTopic[activeTopicId] ?? null : null
+
   const loadData = useCallback(async () => {
-    if (!sessionId || !reportId) return
+    if (!sessionId || !participantId) return
     setLoading(true)
     setError(null)
 
     try {
-      const [rpt, sess, stageAssessments, sessStages, sessSubstages, partPhotos, sessGroups] =
+      const [sess, sessionReports, stageAssessments, sessStages, sessSubstages, partPhotos, sessGroups] =
         await Promise.all([
-          reportService.getById(reportId),
           sessionService.getById(sessionId),
+          reportService.getBySession(sessionId),
           assessmentService.getBySession(sessionId),
           sessionService.getStages(sessionId),
           sessionService.getSubstages(sessionId),
@@ -104,23 +110,42 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
           sessionService.getGroups(sessionId),
         ])
 
-      if (!rpt) {
-        setError('Laporan tidak ditemukan.')
-        setLoading(false)
-        return
-      }
       if (!sess) {
         setError('Sesi tidak ditemukan.')
         setLoading(false)
         return
       }
 
-      setReport(rpt)
+      const partReports = sessionReports.filter((r) => r.participant_id === participantId)
+      if (partReports.length === 0) {
+        setError('Laporan belum dibuat untuk peserta ini. Generate terlebih dahulu.')
+        setLoading(false)
+        return
+      }
+
+      const byTopic: Record<string, Report> = {}
+      for (const r of partReports) {
+        const key = r.program_stage_id || ''
+        byTopic[key] = r
+      }
+      setReportsByTopic(byTopic)
+
+      const programStages = await programService.getStages(sess.program_id)
+      const nameById = new Map(programStages.map((ps) => [ps.id, ps.name]))
+      const tabs: TopicTab[] = sessStages
+        .map((ss) => ({
+          programStageId: ss.program_stage_id,
+          name: nameById.get(ss.program_stage_id) ?? 'Topik',
+        }))
+        // Only show topics that have a generated report for this participant.
+        .filter((t) => byTopic[t.programStageId] !== undefined)
+      setTopics(tabs)
+      setActiveTopicId((prev) => (prev && byTopic[prev] ? prev : (tabs[0]?.programStageId ?? null)))
+
       setSession(sess)
-      setNarrativeText(rpt.ai_narrative_final || rpt.ai_narrative_draft || '')
 
       const participants = await sessionService.getParticipants(sessionId)
-      const part = participants.find((p) => p.id === rpt.participant_id) || null
+      const part = participants.find((p) => p.id === participantId) || null
       if (!part) {
         setError('Peserta tidak ditemukan untuk laporan ini.')
         setLoading(false)
@@ -129,25 +154,24 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       setParticipant(part)
       setGroups(sessGroups ?? [])
 
-      // Soft-fail: badge fetch must never break loadData. Degrade to [] on error.
       try {
         setBadges(await badgeService.listByParticipant(part.id))
       } catch {
         setBadges([])
       }
 
-      const partAssessments = stageAssessments.filter((a) => a.participant_id === rpt.participant_id)
-
-      const programStages = await programService.getStages(sess.program_id)
-      const progSubs = (await Promise.all(programStages.map((ps) => programSubstageService.listByStage(ps.id)))).flat()
-      const nameById = new Map<string, string>(progSubs.map((s) => [s.id, s.name]))
+      const partAssessments = stageAssessments.filter((a) => a.participant_id === participantId)
+      const progSubs = (
+        await Promise.all(programStages.map((ps) => programSubstageService.listByStage(ps.id)))
+      ).flat()
+      const subNameById = new Map<string, string>(progSubs.map((s) => [s.id, s.name]))
       const builtStageInfos: StageInfo[] = sessStages
         .map((ss) => {
           const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
           if (!pgStage) return null
           const kegiatan: KegiatanRow[] = substagesOfStage(sessSubstages, ss.id).map((k) => ({
             sessionSubstage: k,
-            programSubstageName: nameById.get(k.program_substage_id) ?? k.program_substage_id,
+            programSubstageName: subNameById.get(k.program_substage_id) ?? k.program_substage_id,
             assessment: partAssessments.find((a) => a.session_substage_id === k.id),
           }))
           return { programStage: pgStage, sessionStageId: ss.id, kegiatan }
@@ -161,36 +185,79 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       setHasNoAssessment(hasNoAssessment)
 
       const reportPhoto =
-        partPhotos.find((p) => p.participant_id === rpt.participant_id && p.is_report_photo) || null
+        partPhotos.find((p) => p.participant_id === participantId && p.is_report_photo) || null
       setPhoto(reportPhoto)
 
       const missionResult = await missionService.getAll({ limit: 50 })
       const programMissions = missionResult.data.filter((m) => m.program_id === sess.program_id)
       setMissions(programMissions)
-      setAssignedMissionIds(rpt.mission_ids || [])
     } catch {
       setError('Gagal memuat data laporan.')
     } finally {
       setLoading(false)
     }
-  }, [sessionId, reportId])
+  }, [sessionId, participantId])
+
+  // When the active topic changes, hydrate the form from that report.
+  useEffect(() => {
+    if (!activeTopicId) return
+    const r = reportsByTopic[activeTopicId]
+    if (r) {
+      setNarrativeText(r.ai_narrative_final || r.ai_narrative_draft || '')
+      setAssignedMissionIds(r.mission_ids || [])
+    }
+  }, [activeTopicId, reportsByTopic])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  const toggleMission = useCallback((missionId: string) => {
-    setAssignedMissionIds((prev) =>
-      prev.includes(missionId) ? prev.filter((id) => id !== missionId) : [...prev, missionId],
-    )
+  // Topic-scoped mission library (only this Topic's missions) for the modal.
+  const loadTopicMissions = useCallback(async (topicId: string) => {
+    if (!topicId) return
+    try {
+      const list = await missionService.getByTopic(topicId, { limit: 100 })
+      setMissions(list)
+    } catch {
+      /* keep existing program-wide list as fallback */
+    }
   }, [])
 
+  const toggleMission = useCallback((missionId: string) => {
+    setAssignedMissionIds((prev) => {
+      if (prev.includes(missionId)) return prev.filter((id) => id !== missionId)
+      if (prev.length >= MAX_MISSIONS) return prev // enforce max-4 at the source
+      return [...prev, missionId]
+    })
+  }, [])
+
+  const handleSuggestMissions = useCallback(async () => {
+    if (!report?.id) return
+    setSuggesting(true)
+    try {
+      const ids = await reportService.suggestMissions(report.id, saTenant)
+      setAssignedMissionIds((prev) => {
+        const merged = [...ids]
+        // keep any already-assigned ids beyond the AI set, capped at MAX_MISSIONS
+        for (const id of prev) {
+          if (!merged.includes(id) && merged.length < MAX_MISSIONS) merged.push(id)
+        }
+        return merged.slice(0, MAX_MISSIONS)
+      })
+      addToast({ type: 'success', message: 'Misi AI berhasil disarankan' })
+    } catch {
+      addToast({ type: 'error', message: 'Gagal memuat saran misi AI.' })
+    } finally {
+      setSuggesting(false)
+    }
+  }, [report?.id, saTenant, addToast])
+
   const handleApprove = useCallback(async () => {
-    if (!reportId) return
+    if (!report?.id) return
     setActionLoading('approve')
     try {
       await reportService.approve(
-        reportId,
+        report.id,
         {
           narrative_final: narrativeText,
           mission_ids: assignedMissionIds,
@@ -206,13 +273,13 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     } finally {
       setActionLoading(null)
     }
-  }, [reportId, narrativeText, assignedMissionIds, loadData, addToast, saTenant])
+  }, [report?.id, narrativeText, assignedMissionIds, loadData, addToast, saTenant])
 
   const handleSend = useCallback(async () => {
-    if (!reportId) return
+    if (!report?.id) return
     setActionLoading('send')
     try {
-      await reportService.send(reportId, saTenant)
+      await reportService.send(report.id, saTenant)
       await loadData()
       addToast({ type: 'success', message: 'Laporan berhasil dikirim ke orang tua' })
       return true
@@ -222,22 +289,17 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     } finally {
       setActionLoading(null)
     }
-  }, [reportId, loadData, addToast, saTenant])
+  }, [report?.id, loadData, addToast, saTenant])
 
   const handleGenerateNarrative = useCallback(async (force = false) => {
-    if (!reportId || streaming) return false
+    if (!report?.id || streaming) return false
     setStreaming(true)
     const prev = narrativeText
     prevTextRef.current = prev
-    // Start from a clean form (line 0) instead of appending to the old
-    // narrative. The 'done' event delivers the authoritative `full` text; if
-    // it is missed (SSE race) the token appends land on an empty string rather
-    // than concatenating onto the previous generation.
     setNarrativeText('')
     try {
-      // Open SSE first so we don't miss early tokens.
       const source = openSSE(
-        API_ROUTES.REPORTS.GENERATE_STREAM_SSE(reportId),
+        API_ROUTES.REPORTS.GENERATE_STREAM_SSE(report.id),
         () => {},
         {
           tenantId: saTenant,
@@ -271,9 +333,6 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       source.addEventListener('error', (ev: MessageEvent) => {
         try {
           const parsed = JSON.parse(ev.data)
-          // Backend now sends { code, message } (Indonesian). Prefer the code
-          // so we stay consistent with friendlyError elsewhere; fall back to
-          // the message, then a sensible default.
           const code: string | undefined = parsed.code
           const msg: string | undefined = parsed.message
           addToast({
@@ -285,7 +344,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
         source.close()
         setStreaming(false)
       })
-      await reportService.generateNarrativeStream(reportId, force, saTenant)
+      await reportService.generateNarrativeStream(report.id, force, saTenant)
       return true
     } catch (err) {
       setNarrativeText(prevTextRef.current)
@@ -293,7 +352,7 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
       addToast({ type: 'error', message: friendlyError(err) })
       return false
     }
-  }, [reportId, narrativeText, addToast, streaming, saTenant])
+  }, [report?.id, narrativeText, addToast, streaming, saTenant])
 
   const buildRaportHtml = useCallback((): string | null => {
     if (!participant || !session) return null
@@ -372,9 +431,6 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     if (!win) return
     win.document.write(html)
     win.document.close()
-
-    // RISK-1: poll until FontAwesome converts <i> → <svg> before printing.
-    // Non-fatal: on timeout, proceed with print anyway rather than hanging.
     const start = Date.now()
     const poll = () => {
       try {
@@ -427,6 +483,10 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
 
   return {
     report,
+    reportsByTopic,
+    topics,
+    activeTopicId,
+    setActiveTopicId,
     session,
     participant,
     photo,
@@ -438,10 +498,13 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
     loading,
     error,
     actionLoading,
+    suggesting,
     streaming,
     loadData,
+    loadTopicMissions,
     handleGenerateNarrative,
     toggleMission,
+    handleSuggestMissions,
     handleApprove,
     handleSend,
     handleCetak,

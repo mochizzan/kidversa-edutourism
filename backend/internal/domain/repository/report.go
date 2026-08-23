@@ -8,20 +8,23 @@ import (
 
 // ReportFilter narrows a report list query.
 type ReportFilter struct {
-	ParticipantID string
-	SessionID     string
-	Status        string
-	TenantID      string
+	ParticipantID  string
+	SessionID      string
+	ProgramStageID string
+	Status         string
+	TenantID       string
 }
 
 // ReportRepository is the persistence contract for reports + parent access tokens.
 type ReportRepository interface {
 	Create(ctx context.Context, r *entity.Report) error
 	// GetOrCreateDraft returns the existing report (any status) for the given
-	// participant+session, or creates a DRAFT if none exists. The existence check
-	// and insert are a single atomic DB op (ON CONFLICT DO NOTHING) so concurrent
-	// GenerateForSession calls cannot both insert and hit uq_reports_session_participant.
-	GetOrCreateDraft(ctx context.Context, participantID, sessionID string) (*entity.Report, error)
+	// participant+session+topic (program_stage), or creates a DRAFT if none exists.
+	// The existence check and insert are a single atomic DB op (ON CONFLICT DO NOTHING)
+	// keyed on uq_reports_session_participant_topic so concurrent GenerateForSession
+	// calls cannot both insert and hit the unique constraint.
+	// programStageID may be "" for legacy whole-session reports.
+	GetOrCreateDraft(ctx context.Context, participantID, sessionID, programStageID string) (*entity.Report, error)
 	GetByID(ctx context.Context, id, tenantID string) (*entity.Report, error)
 	// GetByToken resolves a report by a valid, unrevoked, unexpired parent token.
 	GetByToken(ctx context.Context, token string) (*entity.Report, error)

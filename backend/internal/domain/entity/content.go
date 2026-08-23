@@ -34,6 +34,7 @@ type Report struct {
 	BaseModel
 	ParticipantID        string       `json:"participant_id"`
 	SessionID            string       `json:"session_id"`
+	ProgramStageID       string       `json:"program_stage_id,omitempty"`
 	AINarrativeDraft     string       `json:"ai_narrative_draft,omitempty"`
 	AINarrativeFinal     string       `json:"ai_narrative_final,omitempty"`
 	ReportPDFURL         string       `json:"report_pdf_url,omitempty"`

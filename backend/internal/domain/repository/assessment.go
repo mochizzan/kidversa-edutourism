@@ -11,6 +11,10 @@ type AssessmentFilter struct {
 	ParticipantID     string
 	SessionID         string
 	SessionSubstageID string
+	// ProgramStageID scopes assessments to a single Topic (program_stage) by
+	// joining assessments -> session_substages -> session_stages -> program_stages.
+	// Enforces per-Topic report scoping structurally (no data leakage across Topics).
+	ProgramStageID string
 	// TenantID scopes the list to a tenant via session_id->sessions.tenant_id.
 	// It must be set by the handler (populated from the JWT/scope); an empty
 	// TenantID is rejected at the repo as defense-in-depth against cross-tenant

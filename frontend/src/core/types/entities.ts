@@ -280,6 +280,7 @@ export interface Report {
   id: string
   participant_id: string
   session_id: string
+  program_stage_id?: string | null
   ai_narrative_draft?: string
   ai_narrative_final?: string
   mission_ids?: string[]

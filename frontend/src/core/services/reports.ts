@@ -15,6 +15,10 @@ interface PublicReportResponse {
   report_pdf_url?: string
 }
 
+interface SuggestMissionsResponse {
+  mission_ids: string[]
+}
+
 const getBySession = async (sessionId: string): Promise<Report[]> => {
   return itemsRequest<Report>('GET', API_ROUTES.REPORTS.BY_SESSION(sessionId))
 }
@@ -54,6 +58,22 @@ const send = async (reportId: string, tenantId?: string | null): Promise<ReportT
   return itemRequest<ReportTokenResponse>('POST', API_ROUTES.REPORTS.SEND(reportId), undefined, tenantId)
 }
 
+// suggestMissions calls the AI recommendation endpoint for a report. Returns up
+// to 4 mission IDs scoped to the report's Topic. No persistence — the caller
+// pre-fills the manual selector and persists on Approve.
+const suggestMissions = async (
+  reportId: string,
+  tenantId?: string | null,
+): Promise<string[]> => {
+  const res = await itemRequest<SuggestMissionsResponse>(
+    'POST',
+    API_ROUTES.REPORTS.SUGGEST_MISSIONS(reportId),
+    undefined,
+    tenantId,
+  )
+  return res?.mission_ids ?? []
+}
+
 const generateNarrativeStream = async (
   reportId: string,
   force = false,
@@ -83,6 +103,7 @@ export const reportService: ReportService = {
   generateOne,
   approve,
   send,
+  suggestMissions,
   generateNarrativeStream,
 }
 

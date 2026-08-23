@@ -111,6 +111,15 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 	if f.SessionSubstageID != "" {
 		q = q.Where("session_substage_id = ?", f.SessionSubstageID)
 	}
+	// Per-Topic scoping: restrict to assessments whose Kegiatan (session_substage)
+	// belongs to the given Topic (program_stage). Join path:
+	// assessments.session_substage_id -> session_substages -> session_stages -> program_stages.
+	if f.ProgramStageID != "" {
+		q = q.
+			Joins("JOIN session_substages ssub ON ssub.id = assessments.session_substage_id").
+			Joins("JOIN session_stages ss ON ss.id = ssub.session_stage_id").
+			Where("ss.program_stage_id = ?", f.ProgramStageID)
+	}
 	// Tenant scoping (cross-tenant READ IDOR defense): scope to the tenant owning
 	// the assessment's session. Empty TenantID is rejected as a required scope.
 	if f.TenantID == "" {

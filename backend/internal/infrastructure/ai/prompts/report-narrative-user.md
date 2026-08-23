@@ -8,11 +8,15 @@ Write a narrative progress report in Bahasa Indonesia, 1 paragraphs, based on th
 4. If a Kegiatan has a low star rating (1-2), frame it as an area for growth with a positive, constructive tone.
 5. Do NOT include generic filler — every paragraph must reference specific assessment data.
 6. Output ONLY the narrative text directly. No preamble, no closing remark.
+{{if .TopicName}}7. This report covers ONLY the Topik "{{.TopicName}}". Do NOT reference other Topik; all assessment data below belongs to this single Topik.{{end}}
 
 # Child & Session Data
 - Child Name: {{.ChildName}}
 - Child Age: {{.ChildAge}} years old
 - Session Name: {{.SessionName}}
+{{- if .TopicName}}
+- Topik: {{.TopicName}}
+{{- end}}
 - Session Date: {{.SessionDate}}
 
 # Assessment Data

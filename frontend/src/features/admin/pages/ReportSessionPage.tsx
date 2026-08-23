@@ -40,6 +40,9 @@ const ReportSessionPage = () => {
 
   const {
     session,
+    topics,
+    activeTopicId,
+    setActiveTopicId,
     reports,
     loading,
     error,
@@ -56,15 +59,21 @@ const ReportSessionPage = () => {
     handleSendAll,
   } = useReportSession(sessionId)
 
-  const allFinalized =
-    reports.length > 0 &&
-    reports.every(
+  // Per-Topic view: only rows for the active Topic are shown; summary cards
+  // and bulk counts below are scoped to that Topic.
+  const topicReports = reports.filter((r) => r.topicId === activeTopicId)
+  const topicFilteredReports = filteredReports.filter((r) => r.topicId === activeTopicId)
+  const topicApproved = topicReports.filter((r) => r.report?.status === ReportStatus.APPROVED).length
+  const topicSent = topicReports.filter((r) => r.report?.status === ReportStatus.SENT).length
+  const topicDraft = topicReports.filter((r) => r.report?.status === ReportStatus.DRAFT).length
+  const topicAllFinalized =
+    topicReports.length > 0 &&
+    topicReports.every(
       (r) =>
         r.report &&
         (r.report.status === ReportStatus.APPROVED || r.report.status === ReportStatus.SENT),
     )
-
-  const allHaveReport = reports.length > 0 && reports.every((r) => r.report)
+  const topicAllHaveReport = topicReports.length > 0 && topicReports.every((r) => r.report)
 
   const [generateResult, setGenerateResult] = useState<{
     generatedCount: number
@@ -141,41 +150,56 @@ const ReportSessionPage = () => {
         }
       />
 
+      {topics.length > 1 && (
+        <div className="flex flex-wrap gap-2 no-print">
+          {topics.map((t) => (
+            <button
+              key={t.programStageId}
+              type="button"
+              onClick={() => setActiveTopicId(t.programStageId)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                activeTopicId === t.programStageId
+                  ? 'bg-primary text-on-primary border-primary'
+                  : 'bg-surface text-on-surface border-outline-variant hover:border-primary'
+              }`}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
             Total Peserta
           </p>
-          <p className="text-2xl font-bold text-on-surface mt-1">{reports.length}</p>
+          <p className="text-2xl font-bold text-on-surface mt-1">{topicReports.length}</p>
         </Card>
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
             Draft
           </p>
-          <p className="text-2xl font-bold text-on-surface mt-1">
-            {reports.filter((r) => r.report?.status === ReportStatus.DRAFT).length}
-          </p>
+          <p className="text-2xl font-bold text-on-surface mt-1">{topicDraft}</p>
         </Card>
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
             Disetujui
           </p>
-          <p className="text-2xl font-bold text-green-600 mt-1">{approvedCount}</p>
+          <p className="text-2xl font-bold text-green-600 mt-1">{topicApproved}</p>
         </Card>
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
             Terkirim
           </p>
-          <p className="text-2xl font-bold text-primary mt-1">
-            {reports.filter((r) => r.report?.status === ReportStatus.SENT).length}
-          </p>
+          <p className="text-2xl font-bold text-primary mt-1">{topicSent}</p>
         </Card>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={onGenerate}
-          disabled={generating || allFinalized || reports.length === 0}
+          disabled={generating || topicAllFinalized || topicReports.length === 0}
         >
           {generating ? (
             <>
@@ -184,9 +208,9 @@ const ReportSessionPage = () => {
           ) : (
             <>
               <FileText className="w-4 h-4 mr-2" />
-              {reports.length === 0
+              {topicReports.length === 0
                 ? 'Generate Semua'
-                : allHaveReport
+                : topicAllHaveReport
                   ? 'Generate Ulang'
                   : 'Generate Semua'}
             </>
@@ -195,7 +219,7 @@ const ReportSessionPage = () => {
         <Button
           variant="secondary"
           onClick={() => setShowConfirmSend(true)}
-          disabled={approvedCount === 0 || sending}
+          disabled={topicApproved === 0 || sending}
         >
           {sending ? (
             <>
@@ -203,7 +227,7 @@ const ReportSessionPage = () => {
             </>
           ) : (
             <>
-              <Send className="w-4 h-4 mr-2" /> Kirim Semua ({approvedCount})
+              <Send className="w-4 h-4 mr-2" /> Kirim Semua ({topicApproved})
             </>
           )}
         </Button>
@@ -230,7 +254,7 @@ const ReportSessionPage = () => {
         />
       </div>
 
-      {filteredReports.length === 0 ? (
+      {topicFilteredReports.length === 0 ? (
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
           title={search ? 'Peserta tidak ditemukan' : 'Belum ada peserta'}
@@ -240,7 +264,7 @@ const ReportSessionPage = () => {
         />
       ) : (
         <div className="grid gap-3">
-          {filteredReports.map((item) => {
+          {topicFilteredReports.map((item) => {
             const isClickable = item.status === 'has_report'
             const showGenerateBtn = item.status === 'ready_to_generate'
             const isIncomplete = item.status === 'incomplete'
@@ -316,7 +340,7 @@ const ReportSessionPage = () => {
                       <Button
                         size="sm"
                         variant="primary"
-                        disabled={generating || item.status !== 'ready_to_generate' || allFinalized}
+                        disabled={generating || item.status !== 'ready_to_generate' || topicAllFinalized}
                         onClick={(e) => {
                           e?.preventDefault()
                           e?.stopPropagation()
@@ -339,7 +363,7 @@ const ReportSessionPage = () => {
               return (
                 <Link
                   key={item.participant.id}
-                  to={`/admin/reports/${sessionId}/review/${item.report.id}`}
+                  to={`/admin/reports/${sessionId}/review/${item.participant.id}`}
                   className="block"
                 >
                   {cardContent}
@@ -417,7 +441,7 @@ const ReportSessionPage = () => {
               Batal
             </Button>
             <Button onClick={onSend} disabled={sending}>
-              {sending ? 'Mengirim...' : `Kirim ${approvedCount} Laporan`}
+              {sending ? 'Mengirim...' : `Kirim ${topicApproved} Laporan`}
             </Button>
           </div>
         }

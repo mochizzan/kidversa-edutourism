@@ -167,10 +167,26 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID, t
 		return "", err
 	}
 
+	// Per-Topic scoping: when the report is for a specific Topic
+	// (program_stage), the assessment fetch is filtered to that Topic via the
+	// repo join (AssessmentFilter.ProgramStageID) so the AI never sees other
+	// Topics' data. The Topic name is resolved for a single-Topic narrative frame.
+	topicName := ""
+	var topicFilter string
+	if r.ProgramStageID != "" {
+		topic, terr := g.programRepo.GetStageByID(ctx, r.ProgramStageID)
+		if terr != nil {
+			return "", fmt.Errorf("fetch topic: %w", terr)
+		}
+		topicName = topic.Name
+		topicFilter = r.ProgramStageID
+	}
+
 	assessments, err := g.assessmentRepo.List(ctx, repository.AssessmentFilter{
-		ParticipantID: participant.ID,
-		SessionID:     r.SessionID,
-		TenantID:      tenantID,
+		ParticipantID:  participant.ID,
+		SessionID:      r.SessionID,
+		ProgramStageID: topicFilter,
+		TenantID:       tenantID,
 	}, 1, 100)
 	if err != nil {
 		return "", fmt.Errorf("fetch assessments: %w", err)
@@ -183,6 +199,7 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID, t
 		"ChildAge":    participant.ChildAge,
 		"SessionName": session.Name,
 		"SessionDate": session.SessionDate,
+		"TopicName":   topicName,
 		"Assessments": assessmentsText,
 	}
 

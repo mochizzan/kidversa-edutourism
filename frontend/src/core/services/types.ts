@@ -154,6 +154,7 @@ export interface ReportService {
     tenantId?: string | null,
   ): Promise<Report>
   send(reportId: string, tenantId?: string | null): Promise<ReportTokenResponse>
+  suggestMissions(reportId: string, tenantId?: string | null): Promise<string[]>
   generateNarrativeStream(reportId: string, force?: boolean, tenantId?: string | null): Promise<void>
 }
 
@@ -229,6 +230,7 @@ export interface MissionBankService {
     filters?: Record<string, string | boolean | undefined>
   }): Promise<{ data: MissionBank[]; total: number; page: number; limit: number; totalPages: number }>
   getById(id: string): Promise<MissionBank | null>
+  getByTopic(topicId: string, params?: { limit?: number }): Promise<MissionBank[]>
   create(data: CreateMissionBankDTO): Promise<MissionBank>
   update(id: string, data: Partial<CreateMissionBankDTO>): Promise<MissionBank>
   delete(id: string): Promise<void>

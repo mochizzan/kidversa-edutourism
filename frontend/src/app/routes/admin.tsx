@@ -60,7 +60,7 @@ export const adminRoutes: RouteObject[] = [
       guardedRoute('participants/:participantId', 'participants', ParticipantDetailPage),
       guardedRoute('reports', 'reports', ReportListPage),
       guardedRoute('reports/:sessionId', 'reports', ReportSessionPage),
-      guardedRoute('reports/:sessionId/review/:reportId', 'reports', ReportReviewPage),
+      guardedRoute('reports/:sessionId/review/:participantId', 'reports', ReportReviewPage),
       guardedRoute('missions', 'missions', MissionBankPage),
       guardedRoute('missions/new', 'missions', MissionFormPage),
       guardedRoute('missions/:missionId/edit', 'missions', MissionFormPage),

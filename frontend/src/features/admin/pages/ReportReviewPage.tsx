@@ -27,11 +27,16 @@ import { ReportMissionSelector } from '../components/ReportMissionSelector'
 import { BadgeList } from '../../../shared/components/data/BadgeList'
 
 const ReportReviewPage = () => {
-  const { sessionId, reportId } = useParams<{ sessionId: string; reportId: string }>()
+  const { sessionId, participantId } = useParams<{ sessionId: string; participantId: string }>()
   const navigate = useNavigate()
 
   const {
     report,
+    topics,
+    activeTopicId,
+    setActiveTopicId,
+    loadTopicMissions,
+    suggesting,
     session,
     participant,
     photo,
@@ -45,6 +50,7 @@ const ReportReviewPage = () => {
     actionLoading,
     loadData,
     toggleMission,
+    handleSuggestMissions,
     handleApprove,
     handleSend,
     handleCetak,
@@ -53,7 +59,7 @@ const ReportReviewPage = () => {
     hasNoAssessment,
     streaming,
     handleGenerateNarrative,
-  } = useReportReview(sessionId, reportId)
+  } = useReportReview(sessionId, participantId)
 
   const [showApproveConfirm, setShowApproveConfirm] = useState(false)
   const [showSendConfirm, setShowSendConfirm] = useState(false)
@@ -144,6 +150,28 @@ const ReportReviewPage = () => {
       />
 
       <ReportStatusBanner report={report} copiedLink={copiedLink} onCopyLink={handleCopyLink} />
+
+      {topics.length > 1 && (
+        <div className="flex flex-wrap gap-2 no-print">
+          {topics.map((t) => (
+            <button
+              key={t.programStageId}
+              type="button"
+              onClick={() => {
+                setActiveTopicId(t.programStageId)
+                void loadTopicMissions(t.programStageId)
+              }}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                activeTopicId === t.programStageId
+                  ? 'bg-primary text-on-primary border-primary'
+                  : 'bg-surface text-on-surface border-outline-variant hover:border-primary'
+              }`}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {hasNoAssessment && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-sm flex items-start gap-2">
@@ -305,6 +333,8 @@ const ReportReviewPage = () => {
             missions={missions}
             assignedMissionIds={assignedMissionIds}
             onToggleMission={toggleMission}
+            onSuggestMissions={handleSuggestMissions}
+            suggesting={suggesting}
           />
         )}
       </div>

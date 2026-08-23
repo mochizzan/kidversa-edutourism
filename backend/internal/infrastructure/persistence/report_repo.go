@@ -36,14 +36,15 @@ func (r *GormReportRepository) Create(ctx context.Context, rep *entity.Report) e
 	return nil
 }
 
-func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participantID, sessionID string) (*entity.Report, error) {
+func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participantID, sessionID, programStageID string) (*entity.Report, error) {
 	var res *entity.Report
 	err := InTx(ctx, r.db, func(tx *gorm.DB) error {
 		m := &ReportModel{
 			Report: entity.Report{
-				ParticipantID: participantID,
-				SessionID:     sessionID,
-				Status:        entity.ReportDraft,
+				ParticipantID:  participantID,
+				SessionID:      sessionID,
+				ProgramStageID: programStageID,
+				Status:         entity.ReportDraft,
 			},
 		}
 		tok, terr := util.RandomToken()
@@ -51,9 +52,12 @@ func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participant
 			return apperrors.Internal("internal_error", terr)
 		}
 		m.ParentAccessToken = tok
-		// Atomic: if (session_id, participant_id) already exists, the insert is skipped
-		// (ON CONFLICT DO NOTHING on uq_reports_session_participant), avoiding the TOCTOU
-		// of the old List->Create pattern.
+		// Atomic: if (session_id, participant_id, program_stage_id) already exists,
+		// the insert is skipped (ON CONFLICT DO NOTHING on
+		// uq_reports_session_participant_topic), avoiding the TOCTOU of the old
+		// List->Create pattern. A NULL program_stage_id (legacy whole-session report)
+		// also participates in the unique key, so at most one legacy row exists per
+		// (session, participant).
 		if cerr := tx.
 			Clauses(clause.OnConflict{DoNothing: true}).
 			Create(m).Error; cerr != nil {
@@ -62,7 +66,7 @@ func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participant
 		var got ReportModel
 		if ferr := tx.
 			Unscoped().
-			Where("session_id = ? AND participant_id = ?", sessionID, participantID).
+			Where("session_id = ? AND participant_id = ? AND (program_stage_id <=> ?)", sessionID, participantID, programStageID).
 			First(&got).Error; ferr != nil {
 			if errors.Is(ferr, gorm.ErrRecordNotFound) {
 				// True absence: create using the ORIGINALLY-built m (NOT the zero-value got) — A4 errata.
@@ -198,6 +202,9 @@ func (r *GormReportRepository) List(ctx context.Context, f repository.ReportFilt
 	}
 	if f.SessionID != "" {
 		q = q.Where("session_id = ?", f.SessionID)
+	}
+	if f.ProgramStageID != "" {
+		q = q.Where("program_stage_id = ?", f.ProgramStageID)
 	}
 	if f.TenantID != "" {
 		q = scopeByTenant(q, f.TenantID)

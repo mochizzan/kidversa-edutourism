@@ -80,6 +80,23 @@ const getById = async (id: string): Promise<MissionBank | null> => {
   return itemRequest<MissionBank>('GET', API_ROUTES.MISSIONS.DETAIL(id))
 }
 
+// getByTopic returns active missions linked (via mission_bank_stages) to the
+// given Topic (program_stage_id). Used by the [Misi Lanjutan] library modal so
+// only the report's Topic missions are selectable.
+const getByTopic = async (topicId: string, params?: { limit?: number }): Promise<MissionBank[]> => {
+  const limit = params?.limit ?? 100
+  const qs = new URLSearchParams()
+  qs.set('page', '1')
+  qs.set('limit', String(limit))
+  qs.set('topic_id', topicId)
+  qs.set('is_active', 'true')
+  const res = await apiRequest<ItemsListEnvelope<MissionBank>>(
+    'GET',
+    `${API_ROUTES.MISSIONS.BASE}?${qs.toString()}`,
+  )
+  return (res.data?.items ?? []).map((m) => normalizeTenantId(normalizeMission(m)))
+}
+
 const create = async (data: CreateMissionBankDTO): Promise<MissionBank> => {
   return itemRequest<MissionBank>('POST', API_ROUTES.MISSIONS.BASE, {
     tenant_id: getActiveTenantId() ?? undefined,
@@ -123,6 +140,7 @@ const toggleActive = async (id: string): Promise<MissionBank> => {
 export const missionService: MissionBankService = {
   getAll,
   getById,
+  getByTopic,
   create,
   update,
   delete: remove,
