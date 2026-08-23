@@ -170,6 +170,7 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID, t
 	assessments, err := g.assessmentRepo.List(ctx, repository.AssessmentFilter{
 		ParticipantID: participant.ID,
 		SessionID:     r.SessionID,
+		TenantID:      tenantID,
 	}, 1, 100)
 	if err != nil {
 		return "", fmt.Errorf("fetch assessments: %w", err)
@@ -204,75 +205,20 @@ func (g *OpenRouterNarrativeGenerator) Generate(ctx context.Context, reportID, t
 }
 
 // StreamGenerate produces a full AI narrative for the given report, invoking
-// onDelta for each streamed token delta.
+// onDelta with the completed text. The configured free-tier model rejects
+// streaming (HTTP 429), so this delegates to Generate (non-streaming) and
+// delivers the full narrative in one shot: onDelta is invoked once with the
+// complete text so any consumer expecting deltas still receives it, and the
+// SSE "done" event carries the same text. This keeps the OpenRouter call
+// footprint to a single request, which the free tier reliably serves.
 func (g *OpenRouterNarrativeGenerator) StreamGenerate(ctx context.Context, reportID, tenantID string, onDelta func(string) error) (string, error) {
-	r, err := g.reportRepo.GetByID(ctx, reportID, tenantID)
+	text, err := g.Generate(ctx, reportID, tenantID)
 	if err != nil {
 		return "", err
 	}
-
-	participant, err := g.sessionRepo.GetParticipantByID(ctx, r.ParticipantID, "")
-	if err != nil {
-		return "", fmt.Errorf("fetch participant: %w", err)
+	if onDelta != nil {
+		_ = onDelta(text)
 	}
-
-	session, err := g.sessionRepo.GetSessionByID(ctx, r.SessionID, "")
-	if err != nil {
-		return "", fmt.Errorf("fetch session: %w", err)
-	}
-
-	// Bridge session Kegiatan IDs -> their parent Topik so each
-	// assessment (keyed by session Kegiatan ID) resolves to a real name + order
-	// instead of the fallback "Kegiatan" label.
-	stageBySubstageID, err := g.buildStageBySubstageID(ctx, r.SessionID, session.ProgramID)
-	if err != nil {
-		return "", err
-	}
-
-	assessments, err := g.assessmentRepo.List(ctx, repository.AssessmentFilter{
-		ParticipantID: participant.ID,
-		SessionID:     r.SessionID,
-	}, 1, 100)
-	if err != nil {
-		return "", fmt.Errorf("fetch assessments: %w", err)
-	}
-
-	assessmentsText := buildAssessmentText(assessments, stageBySubstageID)
-
-	tmplData := map[string]interface{}{
-		"ChildName":   participant.ChildName,
-		"ChildAge":    participant.ChildAge,
-		"SessionName": session.Name,
-		"SessionDate": session.SessionDate,
-		"Assessments": assessmentsText,
-	}
-
-	systemPrompt, err := g.loadSystemPrompt()
-	if err != nil {
-		return "", fmt.Errorf("load system prompt: %w", err)
-	}
-
-	userPrompt, err := g.buildUserPrompt(tmplData)
-	if err != nil {
-		return "", fmt.Errorf("build user prompt: %w", err)
-	}
-
-	var full strings.Builder
-	if err := g.client.StreamChatCompletion(ctx, systemPrompt, userPrompt, func(delta string) error {
-		full.WriteString(delta)
-		if onDelta != nil {
-			return onDelta(delta)
-		}
-		return nil
-	}); err != nil {
-		return "", err
-	}
-
-	text := strings.TrimSpace(full.String())
-	if text == "" {
-		return "", fmt.Errorf("openrouter: empty response content")
-	}
-
 	return text, nil
 }
 

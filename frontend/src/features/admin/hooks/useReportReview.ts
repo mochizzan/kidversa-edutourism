@@ -11,8 +11,8 @@ import { programService } from '../../../core/services/programs'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { friendlyError, ERROR_MESSAGES } from '../../../core/utils/errorMessages'
 import { useAuth } from '../../../core/hooks/useAuth'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { isSuperAdmin } from '../../../core/utils/permissions'
-import { getActiveTenantId } from '../../../core/utils/tenant'
 import { formatDate } from '../../../shared/utils'
 import { getMediaUrl } from '../../../core/utils/media'
 import {
@@ -57,6 +57,7 @@ export interface StageInfo {
 
 export function useReportReview(sessionId: string | undefined, reportId: string | undefined) {
   const { user } = useAuth()
+  const { tenantId } = useTenantScope()
   const { addToast } = useGlobalToast()
 
   const [report, setReport] = useState<Report | null>(null)
@@ -78,11 +79,13 @@ export function useReportReview(sessionId: string | undefined, reportId: string 
 
   const prevTextRef = useRef('')
 
-  // SUPER_ADMIN must pin the request to the report's owning session tenant so the
-  // flow works even when the global tenant selector is empty or switched. Non-SA
-  // roles never send a tenant header (the middleware rejects it).
-  const saTenant: string | undefined =
-    isSuperAdmin(user) ? (session?.tenant_id || getActiveTenantId() || undefined) : undefined
+  // SUPER_ADMIN must pin the request to the active tenant so the flow works even
+  // when the global tenant selector is empty or switched. Source it from the
+  // canonical Zustand store via useTenantScope (activeTenant?.id) — NOT the legacy
+  // localStorage path. Non-SA roles never send a tenant header (the middleware
+  // rejects it with 401), so saTenant stays undefined for them and their JWT tid
+  // carries the scope instead.
+  const saTenant = isSuperAdmin(user) ? (tenantId ?? undefined) : undefined
 
   const loadData = useCallback(async () => {
     if (!sessionId || !reportId) return

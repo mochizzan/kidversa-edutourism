@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"kidversa-edutourism-backend/internal/config"
 )
@@ -73,43 +74,79 @@ func NewOpenRouterClient(cfg *config.Config) *OpenRouterClient {
 	}
 }
 
+// openRouterRetryAttempts is the number of times a transient upstream failure
+// (rate-limit / 403 / 5xx) is retried before giving up. The free tier is
+// throttled intermittently, so a longer backoff lets a later attempt succeed.
+const openRouterRetryAttempts = 5
+
+// isTransientOpenRouterStatus reports whether an OpenRouter HTTP status is
+// worth retrying: rate limits (429) and provider/transport 5xx, plus the
+// intermittent 403 the free tier returns under throttle.
+func isTransientOpenRouterStatus(code int) bool {
+	switch code {
+	case http.StatusTooManyRequests, http.StatusForbidden, 402,
+		http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout,
+		524, 529:
+		return true
+	}
+	return false
+}
+
 // ChatCompletion sends a chat completion request and returns the assistant's response text.
+// Transient upstream failures (rate-limit / 403 / 5xx) are retried with backoff.
+// The request is rebuilt on every attempt because an *http.Request body is
+// consumed by client.Do and cannot be reused across retries.
 func (c *OpenRouterClient) ChatCompletion(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
-	req, err := c.buildRequest(ctx, systemPrompt, userPrompt, false)
-	if err != nil {
-		return "", err
-	}
+	var lastErr error
+	for attempt := range openRouterRetryAttempts {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return "", lastErr
+			case <-time.After(time.Duration(attempt) * 1500 * time.Millisecond):
+			}
+		}
+		req, err := c.buildRequest(ctx, systemPrompt, userPrompt, false)
+		if err != nil {
+			return "", err
+		}
+		resp, err := c.client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("openrouter request failed: %w", err)
+			continue
+		}
+		// Read and close immediately so retries don't leak connections.
+		body, rerr := io.ReadAll(io.LimitReader(resp.Body, openRouterMaxBodySize))
+		resp.Body.Close()
+		if rerr != nil {
+			lastErr = fmt.Errorf("read response body: %w", rerr)
+			continue
+		}
+		if isTransientOpenRouterStatus(resp.StatusCode) {
+			lastErr = fmt.Errorf("openrouter: transient status %d", resp.StatusCode)
+			continue
+		}
+		if err := mapStatusError(resp.StatusCode); err != nil {
+			return "", err
+		}
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("openrouter request failed: %w", err)
-	}
-	defer resp.Body.Close()
+		var orResp openRouterResponse
+		if err := json.Unmarshal(body, &orResp); err != nil {
+			return "", fmt.Errorf("parse openrouter response: %w", err)
+		}
 
-	if err := mapStatusError(resp.StatusCode); err != nil {
-		return "", err
-	}
+		if len(orResp.Choices) == 0 {
+			return "", fmt.Errorf("openrouter: no choices in response")
+		}
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, openRouterMaxBodySize))
-	if err != nil {
-		return "", fmt.Errorf("read response body: %w", err)
-	}
+		content := orResp.Choices[0].Message.Content
+		if content == "" {
+			return "", fmt.Errorf("openrouter: empty response content")
+		}
 
-	var orResp openRouterResponse
-	if err := json.Unmarshal(data, &orResp); err != nil {
-		return "", fmt.Errorf("parse openrouter response: %w", err)
+		return content, nil
 	}
-
-	if len(orResp.Choices) == 0 {
-		return "", fmt.Errorf("openrouter: no choices in response")
-	}
-
-	content := orResp.Choices[0].Message.Content
-	if content == "" {
-		return "", fmt.Errorf("openrouter: empty response content")
-	}
-
-	return content, nil
+	return "", lastErr
 }
 
 // StreamChatCompletion streams a chat completion, invoking onToken for each token delta.

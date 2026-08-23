@@ -48,8 +48,15 @@ func streamSSE(c *echo.Context, hub *sse.Hub, ch string, initial *sse.Event, kee
 	// races). A cursor of 0 replays the whole buffer; ReplaySince only returns
 	// ReplayGap for a once-valid cursor that has since been evicted, in which
 	// case we simply start live.
+	// Errors are per-attempt and terminal: replaying a stale error event from a
+	// previous generation makes a later successful attempt look failed (e.g. a
+	// prior tenant_required surfaces on every subsequent open). Never replay
+	// error events — live errors are still delivered in real time below.
 	if replay, err := hub.ReplaySince(ch, 0); err == nil {
 		for _, ev := range replay {
+			if ev.Type == "error" {
+				continue
+			}
 			writeSSE(w, f, ev)
 		}
 	}

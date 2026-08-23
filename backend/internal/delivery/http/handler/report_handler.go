@@ -144,6 +144,7 @@ func (h *ReportHandler) runNarrativeStream(ctx context.Context, id, tenantID str
 		return nil
 	})
 	if err != nil {
+		log.Printf("DEBUG stream err %s: %v", id, err)
 		_, code, _ := apperrors.AsAppError(err)
 		msg := appresp.MessageForCode(code)
 		if perr := h.hub.Publish(ctx, ch, sse.Event{Type: "error", Data: map[string]string{"code": code, "message": msg}}); perr != nil {

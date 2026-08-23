@@ -157,7 +157,6 @@
     --color-brand-green: #80bd35;
     --color-brand-darkGreen: #689c27;
     --color-brand-lightGreen: #f0f7ec;
-    --color-brand-blue: #ebf6fa;
     --color-brand-yellow: #fffde8;
     --color-brand-star: #ffc107;
     --color-brand-text: #334155;
@@ -932,6 +931,9 @@
   .min-h-\[120px\] {
     min-height: 120px;
   }
+  .min-h-\[190px\] {
+    min-height: 190px;
+  }
   .min-h-\[300px\] {
     min-height: 300px;
   }
@@ -1085,6 +1087,9 @@
   .max-w-\[200px\] {
     max-width: 200px;
   }
+  .max-w-\[210mm\] {
+    max-width: 210mm;
+  }
   .max-w-\[220px\] {
     max-width: 220px;
   }
@@ -1147,6 +1152,9 @@
   }
   .flex-\[2\] {
     flex: 2;
+  }
+  .flex-shrink {
+    flex-shrink: 1;
   }
   .flex-shrink-0 {
     flex-shrink: 0;
@@ -1258,6 +1266,9 @@
   }
   .place-items-center {
     place-items: center;
+  }
+  .items-baseline {
+    align-items: baseline;
   }
   .items-center {
     align-items: center;
@@ -1394,6 +1405,9 @@
   .gap-y-2 {
     row-gap: calc(var(--spacing) * 2);
   }
+  .gap-y-4 {
+    row-gap: calc(var(--spacing) * 4);
+  }
   .divide-y {
     :where(& > :not(:last-child)) {
       --tw-divide-y-reverse: 0;
@@ -1448,6 +1462,9 @@
   }
   .rounded-\[1\.25rem\] {
     border-radius: 1.25rem;
+  }
+  .rounded-\[1rem\] {
+    border-radius: 1rem;
   }
   .rounded-\[2rem\] {
     border-radius: 2rem;
@@ -1582,9 +1599,6 @@
   }
   .border-amber-400 {
     border-color: var(--color-amber-400);
-  }
-  .border-blue-100 {
-    border-color: var(--color-blue-100);
   }
   .border-blue-200\/50 {
     border-color: color-mix(in srgb, oklch(88.2% 0.059 254.128) 50%, transparent);
@@ -1798,9 +1812,6 @@
   }
   .bg-brand-badge {
     background-color: var(--color-brand-badge);
-  }
-  .bg-brand-blue {
-    background-color: var(--color-brand-blue);
   }
   .bg-brand-green {
     background-color: var(--color-brand-green);
@@ -2612,9 +2623,6 @@
   }
   .opacity-80 {
     opacity: 80%;
-  }
-  .opacity-88 {
-    opacity: 88%;
   }
   .opacity-90 {
     opacity: 90%;
