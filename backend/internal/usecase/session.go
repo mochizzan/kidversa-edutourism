@@ -209,6 +209,17 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) 
 	if s.Status != entity.SessionDraft && s.Status != entity.SessionCancelled {
 		return nil, apperrors.Conflict("bad_request", nil)
 	}
+	// Facilitator assignment gate: every group must have a facilitator assigned
+	// before the session can start.
+	groups, gerr := u.sessionRepo.ListSessionGroups(ctx, id)
+	if gerr != nil {
+		return nil, gerr
+	}
+	for i := range groups {
+		if groups[i].FacilitatorID == nil || *groups[i].FacilitatorID == "" {
+			return nil, apperrors.BadRequest("facilitator_required", nil)
+		}
+	}
 	s.Status = entity.SessionActive
 	if err := u.sessionRepo.UpdateSession(ctx, s); err != nil {
 		return nil, err
@@ -272,6 +283,13 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID strin
 	}
 	if s.Status != entity.SessionActive {
 		return nil, apperrors.Conflict("bad_request", nil)
+	}
+	// Grading completeness gate: every participant in every group must be graded
+	// for every session Kegiatan before the session can be completed.
+	if ungraded, gerr := u.firstUngradedGroup(ctx, id); gerr != nil {
+		return nil, gerr
+	} else if ungraded != "" {
+		return nil, apperrors.BadRequest("grading_incomplete", nil)
 	}
 	s.Status = entity.SessionCompleted
 	if err := u.sessionRepo.UpdateSession(ctx, s); err != nil {
@@ -751,6 +769,72 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 		}
 	}
 	return nil
+}
+
+// firstUngradedGroup reports whether the session has an ungraded participant.
+// It returns the name of the first group containing an ungraded participant
+// (empty when every participant across every group is fully graded). A
+// participant is "fully graded" when a scored assessment (star_rating >= 1)
+// exists for every session Kegiatan leaf of the session.
+func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID string) (string, error) {
+	if u.assessmentRepo == nil || u.sessionSubstages == nil {
+		// Repos unwired (defensive): do not block completion when we cannot verify.
+		return "", nil
+	}
+	groups, gerr := u.sessionRepo.ListSessionGroups(ctx, sessionID)
+	if gerr != nil {
+		return "", gerr
+	}
+	subs, serr := u.sessionSubstages.ListSessionSubstages(ctx, sessionID)
+	if serr != nil {
+		return "", serr
+	}
+	subIDs := make([]string, 0, len(subs))
+	for i := range subs {
+		subIDs = append(subIDs, subs[i].ID)
+	}
+	for i := range groups {
+		participants, perr := u.sessionRepo.ListParticipants(ctx, sessionID, groups[i].ID, "")
+		if perr != nil {
+			return "", perr
+		}
+		for j := range participants {
+			if !u.participantFullyGraded(ctx, participants[j].ID, subIDs) {
+				return groups[i].Name, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+// participantFullyGraded reports whether the participant has a scored assessment
+// for every one of the given session Kegiatan leaves.
+func (u *SessionUsecase) participantFullyGraded(ctx context.Context, participantID string, sessionSubstageIDs []string) bool {
+	if len(sessionSubstageIDs) == 0 {
+		// No Kegiatan leaves => nothing to grade. Treat as fully graded.
+		return true
+	}
+	for k := range sessionSubstageIDs {
+		scored, lerr := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
+			ParticipantID:     participantID,
+			SessionSubstageID: sessionSubstageIDs[k],
+			TenantID:          "00000000-0000-0000-0000-000000000000",
+		}, 1, 10)
+		if lerr != nil || len(scored.Items) == 0 {
+			return false
+		}
+		ok := false
+		for m := range scored.Items {
+			if scored.Items[m].StarRating >= 1 {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func isValidSessionStatus(s string) bool {

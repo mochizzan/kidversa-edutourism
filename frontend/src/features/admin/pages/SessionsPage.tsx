@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { Plus, Eye, Play, X, Calendar, Trash2, AlertCircle } from 'lucide-react'
+import { Plus, Eye, Play, X, Calendar, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -12,8 +12,10 @@ import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { useCrudList } from '../../../shared/hooks/useCrudList'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { sessionService } from '../../../core/services/sessions'
+import { assessmentService } from '../../../core/services/assessments'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Session } from '../../../core/types'
+import type { SessionSubstage } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
 
@@ -28,6 +30,8 @@ const SessionsPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [startingId, setStartingId] = useState<string | null>(null)
+  const [completingId, setCompletingId] = useState<string | null>(null)
+  const [ungradedGroupName, setUngradedGroupName] = useState<string | null>(null)
   const { getHighlightClass } = useHighlight()
   const { addToast } = useGlobalToast()
 
@@ -61,17 +65,76 @@ const SessionsPage = () => {
     }
   }
 
+  // Start gate: every group must have a facilitator assigned.
+  const canStart = async (id: string): Promise<boolean> => {
+    try {
+      const detail = await sessionService.getById(id)
+      if (!detail) return false
+      const unassigned = detail.groups.filter((g) => !g.facilitator_id).length
+      if (unassigned > 0) {
+        const names = detail.groups.filter((g) => !g.facilitator_id).map((g) => g.name).join(', ')
+        addToast({ type: 'error', message: `Setiap kelompok harus memiliki fasilitator. Kelompok tanpa fasilitator: ${names}` })
+        return false
+      }
+      return true
+    } catch {
+      addToast({ type: 'error', message: 'Gagal memeriksa penugasan fasilitator' })
+      return false
+    }
+  }
+
   const handleStart = async (id: string) => {
     if (startingId) return
+    if (!(await canStart(id))) return
     setStartingId(id)
     try {
       await sessionService.start(id)
       addToast({ type: 'success', message: 'Sesi berhasil dimulai' })
       refresh()
-    } catch {
-      addToast({ type: 'error', message: 'Gagal memulai sesi' })
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setStartingId(null)
+    }
+  }
+
+  // Complete gate: every participant in every group must be graded for all Kegiatan.
+  const canComplete = async (id: string): Promise<boolean> => {
+    const detail = await sessionService.getById(id)
+    if (!detail) return false
+    const subs: SessionSubstage[] = await sessionService.getSubstages(id)
+    const subIDs = subs.map((s) => s.id)
+    if (subIDs.length === 0) return true
+    const assessments = await assessmentService.getBySession(id)
+    const graded = new Set<string>()
+    for (const a of assessments) {
+      if (a.star_rating >= 1) graded.add(`${a.participant_id}__${a.session_substage_id}`)
+    }
+    for (const group of detail.groups) {
+      for (const p of group.participants) {
+        const fully = subIDs.every((sid) => graded.has(`${p.id}__${sid}`))
+        if (!fully) {
+          setUngradedGroupName(group.name)
+          return false
+        }
+      }
+    }
+    return true
+  }
+
+  const handleComplete = async (id: string) => {
+    if (completingId) return
+    const ok = await canComplete(id)
+    if (!ok) return
+    setCompletingId(id)
+    try {
+      await sessionService.complete(id)
+      addToast({ type: 'success', message: 'Sesi berhasil diselesaikan' })
+      refresh()
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
+    } finally {
+      setCompletingId(null)
     }
   }
 
@@ -121,6 +184,17 @@ const SessionsPage = () => {
               loading={startingId === item.id}
               disabled={!!startingId}
               onClick={() => handleStart(item.id)}
+            />
+          )}
+          {item.status === 'ACTIVE' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<CheckCircle2 className="w-4 h-4 text-blue-600" />}
+              tooltip="Selesaikan Sesi"
+              loading={completingId === item.id}
+              disabled={!!completingId}
+              onClick={() => handleComplete(item.id)}
             />
           )}
           {(item.status === 'DRAFT' || item.status === 'ACTIVE') && (
@@ -187,6 +261,14 @@ const SessionsPage = () => {
         </div>
       }>
         <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menghapus sesi ini secara permanen? Seluruh data terkait (kelompok, peserta, konten, laporan) juga akan dihapus. Tindakan ini tidak dapat dibatalkan.</p>
+      </Modal>
+
+      <Modal open={ungradedGroupName !== null} onClose={() => setUngradedGroupName(null)} title="Belum Dapat Menyelesaikan Sesi" footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setUngradedGroupName(null)}>Tutup</Button>
+        </div>
+      }>
+        <p className="text-sm text-on-surface-variant">There are ungraded students in group {ungradedGroupName}</p>
       </Modal>
     </div>
   )

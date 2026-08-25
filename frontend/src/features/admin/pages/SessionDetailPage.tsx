@@ -180,7 +180,7 @@ const SessionDetailPage = () => {
         actions={<Badge variant={session.status === 'ACTIVE' ? 'success' : session.status === 'COMPLETED' ? 'primary' : 'neutral'}>{session.status}</Badge>}
       />
 
-      <Tabs tabs={[{ key: 'info', label: 'Info' }, { key: 'stages', label: 'Stages' }, { key: 'groups', label: 'Groups' }]}
+      <Tabs tabs={[{ key: 'info', label: 'Info' }, { key: 'stages', label: 'Topik' }, { key: 'groups', label: 'Groups' }]}
         activeKey={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'info' && <SessionInfoTab session={session} programName={programMap.get(session.program_id) || session.program_id} />}

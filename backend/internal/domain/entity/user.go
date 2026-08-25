@@ -1,5 +1,7 @@
 package entity
 
+import "time"
+
 // User is a platform account. password_hash is never serialized to clients.
 type User struct {
 	BaseModel
@@ -12,9 +14,9 @@ type User struct {
 	Role               UserRole       `json:"role"`
 	IsActive           bool           `json:"is_active"`
 	ApprovalStatus     ApprovalStatus `json:"approval_status"`
-	ApprovedAt         *string        `json:"approved_at,omitempty"`
+	ApprovedAt         *time.Time     `json:"approved_at,omitempty"`
 	ApprovedBy         *string        `json:"approved_by,omitempty"`
-	RejectedAt         *string        `json:"rejected_at,omitempty"`
+	RejectedAt         *time.Time     `json:"rejected_at,omitempty"`
 	RejectedBy         *string        `json:"rejected_by,omitempty"`
 	RejectionReason    string         `json:"rejection_reason,omitempty"`
 	MustChangePassword bool           `json:"must_change_password,omitempty"`

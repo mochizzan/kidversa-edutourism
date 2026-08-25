@@ -197,6 +197,9 @@ const ChildAssessmentPage = () => {
               {childDetail.sessionSubstages.map((k, idx) => {
                 const active = k.id === selectedSubstageId
                 const done = k.status === 'COMPLETED'
+                const title =
+                  childDetail.programSubstageNameMap[k.program_substage_id] ||
+                  `Kegiatan ${idx + 1}`
                 return (
                   <button
                     key={k.id}
@@ -211,7 +214,7 @@ const ChildAssessmentPage = () => {
                       (saving || !isMine) && 'cursor-not-allowed opacity-60',
                     )}
                   >
-                    {done ? '✅ ' : ''}Kegiatan {idx + 1}
+                    {done ? '✅ ' : ''}{title}
                   </button>
                 )
               })}

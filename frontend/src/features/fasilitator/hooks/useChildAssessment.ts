@@ -3,6 +3,7 @@ import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
+import { programSubstageService } from '../../../core/services/program-substages'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { substagesOfStage } from '../../../core/utils/substage'
 import { friendlyError } from '../../../core/utils/errorMessages'
@@ -25,6 +26,8 @@ export interface ChildDetail {
   // Kegiatan (session_substage) leaves for the current session stage. The
   // assessment is scored per leaf, not per session stage.
   sessionSubstages: SessionSubstage[]
+  // program_substage_id -> ProgramSubstage.name (the Kegiatan title).
+  programSubstageNameMap: Record<string, string>
 }
 
 async function findChildInSessions(childId: string): Promise<{ detail: ChildDetail | null; sessionId?: string }> {
@@ -65,8 +68,34 @@ async function findChildInSessions(childId: string): Promise<{ detail: ChildDeta
       ? programStages.find((ps) => ps.id === currentStage.program_stage_id)
       : undefined
 
+    // Map each Kegiatan leaf to its ProgramSubstage title for display.
+    const programSubstageNameMap: Record<string, string> = {}
+    const substageIds = Array.from(
+      new Set(sessionSubstages.map((s) => s.program_substage_id)),
+    )
+    if (substageIds.length > 0) {
+      try {
+        const substagePromises = programStages.map((ps) =>
+          programSubstageService.listByStage(ps.id),
+        )
+        const allSubs = (await Promise.all(substagePromises)).flat()
+        for (const sub of allSubs) {
+          programSubstageNameMap[sub.id] = sub.name
+        }
+      } catch {
+        // Leave the map empty; the page falls back to the Kegiatan index.
+      }
+    }
+
     return {
-      detail: { participant, group, programStage, sessionStage: currentStage, sessionSubstages },
+      detail: {
+        participant,
+        group,
+        programStage,
+        sessionStage: currentStage,
+        sessionSubstages,
+        programSubstageNameMap,
+      },
       sessionId: session.id,
     }
   }

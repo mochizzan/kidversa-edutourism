@@ -144,6 +144,20 @@ type GroupStageProgressHistoryModel struct {
 
 func (GroupStageProgressHistoryModel) TableName() string { return "group_stage_progress_history" }
 
+// BeforeCreate generates a UUID and timestamps if missing. Without this the
+// embedded BaseModel.ID stays empty and GORM inserts ” as the PRIMARY KEY,
+// causing a Duplicate-entry 1062 on the audit table.
+func (m *GroupStageProgressHistoryModel) BeforeCreate(*gorm.DB) error {
+	if m.ID == "" {
+		m.ID = newUUID()
+	}
+	if m.CreatedAt.IsZero() {
+		m.CreatedAt = time.Now()
+	}
+	m.UpdatedAt = m.CreatedAt
+	return nil
+}
+
 func (m *GroupStageProgressHistoryModel) ToEntity() *entity.GroupStageProgressHistory {
 	e := m.GroupStageProgressHistory
 	return &e

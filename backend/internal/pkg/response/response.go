@@ -115,6 +115,10 @@ func MessageForCode(code string) string {
 		return "Terjadi kesalahan pada struktur database. Hubungi administrator."
 	case "internal_error":
 		return "Terjadi kesalahan pada server"
+	case "facilitator_required":
+		return "Setiap kelompok harus memiliki fasilitator"
+	case "grading_incomplete":
+		return "Terdapat peserta yang belum dinilai pada sesi ini"
 	default:
 		return "Terjadi kesalahan"
 	}

@@ -33,13 +33,23 @@ export function GroupCard({
   const config = statusConfig[status] ?? { label: status, variant: 'neutral' as const }
   const isMine = !!currentUserId && facilitatorId === currentUserId
 
+  const handleClick = () => {
+    if (!isMine) return
+    onClick?.()
+  }
+
   return (
     <button
-      onClick={onClick}
+      type="button"
+      onClick={handleClick}
+      disabled={!isMine}
+      aria-disabled={!isMine}
       className={cn(
         'w-full text-left bg-surface rounded-2xl p-5 shadow-sm border border-outline-variant/50',
-        'hover:border-primary/30 hover:shadow-md hover:bg-surface-container-low/50',
         'transition-all duration-200 group',
+        isMine
+          ? 'hover:border-primary/30 hover:shadow-md hover:bg-surface-container-low/50 cursor-pointer'
+          : 'opacity-60 grayscale cursor-not-allowed border-dashed',
         className,
       )}
     >
@@ -49,10 +59,14 @@ export function GroupCard({
             <h3 className="font-semibold text-on-surface text-base group-hover:text-primary transition-colors">
               {name}
             </h3>
-            {isMine && (
+            {isMine ? (
               <Badge variant="accent" size="sm" className="shrink-0">
                 <CheckCircle className="w-3 h-3 mr-1" />
                 Tugas Saya
+              </Badge>
+            ) : (
+              <Badge variant="neutral" size="sm" className="shrink-0">
+                Bukan kelompok Anda
               </Badge>
             )}
           </div>
@@ -70,10 +84,12 @@ export function GroupCard({
           <Users className="w-4 h-4 shrink-0" />
           <span>{childCount} peserta</span>
         </div>
-        <div className="flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-          <span>Buka</span>
-          <ChevronRight className="w-4 h-4" />
-        </div>
+        {isMine && (
+          <div className="flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+            <span>Buka</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        )}
       </div>
     </button>
   )

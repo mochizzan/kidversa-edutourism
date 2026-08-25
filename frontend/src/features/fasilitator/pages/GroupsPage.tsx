@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Users, Calendar } from 'lucide-react'
+import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
 import { liveService } from '../../../core/services/live'
 import { programService } from '../../../core/services/programs'
@@ -34,6 +35,7 @@ function SkeletonCard() {
 
 const GroupsPage = () => {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const sessionIdFilter = searchParams.get('sessionId')
 
@@ -163,6 +165,8 @@ const GroupsPage = () => {
                         : undefined
                     }
                     status={deriveGroupStatus(item.progress)}
+                    facilitatorId={item.group.facilitator_id}
+                    currentUserId={user?.id}
                     onClick={() => navigate(`/fasilitator/groups/${item.group.id}`)}
                   />
                 ))}

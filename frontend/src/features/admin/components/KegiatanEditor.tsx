@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, Loader2, Camera } from 'lucide-react'
-import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
 import { Input } from '../../../shared/components/ui/Input'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { Modal } from '../../../shared/components/ui/Modal'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programSubstageService } from '../../../core/services/program-substages'
 import type { ProgramSubstage } from '../../../core/types'
@@ -22,14 +22,16 @@ interface KegiatanEditorProps {
 
 interface DraftState {
   editing: ProgramSubstage | null
+  programStageId: string
   name: string
   description: string
   duration_minutes: number
   is_photo_stage: boolean
 }
 
-const emptyDraft = (): DraftState => ({
+const emptyDraft = (programStageId: string): DraftState => ({
   editing: null,
+  programStageId,
   name: '',
   description: '',
   duration_minutes: 0,
@@ -46,22 +48,31 @@ export function KegiatanEditor({
   contentSlot,
 }: KegiatanEditorProps) {
   const { addToast } = useGlobalToast()
-  const [draft, setDraft] = useState<DraftState>(emptyDraft())
+  const [draft, setDraft] = useState<DraftState>(emptyDraft(programStageId))
+  const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const startEdit = (k: ProgramSubstage) => {
     setDraft({
       editing: k,
+      programStageId: k.program_stage_id,
       name: k.name,
       description: k.description ?? '',
       duration_minutes: k.duration_minutes,
       is_photo_stage: k.is_photo_stage,
     })
+    setModalOpen(true)
   }
 
-  const startAdd = () => setDraft({ ...emptyDraft() })
+  const startAdd = () => {
+    setDraft({ ...emptyDraft(programStageId) })
+    setModalOpen(true)
+  }
 
-  const cancel = () => setDraft(emptyDraft())
+  const cancel = () => {
+    setModalOpen(false)
+    setDraft(emptyDraft(programStageId))
+  }
 
   const save = async () => {
     if (!draft.name.trim()) {
@@ -72,6 +83,7 @@ export function KegiatanEditor({
     try {
       if (draft.editing) {
         const updated = await programSubstageService.update(draft.editing.id, {
+          program_stage_id: draft.programStageId,
           name: draft.name.trim(),
           description: draft.description,
           duration_minutes: draft.duration_minutes,
@@ -80,7 +92,7 @@ export function KegiatanEditor({
         onChange(items.map((k) => (k.id === updated.id ? updated : k)))
       } else {
         const created = await programSubstageService.create({
-          program_stage_id: programStageId,
+          program_stage_id: draft.programStageId,
           sequence_order: items.length + 1,
           name: draft.name.trim(),
           description: draft.description,
@@ -113,29 +125,30 @@ export function KegiatanEditor({
     }
   }
 
+  // Keep draft in sync when the program stage id changes (e.g. switching tabs).
+  const handleCloseModal = () => cancel()
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-lg font-semibold text-on-surface">Daftar Kegiatan</h4>
-        {!draft.editing && (
-          <Button icon={<Plus className="w-4 h-4" />} onClick={startAdd}>
-            Tambah Kegiatan
-          </Button>
-        )}
+        <Button icon={<Plus className="w-4 h-4" />} onClick={startAdd}>
+          Tambah Kegiatan
+        </Button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
-      ) : items.length === 0 && !draft.editing ? (
-        <Card>
+      ) : items.length === 0 ? (
+        <div className="rounded-lg bg-surface-variant p-6">
           <EmptyState
             icon={<Plus className="w-12 h-12" />}
             title="Belum ada kegiatan"
             description="Tambahkan kegiatan untuk Topik ini. Konten (materi) ditambahkan di dalam masing-masing kegiatan."
           />
-        </Card>
+        </div>
       ) : (
         <div className="space-y-2">
           {items.map((k, i) => (
@@ -187,56 +200,57 @@ export function KegiatanEditor({
         </div>
       )}
 
-      {draft.editing !== undefined && (
-        <Card>
-          <h5 className="text-sm font-semibold text-on-surface mb-3">
-            {draft.editing ? 'Edit Kegiatan' : 'Tambah Kegiatan'}
-          </h5>
-          <div className="space-y-3">
-            <Input
-              label="Nama Kegiatan"
-              value={draft.name}
-              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              required
-              placeholder="Nama kegiatan"
-            />
-            <Input
-              label="Deskripsi"
-              value={draft.description}
-              onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-              placeholder="Deskripsi kegiatan"
-            />
-            <Input
-              label="Durasi (menit)"
-              type="number"
-              min={0}
-              value={String(draft.duration_minutes)}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, duration_minutes: Number(e.target.value) || 0 }))
-              }
-            />
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-on-surface">
-                <input
-                  type="checkbox"
-                  checked={draft.is_photo_stage}
-                  onChange={(e) => setDraft((d) => ({ ...d, is_photo_stage: e.target.checked }))}
-                  className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
-                />
-                Foto
-              </label>
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="secondary" onClick={cancel} disabled={saving}>
-                Batal
-              </Button>
-              <Button onClick={save} loading={saving}>
-                {draft.editing ? 'Simpan' : 'Tambah'}
-              </Button>
-            </div>
+      <Modal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        title={draft.editing ? 'Edit Kegiatan' : 'Tambah Kegiatan'}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={cancel} disabled={saving}>
+              Batal
+            </Button>
+            <Button onClick={save} loading={saving}>
+              {draft.editing ? 'Simpan' : 'Tambah'}
+            </Button>
           </div>
-        </Card>
-      )}
+        }
+      >
+        <div className="space-y-3">
+          <Input
+            label="Nama Kegiatan"
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            required
+            placeholder="Nama kegiatan"
+          />
+          <Input
+            label="Deskripsi"
+            value={draft.description}
+            onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+            placeholder="Deskripsi kegiatan"
+          />
+          <Input
+            label="Durasi (menit)"
+            type="number"
+            min={0}
+            value={String(draft.duration_minutes)}
+            onChange={(e) =>
+              setDraft((d) => ({ ...d, duration_minutes: Number(e.target.value) || 0 }))
+            }
+          />
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-on-surface">
+              <input
+                type="checkbox"
+                checked={draft.is_photo_stage}
+                onChange={(e) => setDraft((d) => ({ ...d, is_photo_stage: e.target.checked }))}
+                className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+              />
+              Foto
+            </label>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

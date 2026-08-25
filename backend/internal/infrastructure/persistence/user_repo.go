@@ -159,7 +159,7 @@ func (r *GormUserRepository) Approve(ctx context.Context, id, approverID string)
 		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	now := time.Now().Format("2006-01-02 15:04:05.000")
+	now := time.Now().UTC()
 	m.IsActive = true
 	m.ApprovalStatus = entity.ApprovalApproved
 	m.ApprovedAt = &now
@@ -181,7 +181,7 @@ func (r *GormUserRepository) Reject(ctx context.Context, id, approverID, reason 
 		}
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	now := time.Now().Format("2006-01-02 15:04:05.000")
+	now := time.Now().UTC()
 	m.IsActive = false
 	m.ApprovalStatus = entity.ApprovalRejected
 	m.RejectedAt = &now

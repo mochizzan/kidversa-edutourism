@@ -194,7 +194,13 @@ func (r *GormLiveRepository) ListSessionStagesOrdered(ctx context.Context, sessi
 }
 
 func (r *GormLiveRepository) CreateProgressHistory(ctx context.Context, h *entity.GroupStageProgressHistory) error {
-	if err := r.db.WithContext(ctx).Create(groupStageProgressHistoryModelFromEntity(h)).Error; err != nil {
+	// The group_stage_progress_history table is an append-only audit log with
+	// neither updated_at nor deleted_at columns, so omit both BaseModel fields
+	// GORM would otherwise try to write (MariaDB Error 1054). No schema
+	// migration is required.
+	if err := r.db.WithContext(ctx).
+		Omit("updated_at", "deleted_at").
+		Create(groupStageProgressHistoryModelFromEntity(h)).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
