@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { programSubstageService } from '../../../core/services/program-substages'
-import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { substagesOfStage } from '../../../core/utils/substage'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { useGroupOwnership } from './useGroupOwnership'
@@ -15,7 +13,6 @@ import type {
   SessionStage,
   ProgramStage,
   SessionSubstage,
-  CreateAssessmentDTO,
 } from '../../../core/types'
 
 export interface ChildDetail {
@@ -103,20 +100,26 @@ async function findChildInSessions(childId: string): Promise<{ detail: ChildDeta
 }
 
 export function useChildAssessment(childId: string | undefined) {
-  const { user } = useAuth()
-  const { addToast } = useGlobalToast()
   const { isMine } = useGroupOwnership(childId)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [childDetail, setChildDetail] = useState<ChildDetail | null>(null)
-  const [existingAssessment, setExistingAssessment] = useState<Assessment | null>(null)
+  const [assessmentMap, setAssessmentMap] = useState<Map<string, Assessment>>(new Map())
 
-  const [starRating, setStarRating] = useState(1)
-  const [comment, setComment] = useState('')
-  const [selectedSubstageId, setSelectedSubstageId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
+  const fetchAssessments = useCallback(async () => {
+    if (!childId) return
+    try {
+      const assessments = await assessmentService.getByParticipant(childId)
+      const map = new Map<string, Assessment>()
+      for (const a of assessments) {
+        map.set(a.session_substage_id, a)
+      }
+      setAssessmentMap(map)
+    } catch {
+      // Non-fatal: leave map empty
+    }
+  }, [childId])
 
   const fetchData = useCallback(async () => {
     if (!childId) return
@@ -131,120 +134,32 @@ export function useChildAssessment(childId: string | undefined) {
       }
       setChildDetail(detail)
 
-      const leaves = detail.sessionSubstages
-      if (leaves.length > 0) {
-        // Prefer the first incomplete leaf; otherwise the first leaf.
-        const incomplete = leaves.find((s) => s.status !== 'COMPLETED')
-        const picked = incomplete ?? leaves[0]
-        setSelectedSubstageId(picked.id)
-
-        const assessments = await assessmentService.getByParticipant(childId)
-        const existing = assessments.find((a) => a.session_substage_id === picked.id)
-        if (existing) {
-          setExistingAssessment(existing)
-          setStarRating(existing.star_rating)
-          setComment(existing.comment ?? '')
-        } else {
-          setStarRating(1)
-          setComment('')
-        }
+      // Fetch all assessments at once for all kegiatan cards
+      if (detail.sessionSubstages.length > 0) {
+        await fetchAssessments()
       }
     } catch (err) {
       setError(friendlyError(err))
     } finally {
       setLoading(false)
     }
-  }, [childId])
+  }, [childId, fetchAssessments])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
-  const handleSave = useCallback(async () => {
-    if (!childDetail) {
-      addToast({ type: 'error', message: 'Data anak tidak ditemukan' })
-      return
-    }
-    // The assessment target is the selected Kegiatan leaf (session_substage).
-    const targetId = selectedSubstageId
-    const leaf = childDetail.sessionSubstages.find((s) => s.id === selectedSubstageId)
-    const sessionId = leaf?.session_id
-    if (!targetId || !sessionId) {
-      addToast({
-        type: 'error',
-        message: 'SubTopik ini belum memiliki Kegiatan. Minta admin atau koordinator membuat Kegiatan terlebih dahulu agar anak dapat dinilai.',
-      })
-      return
-    }
-    if (!childId || !user) {
-      addToast({ type: 'error', message: 'Sesi tidak valid, silakan login ulang' })
-      return
-    }
-    // 0 means "tidak hadir" and is a valid, persistable rating.
-
-    setSaving(true)
-    try {
-      const data: CreateAssessmentDTO = {
-        participant_id: childId,
-        session_id: sessionId,
-        session_substage_id: targetId,
-        star_rating: starRating,
-        comment: comment.trim() || undefined,
-      }
-      const result = await assessmentService.upsert(data)
-      setExistingAssessment(result)
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
-    } catch (err) {
-      addToast({ type: 'error', message: friendlyError(err) })
-    } finally {
-      setSaving(false)
-    }
-  }, [childDetail, selectedSubstageId, childId, user, starRating, comment, addToast])
-
-  // When the facilitator switches the Kegiatan leaf, load its existing score.
-  const selectSubstage = useCallback(
-    async (substageId: string) => {
-      setSelectedSubstageId(substageId)
-      if (!childId) return
-      try {
-        const assessments = await assessmentService.getByParticipant(childId)
-        const existing = assessments.find((a) => a.session_substage_id === substageId)
-        if (existing) {
-          setExistingAssessment(existing)
-          setStarRating(existing.star_rating)
-          setComment(existing.comment ?? '')
-        } else {
-          setStarRating(1)
-          setComment('')
-        }
-      } catch {
-        setStarRating(1)
-        setComment('')
-      }
-    },
-    [childId],
-  )
-
-  const isDirty =
-    starRating !== (existingAssessment?.star_rating ?? 0) ||
-    comment !== (existingAssessment?.comment ?? '')
+  const refreshAssessments = useCallback(async () => {
+    await fetchAssessments()
+  }, [fetchAssessments])
 
   return {
     loading,
     error,
     childDetail,
-    starRating,
-    setStarRating,
-    comment,
-    setComment,
-    selectedSubstageId,
-    selectSubstage,
-    saving,
-    saveSuccess,
-    isDirty,
+    assessmentMap,
+    refreshAssessments,
     isMine,
     fetchData,
-    handleSave,
   }
 }

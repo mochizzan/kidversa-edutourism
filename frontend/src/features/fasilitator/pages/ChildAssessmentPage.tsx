@@ -1,69 +1,14 @@
+import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Star, Camera, Save, ShieldCheck, ShieldX } from 'lucide-react'
+import { Camera, ShieldCheck, ShieldX } from 'lucide-react'
 import { ROUTES } from '../../../core/constants/app'
-import { cn } from '../../../core/utils'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { useChildAssessment } from '../hooks/useChildAssessment'
-
-function StarRatingInput({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: number
-  onChange: (v: number) => void
-  disabled?: boolean
-}) {
-  // 0 = "tidak hadir" (absent); 1–5 are normal ratings. Default selection is 1.
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => onChange(0)}
-        className={cn(
-          'px-2 py-1 rounded-lg text-xs font-medium transition-all',
-          'hover:scale-105 active:scale-95',
-          disabled && 'cursor-not-allowed opacity-60',
-          value === 0
-            ? 'bg-error-container text-on-error-container'
-            : 'bg-surface-variant text-on-surface-variant',
-        )}
-        aria-label="Tidak hadir"
-      >
-        Tidak Hadir
-      </button>
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(star)}
-          className={cn(
-            'p-1 rounded-lg transition-all duration-150',
-            'hover:scale-110 active:scale-95',
-            disabled && 'cursor-not-allowed opacity-60',
-          )}
-          aria-label={`Nilai ${star} bintang`}
-        >
-          <Star
-            className={cn(
-              'w-8 h-8 sm:w-10 sm:h-10 transition-colors',
-              star <= value
-                ? 'fill-yellow-400 text-yellow-400'
-                : 'text-outline-variant',
-            )}
-          />
-        </button>
-      ))}
-      <span className="ml-3 text-sm font-medium text-on-surface-variant">
-        {value === 0 ? 'Tidak hadir' : `${value}/5`}
-      </span>
-    </div>
-  )
-}
+import { KegiatanCard } from '../components/KegiatanCard'
+import { assessmentService } from '../../../core/services/assessments'
+import type { CreateAssessmentDTO } from '../../../core/types'
 
 const ChildAssessmentPage = () => {
   const { groupId, childId } = useParams<{ groupId: string; childId: string }>()
@@ -73,19 +18,28 @@ const ChildAssessmentPage = () => {
     loading,
     error,
     childDetail,
-    starRating,
-    setStarRating,
-    comment,
-    setComment,
-    selectedSubstageId,
-    selectSubstage,
-    saving,
-    saveSuccess,
-    isDirty,
+    assessmentMap,
+    refreshAssessments,
     isMine,
     fetchData,
-    handleSave,
   } = useChildAssessment(childId)
+
+  const [savingAny, setSavingAny] = useState(false)
+
+  const handleSaveForKegiatan = useCallback(
+    (_kegiatan: { id: string; session_id: string }) => {
+      return async (data: CreateAssessmentDTO) => {
+        setSavingAny(true)
+        try {
+          await assessmentService.upsert(data)
+          await refreshAssessments()
+        } finally {
+          setSavingAny(false)
+        }
+      }
+    },
+    [refreshAssessments],
+  )
 
   const handleBack = () => {
     navigate(`/fasilitator/groups/${groupId}`)
@@ -171,7 +125,7 @@ const ChildAssessmentPage = () => {
         )}
 
         {/* Consent status */}
-        <div className="flex items-center gap-4 mb-6 flex-wrap">
+        <div className="flex items-center gap-4 flex-wrap">
           {programStage?.is_photo_stage && (
             <div className="flex items-center gap-1.5 text-xs">
               {hasConsentPhoto ? (
@@ -186,110 +140,48 @@ const ChildAssessmentPage = () => {
             </div>
           )}
         </div>
-
-        {/* Kegiatan (per-leaf) selector */}
-        {childDetail.sessionSubstages.length > 0 && (
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-on-surface mb-2">
-              Kegiatan
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {childDetail.sessionSubstages.map((k, idx) => {
-                const active = k.id === selectedSubstageId
-                const done = k.status === 'COMPLETED'
-                const title =
-                  childDetail.programSubstageNameMap[k.program_substage_id] ||
-                  `Kegiatan ${idx + 1}`
-                return (
-                  <button
-                    key={k.id}
-                    type="button"
-                    disabled={saving || !isMine}
-                    onClick={() => selectSubstage(k.id)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-xl text-sm border transition-colors',
-                      active
-                        ? 'bg-primary-container text-on-primary-container border-primary'
-                        : 'bg-surface-variant text-on-surface-variant border-outline-variant',
-                      (saving || !isMine) && 'cursor-not-allowed opacity-60',
-                    )}
-                  >
-                    {done ? '✅ ' : ''}{title}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Assessment form */}
-        <div className="space-y-6">
-          {/* Star Rating */}
-          <div>
-            <label className="block text-sm font-medium text-on-surface mb-2">
-              Penilaian Bintang
-            </label>
-            <p className="text-xs text-on-surface-variant mb-2">
-              Pilih "Tidak Hadir" (0) jika anak tidak mengikuti kegiatan ini.
-            </p>
-            <StarRatingInput
-              value={starRating}
-              onChange={setStarRating}
-              disabled={saving || !isMine}
-            />
-          </div>
-
-          {/* Comment */}
-          <div>
-            <label className="block text-sm font-medium text-on-surface mb-2">
-              Komentar
-            </label>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Tulis komentar tentang anak ini..."
-              maxLength={300}
-              rows={4}
-              disabled={saving || !isMine}
-              className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-4 py-3 text-sm text-on-surface placeholder-on-surface-variant focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none transition-all"
-            />
-            <p className="text-xs text-on-surface-variant mt-1 text-right">
-              {comment.length}/300
-            </p>
-          </div>
-
-          {/* Save button */}
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handleSave}
-              loading={saving}
-              disabled={((!isDirty || saving) || !selectedSubstageId) && isMine}
-              icon={<Save className="w-4 h-4" />}
-            >
-              Simpan Penilaian
-            </Button>
-            {saveSuccess && (
-              <span className="text-sm text-green-600 font-medium animate-fade-in">
-                Tersimpan!
-              </span>
-            )}
-          </div>
-        </div>
       </div>
+
+      {/* Kegiatan Cards */}
+      {childDetail.sessionSubstages.length > 0 ? (
+        <div className="space-y-4">
+          {childDetail.sessionSubstages.map((kegiatan, idx) => (
+            <KegiatanCard
+              key={kegiatan.id}
+              kegiatan={kegiatan}
+              assessment={assessmentMap.get(kegiatan.id)}
+              kegiatanName={
+                childDetail.programSubstageNameMap[kegiatan.program_substage_id] ??
+                `Kegiatan ${idx + 1}`
+              }
+              isMine={isMine}
+              onSave={handleSaveForKegiatan(kegiatan)}
+              isSavingGlobal={savingAny}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50 text-center">
+          <p className="text-sm text-on-surface-variant">
+            Belum ada kegiatan untuk dinilai.
+          </p>
+        </div>
+      )}
 
       {/* Quick Actions */}
       {programStage?.is_photo_stage && (
         <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50">
           <h3 className="text-sm font-semibold text-on-surface mb-4">Aksi Cepat</h3>
           <div className="flex flex-wrap gap-3">
-            {/* Photo action */}
             {programStage.is_photo_stage && (
               <div className="flex-1 min-w-[180px]">
                 {hasConsentPhoto && isMine ? (
                   <button
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-medium text-sm hover:bg-primary-container/80 transition-colors"
                     onClick={() =>
-                      navigate(`/fasilitator/groups/${groupId}/children/${childId}/photo`)
+                      navigate(
+                        `/fasilitator/groups/${groupId}/children/${childId}/photo`,
+                      )
                     }
                   >
                     <Camera className="w-5 h-5" />

@@ -209,15 +209,29 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) 
 	if s.Status != entity.SessionDraft && s.Status != entity.SessionCancelled {
 		return nil, apperrors.Conflict("bad_request", nil)
 	}
-	// Facilitator assignment gate: every group must have a facilitator assigned
-	// before the session can start.
+	// Gate: session must have at least one group.
 	groups, gerr := u.sessionRepo.ListSessionGroups(ctx, id)
 	if gerr != nil {
 		return nil, gerr
 	}
+	if len(groups) == 0 {
+		return nil, apperrors.BadRequest("no_groups", nil)
+	}
+	// Facilitator assignment gate: every group must have a facilitator assigned
+	// before the session can start.
 	for i := range groups {
 		if groups[i].FacilitatorID == nil || *groups[i].FacilitatorID == "" {
 			return nil, apperrors.BadRequest("facilitator_required", nil)
+		}
+	}
+	// Gate: every group must have at least one participant.
+	for i := range groups {
+		participants, perr := u.sessionRepo.ListParticipants(ctx, id, groups[i].ID, tenantID)
+		if perr != nil {
+			return nil, perr
+		}
+		if len(participants) == 0 {
+			return nil, apperrors.BadRequest("no_participants", nil)
 		}
 	}
 	s.Status = entity.SessionActive

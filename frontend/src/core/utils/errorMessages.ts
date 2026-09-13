@@ -22,6 +22,9 @@ export const ERROR_MESSAGES: Record<string, string> = {
   participant_not_deletable: 'Peserta ini tidak dapat dihapus.',
   bad_request: 'Permintaan tidak dapat diproses.',
   schema_drift: 'Terjadi kesalahan pada struktur database. Hubungi administrator.',
+  facilitator_required: 'Belum ada fasilitator yang ditugaskan.',
+  no_groups: 'Sesi harus memiliki minimal satu kelompok.',
+  no_participants: 'Setiap kelompok harus memiliki minimal satu peserta.',
   network: 'Gagal terhubung ke server. Periksa koneksi internet Anda.',
 }
 
