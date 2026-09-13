@@ -154,6 +154,7 @@ const ChildAssessmentPage = () => {
                 childDetail.programSubstageNameMap[kegiatan.program_substage_id] ??
                 `Kegiatan ${idx + 1}`
               }
+              participantId={participant.id}
               isMine={isMine}
               onSave={handleSaveForKegiatan(kegiatan)}
               isSavingGlobal={savingAny}

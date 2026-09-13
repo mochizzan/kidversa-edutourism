@@ -8,6 +8,7 @@ interface KegiatanCardProps {
   kegiatan: SessionSubstage
   assessment?: Assessment
   kegiatanName: string
+  participantId: string
   isMine: boolean
   onSave: (data: CreateAssessmentDTO) => Promise<void>
   isSavingGlobal: boolean
@@ -83,6 +84,7 @@ export function KegiatanCard({
   kegiatan,
   assessment,
   kegiatanName,
+  participantId,
   isMine,
   onSave,
   isSavingGlobal,
@@ -112,7 +114,7 @@ export function KegiatanCard({
     setSaving(true)
     try {
       await onSave({
-        participant_id: assessment?.participant_id ?? '',
+        participant_id: participantId,
         session_id: kegiatan.session_id,
         session_substage_id: kegiatan.id,
         star_rating: starRating,
@@ -128,7 +130,7 @@ export function KegiatanCard({
     } finally {
       setSaving(false)
     }
-  }, [starRating, comment, kegiatan, assessment, isMine, isDirty, isSavingGlobal, saving, onSave])
+  }, [starRating, comment, kegiatan, participantId, isMine, isDirty, isSavingGlobal, saving, onSave])
 
   const isSaving = saving || isSavingGlobal
 
