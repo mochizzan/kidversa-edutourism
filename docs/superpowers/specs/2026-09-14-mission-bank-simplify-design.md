@@ -304,3 +304,63 @@ Removed: Category select, second title input, description textarea
 | File | Action |
 |---|---|
 | `migrations/000014_simplify_mission_banks.sql` | DROP category, description_parent; RENAME title_child→title; DROP title_parent |
+
+## Section 5: Testing
+
+### Existing Test: `tmp/probe-mission.mjs`
+
+The existing smoke test (`tmp/probe-mission.mjs`) drives Puppeteer against the running app at `localhost:8002`. It **must be updated** to match the new form structure:
+
+**Current (broken after refactor):**
+```javascript
+await page.select('#kategori', 'HOME');
+await typeFieldById(page, 'judul-(anak)', mChild);
+await typeFieldById(page, 'judul-(orang-tua)', mParent);
+await page.type('textarea', 'Lakukan aktivitas bersama orang tua.');
+```
+
+**New (after refactor):**
+```javascript
+// No kategori select — removed
+await typeFieldById(page, 'judul', mTitle);  // single title field
+// No textarea — description removed
+```
+
+### Updated Test Scenarios
+
+**`tmp/probe-mission.mjs` — Create Mission:**
+1. Login superadmin, select tenant
+2. Navigate to `/admin/missions/new`
+3. Select program from dropdown
+4. Type title in single `#judul` field
+5. Click topic chip to select related stage
+6. Click "Tambah" submit
+7. Verify: mission created in DB (`SELECT id FROM mission_banks WHERE title=?`)
+8. Verify: no error toast in UI
+
+**`tmp/probe-mission.mjs` — Edit Mission:**
+1. Navigate to `/admin/missions/:id/edit`
+2. Verify: form pre-filled with existing title
+3. Change title, toggle different topic
+4. Click "Simpan"
+5. Verify: DB updated
+
+**`tmp/probe-mission.mjs` — List & Filter:**
+1. Navigate to `/admin/missions`
+2. Verify: no category tabs visible
+3. Verify: missions displayed with title (not title_child)
+4. Filter by program — verify results filtered
+5. Search by title — verify search works
+
+### Build Verification
+
+After all changes, run:
+```bash
+# Backend
+cd backend && gofmt -w . && go vet ./... && go build ./...
+
+# Frontend
+cd frontend && pnpm build
+```
+
+Both must pass cleanly. No TypeScript errors, no Go compilation errors.
