@@ -117,7 +117,13 @@ misi merakit string sendiri tanpa nama Kegiatan.
 - Untuk jalur misi, nama Kegiatan diambil dari pemetaan
   `session_substage → program_substage (nama)` yang di-scope ke topik aktif —
   setara dengan `stageInfos` yang sudah ada di frontend, tapi dihitung di backend
-  agar LLM menerima nama asli, bukan ID.
+  agar LLM menerima nama asli, bukan ID. Rantai resolusi terverifikasi tersedia:
+  `Assessment.SessionSubstageID` → `SessionSubstage.ProgramSubstageID` →
+  `ProgramSubstage.Name` (via `ProgramSubstageRepository.ListSubstages`, sudah
+  di-wire untuk session usecase di `main.go:78`). Namun reports usecase
+  (`reportsuc.NewUsecase`) **belum** menerima repo tersebut — implementasi WAJIB
+  menambah wiring DI (param repo baru + update call site di `main.go:84`).
+  Tanpa ini Bagian 3 tidak bisa jalan.
 - Lokasi fungsi builder diputuskan saat plan (natural: paket `reports` atau helper yang
   bisa di-import kedua sisi tanpa melanggar boundary "usecase tidak import `ai`").
 - Template `report-missions-user.md` diperbarui: bagian Assessment Data format baru +
@@ -193,6 +199,9 @@ Gates wajib (repo tanpa test suite):
    buktikan: (a) semua ID hasil ⊂ kandidat topik (`GET mission-bank?topic_id=`),
    (b) fallback deterministik (2× panggil tanpa AI key → hasil identik + sesuai
    urutan kurasi), (c) heuristik tidak lagi abjad-murni. Boleh dihapus setelah lolos.
+   Catatan: respons suggest-missions berbentuk envelope `{ data: { mission_ids: [...] } }`
+   (`report_handler.go: SuggestMissions`) — skrip wajib unwrap `data.mission_ids`,
+   bukan mengharapkan array mentah.
 
 ### File scope (final)
 
@@ -202,6 +211,9 @@ Gates wajib (repo tanpa test suite):
   `loadTopicMissions(activeTopicId)` dipanggil saat modal dibuka / topik ganti (kecil).
 - `backend/internal/usecase/reports/mission_recommender.go` — builder konteks bersama
   + heuristik + kandidat berlabel topik.
+- `backend/internal/usecase/reports/reports.go` (`NewUsecase`) +
+  `backend/cmd/server/main.go:84` — wiring DI repo Kegiatan
+  (`ProgramSubstageRepository` + `SessionSubstageRepository`) ke reports usecase.
 - `backend/internal/usecase/reports/prompts/report-missions-system.md`,
   `prompts/report-missions-user.md` — format baru.
 - `tmp/verify-mission-suggest.mjs` — skrip verifikasi baru (throwaway).
