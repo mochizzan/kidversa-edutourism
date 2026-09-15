@@ -129,9 +129,41 @@ useReportReview.fetchData()
 
 ## Error Handling
 
-- **Backend `Approve`**: return `apperrors.BadRequest("group_not_completed", nil)` — middleware `ErrorHandler` converts to `{ error: { code: "group_not_completed", message: "..." } }`
-- **Frontend**: button disabled, no additional error handling needed
-- **Backend `CheckAndCompleteGroup`**: errors from group status update are logged but don't block the leaf completion operation
+### Backend: Report Approval Gate (`Approve` usecase)
+
+| Scenario | Error Code | HTTP Status | Message |
+|----------|-----------|-------------|---------|
+| Group not completed | `group_not_completed` | 400 Bad Request | "Kelompok belum diselesaikan oleh fasilitator" |
+| Participant not found | `not_found` | 404 Not Found | "Peserta tidak ditemukan" |
+| Group not found | `not_found` | 404 Not Found | "Kelompok tidak ditemukan" |
+| Report not found | `not_found` | 404 Not Found | "Laporan tidak ditemukan" |
+| Internal error | `internal_error` | 500 Internal Server Error | "Terjadi kesalahan server" |
+
+**Implementation**: Use `apperrors.BadRequest("group_not_completed", nil)` which the middleware `ErrorHandler` converts to the standard envelope `{ error: { code, message } }`.
+
+### Backend: Group Status Update (`CheckAndCompleteGroup`)
+
+| Scenario | Handling |
+|----------|----------|
+| All leaves completed | Update `session_groups.status = COMPLETED` |
+| Some leaves not completed | No-op (group stays IN_PROGRESS) |
+| Group already COMPLETED | Idempotent — no-op, no error |
+| Database error on status update | Log error, don't block leaf completion (leaf is still COMPLETED) |
+| Group not found | Log warning, skip (defensive) |
+
+**Key invariant**: `CheckAndCompleteGroup` errors NEVER block the `CompleteSessionSubstage` operation. The leaf completion is the primary operation; group status update is a side effect.
+
+### Frontend: Button Disable
+
+| Scenario | Behavior |
+|----------|----------|
+| Group COMPLETED | Button enabled, normal flow |
+| Group not completed | Button disabled + tooltip "Kelompok belum diselesaikan oleh fasilitator" |
+| Participant has no group | Button enabled (skip validation) |
+| Group status fetch fails | Button enabled (fail-open — don't block admin due to network issues) |
+| API returns `group_not_completed` | Toast error "Kelompok belum diselesaikan oleh fasilitator" (defense-in-depth) |
+
+**Fail-open principle**: If the frontend cannot determine group status (network error, API failure), the button stays enabled. The backend gate is the source of truth — if the backend rejects, the toast shows the error. This avoids permanently blocking admins due to transient frontend issues.
 
 ## Testing Strategy
 
