@@ -39,6 +39,7 @@ interface CameraViewportProps {
   onTakePhoto: () => void
   onOpenGallery: () => void
   onOpenFramePicker: () => void
+  disabled?: boolean
 }
 
 export const CameraViewport = ({
@@ -65,6 +66,7 @@ export const CameraViewport = ({
   onTakePhoto,
   onOpenGallery,
   onOpenFramePicker,
+  disabled,
 }: CameraViewportProps) => (
   <>
     {pageError && (
@@ -178,7 +180,7 @@ export const CameraViewport = ({
 
     {cameraState !== 'loading' && isMobile && (
       <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-4">
-        <CircleControlBtn icon={Zap} label="Flash" onClick={() => {}} />
+        <CircleControlBtn icon={Zap} label="Flash" onClick={() => { }} />
         <CircleControlBtn icon={RefreshCw} label="Balik" onClick={onSwitchCamera} />
         <CircleControlBtn icon={LayoutGrid} label="Grid" onClick={onToggleGrid} active={showGrid} />
       </div>
@@ -198,8 +200,8 @@ export const CameraViewport = ({
 
         <button
           onClick={onTakePhoto}
-          disabled={isMaxPhotos || cameraState !== 'active'}
-          className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-lg active:scale-90 transition-all flex-shrink-0 relative group"
+          disabled={isMaxPhotos || cameraState !== 'active' || disabled}
+          className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-lg active:scale-90 transition-all flex-shrink-0 relative group disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <div className="absolute inset-[3px] rounded-full border-2 border-primary/30 group-hover:border-primary/50 transition-all" />
           <Camera className="w-6 h-6 text-primary" />

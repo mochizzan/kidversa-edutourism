@@ -370,6 +370,7 @@ const SmartPhotoPage = () => {
               onTakePhoto={takePhoto}
               onOpenGallery={() => setPhase('gallery')}
               onOpenFramePicker={() => setFramePickerOpen(true)}
+              disabled={!isMine}
             />
           )}
 
