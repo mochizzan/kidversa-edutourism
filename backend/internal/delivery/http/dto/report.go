@@ -40,6 +40,7 @@ type PublicReportDTO struct {
 	AINarrativeFinal string   `json:"ai_narrative_final,omitempty"`
 	MissionIDs       []string `json:"mission_ids,omitempty"`
 	ReportPDFURL     string   `json:"report_pdf_url,omitempty"`
+	GroupName        string   `json:"group_name,omitempty"`
 }
 
 // NewPublicReportDTO builds the safe public view (no PII beyond IDs, no token).
@@ -52,6 +53,7 @@ func NewPublicReportDTO(r *entity.Report) *PublicReportDTO {
 		AINarrativeFinal: r.AINarrativeFinal,
 		MissionIDs:       r.MissionIDs,
 		ReportPDFURL:     r.ReportPDFURL,
+		GroupName:        r.GroupName,
 	}
 }
 

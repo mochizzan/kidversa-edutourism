@@ -8,21 +8,29 @@ import type { ConsentProgressEvent } from '../../core/services/types'
 export function useConsentProgress(batchId: string | null) {
   const [progress, setProgress] = useState<ConsentProgressEvent | null>(null)
   const [connected, setConnected] = useState(false)
+  const [failed, setFailed] = useState(false)
   const sourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
     if (!batchId) return
     setProgress(null)
     setConnected(false)
+    setFailed(false)
 
     const path = `/api/consent/send-whatsapp/stream?batch_id=${encodeURIComponent(batchId)}`
     const source = openSSE(path, () => {
       // Default (unnamed) events are not used here; named events "progress" and
       // "done" are dispatched via addEventListener below.
     }, {
-      onError: () => setConnected(false),
+      onError: () => {
+        setConnected(false)
+        // If onopen never fired, this is an immediate failure (e.g. 401).
+        if (!sourceRef.current || sourceRef.current.readyState === EventSource.CONNECTING) {
+          setFailed(true)
+        }
+      },
     })
-    source.onopen = () => setConnected(true)
+    source.onopen = () => { setConnected(true); setFailed(false) }
     sourceRef.current = source
 
     // The backend emits NAMED SSE events (event: progress / event: done), which
@@ -54,5 +62,5 @@ export function useConsentProgress(batchId: string | null) {
     }
   }, [batchId])
 
-  return { progress, connected }
+  return { progress, connected, failed }
 }

@@ -37,15 +37,6 @@ const (
 	StageContentBundle StageContentFileType = "GAME_BUNDLE"
 )
 
-// MissionCategory enumerates participant mission categories.
-type MissionCategory string
-
-const (
-	MissionHome   MissionCategory = "HOME"
-	MissionParent MissionCategory = "PARENT"
-	MissionSchool MissionCategory = "SCHOOL"
-)
-
 // SessionStatus enumerates session lifecycle states.
 type SessionStatus string
 

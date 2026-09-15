@@ -46,6 +46,7 @@ type Report struct {
 	SentAt               *time.Time   `json:"sent_at,omitempty"`
 	ApprovedBy           *string      `json:"approved_by,omitempty"`
 	MissionIDs           []string     `json:"mission_ids,omitempty" gorm:"-"`
+	GroupName            string       `json:"group_name,omitempty" gorm:"-"`
 }
 
 // ParticipantMission links a report to a completed mission from the mission bank.
@@ -83,17 +84,14 @@ type TimelineEvent struct {
 	UserID    string            `json:"user_id,omitempty"`
 }
 
-// MissionBank is a reusable mission template (Home/Parent/School) tied to a program + tenant.
+// MissionBank is a reusable mission template tied to a program + tenant.
 type MissionBank struct {
 	BaseModel
-	TenantID          string          `json:"tenant_id"`
-	ProgramID         string          `json:"program_id"`
-	Category          MissionCategory `json:"category"`
-	TitleChild        string          `json:"title_child"`
-	TitleParent       string          `json:"title_parent"`
-	DescriptionParent string          `json:"description_parent,omitempty"`
-	RelatedStageIDs   []string        `json:"related_stage_ids,omitempty" gorm:"-"`
-	IsActive          bool            `json:"is_active"`
+	TenantID        string   `json:"tenant_id"`
+	ProgramID       string   `json:"program_id"`
+	Title           string   `json:"title"`
+	RelatedStageIDs []string `json:"related_stage_ids,omitempty" gorm:"-"`
+	IsActive        bool     `json:"is_active"`
 }
 
 // PhotoFrame is a decorative frame overlay (per tenant + optional program) applied to photos.

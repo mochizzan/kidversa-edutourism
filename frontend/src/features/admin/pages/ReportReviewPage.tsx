@@ -208,7 +208,7 @@ const ReportReviewPage = () => {
                     .map((m) => (
                       <li key={m.id} className="flex items-start gap-2">
                         <span>•</span>
-                        <span>{m.title_child}</span>
+                        <span>{m.title}</span>
                       </li>
                     ))}
                 </ul>

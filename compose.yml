@@ -4,7 +4,7 @@
 #   docker compose down              ← stop stack (does NOT touch bind-mount data)
 #   docker compose logs -f backend
 #
-#   Host ports (bound to 127.0.0.1):  MariaDB 3307  •  backend 8080  •  frontend 8002
+#   Host ports (bound to 127.0.0.1):  MariaDB 3307  •  backend 8080  •  frontend 8002  •  wa-engine 2785
 #   On a VPS, the HOST nginx (see nginx/vps.conf) is the only public entry point
 #   and reverse-proxies to these loopback-bound container ports.
 #   Local dev: also reachable at http://localhost:8002 (localhost == 127.0.0.1).
@@ -98,3 +98,35 @@ services:
         reservations:
           cpus: "0.10"
           memory: 64M
+
+  wa-engine:
+    image: ghcr.io/rmyndharis/openwa:latest
+    environment:
+      ENGINE_TYPE: baileys
+      PORT: "2785"
+      API_PORT: "2785"
+      AUTO_START_SESSIONS: "true"
+      DATABASE_TYPE: sqlite
+      LOG_LEVEL: info
+      # Session name: backend searches by this name, not UUID.
+      # Create session via dashboard or: POST /api/sessions {"name":"main"}
+    ports:
+      - "127.0.0.1:2785:2785"
+    volumes:
+      - ./data/wa-engine:/app/data
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2785/api/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+          pids: 100

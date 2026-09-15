@@ -117,6 +117,10 @@ func MessageForCode(code string) string {
 		return "Terjadi kesalahan pada server"
 	case "facilitator_required":
 		return "Setiap kelompok harus memiliki fasilitator"
+	case "no_groups":
+		return "Sesi harus memiliki minimal satu kelompok"
+	case "no_participants":
+		return "Setiap kelompok harus memiliki minimal satu peserta"
 	case "grading_incomplete":
 		return "Terdapat peserta yang belum dinilai pada sesi ini"
 	default:

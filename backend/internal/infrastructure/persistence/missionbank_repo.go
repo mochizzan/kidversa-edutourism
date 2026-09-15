@@ -110,9 +110,6 @@ func (r *GormMissionBankRepository) List(ctx context.Context, f repository.Missi
 	if f.ProgramID != "" {
 		q = q.Where("program_id = ?", f.ProgramID)
 	}
-	if f.Category != "" {
-		q = q.Where("category = ?", f.Category)
-	}
 	if f.IsActive != nil {
 		q = q.Where("is_active = ?", *f.IsActive)
 	}

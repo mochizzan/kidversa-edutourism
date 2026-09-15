@@ -242,11 +242,6 @@ function ConsentForm() {
     )
   }
 
-  const completedSteps =
-    (photoConsent !== null ? 1 : 0) +
-    (parentName.trim() ? 1 : 0)
-  const progressPct = Math.round((completedSteps / 2) * 100)
-
   /* ── Form ── */
   return (
     <div className="space-y-5">
@@ -316,28 +311,6 @@ function ConsentForm() {
           hanya digunakan untuk laporan perkembangan anak dan{' '}
           <span className="font-medium text-on-surface">tidak disebarluaskan</span>.
         </p>
-      </div>
-
-      {/* Progress meter */}
-      <div className="px-1">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs font-medium text-on-surface-variant">
-            Kelengkapan persetujuan
-          </span>
-          <span className="text-xs font-semibold text-primary">{progressPct}%</span>
-        </div>
-        <div
-          className="h-2 w-full rounded-full bg-surface-variant overflow-hidden"
-          role="progressbar"
-          aria-valuenow={progressPct}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-300"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
       </div>
 
       {/* Photo consent */}

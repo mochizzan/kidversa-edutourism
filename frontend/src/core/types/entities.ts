@@ -139,10 +139,7 @@ export interface PhotoFrame {
 export interface MissionBank {
   id: string
   program_id: string
-  category: import('./enums').MissionCategory
-  title_child: string
-  title_parent: string
-  description_parent?: string
+  title: string
   related_stage_ids?: string[]
   is_active: boolean
   created_at: string

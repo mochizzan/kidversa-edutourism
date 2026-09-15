@@ -431,14 +431,13 @@ func buildConsentMessage(parentName, childName, sessionName, sessionDate, locati
 
 Halo Bapak/Ibu %s,
 
-Kami dari Kidversa Edutourism meminta persetujuan Anda untuk kegiatan edutourism anak %s.
+Kami dari Kidversa Edutourism meminta persetujuan Bpk / Ibu  untuk kegiatan edutourism atas nama  %s (peserta)
 
 📋 Sesi: %s
 📅 Tanggal: %s
 📍 Lokasi: %s
 
-Mohon berikan izin untuk:
-• Pengambilan foto selama kegiatan
+Kami mohon diberikan izin untuk pengambilan gambar Selama kegiatan untuk proses dokumetasi pembelajaran.
 
 Klik tautan berikut untuk memberikan persetujuan:
 %s

@@ -24,7 +24,8 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	streamAuth := appmiddleware.JWTAuth(jm, cfg.SSECookieName(), revoker)
 	scopeMW := appmiddleware.TenantScope()
 	// Public token access — intentionally outside JWTAuth (token is the authn).
-	g.GET("/access", h.GetByAccessToken)
+	// RateLimit(30) brute-force protection on the 64hex token space.
+	g.GET("/access", h.GetByAccessToken, appmiddleware.RateLimit(30))
 	// Session-level generate: static route must precede /:id routes.
 	g.POST("/generate", h.GenerateForSession, authMW, scopeMW)
 	g.GET("", h.ListReports, authMW, scopeMW)

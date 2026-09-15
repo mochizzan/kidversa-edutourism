@@ -113,9 +113,6 @@ export interface LoginResponse {
 
 export interface CreateMissionBankDTO {
   program_id: string
-  category: import('./enums').MissionCategory
-  title_child: string
-  title_parent: string
-  description_parent?: string
+  title: string
   related_stage_ids?: string[]
 }

@@ -199,8 +199,11 @@ const DashboardPage = () => {
               <SessionCard
                 key={session.id}
                 session={session}
-                forceClickable
-                onClick={() => navigate(`/fasilitator/groups?sessionId=${session.id}`)}
+                onClick={() => {
+                  if (session.is_my_session) {
+                    navigate(`/fasilitator/groups?sessionId=${session.id}`)
+                  }
+                }}
               />
             ))}
           </div>

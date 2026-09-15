@@ -42,47 +42,24 @@ export function selectMissionsForParticipant({
 
   const lowestProgramStageIds = sortedStages.slice(0, 2)
 
-  const byCategory = {
-    HOME: availableMissions.filter((m) => m.category === 'HOME' && m.is_active),
-    PARENT: availableMissions.filter((m) => m.category === 'PARENT' && m.is_active),
-    SCHOOL: availableMissions.filter((m) => m.category === 'SCHOOL' && m.is_active),
-  }
-
   const scoreMission = (mission: MissionBank): number => {
     if (!mission.related_stage_ids || mission.related_stage_ids.length === 0) return 0
     return mission.related_stage_ids.filter((sid) => lowestProgramStageIds.includes(sid)).length
   }
 
+  const active = availableMissions.filter((m) => m.is_active)
+
+  const scored = active
+    .map((m) => ({ mission: m, score: scoreMission(m) }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      return a.mission.id.localeCompare(b.mission.id)
+    })
+
   const selected: string[] = []
-
-  for (const category of ['HOME', 'PARENT', 'SCHOOL'] as const) {
-    const missions = byCategory[category]
-    if (missions.length === 0) continue
-
-    const scored = missions
-      .map((m) => ({ mission: m, score: scoreMission(m) }))
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score
-        return a.mission.id.localeCompare(b.mission.id)
-      })
-
-    selected.push(scored[0].mission.id)
+  for (const { mission } of scored) {
+    selected.push(mission.id)
     if (selected.length >= 3) break
-  }
-
-  if (selected.length < 3) {
-    const remaining = availableMissions
-      .filter((m) => m.is_active && !selected.includes(m.id))
-      .map((m) => ({ mission: m, score: scoreMission(m) }))
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score
-        return a.mission.id.localeCompare(b.mission.id)
-      })
-
-    for (const { mission } of remaining) {
-      selected.push(mission.id)
-      if (selected.length >= 3) break
-    }
   }
 
   return selected

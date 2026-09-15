@@ -1,6 +1,8 @@
 import MINI_RAPORT_TAILWIND_CSS from './miniRaport.styles.css?inline'
 
 export interface MiniRaportData {
+  programName: string
+  topicName: string
   childName: string
   childAge: number
   childSchool?: string
@@ -14,12 +16,10 @@ export interface MiniRaportData {
   }[]
   extraTopicsCount?: number
   narrative: string
-  facilitatorMessage: string
   missions: string[]
   badges: { badgeName: string; badgeImageUrl?: string }[]
   facilitatorName: string
   facilitatorPhotoUrl?: string
-  galleryTitle: string
   galleryUrl?: string
   partnerLogoUrl?: string
   kidversaLogoUrl?: string
@@ -53,24 +53,14 @@ function starsHTML(rating: number): string {
   ).join('')
 }
 
-const STAGE_CONFIG = [
-  { icon: 'fa-face-smile', bg: 'bg-green-100', text: 'text-green-600', label: 'text-brand-green' },
-  { icon: 'fa-gamepad', bg: 'bg-blue-100', text: 'text-blue-500', label: 'text-blue-500' },
-  { icon: 'fa-scale-balanced', bg: 'bg-orange-100', text: 'text-orange-500', label: 'text-orange-500' },
-  { icon: 'fa-heart', bg: 'bg-pink-100', text: 'text-pink-500', label: 'text-pink-500' },
-]
-
 function stageRowHTML(
   stage: MiniRaportData['stages'][0],
-  index: number,
+  _index: number,
   isLast: boolean
 ): string {
-  const cfg = STAGE_CONFIG[index % STAGE_CONFIG.length]
-  const iconClass = index === 0 ? `fa-regular ${cfg.icon}` : `fas ${cfg.icon}`
   const border = isLast ? '' : 'border-b border-dashed border-gray-200 pb-3'
   const kegiatan = stage.kegiatan && stage.kegiatan.length
     ? stage.kegiatan
-        .slice(0, 3)
         .map(
           (k) => `
           <div class="flex items-center justify-between gap-2">
@@ -82,16 +72,7 @@ function stageRowHTML(
     : '<p class="text-[11px] text-gray-400 italic">Belum ada kegiatan tercatat.</p>'
   return `
     <div class="${border}">
-      <div class="flex items-center gap-3 mb-2">
-        <div class="w-9 h-9 rounded-full ${cfg.bg} ${cfg.text} flex items-center justify-center text-xl shrink-0">
-          <i class="${iconClass}"></i>
-        </div>
-        <div class="min-w-0">
-          <div class="${cfg.label} font-bold text-[12px] leading-tight">Topik ${esc(stage.sequenceOrder)}</div>
-          <div class="text-brand-purple font-black text-[14px] leading-tight truncate">${esc(stage.name)}</div>
-        </div>
-      </div>
-      <div class="flex flex-col gap-1.5 pl-12">${kegiatan}</div>
+      <div class="flex flex-col gap-1.5">${kegiatan}</div>
     </div>`
 }
 
@@ -117,17 +98,17 @@ function badgeHTML(badges: { badgeName: string; badgeImageUrl?: string }[]): str
     .slice(0, 4)
     .map((b) => {
       const inner = b.badgeImageUrl
-        ? `<img src="${esc(b.badgeImageUrl)}" alt="${esc(b.badgeName)}" class="w-9 h-9 object-contain rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" />
-           <i class="fas fa-award text-brand-badge text-2xl hidden"></i>`
-        : '<i class="fas fa-award text-brand-badge text-2xl"></i>'
+        ? `<img src="${esc(b.badgeImageUrl)}" alt="${esc(b.badgeName)}" class="w-8 h-8 object-contain rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" />
+           <i class="fas fa-award text-brand-badge text-xl hidden"></i>`
+        : '<i class="fas fa-award text-brand-badge text-xl"></i>'
       return `
         <div class="flex items-center gap-2 min-w-0">
-          <div class="w-9 h-9 flex items-center justify-center shrink-0">${inner}</div>
+          <div class="w-8 h-8 flex items-center justify-center shrink-0">${inner}</div>
           <span class="text-[11px] font-semibold text-gray-700 truncate">${esc(b.badgeName)}</span>
         </div>`
     })
     .join('')
-  return `<div class="grid grid-cols-2 gap-x-3 gap-y-4 w-full">${items}</div>`
+  return `<div class="flex flex-wrap gap-3">${items}</div>`
 }
 
 function narrativeBlock(data: MiniRaportData): string {
@@ -158,17 +139,13 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
       })()
     : '<p class="text-sm text-gray-500 italic">Belum ada data topik.</p>'
 
-  const facilitatorAvatar = data.facilitatorPhotoUrl
-    ? `<img src="${esc(data.facilitatorPhotoUrl)}" alt="${esc(data.facilitatorName)}" class="w-full h-full object-cover rounded-full" />`
-    : '<span class="text-[8px] font-bold text-gray-400 text-center leading-tight">FOTO<br>FASILITATOR</span>'
-
   const kidversaLogo = data.kidversaLogoUrl
-    ? `<img src="${esc(data.kidversaLogoUrl)}" alt="Kidversa" class="w-full h-12 object-contain" />`
-    : '<div class="w-full h-12 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-50 text-center leading-tight px-2">[ LOGO BRAND KIDVERSA ]</div>'
+    ? `<img src="${esc(data.kidversaLogoUrl)}" alt="Kidversa" class="w-full h-16 object-contain" />`
+    : '<img src="/logo.png" alt="Kidversa" class="w-full h-16 object-contain" />'
 
   const partnerLogo = data.partnerLogoUrl
     ? `<img src="${esc(data.partnerLogoUrl)}" alt="Partner" class="w-full h-12 object-contain" />`
-    : '<div class="w-full h-12 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-50 text-center leading-tight px-2">[ LOGO BRAND EDU TOURISM ]</div>'
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -341,10 +318,27 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             var scale = Math.min(1, 297 / hMm)
             document.documentElement.style.setProperty('--print-scale', String(scale))
         }
+
+        function __scaleRingkasan() {
+            var card = document.getElementById('ringkasan-card')
+            var text = document.getElementById('ringkasan-text')
+            if (!card || !text) return
+            var maxH = 140
+            var curH = card.scrollHeight
+            if (curH > maxH) {
+                var s = Math.max(0.7, maxH / curH)
+                text.style.transform = 'scale(' + s + ')'
+                text.style.transformOrigin = 'top left'
+                text.style.width = (100 / s) + '%'
+            }
+        }
+
         if (window.addEventListener) {
             window.addEventListener('beforeprint', __raportBeforePrint)
+            window.addEventListener('DOMContentLoaded', __scaleRingkasan)
         } else if (window.attachEvent) {
             window.attachEvent('onbeforeprint', __raportBeforePrint)
+            window.attachEvent('onload', __scaleRingkasan)
         }
     </script>
 </head>
@@ -361,18 +355,14 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
 
             <!-- Center Title -->
             <div class="text-center flex-1 px-4 flex flex-col items-center z-20">
-                <h1 class="text-brand-purple font-black text-[1.6rem] leading-none tracking-wide mb-1">MINI RAPORT</h1>
-                <h2 class="text-brand-purple font-black text-base leading-none mb-2">PENGALAMAN BELAJAR</h2>
+                <h1 class="text-brand-purple font-black text-[1.6rem] leading-none tracking-wide mb-1">MINI RAPORT ${esc(data.programName)}</h1>
+                <h2 class="text-brand-purple font-black text-base leading-none mb-2">${esc(data.topicName)}</h2>
                 <div class="ribbon-container">
                     <div class="bg-brand-green text-white px-6 py-1 rounded-full font-bold text-base relative z-10 shadow-sm border border-brand-green">
-                        Program Kidversa Edu-Tourism
+                        ${esc(data.sessionDate)}
                     </div>
                     <div class="ribbon-tail-left"></div>
                     <div class="ribbon-tail-right"></div>
-                </div>
-                <div class="flex items-center gap-2 mt-3 text-brand-purple font-black text-sm">
-                    <i class="fa-regular fa-calendar-days text-lg text-purple-400"></i>
-                    <span>${esc(data.sessionDate)}</span>
                 </div>
             </div>
 
@@ -422,73 +412,64 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 </div>
             </div>
 
-            <!-- 3. LEVEL KEGIATAN (diberi jarak ektra ke bawah dari section Profil Anak) -->
-            <div class="col-span-8 bg-white border-[2px] border-gray-200 rounded-[1.5rem] p-4 relative pt-6 mt-3">
+            <!-- 3. LEVEL KEGIATAN -->
+            <div class="col-span-8 bg-white border-2 border-gray-200 rounded-[1.5rem] p-5 pt-6 relative mt-3">
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
                     <i class="fas fa-star text-brand-star text-xs"></i> LEVEL KEGIATAN
                 </div>
-                <div class="flex flex-col gap-2 mt-1 overflow-hidden rounded-[1rem]">
+                <div class="flex flex-col gap-2 mt-1">
                     ${stagesBlock}
                 </div>
             </div>
 
-            <!-- 4. PESAN FASILITATOR + TTD (kolom kanan, di atas Ringkasan) -->
-            <div class="col-span-8 bg-brand-lightPurple rounded-[1.25rem] p-4 border border-purple-50 shadow-sm relative flex flex-col">
-                <div class="flex items-center gap-3 mb-2">
-                    <div class="w-10 h-10 rounded-full bg-white border-2 border-dashed border-gray-300 shadow-sm flex items-center justify-center shrink-0 overflow-hidden">
-                        ${facilitatorAvatar}
-                    </div>
-                    <h4 class="font-black text-brand-purple text-[14px]">PESAN FASILITATOR</h4>
+            <!-- 4. BADGE PENCAPAIAN (compact, kolom kanan, di atas Ringkasan) -->
+            <div class="col-span-8 bg-white border-2 border-brand-badge rounded-[1.25rem] p-3 pt-5 shadow-sm relative min-h-[100px] mt-3">
+                <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
+                    <i class="fas fa-award text-xs"></i> BADGE PENCAPAIAN
                 </div>
-                <p class="text-[12px] font-semibold text-brand-badge leading-relaxed flex-1 line-clamp-4">${esc(data.facilitatorMessage)}</p>
-                <div class="mt-2 flex items-center gap-3 border-t border-purple-200 pt-2">
-                    <div class="w-20 h-10 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-[10px] font-bold text-gray-400 bg-gray-50 relative">
-                        [ TTD FASILITATOR ]
-                    </div>
-                    <div class="text-[12px] font-bold text-gray-600 truncate">${esc(data.facilitatorName)}</div>
+                <div class="flex flex-wrap gap-3">
+                    ${badgeHTML(data.badges)}
                 </div>
             </div>
 
-            <!-- 5. RINGKASAN (full-width, lebih tinggi) -->
-            <div class="col-span-12 bg-brand-lightGreen rounded-[1.5rem] p-3.5 shadow-sm min-h-[120px] flex flex-col">
+            <!-- 5. RINGKASAN (full-width, max-height dengan auto-scale) -->
+            <div id="ringkasan-card" class="col-span-12 bg-brand-lightGreen rounded-[1.5rem] p-3.5 shadow-sm max-h-[140px] overflow-hidden">
                 <h4 class="font-bold text-brand-darkGreen flex items-center gap-2 mb-1 shrink-0">
                     <i class="fas fa-star text-xs"></i> RINGKASAN
                 </h4>
-                <p class="text-[13px] font-semibold text-gray-800 leading-snug line-clamp-5 flex-1">${narrativeBlock(data)}</p>
+                <p id="ringkasan-text" class="text-[13px] font-semibold text-gray-800 leading-snug">${narrativeBlock(data)}</p>
             </div>
 
-            <!-- 6a. MISI LANJUTAN -->
+            <!-- 6a. MISI RUMAH BERSAMA KELUARGA -->
             <div class="col-span-6 bg-brand-yellow rounded-[1.25rem] p-4 pt-3 border border-yellow-200 shadow-sm relative">
                 <div class="flex items-center gap-3 mb-3">
                     <span class="bg-orange-200 text-orange-600 w-8 h-8 rounded-xl flex items-center justify-center text-lg shadow-sm"><i class="fas fa-home"></i></span>
-                    <h3 class="font-black text-brand-purple text-base">MISI LANJUTAN</h3>
+                    <h3 class="font-black text-brand-purple text-[13px]">MISI RUMAH BERSAMA KELUARGA</h3>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     ${missionsHTML(data.missions)}
                 </div>
             </div>
 
-            <!-- 6b. BADGE PENCAPAIAN (dibuat lebih tinggi) -->
-            <div class="col-span-6 bg-white border-2 border-brand-badge rounded-[1.25rem] p-4 pt-3 shadow-sm relative min-h-[190px] flex flex-col">
-                <div class="flex items-center gap-3 mb-3">
-                    <i class="fas fa-award text-brand-badge text-lg"></i>
-                    <h3 class="font-black text-brand-purple text-[14px]">BADGE PENCAPAIAN</h3>
+            <!-- 6b. PENGESAHAN + TTD -->
+            <div class="col-span-6 bg-white border-2 border-gray-200 rounded-[1.25rem] p-4 pt-5 shadow-sm relative">
+                <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
+                    <i class="fas fa-pen text-xs"></i> PENGESAHAN
                 </div>
-                <div class="flex-1 flex items-center">
-                    ${badgeHTML(data.badges)}
+                <div class="mt-1">
+                    <p class="text-[11px] font-semibold text-gray-500 mb-0.5">Guru Fasilitator</p>
+                    <p class="text-[13px] font-bold text-brand-purple mb-3">${esc(data.facilitatorName)}</p>
+                    <div class="w-full h-[60px] border-2 border-dashed border-gray-300 rounded-lg bg-gray-50"></div>
                 </div>
             </div>
         </main>
 
         <!-- Footer: Copyright (kiri) | divider | QR Code Galeri (kanan) -->
-        <div class="bg-[#795db2] text-white px-8 py-3 flex items-center gap-4 relative z-10 rounded-b-[2rem]">
+        <div class="bg-[#795db2] text-white px-8 py-2 flex items-center gap-4 relative z-10 rounded-b-[2rem]">
 
             <!-- Kiri: Copyright -->
             <div class="flex-1 min-w-0">
-                <p class="text-[11px] font-semibold opacity-95 leading-snug flex items-center gap-2">
-                    <i class="fas fa-book-open text-sm opacity-90 shrink-0"></i>
-                    <span>Dokumen ini merupakan laporan perkembangan pengalaman belajar anak pada Program Kidversa Edu-Tourism.</span>
-                </p>
+                <p class="text-[10px] font-semibold opacity-95">&copy; 2026 | www.kidversa.fun</p>
             </div>
 
             <!-- Divider vertikal -->
@@ -497,7 +478,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             <!-- Kanan: QR Code Galeri -->
             <div class="raport-footer-qr">
                 <div class="raport-qr-caption">
-                    <div class="text-[9px] font-bold text-white/70 tracking-wider truncate">${esc(data.galleryTitle)}</div>
+                    <div class="text-[9px] font-bold text-white/70 tracking-wider">Galeri Digital</div>
                     <div class="text-[9px] font-semibold text-white/70 italic">Scan untuk melihat galeri</div>
                 </div>
                 <div class="w-14 h-14 bg-white rounded-lg flex items-center justify-center text-gray-400 text-[8px] font-bold text-center leading-tight shrink-0 shadow-sm p-1">

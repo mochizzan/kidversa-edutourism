@@ -9,8 +9,8 @@ import (
 )
 
 // RegisterConsentRoutes mounts /api/consent/* on the given echo group.
-func RegisterConsentRoutes(g *echo.Group, h *ConsentHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
-	authMW := appmiddleware.JWTAuth(jm, "", revoker)
+func RegisterConsentRoutes(g *echo.Group, h *ConsentHandler, jm *auth.JWTManager, revoker auth.TokenRevoker, sseCookieName string) {
+	authMW := appmiddleware.JWTAuth(jm, sseCookieName, revoker)
 	roleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator)
 	scopeMW := appmiddleware.TenantScope()
 

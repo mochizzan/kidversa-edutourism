@@ -5,7 +5,6 @@ import (
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
-	"kidversa-edutourism-backend/internal/domain/entity"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
@@ -24,10 +23,7 @@ func (h *MissionBankHandler) Update(c *echo.Context) error {
 		return err
 	}
 	m.ProgramID = req.ProgramID
-	m.Category = entity.MissionCategory(req.Category)
-	m.TitleChild = req.TitleChild
-	m.TitleParent = req.TitleParent
-	m.DescriptionParent = req.DescriptionParent
+	m.Title = req.Title
 	m.RelatedStageIDs = req.RelatedStageIDs
 	m.IsActive = req.IsActive
 	if err := h.repo.Update((*c).Request().Context(), m); err != nil {

@@ -76,7 +76,7 @@ func NewRouter(d Deps) *echo.Echo {
 	handler.RegisterReportsRoutes(api.Group("/reports"), h.Report, d.JWT, d.Config, d.Revoker)
 	handler.RegisterMissionBanksRoutes(api.Group("/mission-banks"), h.MissionBank, d.JWT, d.Revoker)
 	handler.RegisterParticipantMissionsRoutes(api.Group("/participant-missions"), h.ParticipantMission, d.JWT, d.Revoker)
-	handler.RegisterConsentRoutes(api.Group("/consent"), h.Consent, d.JWT, d.Revoker)
+	handler.RegisterConsentRoutes(api.Group("/consent"), h.Consent, d.JWT, d.Revoker, d.Config.SSECookieName())
 	handler.RegisterFramesRoutes(api.Group("/frames"), h.Frame, d.JWT, d.Revoker)
 
 	// Participant badges (read-only).

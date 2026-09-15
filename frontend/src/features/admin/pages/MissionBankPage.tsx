@@ -1,39 +1,17 @@
-import { useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import {
-  Plus,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  AlertCircle,
-  FileText,
-} from 'lucide-react'
+import { Plus, Pencil, Power, PowerOff, Trash2, FileText } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
+import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Select } from '../../../shared/components/ui/Select'
-import { Input } from '../../../shared/components/ui/Input'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
-import { cn } from '../../../core/utils'
-import {
-  MISSION_CATEGORY_META,
-  MISSION_CATEGORY_ORDER,
-} from '../../../core/constants/missionCategory'
+import { DataTable } from '../../../shared/components/data/DataTable'
+import type { Column } from '../../../shared/components/data/DataTable'
 import { useMissionBank } from '../hooks/useMissionBank'
-import { MissionCard } from '../components/MissionCard'
-
-// Filter tabs: an "all" pseudo-category followed by the canonical order. Labels
-// and icons come from MISSION_CATEGORY_META so the tab strip, the summary row
-// and MissionCard can never drift apart again.
-const CATEGORY_TABS = [
-  { key: '', label: 'Semua', Icon: null },
-  ...MISSION_CATEGORY_ORDER.map((key) => ({
-    key,
-    label: key,
-    Icon: MISSION_CATEGORY_META[key].Icon,
-  })),
-]
+import type { MissionBank } from '../../../core/types'
 
 const MissionBankPage = () => {
   const navigate = useNavigate()
@@ -41,29 +19,126 @@ const MissionBankPage = () => {
   const {
     missions,
     programs,
-    stats,
     loading,
     error,
     page,
     total,
-    totalPages,
     selectedProgram,
-    selectedCategory,
-    searchQuery,
     deactivateTarget,
     deactivating,
+    deleteTarget,
+    deleting,
     setSearchQuery,
     setPage,
     setSelectedProgram,
-    setSelectedCategory,
     setDeactivateTarget,
+    setDeleteTarget,
     loadMissions,
     handleToggleActive,
     confirmToggle,
+    handleDelete,
+    confirmDelete,
     stageMap,
   } = useMissionBank()
 
+  const programMap = useMemo(
+    () => new Map(programs.map((p) => [p.id, p.name])),
+    [programs],
+  )
+
   const currentAction = deactivateTarget?.is_active ? 'Nonaktifkan' : 'Aktifkan'
+
+  const columns: Column<MissionBank>[] = [
+    {
+      key: 'title',
+      header: 'Judul Misi',
+      sortable: true,
+      render: (item) => (
+        <span className="font-medium text-on-surface">{item.title}</span>
+      ),
+    },
+    {
+      key: 'program_id',
+      header: 'Program',
+      render: (item) => (
+        <span className="text-sm text-on-surface-variant">
+          {programMap.get(item.program_id) || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'related_stage_ids',
+      header: 'Topik Terkait',
+      render: (item) => {
+        const ids = item.related_stage_ids
+        if (!ids || ids.length === 0) {
+          return <span className="text-sm text-on-surface-variant">—</span>
+        }
+        return (
+          <div className="flex flex-wrap gap-1">
+            {ids.slice(0, 3).map((stageId) => (
+              <Badge key={stageId} variant="accent" size="sm">
+                {stageMap[stageId]?.name ?? stageId.slice(-4)}
+              </Badge>
+            ))}
+            {ids.length > 3 && (
+              <Badge variant="neutral" size="sm">+{ids.length - 3}</Badge>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'is_active',
+      header: 'Status',
+      render: (item) => (
+        <Badge variant={item.is_active ? 'success' : 'neutral'}>
+          {item.is_active ? 'Aktif' : 'Nonaktif'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Aksi',
+      align: 'right',
+      render: (item) => (
+        <div className="flex items-center justify-end gap-1">
+          <Link to={`/admin/missions/${item.id}/edit`}>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Pencil className="w-4 h-4" />}
+              tooltip="Edit"
+            />
+          </Link>
+          {item.is_active ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<PowerOff className="w-4 h-4 text-warning" />}
+              tooltip="Nonaktifkan"
+              onClick={() => handleToggleActive(item)}
+            />
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Power className="w-4 h-4 text-green-600" />}
+              tooltip="Aktifkan"
+              onClick={() => setDeactivateTarget(item)}
+            />
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 className="w-4 h-4 text-error" />}
+            tooltip="Hapus"
+            onClick={() => handleDelete(item)}
+          />
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -80,73 +155,8 @@ const MissionBankPage = () => {
         }
       />
 
-      <div className="bg-surface-container-low rounded-2xl px-6 py-4">
-        <div className="flex items-center gap-6 flex-wrap">
-          <span className="text-sm text-on-surface-variant">Ringkasan Misi:</span>
-          {MISSION_CATEGORY_ORDER.map((cat) => {
-            const count = stats[cat] || 0
-            return (
-              <span key={cat} className="flex items-center gap-1.5 text-sm">
-                <span>{MISSION_CATEGORY_META[cat].emoji}</span>
-                <span className="font-medium text-on-surface">{count}</span>
-                <span className="text-on-surface-variant">misi {cat}</span>
-              </span>
-            )
-          })}
-          <span className="text-xs text-green-600 font-medium ml-auto">Semua kategori siap</span>
-        </div>
-      </div>
-
-      <div className="bg-surface-container-low p-4 rounded-2xl flex flex-col sm:flex-row gap-4 items-end">
-        <div className="w-full sm:w-64">
-          <Select
-            options={[
-              { value: '', label: 'Semua Program' },
-              ...programs.map((p) => ({ value: p.id, label: p.name })),
-            ]}
-            value={selectedProgram}
-            onChange={(e) => setSelectedProgram(e.target.value)}
-            placeholder="Semua Program"
-          />
-        </div>
-        <div className="flex-1">
-          <Input
-            leftIcon={<Search className="w-4 h-4" />}
-            placeholder="Cari misi..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex gap-1 border-b border-outline-variant">
-        {CATEGORY_TABS.map(({ key, label, Icon }) => (
-          <button
-            key={key}
-            onClick={() => setSelectedCategory(key)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
-              selectedCategory === key
-                ? 'border-primary text-primary'
-                : 'border-transparent text-on-surface-variant hover:text-on-surface hover:border-outline-variant',
-            )}
-          >
-            {Icon && <Icon className="w-4 h-4" />}
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {loading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <span className="ml-3 text-sm text-on-surface-variant">Memuat data misi...</span>
-        </div>
-      )}
-
-      {!loading && error && (
+      {error && (
         <div className="bg-error-container/30 rounded-2xl p-6 text-center">
-          <AlertCircle className="w-10 h-10 mx-auto mb-3 text-on-error-container" />
           <p className="text-sm font-medium text-on-error-container mb-2">{error}</p>
           <Button variant="secondary" size="sm" onClick={loadMissions}>
             Coba Lagi
@@ -154,64 +164,48 @@ const MissionBankPage = () => {
         </div>
       )}
 
-      {!loading && !error && missions.length === 0 && (
-        <EmptyState
-          icon={<FileText className="w-12 h-12" />}
-          title="Belum ada misi"
-          description={
-            selectedProgram
-              ? 'Belum ada misi untuk program ini. Klik "Tambah Misi Baru" untuk memulai.'
-              : 'Pilih program atau klik "Tambah Misi Baru" untuk membuat misi pertama.'
-          }
-          action={
-            selectedProgram
-              ? { label: 'Tambah Misi Baru', onClick: () => navigate(ROUTES.ADMIN.MISSION_NEW) }
-              : undefined
-          }
-        />
-      )}
-
-      {!loading && !error && missions.length > 0 && (
-        <div className="grid gap-4">
-          {missions.map((mission) => (
-            <MissionCard
-              key={mission.id}
-              mission={mission}
-              stageMap={stageMap}
-              onEdit={(m) => navigate(`/admin/missions/${m.id}/edit`)}
-              onToggleActive={handleToggleActive}
-              onActivate={setDeactivateTarget}
-            />
-          ))}
-        </div>
-      )}
-
-      {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-on-surface-variant">
-            {total} misi total — Halaman {page} dari {totalPages}
-          </p>
+      <DataTable
+        data={missions}
+        columns={columns}
+        loading={loading}
+        page={page}
+        pageSize={10}
+        total={total}
+        onPageChange={setPage}
+        onSearch={setSearchQuery}
+        getRowId={(item) => item.id}
+        actions={
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<ChevronLeft className="w-4 h-4" />}
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            />
-            <span className="text-sm text-on-surface-variant px-2">
-              {page} / {totalPages}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<ChevronRight className="w-4 h-4" />}
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            />
+            <div className="w-56">
+              <Select
+                options={[
+                  { value: '', label: 'Semua Program' },
+                  ...programs.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                value={selectedProgram}
+                onChange={(e) => setSelectedProgram(e.target.value)}
+                placeholder="Semua Program"
+              />
+            </div>
           </div>
-        </div>
-      )}
+        }
+        emptyState={
+          <EmptyState
+            icon={<FileText className="w-12 h-12" />}
+            title="Belum ada misi"
+            description={
+              selectedProgram
+                ? 'Belum ada misi untuk program ini. Klik "Tambah Misi Baru" untuk memulai.'
+                : 'Pilih program atau klik "Tambah Misi Baru" untuk membuat misi pertama.'
+            }
+            action={
+              selectedProgram
+                ? { label: 'Tambah Misi Baru', onClick: () => navigate(ROUTES.ADMIN.MISSION_NEW) }
+                : undefined
+            }
+          />
+        }
+      />
 
       <Modal
         open={!!deactivateTarget}
@@ -234,8 +228,32 @@ const MissionBankPage = () => {
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Apakah Anda yakin ingin {currentAction.toLowerCase()} misi "{deactivateTarget?.title_child}
-          "?
+          Apakah Anda yakin ingin {currentAction.toLowerCase()} misi &ldquo;{deactivateTarget?.title}&rdquo;?
+        </p>
+      </Modal>
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Hapus Misi"
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              onClick={confirmDelete}
+              loading={deleting}
+            >
+              Hapus
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-on-surface-variant">
+          Apakah Anda yakin ingin menghapus misi &ldquo;{deleteTarget?.title}&rdquo;? Misi yang dihapus tidak dapat dikembalikan.
         </p>
       </Modal>
     </div>

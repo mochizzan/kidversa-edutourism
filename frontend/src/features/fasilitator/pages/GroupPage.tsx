@@ -114,6 +114,14 @@ const GroupPage = () => {
         return
       }
 
+      // Ownership guard: FASILITATOR may only access their own groups.
+      const isGroupMine = !user || user.role !== 'FASILITATOR' || group.facilitator_id === user.id
+      if (!isGroupMine) {
+        navigate(ROUTES.FASILITATOR.DASHBOARD, { replace: true })
+        addToast({ type: 'error', message: 'Anda tidak memiliki akses ke kelompok ini.' })
+        return
+      }
+
       // Get program stages for stage name lookup
       const programStages = await programService.getStages(detail.program_id)
       const stageNameMap = new Map(programStages.map((ps) => [ps.id, ps.name]))

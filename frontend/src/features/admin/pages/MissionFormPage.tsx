@@ -10,7 +10,6 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { missionService } from '../../../core/services/missions'
 import { programService } from '../../../core/services/programs'
 import type { Program, ProgramStage } from '../../../core/types'
-import { MissionCategory } from '../../../core/types'
 import { cn } from '../../../core/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
 
@@ -28,10 +27,7 @@ const MissionFormPage = () => {
 
   const [form, setForm] = useState({
     program_id: '',
-    category: MissionCategory.HOME,
-    title_child: '',
-    title_parent: '',
-    description_parent: '',
+    title: '',
   })
 
   useEffect(() => {
@@ -44,10 +40,7 @@ const MissionFormPage = () => {
         if (mission) {
           setForm({
             program_id: mission.program_id,
-            category: mission.category,
-            title_child: mission.title_child,
-            title_parent: mission.title_parent,
-            description_parent: mission.description_parent || '',
+            title: mission.title,
           })
           setSelectedStages(mission.related_stage_ids || [])
           programService.getStages(mission.program_id).then(setStages)
@@ -80,7 +73,7 @@ const MissionFormPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.program_id || !form.title_child || !form.title_parent) {
+    if (!form.program_id || !form.title) {
       addToast({ type: 'error', message: 'Lengkapi semua field yang wajib' })
       return
     }
@@ -90,20 +83,14 @@ const MissionFormPage = () => {
       if (isEdit && missionId) {
         await missionService.update(missionId, {
           program_id: form.program_id,
-          category: form.category,
-          title_child: form.title_child,
-          title_parent: form.title_parent,
-          description_parent: form.description_parent || undefined,
+          title: form.title,
           related_stage_ids: selectedStages.length > 0 ? selectedStages : undefined,
         })
         addToast({ type: 'success', message: 'Misi berhasil diperbarui' })
       } else {
         await missionService.create({
           program_id: form.program_id,
-          category: form.category,
-          title_child: form.title_child,
-          title_parent: form.title_parent,
-          description_parent: form.description_parent || undefined,
+          title: form.title,
           related_stage_ids: selectedStages.length > 0 ? selectedStages : undefined,
         })
         addToast({ type: 'success', message: 'Misi baru berhasil ditambahkan' })
@@ -146,46 +133,14 @@ const MissionFormPage = () => {
             placeholder="Pilih Program"
           />
 
-          <Select
-            label="Kategori"
-            required
-            options={[
-              { value: MissionCategory.HOME, label: '🏠 HOME' },
-              { value: MissionCategory.PARENT, label: '👨‍👩‍👧 PARENT' },
-              { value: MissionCategory.SCHOOL, label: '🏫 SCHOOL' },
-            ]}
-            value={form.category}
-            onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value as MissionCategory }))}
-          />
-
           <Input
-            label="Judul (Anak)"
+            label="Judul Misi"
+            id="judul"
             required
-            value={form.title_child}
-            onChange={(e) => setForm((prev) => ({ ...prev, title_child: e.target.value }))}
+            value={form.title}
+            onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
             placeholder="Contoh: Gambar sapi kesukaanku"
           />
-
-          <Input
-            label="Judul (Orang Tua)"
-            required
-            value={form.title_parent}
-            onChange={(e) => setForm((prev) => ({ ...prev, title_parent: e.target.value }))}
-            placeholder="Contoh: Minta anak menggambar sapi yang paling berkesan"
-          />
-
-          <div className="w-full">
-            <label className="block text-sm font-medium text-on-surface mb-1">
-              Deskripsi (Orang Tua)
-            </label>
-            <textarea
-              value={form.description_parent}
-              onChange={(e) => setForm((prev) => ({ ...prev, description_parent: e.target.value }))}
-              rows={3}
-              placeholder="Jelaskan aktivitas yang harus dilakukan orang tua..."
-              className="w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
-            />
-          </div>
 
           {stages.length > 0 && (
             <div className="w-full">

@@ -10,9 +10,7 @@ import {
 import type { PublicReport } from '../../../core/types'
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
-import { DEFAULT_FACILITATOR_MESSAGE, DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
-import { participantMissionService } from '../../../core/services/missions'
-import { BadgeList } from '../../../shared/components/data/BadgeList'
+import { DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
 
 /* ── Inner report component ── */
 function ReportView() {
@@ -23,22 +21,10 @@ function ReportView() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
-  const [participantId, setParticipantId] = useState<string>('')
 
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const [iframeHeight, setIframeHeight] = useState(0)
-
-  // Derive the participant id (for badge display) from the report's missions.
-  useEffect(() => {
-    if (!report) return
-    participantMissionService
-      .getByReport(report.id)
-      .then((list) => {
-        if (list.length > 0) setParticipantId(list[0].participant_id)
-      })
-      .catch(() => {})
-  }, [report])
 
   useEffect(() => {
     if (!report) return
@@ -56,18 +42,18 @@ function ReportView() {
       // mission_ids cannot be resolved to titles. Passing them would expose raw
       // UUIDs to parents; the template's empty-state covers this instead.
       return generateMiniRaportHTML({
+        programName: '',
+        topicName: '',
         childName: 'Ananda',
         childAge: 0,
         childSchool: undefined,
-        childGroup: undefined,
+        childGroup: pub.group_name,
         sessionDate: '',
         photoUrl: undefined,
         stages: [],
         narrative,
-        facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
         missions: [],
         badges: [],
-        galleryTitle: 'Galeri Peserta',
         facilitatorName: DEFAULT_FACILITATOR_NAME,
         facilitatorPhotoUrl: undefined,
       })
@@ -180,12 +166,6 @@ function ReportView() {
       {downloadError && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-2 shadow-lg no-print">
           {downloadError}
-        </div>
-      )}
-
-      {participantId && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[min(92vw,420px)] no-print">
-          <BadgeList participantId={participantId} />
         </div>
       )}
 

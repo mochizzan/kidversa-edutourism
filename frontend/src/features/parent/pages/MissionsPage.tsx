@@ -274,13 +274,8 @@ function MissionsView() {
                             : 'text-on-surface'
                         )}
                       >
-                        {bank?.title_child || 'Misi'}
+                        {bank?.title || 'Misi'}
                       </p>
-                      {bank?.description_parent && (
-                        <p className="text-xs text-on-surface-variant mt-1">
-                          {bank.description_parent}
-                        </p>
-                      )}
                       {pm.completed_at && (
                         <p className="text-[11px] text-green-500 mt-1">
                           Selesai{' '}

@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"regexp"
 	"sync"
 
 	"github.com/labstack/echo/v5"
@@ -19,6 +20,9 @@ import (
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
 )
+
+// tokenFormat matches a 64-hex-char parent access token.
+var tokenFormat = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
 
 // ReportHandler serves /api/reports/* (authenticated) and the public token
 // access endpoint. Parent access tokens are anti-IDOR: unguessable 64hex,
@@ -53,6 +57,9 @@ func tenantGuard(c *echo.Context, tenantID string) error {
 func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 	token := (*c).QueryParam("token")
 	if token == "" {
+		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
+	}
+	if !tokenFormat.MatchString(token) {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
 	r, err := h.uc.Repo().GetByToken((*c).Request().Context(), token)

@@ -35,14 +35,11 @@ func (h *MissionBankHandler) Create(c *echo.Context) error {
 	// SUPER_ADMIN), never trusted from the request body (anti-forgery, F5).
 	tenantID := appmiddleware.GetTenantID(c)
 	m := &entity.MissionBank{
-		TenantID:          tenantID,
-		ProgramID:         req.ProgramID,
-		Category:          entity.MissionCategory(req.Category),
-		TitleChild:        req.TitleChild,
-		TitleParent:       req.TitleParent,
-		DescriptionParent: req.DescriptionParent,
-		RelatedStageIDs:   req.RelatedStageIDs,
-		IsActive:          req.IsActive,
+		TenantID:        tenantID,
+		ProgramID:       req.ProgramID,
+		Title:           req.Title,
+		RelatedStageIDs: req.RelatedStageIDs,
+		IsActive:        req.IsActive,
 	}
 	if err := h.repo.Create((*c).Request().Context(), m); err != nil {
 		return err
@@ -70,7 +67,6 @@ func (h *MissionBankHandler) List(c *echo.Context) error {
 	f := repository.MissionBankFilter{
 		TenantID:  appmiddleware.GetTenantID(c),
 		ProgramID: (*c).QueryParam("program_id"),
-		Category:  (*c).QueryParam("category"),
 		TopicID:   (*c).QueryParam("topic_id"),
 	}
 	if v := (*c).QueryParam("is_active"); v == "true" {

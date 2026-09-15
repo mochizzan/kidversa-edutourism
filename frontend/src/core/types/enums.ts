@@ -18,12 +18,6 @@ export enum StageContentFileType {
   GAME_BUNDLE = 'GAME_BUNDLE',
 }
 
-export enum MissionCategory {
-  HOME = 'HOME',
-  PARENT = 'PARENT',
-  SCHOOL = 'SCHOOL',
-}
-
 export enum SessionStatus {
   DRAFT = 'DRAFT',
   ACTIVE = 'ACTIVE',

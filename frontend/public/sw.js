@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kidversa-v1';
+const CACHE_NAME = 'kidversa-v3';
 
 // Precache manifest: all SPA routes → index.html (same file for all routes in Vite SPA)
 const PRECACHE_ROUTES = [

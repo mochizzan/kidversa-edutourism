@@ -32,7 +32,7 @@ export function useConsentMonitor() {
     total: number
   } | null>(null)
 
-  const { progress, connected } = useConsentProgress(activeBatch?.batchId ?? null)
+  const { progress, connected, failed } = useConsentProgress(activeBatch?.batchId ?? null)
   const sseEverConnected = useRef(false)
 
   const loadData = useCallback(async () => {
@@ -99,6 +99,16 @@ export function useConsentMonitor() {
   }, [connected])
 
   useEffect(() => {
+    if (activeBatch && failed) {
+      addToast({
+        type: 'error',
+        message: 'Gagal mengirim permintaan consent. Silakan coba lagi.',
+      })
+      setActiveBatch(null)
+    }
+  }, [failed, activeBatch, addToast])
+
+  useEffect(() => {
     if (activeBatch && sseEverConnected.current && !connected && progress?.type !== 'done') {
       addToast({
         type: 'warning',
@@ -133,8 +143,14 @@ export function useConsentMonitor() {
             : `Mengirim permintaan consent via WhatsApp ke ${res.total} peserta...`,
         })
       } catch (err) {
-        const message =
-          err instanceof ApiError ? err.message : 'Gagal mengirim permintaan consent'
+        let message = 'Gagal mengirim permintaan consent'
+        if (err instanceof ApiError) {
+          if (err.code === 'nothing_to_send') {
+            message = 'Permintaan sudah dikirim sebelumnya. Gunakan "Kirim Ulang" untuk mengirim ulang.'
+          } else {
+            message = err.message
+          }
+        }
         addToast({ type: 'error', message })
       } finally {
         setSending((prev) => ({ ...prev, [sessionId]: false }))

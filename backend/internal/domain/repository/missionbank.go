@@ -10,7 +10,6 @@ import (
 type MissionBankFilter struct {
 	TenantID  string
 	ProgramID string
-	Category  string
 	// TopicID filters missions to those linked via mission_bank_stages to the
 	// given program_stage (Topic). Empty = no Topic scoping.
 	TopicID  string

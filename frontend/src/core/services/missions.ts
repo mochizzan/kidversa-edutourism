@@ -101,10 +101,7 @@ const create = async (data: CreateMissionBankDTO): Promise<MissionBank> => {
   return itemRequest<MissionBank>('POST', API_ROUTES.MISSIONS.BASE, {
     tenant_id: getActiveTenantId() ?? undefined,
     program_id: data.program_id,
-    category: data.category,
-    title_child: data.title_child,
-    title_parent: data.title_parent,
-    description_parent: data.description_parent ?? '',
+    title: data.title,
     is_active: true,
     ...(data.related_stage_ids && data.related_stage_ids.length > 0
       ? { related_stage_ids: data.related_stage_ids }
@@ -116,13 +113,11 @@ const update = async (
   id: string,
   data: Partial<CreateMissionBankDTO>,
 ): Promise<MissionBank> => {
-  const body: Record<string, unknown> = {}
+  const body: Record<string, unknown> = {
+    tenant_id: getActiveTenantId() ?? undefined,
+  }
   if (data.program_id !== undefined) body.program_id = data.program_id
-  if (data.category !== undefined) body.category = data.category
-  if (data.title_child !== undefined) body.title_child = data.title_child
-  if (data.title_parent !== undefined) body.title_parent = data.title_parent
-  if (data.description_parent !== undefined)
-    body.description_parent = data.description_parent
+  if (data.title !== undefined) body.title = data.title
   if (data.related_stage_ids !== undefined) {
     body.related_stage_ids = data.related_stage_ids
   }
