@@ -4,10 +4,6 @@ import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { cn } from '../../../core/utils'
-import {
-  MISSION_CATEGORY_META,
-  MISSION_CATEGORY_ORDER,
-} from '../../../core/constants/missionCategory'
 import type { MissionBank } from '../../../core/types'
 
 const MAX_MISSIONS = 4
@@ -32,6 +28,7 @@ export const ReportMissionSelector = ({
 
   return (
     <Card title="Misi Lanjutan" subtitle="Pilih maksimal 4 misi untuk diberikan kepada orang tua">
+      {/* Action bar */}
       <div className="flex flex-wrap items-center gap-2 no-print mb-4">
         <Button variant="secondary" size="sm" onClick={() => setShowLibrary(true)}>
           <Library className="w-4 h-4 mr-1" /> Pilih dari library misi
@@ -52,70 +49,54 @@ export const ReportMissionSelector = ({
         </span>
       </div>
 
+      {/* Empty states */}
       {missions.length === 0 ? (
         <p className="text-sm text-on-surface-variant py-4">
           Belum ada misi yang tersedia untuk topik ini.
         </p>
+      ) : assignedMissionIds.length === 0 ? (
+        <p className="text-sm text-on-surface-variant py-4">
+          Belum ada misi dipilih — pilih dari library atau gunakan saran AI.
+        </p>
       ) : (
-        <div className="space-y-4">
-          {MISSION_CATEGORY_ORDER.map((cat) => {
-            const catMissions = missions.filter((m) => m.category === cat)
-            if (catMissions.length === 0) return null
-
-            const meta = MISSION_CATEGORY_META[cat]
-            return (
-              <div key={cat}>
-                <p className="text-sm font-medium text-on-surface mb-2 flex items-center gap-2">
-                  <span>{meta.emoji}</span>
-                  {meta.label}
+        <>
+          {/* Selected missions as chips */}
+          <div className="flex flex-wrap gap-2 no-print">
+            {assignedMissionIds.map((id) => {
+              const m = missions.find((x) => x.id === id)
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1 rounded-full bg-primary-container/30 border border-primary-container px-3 py-1 text-sm"
+                >
+                  {m?.title ?? id}
+                  <button
+                    type="button"
+                    aria-label={`Hapus ${m?.title ?? id}`}
+                    onClick={() => onToggleMission(id)}
+                    className="ml-0.5 text-on-surface-variant hover:text-on-surface"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+          {/* Print: bullet list */}
+          <div className="hidden print:block mt-2">
+            {assignedMissionIds.map((id) => {
+              const m = missions.find((x) => x.id === id)
+              return (
+                <p key={id} className="text-sm">
+                  • {m?.title ?? id}
                 </p>
-                <div className="space-y-2">
-                  {catMissions.map((mission) => {
-                    const checked = assignedMissionIds.includes(mission.id)
-                    const disabled = !checked && atCapacity
-                    return (
-                      <label
-                        key={mission.id}
-                        className={cn(
-                          'flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors no-print',
-                          checked
-                            ? 'bg-primary-container/30 border border-primary-container'
-                            : 'bg-surface-variant hover:bg-surface-container border border-transparent',
-                          disabled && 'opacity-50 cursor-not-allowed',
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={() => onToggleMission(mission.id)}
-                          className="mt-0.5 w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary-container"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-on-surface">{mission.title_child}</p>
-                          <p className="text-xs text-on-surface-variant mt-0.5">
-                            {mission.title_parent}
-                          </p>
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-                <div className="hidden print:block mt-2">
-                  {catMissions
-                    .filter((m) => assignedMissionIds.includes(m.id))
-                    .map((mission) => (
-                      <p key={mission.id} className="text-sm">
-                        • {mission.title_child}
-                      </p>
-                    ))}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
+      {/* Modal: single place to pick missions */}
       <Modal
         open={showLibrary}
         onClose={() => setShowLibrary(false)}
@@ -155,12 +136,8 @@ export const ReportMissionSelector = ({
                     className="mt-0.5 w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary-container"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-on-surface">{mission.title_child}</p>
-                    <p className="text-xs text-on-surface-variant mt-0.5">{mission.title_parent}</p>
+                    <p className="text-sm font-medium text-on-surface">{mission.title}</p>
                   </div>
-                  <span className="text-xs text-on-surface-variant shrink-0">
-                    {MISSION_CATEGORY_META[mission.category]?.emoji} {mission.category}
-                  </span>
                 </label>
               )
             })}
@@ -170,4 +147,3 @@ export const ReportMissionSelector = ({
     </Card>
   )
 }
-

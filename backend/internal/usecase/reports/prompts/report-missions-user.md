@@ -1,16 +1,19 @@
 # Task
 Select up to {{.MaxMissions}} follow-up missions (misi lanjutan) for the child below, strictly from the candidate list, based on their assessment in the named Topik.
 
-# Child & Context
-- Child Name: {{.ChildName}}
-- Topik: {{.TopicName}}
-- Session: {{.SessionName}}
+# Anak
+- Nama: {{.ChildName}}
 
-# Candidate Missions (only these may be selected)
+# Topik & Sesi
+- Topik: {{.TopicName}}
+- Sesi: {{.SessionName}}
+
+# Kandidat Misi (hanya dari daftar ini yang boleh dipilih)
 {{.Candidates}}
 
-# Assessment Data (this Topik only)
+# Data Asesmen (Topik ini saja)
+Format: Kegiatan <nama>: <N> bintang — "<komentar>"
 {{.Assessments}}
 
 # Output
-Return a JSON array of up to {{.MaxMissions}} mission id strings selected from the candidates above. Example: ["id-1","id-2"].
+Kembalikan JSON array berisi hingga {{.MaxMissions}} mission id string dari kandidat di atas. Contoh: ["id-1","id-2"].

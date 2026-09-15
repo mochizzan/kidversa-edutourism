@@ -44,6 +44,8 @@ type Usecase struct {
 	sessionRepo            repository.SessionRepository
 	programRepo            repository.ProgramRepository
 	participantMissionRepo repository.ParticipantMissionRepository
+	programSubstageRepo    repository.ProgramSubstageRepository
+	sessionSubstageRepo    repository.SessionSubstageRepository
 }
 
 // NewUsecase builds the reports usecase.
@@ -56,6 +58,8 @@ func NewUsecase(
 	sessionRepo repository.SessionRepository,
 	programRepo repository.ProgramRepository,
 	participantMissionRepo repository.ParticipantMissionRepository,
+	programSubstageRepo repository.ProgramSubstageRepository,
+	sessionSubstageRepo repository.SessionSubstageRepository,
 ) *Usecase {
 	return &Usecase{
 		repo:                   repo,
@@ -66,6 +70,8 @@ func NewUsecase(
 		sessionRepo:            sessionRepo,
 		programRepo:            programRepo,
 		participantMissionRepo: participantMissionRepo,
+		programSubstageRepo:    programSubstageRepo,
+		sessionSubstageRepo:    sessionSubstageRepo,
 	}
 }
 

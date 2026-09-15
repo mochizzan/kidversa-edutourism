@@ -16,7 +16,6 @@ import { isSuperAdmin } from '../../../core/utils/permissions'
 import { formatDate } from '../../../shared/utils'
 import { getMediaUrl } from '../../../core/utils/media'
 import {
-  DEFAULT_FACILITATOR_MESSAGE,
   DEFAULT_FACILITATOR_NAME,
   RAPORT_LAYOUT,
 } from '../../../core/constants/report'
@@ -78,6 +77,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   const [assignedMissionIds, setAssignedMissionIds] = useState<string[]>([])
   const [groups, setGroups] = useState<SessionGroup[]>([])
   const [badges, setBadges] = useState<ParticipantBadge[]>([])
+  const [programName, setProgramName] = useState('')
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -130,7 +130,11 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       }
       setReportsByTopic(byTopic)
 
-      const programStages = await programService.getStages(sess.program_id)
+      const [programData, programStages] = await Promise.all([
+        programService.getById(sess.program_id),
+        programService.getStages(sess.program_id),
+      ])
+      setProgramName(programData?.name ?? '')
       const nameById = new Map(programStages.map((ps) => [ps.id, ps.name]))
       const tabs: TopicTab[] = sessStages
         .map((ss) => ({
@@ -222,6 +226,11 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       /* keep existing program-wide list as fallback */
     }
   }, [])
+
+  // When active topic changes, load that topic's missions for the modal.
+  useEffect(() => {
+    if (activeTopicId) loadTopicMissions(activeTopicId)
+  }, [activeTopicId, loadTopicMissions])
 
   const toggleMission = useCallback((missionId: string) => {
     setAssignedMissionIds((prev) => {
@@ -367,18 +376,18 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     const stagedStages = detailStages.map((si, i) => ({
       name: si.programStage.name,
       sequenceOrder: si.programStage.sequence_order ?? i + 1,
-      kegiatan: si.kegiatan.slice(0, RAPORT_LAYOUT.MAX_KEGIATAN_PER_STAGE).map((k) => ({
+      kegiatan: si.kegiatan.map((k) => ({
         name: k.programSubstageName,
         starRating: k.assessment?.star_rating ?? 0,
       })),
     }))
 
-    const narrative = narrativeText.length > RAPORT_LAYOUT.MAX_NARRATIVE_CHARS ? `${narrativeText.slice(0, RAPORT_LAYOUT.MAX_NARRATIVE_CHARS)}…` : narrativeText
+    const narrative = narrativeText
 
     const selectedMissionIds = assignedMissionIds.slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
     let missionTitles = missions
       .filter((m) => selectedMissionIds.includes(m.id))
-      .map((m) => m.title_child)
+      .map((m) => m.title)
     if (missionTitles.length === 0) {
       const picked = selectMissionsForParticipant({
         participantId: participant.id,
@@ -397,7 +406,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       const pickedIds = picked.slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
       missionTitles = missions
         .filter((m) => pickedIds.includes(m.id))
-        .map((m) => m.title_child)
+        .map((m) => m.title)
     }
 
     const mappedBadges = badges.slice(0, RAPORT_LAYOUT.MAX_BADGES_PREVIEW).map((b) => ({
@@ -405,7 +414,11 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       badgeImageUrl: b.badge_image_url ? getMediaUrl('content', b.badge_image_url) : undefined,
     }))
 
+    const topicName = topics.find((t) => t.programStageId === activeTopicId)?.name ?? ''
+
     return generateMiniRaportHTML({
+      programName,
+      topicName,
       childName: participant.child_name,
       childAge: participant.child_age,
       childSchool: participant.school_name || undefined,
@@ -415,14 +428,12 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       stages: stagedStages,
       extraTopicsCount: extraTopicsCount > 0 ? extraTopicsCount : undefined,
       narrative,
-      facilitatorMessage: DEFAULT_FACILITATOR_MESSAGE,
       missions: missionTitles,
       badges: mappedBadges,
       facilitatorName: user?.name || DEFAULT_FACILITATOR_NAME,
       facilitatorPhotoUrl: user?.avatar_url,
-      galleryTitle: `Galeri ${participant.child_name}`,
     })
-  }, [participant, session, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, user])
+  }, [participant, session, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, user, programName, activeTopicId, topics])
 
   const handleCetak = useCallback(() => {
     const html = buildRaportHtml()

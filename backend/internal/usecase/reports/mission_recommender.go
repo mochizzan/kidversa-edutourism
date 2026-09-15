@@ -73,6 +73,58 @@ func (u *Usecase) SuggestMissions(ctx context.Context, reportID, tenantID string
 	return picked, nil
 }
 
+// resolveKegiatanNames maps session Kegiatan IDs → their human-readable Kegiatan
+// names. Returns an empty (non-nil) map on any repo failure — callers treat
+// empty names as "Kegiatan tanpa nama" instead of erroring.
+func (u *Usecase) resolveKegiatanNames(ctx context.Context, r *entity.Report, sessionID string) map[string]string {
+	out := make(map[string]string)
+	if u.programSubstageRepo == nil || u.sessionSubstageRepo == nil {
+		return out
+	}
+	programSubstages, err := u.programSubstageRepo.ListSubstages(ctx, r.ProgramStageID)
+	if err != nil {
+		return out
+	}
+	nameByProgramSubstageID := make(map[string]string, len(programSubstages))
+	for _, ps := range programSubstages {
+		nameByProgramSubstageID[ps.ID] = ps.Name
+	}
+	sessionSubstages, err := u.sessionSubstageRepo.ListSessionSubstages(ctx, sessionID)
+	if err != nil {
+		return out
+	}
+	for _, sub := range sessionSubstages {
+		if name, ok := nameByProgramSubstageID[sub.ProgramSubstageID]; ok && name != "" {
+			out[sub.ID] = name
+		}
+	}
+	return out
+}
+
+// BuildAssessmentLines renders assessment rows for the LLM prompt.
+// Format: "Kegiatan <nama>: <N> bintang — "<komentar>""
+// Drops uninformative rows (no signal). Stable input order. Missing names
+// become "Kegiatan tanpa nama" (never UUIDs).
+func BuildAssessmentLines(assessments []entity.Assessment, nameBySessionSubstageID map[string]string) []string {
+	const defaultLabel = "Kegiatan tanpa nama"
+	lines := make([]string, 0, len(assessments))
+	for _, a := range assessments {
+		if a.StarRating == 0 && a.Comment == "" {
+			continue
+		}
+		name := defaultLabel
+		if n, ok := nameBySessionSubstageID[a.SessionSubstageID]; ok && n != "" {
+			name = n
+		}
+		line := fmt.Sprintf("Kegiatan %s: %d bintang", name, a.StarRating)
+		if a.Comment != "" {
+			line += fmt.Sprintf(" — %q", a.Comment)
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
 // suggestViaLLM asks the model to return up to MaxReportMissions mission IDs.
 func (u *Usecase) suggestViaLLM(ctx context.Context, r *entity.Report, session *entity.Session, candidates []entity.MissionBank, assessments []entity.Assessment) ([]string, error) {
 	if u.aiClient == nil {
@@ -104,15 +156,13 @@ func (u *Usecase) suggestViaLLM(ctx context.Context, r *entity.Report, session *
 	candLines := make([]string, 0, len(candidates))
 	for _, c := range candidates {
 		candByID[c.ID] = c
-		candLines = append(candLines, fmt.Sprintf("- id: %s | judul: %s | kategori: %s", c.ID, c.TitleChild, c.Category))
+		candLines = append(candLines, fmt.Sprintf("- id: %s | misi: %q (Topik: %q)", c.ID, c.Title, topic.Name))
 	}
-	assessLines := make([]string, 0, len(assessments))
-	for _, a := range assessments {
-		line := fmt.Sprintf("- %d bintang", a.StarRating)
-		if a.Comment != "" {
-			line += fmt.Sprintf(" — %q", a.Comment)
-		}
-		assessLines = append(assessLines, line)
+	kegiatanNames := u.resolveKegiatanNames(ctx, r, session.ID)
+	assessLines := BuildAssessmentLines(assessments, kegiatanNames)
+	assessText := "(tidak ada data asesmen)"
+	if len(assessLines) > 0 {
+		assessText = strings.Join(assessLines, "\n")
 	}
 
 	var sb strings.Builder
@@ -122,7 +172,7 @@ func (u *Usecase) suggestViaLLM(ctx context.Context, r *entity.Report, session *
 		"SessionName": session.Name,
 		"MaxMissions": MaxReportMissions,
 		"Candidates":  strings.Join(candLines, "\n"),
-		"Assessments": strings.Join(assessLines, "\n"),
+		"Assessments": assessText,
 	}); err != nil {
 		return nil, fmt.Errorf("execute user prompt: %w", err)
 	}
@@ -184,47 +234,46 @@ func filterAndTrim(ids []string, candByID map[string]entity.MissionBank) []strin
 }
 
 // suggestHeuristic is the deterministic fallback when the LLM is unavailable.
-// It scores each candidate by low-rating signals: when assessments show low
-// ratings (<=2), missions in PARENT/SCHOOL categories (home/school
-// reinforcement) are prioritized. Returns up to MaxReportMissions IDs, stable
-// by score then title.
+// Returns up to MaxReportMissions IDs. Base order = curation order (input
+// candidates already sorted by sort_order ASC, created_at DESC from the repo).
+// Secondary scoring (+1) for missions whose title contains a weak Kegiatan
+// name (case-insensitive substring of assessment comments with bintang ≤ 2).
+// Returns always min(MaxReportMissions, len(candidates)).
 func (u *Usecase) suggestHeuristic(candidates []entity.MissionBank, assessments []entity.Assessment) []string {
+	// Collect weak assessment comments (bintang ≤ 2, non-empty) for secondary scoring.
+	var weakComments []string
+	for _, a := range assessments {
+		if a.StarRating >= 1 && a.StarRating <= 2 && a.Comment != "" {
+			weakComments = append(weakComments, a.Comment)
+		}
+	}
+
 	type scored struct {
 		id    string
 		score int
-		title string
-	}
-	lowRated := 0
-	for _, a := range assessments {
-		if a.StarRating <= 2 {
-			lowRated++
-		}
 	}
 	items := make([]scored, 0, len(candidates))
 	for _, c := range candidates {
-		s := 0
-		if lowRated > 0 {
-			switch c.Category {
-			case "PARENT", "SCHOOL":
-				s += 2
-			case "HOME":
-				s += 1
+		score := 0
+		titleLower := strings.ToLower(c.Title)
+		for _, wc := range weakComments {
+			if strings.Contains(titleLower, strings.ToLower(wc)) {
+				score++
 			}
 		}
-		items = append(items, scored{id: c.ID, score: s, title: c.TitleChild})
+		items = append(items, scored{id: c.ID, score: score})
 	}
+	// Stable sort by score DESC only — preserves input (curation) order as tie-break.
 	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].score != items[j].score {
-			return items[i].score > items[j].score
-		}
-		return items[i].title < items[j].title
+		return items[i].score > items[j].score
 	})
-	out := make([]string, 0, MaxReportMissions)
-	for _, it := range items {
-		out = append(out, it.id)
-		if len(out) >= MaxReportMissions {
-			break
-		}
+	limit := MaxReportMissions
+	if len(items) < limit {
+		limit = len(items)
+	}
+	out := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		out = append(out, items[i].id)
 	}
 	return out
 }
