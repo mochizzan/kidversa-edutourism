@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Camera, AlertTriangle, ChevronLeft, Lock } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, Lock, X } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { getMediaUrl } from '../../../core/utils/media'
@@ -39,7 +39,8 @@ const SmartPhotoPage = () => {
   const captureCanvasRef = useRef<HTMLCanvasElement>(null)
   const editorCanvasRef = useRef<HTMLCanvasElement>(null)
 
-  const [phase, setPhase] = useState<'camera' | 'editor' | 'gallery'>('camera')
+  const [phase, setPhase] = useState<'camera' | 'editor'>('camera')
+  const [galleryOpen, setGalleryOpen] = useState(false)
   const [pageError, setPageError] = useState<string | null>(null)
   const [cameraPickerOpen, setCameraPickerOpen] = useState(false)
   const [showGrid, setShowGrid] = useState(false)
@@ -239,7 +240,7 @@ const SmartPhotoPage = () => {
       setCapturedPhotoDataUrl(null)
       setSelectedFrameId(null)
       setIsReportPhoto(false)
-      setPhase('gallery')
+      setGalleryOpen(true)
       await loadPhotos()
     } catch (err: unknown) {
       const e = err as Error & { code?: string }
@@ -257,17 +258,14 @@ const SmartPhotoPage = () => {
   }, [childId, participant, user, selectedFrameId, isReportPhoto, uploadPhoto, loadPhotos, addToast])
 
   const handleBack = useCallback(() => {
-    if (phase === 'editor') {
+    if (galleryOpen) {
+      setGalleryOpen(false)
+    } else if (phase === 'editor') {
       handleRetake()
     } else {
       navigate(-1)
     }
-  }, [phase, navigate, handleRetake])
-
-  const handleBackToCamera = useCallback(() => {
-    restartCamera()
-    setPhase('camera')
-  }, [restartCamera])
+  }, [phase, galleryOpen, navigate, handleRetake])
 
   const currentCameraLabel = (() => {
     if (window.innerWidth <= 1024) {
@@ -368,7 +366,7 @@ const SmartPhotoPage = () => {
               maxPhotos={MAX_PHOTOS}
               isMaxPhotos={isMaxPhotos}
               onTakePhoto={takePhoto}
-              onOpenGallery={() => setPhase('gallery')}
+              onOpenGallery={() => setGalleryOpen(true)}
               onOpenFramePicker={() => setFramePickerOpen(true)}
               disabled={!isMine}
             />
@@ -386,12 +384,46 @@ const SmartPhotoPage = () => {
             </div>
           )}
 
-          {phase === 'gallery' && (
-            <PhotoGallery photos={photos} participant={participant} onPhotoClick={setFullscreenPhoto} />
-          )}
-
           <canvas ref={captureCanvasRef} className="hidden" />
         </div>
+
+        {/* Gallery Modal Overlay */}
+        {galleryOpen && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-black/95">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <h3 className="text-white font-bold text-sm">
+                Galeri Foto — {participant.child_name}
+              </h3>
+              <button
+                onClick={() => setGalleryOpen(false)}
+                className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                aria-label="Tutup galeri"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <PhotoGallery
+                photos={photos}
+                participant={participant}
+                onPhotoClick={setFullscreenPhoto}
+              />
+            </div>
+            <div className="px-4 py-3 border-t border-white/10 text-center">
+              <p className="text-xs text-white/50">
+                {photos.length}/{MAX_PHOTOS} foto
+              </p>
+              {photos.length === 0 && (
+                <Button
+                  onClick={() => setGalleryOpen(false)}
+                  className="mt-3"
+                >
+                  Kembali ke Kamera
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         {phase === 'editor' && (
           <PhotoEditor
@@ -406,18 +438,6 @@ const SmartPhotoPage = () => {
             onSave={handleSave}
             onDiscard={handleDiscard}
           />
-        )}
-
-        {phase === 'gallery' && (
-          <div className="flex justify-center md:justify-start">
-            <Button
-              icon={<Camera className="w-4 h-4" />}
-              onClick={handleBackToCamera}
-              className="w-full max-w-xs md:w-auto"
-            >
-              Ambil Baru
-            </Button>
-          </div>
         )}
 
         <Modal
