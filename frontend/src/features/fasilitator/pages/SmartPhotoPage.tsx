@@ -145,7 +145,9 @@ const SmartPhotoPage = () => {
             )
             if (!cancelled) ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height)
           } catch {
-            // ignore
+            if (!cancelled) {
+              addToast({ type: 'warning', message: 'Gagal memuat frame. Foto ditampilkan tanpa frame.' })
+            }
           }
         }
       }
