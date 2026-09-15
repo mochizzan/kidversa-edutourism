@@ -1,4 +1,4 @@
-import { Clock, MapPin, CheckCircle, CalendarDays } from 'lucide-react'
+import { Clock, MapPin, CheckCircle, CalendarDays, BookOpen } from 'lucide-react'
 import { cn } from '../../../core/utils'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { formatDate } from '../../../shared/utils'
@@ -49,19 +49,29 @@ export function SessionCard({ session, onClick, forceClickable = false, classNam
       )}
     >
       <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <h3 className={cn(
-            'font-semibold text-base leading-snug truncate',
-            isMySession ? 'text-primary group-hover:text-primary-dark' : 'text-on-surface',
-          )}>
-            {session.name}
-          </h3>
-          {isMySession && (
-            <Badge variant="accent" size="sm" className="shrink-0">
-              <CheckCircle className="w-3 h-3 mr-1" />
-              Tugas Saya
-            </Badge>
+        <div className="min-w-0">
+          {session.program_name && (
+            <div className="flex items-center gap-1.5 mb-1">
+              <BookOpen className="w-3.5 h-3.5 text-on-surface-variant/60 shrink-0" />
+              <span className="text-xs text-on-surface-variant/70 truncate">
+                {session.program_name}
+              </span>
+            </div>
           )}
+          <div className="flex items-center gap-2">
+            <h3 className={cn(
+              'font-semibold text-base leading-snug truncate',
+              isMySession ? 'text-primary group-hover:text-primary-dark' : 'text-on-surface',
+            )}>
+              {session.name}
+            </h3>
+            {isMySession && (
+              <Badge variant="accent" size="sm" className="shrink-0">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Tugas Saya
+              </Badge>
+            )}
+          </div>
         </div>
         <Badge variant={statusVariant[session.status] ?? 'neutral'}>
           {statusLabel[session.status] ?? session.status}

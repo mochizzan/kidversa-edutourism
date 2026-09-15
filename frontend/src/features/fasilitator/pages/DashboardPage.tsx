@@ -1,37 +1,23 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Calendar } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
-import { liveService } from '../../../core/services/live'
-import { programService } from '../../../core/services/programs'
-import { SessionStatus } from '../../../core/types/enums'
-import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { SessionCard } from '../components/SessionCard'
-import { GroupCard } from '../components/GroupCard'
 import { cn } from '../../../core/utils'
-import type { Session, SessionStage, ProgramStage } from '../../../core/types'
-import type { LiveGroupWithProgress, GroupStageProgressRow } from '../../../core/services/live'
+import type { Session } from '../../../core/types'
 import { friendlyError } from '../../../core/utils/errorMessages'
 
-type FilterKey = 'all' | 'today' | 'upcoming' | 'completed' | 'cancelled'
+type FilterKey = 'all' | 'today' | 'completed' | 'cancelled'
 
 const filterLabels: Record<FilterKey, string> = {
   all: 'Semua',
   today: 'Hari Ini',
-  upcoming: 'Mendatang',
   completed: 'Selesai',
   cancelled: 'Dibatalkan',
-}
-
-function deriveGroupStatus(progress: GroupStageProgressRow[]): 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' {
-  if (progress.length === 0) return 'WAITING'
-  if (progress.some((p) => p.status === 'IN_PROGRESS' || p.status === 'UNLOCKED')) return 'IN_PROGRESS'
-  if (progress.every((p) => p.status === 'COMPLETED' || p.status === 'SKIPPED')) return 'COMPLETED'
-  return 'WAITING'
 }
 
 const roleLabel: Record<string, string> = {
@@ -41,117 +27,82 @@ const roleLabel: Record<string, string> = {
   FASILITATOR: 'Fasilitator',
 }
 
-function SkeletonCard() {
-  return (
-    <div className="bg-surface rounded-2xl p-5 shadow-sm border border-outline-variant/50 animate-pulse">
-      <div className="flex items-start justify-between mb-3">
-        <div className="h-5 bg-surface-container-high rounded w-3/5" />
-        <div className="h-5 bg-surface-container-high rounded w-16" />
-      </div>
-      <div className="flex gap-4">
-        <div className="h-4 bg-surface-container-high rounded w-24" />
-        <div className="h-4 bg-surface-container-high rounded w-32" />
-      </div>
-    </div>
-  )
-}
-
 const DashboardPage = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
 
+  const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [todaySessions, setTodaySessions] = useState<Session[]>([])
-  const [allSessions, setAllSessions] = useState<Session[]>([])
-  const [groups, setGroups] = useState<LiveGroupWithProgress[]>([])
-  const [sessionStages, setSessionStages] = useState<SessionStage[]>([])
-  const [stageMap, setStageMap] = useState<Record<string, string>>({})
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('today')
+  const [switching, setSwitching] = useState(false)
 
-  const fetchData = useCallback(async () => {
+  const fetchSessions = useCallback(async (filter: FilterKey, isInitial = false) => {
+    if (!user?.id) return
+    if (isInitial) setLoading(true)
+    setError(null)
+    const today = new Date().toISOString().split('T')[0]
+    const filters: Record<string, string | boolean | undefined> = { facilitator_id: user.id }
+    if (filter === 'today') filters.session_date = today
+    else if (filter === 'completed') filters.status = 'COMPLETED'
+    else if (filter === 'cancelled') filters.status = 'CANCELLED'
     try {
-      setLoading(true)
-      setError(null)
-
-      const today = new Date().toISOString().split('T')[0]
-
-      // Fetch today's active sessions (existing behavior)
-      const todayRes = await sessionService.getAll({ limit: 100 })
-      const todayActive = todayRes.data.filter(
-        (s) => s.status === SessionStatus.ACTIVE && s.session_date === today,
-      )
-      setTodaySessions(todayActive)
-
-      if (todayActive.length > 0) {
-        const activeSession = todayActive[0]
-        const detail = await sessionService.getById(activeSession.id)
-        if (detail) {
-          setSessionStages(detail.stages)
-
-          const groupsWithProgress = await liveService.getGroupsWithProgress(activeSession.id)
-          setGroups(groupsWithProgress)
-
-          const programStages = await programService.getStages(detail.program_id)
-          const map: Record<string, string> = {}
-          programStages.forEach((ps: ProgramStage) => {
-            map[ps.id] = ps.name
-          })
-          setStageMap(map)
-        }
-      }
-
-      // Fetch all sessions assigned to this facilitator
-      const allRes = await sessionService.getAll({
-        limit: 100,
-        filters: { facilitator_id: user?.id },
-      })
-      setAllSessions(allRes.data)
+      const res = await sessionService.getAll({ limit: 100, filters })
+      setSessions(res.data)
+      setActiveFilter(filter)
     } catch (err) {
       setError(friendlyError(err))
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }, [user?.id])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  const filteredSessions = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0]
-    switch (activeFilter) {
-      case 'today':
-        return allSessions.filter((s) => s.session_date === today)
-      case 'upcoming':
-        return allSessions.filter((s) => s.session_date >= today && s.status !== SessionStatus.COMPLETED && s.status !== SessionStatus.CANCELLED)
-      case 'completed':
-        return allSessions.filter((s) => s.status === SessionStatus.COMPLETED)
-      case 'cancelled':
-        return allSessions.filter((s) => s.status === SessionStatus.CANCELLED)
-      default:
-        return allSessions
+    if (!user?.id) return
+    let cancelled = false
+    const init = async () => {
+      // Try today first
+      const today = new Date().toISOString().split('T')[0]
+      const todayRes = await sessionService.getAll({
+        limit: 100,
+        filters: { facilitator_id: user.id, session_date: today },
+      })
+      if (cancelled) return
+      if (todayRes.data.length > 0) {
+        setSessions(todayRes.data)
+        setActiveFilter('today')
+      } else {
+        const allRes = await sessionService.getAll({
+          limit: 100,
+          filters: { facilitator_id: user.id },
+        })
+        if (cancelled) return
+        setSessions(allRes.data)
+        setActiveFilter('all')
+      }
     }
-  }, [allSessions, activeFilter])
+    setLoading(true)
+    init().catch((err) => { if (!cancelled) setError(friendlyError(err)) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [user?.id])
 
-  const getStageName = (sessionStageId: string): string | undefined => {
-    const ss = sessionStages.find((s) => s.id === sessionStageId)
-    if (!ss) return undefined
-    return stageMap[ss.program_stage_id]
-  }
+  const handleFilterChange = useCallback(async (filter: FilterKey) => {
+    if (filter === activeFilter) return
+    setSwitching(true)
+    await fetchSessions(filter)
+    setSwitching(false)
+  }, [activeFilter, fetchSessions])
 
   // ── Loading skeleton ──
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between mb-2">
-          <div className="h-8 bg-surface-container-high rounded w-48 animate-pulse" />
-          <div className="h-6 bg-surface-container-high rounded w-24 animate-pulse" />
-        </div>
-        <div className="h-5 bg-surface-container-high rounded w-32 mb-4 animate-pulse" />
-        <div className="grid gap-4">
-          <SkeletonCard />
-          <SkeletonCard />
+        <div className="h-8 bg-surface-container-high rounded w-48 animate-pulse" />
+        <div className="h-5 bg-surface-container-high rounded w-32 animate-pulse" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="h-32 bg-surface-container-high rounded-2xl animate-pulse" />
+          <div className="h-32 bg-surface-container-high rounded-2xl animate-pulse" />
         </div>
       </div>
     )
@@ -161,8 +112,12 @@ const DashboardPage = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Dashboard Fasilitator" />
-        <ErrorState message={error} onRetry={fetchData} />
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-on-surface">
+            Hai, {user?.name ?? 'Fasilitator'}!
+          </h1>
+        </div>
+        <ErrorState message={error} onRetry={() => fetchSessions(activeFilter)} />
       </div>
     )
   }
@@ -183,58 +138,6 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* Sesi Hari Ini */}
-      <section>
-        <h2 className="text-lg font-semibold text-on-surface mb-4">Sesi Hari Ini</h2>
-
-        {todaySessions.length === 0 ? (
-          <EmptyState
-            icon={<Calendar className="w-12 h-12" />}
-            title="Tidak ada sesi hari ini"
-            description="Belum ada sesi aktif untuk hari ini. Silakan periksa jadwal Anda."
-          />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {todaySessions.map((session) => (
-              <SessionCard
-                key={session.id}
-                session={session}
-                onClick={() => {
-                  if (session.is_my_session) {
-                    navigate(`/fasilitator/groups?sessionId=${session.id}`)
-                  }
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Kelompok (from today's active session) */}
-      {todaySessions.length > 0 && groups.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold text-on-surface mb-4">Kelompok</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {groups.map((item) => (
-              <GroupCard
-                key={item.group.id}
-                name={item.group.name}
-                childCount={item.participants.length}
-                currentStage={
-                  item.group.current_session_stage_id
-                    ? getStageName(item.group.current_session_stage_id)
-                    : undefined
-                }
-                status={deriveGroupStatus(item.progress)}
-                facilitatorId={item.group.facilitator_id}
-                currentUserId={user?.id}
-                onClick={() => navigate(`/fasilitator/groups/${item.group.id}`)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Semua Sesi */}
       <section>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -243,12 +146,14 @@ const DashboardPage = () => {
             {(Object.keys(filterLabels) as FilterKey[]).map((key) => (
               <button
                 key={key}
-                onClick={() => setActiveFilter(key)}
+                onClick={() => handleFilterChange(key)}
+                disabled={switching}
                 className={cn(
                   'px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors',
                   activeFilter === key
                     ? 'bg-primary text-on-primary'
                     : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-high/80',
+                  switching && 'opacity-60 cursor-wait',
                 )}
               >
                 {filterLabels[key]}
@@ -257,7 +162,7 @@ const DashboardPage = () => {
           </div>
         </div>
 
-        {filteredSessions.length === 0 ? (
+        {sessions.length === 0 ? (
           <EmptyState
             icon={<Calendar className="w-12 h-12" />}
             title="Belum ada sesi"
@@ -269,7 +174,7 @@ const DashboardPage = () => {
           />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {filteredSessions.map((session) => (
+            {sessions.map((session) => (
               <SessionCard
                 key={session.id}
                 session={session}

@@ -78,6 +78,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   const [groups, setGroups] = useState<SessionGroup[]>([])
   const [badges, setBadges] = useState<ParticipantBadge[]>([])
   const [programName, setProgramName] = useState('')
+  const [groupCompleted, setGroupCompleted] = useState(true) // default true (fail-open)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -159,6 +160,8 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       }
       setParticipant(part)
       setGroups(sessGroups ?? [])
+      const participantGroup = sessGroups?.find((g) => g.id === part?.group_id)
+      setGroupCompleted(!participantGroup || participantGroup.status === 'COMPLETED')
 
       try {
         setBadges(await badgeService.listByParticipant(part.id))
@@ -295,8 +298,13 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       await loadData()
       addToast({ type: 'success', message: 'Laporan berhasil disetujui' })
       return true
-    } catch {
-      setError('Gagal menyetujui laporan.')
+    } catch (err: unknown) {
+      const apiErr = err as { code?: string }
+      if (apiErr?.code === 'group_not_completed') {
+        addToast({ type: 'error', message: 'Kelompok belum diselesaikan oleh fasilitator' })
+      } else {
+        setError('Gagal menyetujui laporan.')
+      }
       return false
     } finally {
       setActionLoading(null)
@@ -541,5 +549,6 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     handleDownloadPdf,
     handleDownloadPng,
     hasNoAssessment,
+    groupCompleted,
   }
 }

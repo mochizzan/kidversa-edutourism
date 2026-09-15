@@ -25,6 +25,7 @@ import { ReportStatusBanner } from '../components/ReportStatusBanner'
 import { ReportAssessmentScores } from '../components/ReportAssessmentScores'
 import { ReportMissionSelector } from '../components/ReportMissionSelector'
 import { BadgeList } from '../../../shared/components/data/BadgeList'
+import { Tooltip } from '../../../shared/components/ui/Tooltip'
 
 const ReportReviewPage = () => {
   const { sessionId, participantId } = useParams<{ sessionId: string; participantId: string }>()
@@ -59,6 +60,7 @@ const ReportReviewPage = () => {
     hasNoAssessment,
     streaming,
     handleGenerateNarrative,
+    groupCompleted,
   } = useReportReview(sessionId, participantId)
 
   const [showApproveConfirm, setShowApproveConfirm] = useState(false)
@@ -371,21 +373,23 @@ const ReportReviewPage = () => {
             )}
           </Button>
           {canApprove && (
-            <Button
-              size="sm"
-              onClick={() => setShowApproveConfirm(true)}
-              disabled={actionLoading === 'approve'}
-            >
-              {actionLoading === 'approve' ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-1" /> Setujui
-                </>
-              )}
-            </Button>
+            <Tooltip content={!groupCompleted ? 'Kelompok belum diselesaikan oleh fasilitator' : ''}>
+              <Button
+                size="sm"
+                onClick={() => setShowApproveConfirm(true)}
+                disabled={actionLoading === 'approve' || !groupCompleted}
+              >
+                {actionLoading === 'approve' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-1" /> Setujui
+                  </>
+                )}
+              </Button>
+            </Tooltip>
           )}
           {canSend && (
             <Button
@@ -417,7 +421,7 @@ const ReportReviewPage = () => {
             <Button variant="secondary" onClick={() => setShowApproveConfirm(false)}>
               Batal
             </Button>
-            <Button onClick={onApprove} disabled={actionLoading === 'approve'}>
+            <Button onClick={onApprove} disabled={actionLoading === 'approve' || !groupCompleted}>
               {actionLoading === 'approve' ? 'Memproses...' : 'Setujui'}
             </Button>
           </div>

@@ -84,6 +84,12 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 	if err != nil {
 		return nil, err
 	}
+	// Group completion gate: reject approval if the participant's group is not COMPLETED.
+	if participant, perr := u.sessionRepo.GetParticipantByID(ctx, r.ParticipantID, tenantID); perr == nil && participant.GroupID != nil && *participant.GroupID != "" {
+		if group, gerr := u.sessionRepo.GetSessionGroupByID(ctx, *participant.GroupID, tenantID); gerr == nil && group.Status != entity.GroupCompleted {
+			return nil, apperrors.BadRequest("group_not_completed", nil)
+		}
+	}
 	r.Status = entity.ReportApproved
 	// Empty approver (e.g. when the client doesn't supply one) must be stored as
 	// NULL, never as an empty string — fk_reports_approved_by references

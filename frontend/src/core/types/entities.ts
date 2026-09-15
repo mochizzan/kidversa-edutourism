@@ -149,6 +149,7 @@ export interface Session {
   id: string
   tenant_id: string
   program_id: string
+  program_name?: string  // populated by backend JOIN with programs
   name: string
   session_date: string
   start_time?: string

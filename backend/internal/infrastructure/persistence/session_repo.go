@@ -58,26 +58,29 @@ func (r *GormSessionRepository) GetSessionByID(ctx context.Context, id, tenantID
 }
 
 func (r *GormSessionRepository) ListSessions(ctx context.Context, f repository.SessionFilter, page, limit int) (*repository.Paginated[entity.Session], error) {
-	q := r.db.WithContext(ctx).Model(&SessionModel{})
+	q := r.db.WithContext(ctx).
+		Model(&SessionModel{}).
+		Select("sessions.*, programs.name AS program_name").
+		Joins("LEFT JOIN programs ON programs.id = sessions.program_id")
 	if f.TenantID != "" {
-		q = q.Where("tenant_id = ?", f.TenantID)
+		q = q.Where("sessions.tenant_id = ?", f.TenantID)
 	}
 	if f.Status != "" {
-		q = q.Where("status = ?", f.Status)
+		q = q.Where("sessions.status = ?", f.Status)
 	}
 	if f.SessionDate != "" {
-		q = q.Where("session_date = ?", f.SessionDate)
+		q = q.Where("sessions.session_date = ?", f.SessionDate)
 	}
 	if f.Search != "" {
 		like := "%" + strings.ToLower(f.Search) + "%"
-		q = q.Where("LOWER(name) LIKE ? OR LOWER(location) LIKE ?", like, like)
+		q = q.Where("LOWER(sessions.name) LIKE ? OR LOWER(sessions.location) LIKE ?", like, like)
 	}
 	// When FacilitatorID is set, restrict to sessions where the facilitator
 	// owns at least one session_group (group.facilitator_id is the single
 	// source of truth under Opsi A; stage.facilitator_id is no longer assigned).
 	if f.FacilitatorID != "" {
 		q = q.Where(
-			"id IN (SELECT session_id FROM session_groups WHERE facilitator_id = ?)",
+			"sessions.id IN (SELECT session_id FROM session_groups WHERE facilitator_id = ?)",
 			f.FacilitatorID,
 		)
 	}
@@ -226,6 +229,18 @@ func (r *GormSessionRepository) CreateGroupStageProgress(ctx context.Context, p 
 func (r *GormSessionRepository) ListGroupStageProgress(ctx context.Context, sessionSubstageID string) ([]entity.GroupStageProgress, error) {
 	var models []GroupStageProgressModel
 	if err := r.db.WithContext(ctx).Where("session_substage_id = ?", sessionSubstageID).Order("created_at ASC").Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.GroupStageProgress, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return items, nil
+}
+
+func (r *GormSessionRepository) ListGroupStageProgressByGroup(ctx context.Context, groupID string) ([]entity.GroupStageProgress, error) {
+	var models []GroupStageProgressModel
+	if err := r.db.WithContext(ctx).Where("group_id = ?", groupID).Order("created_at ASC").Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.GroupStageProgress, 0, len(models))

@@ -224,6 +224,41 @@ func (u *Usecase) CompleteSessionSubstage(ctx context.Context, sessionSubstageID
 	return nil
 }
 
+// CheckAndCompleteGroup validates that all group_stage_progress rows for the
+// group are COMPLETED or SKIPPED, and if so updates session_groups.status to
+// COMPLETED. Idempotent: already COMPLETED groups are no-ops. Returns nil when
+// progress is incomplete (caller decides policy).
+func (u *Usecase) CheckAndCompleteGroup(ctx context.Context, sessionID, groupID, tenantID string) error {
+	if groupID == "" {
+		return nil
+	}
+	group, err := u.sessionRepo.GetSessionGroupByID(ctx, groupID, tenantID)
+	if err != nil {
+		return err
+	}
+	// Already completed — idempotent no-op.
+	if group.Status == entity.GroupCompleted {
+		return nil
+	}
+	progress, err := u.sessionRepo.ListGroupStageProgressByGroup(ctx, groupID)
+	if err != nil {
+		return err
+	}
+	// No progress rows yet — nothing to complete.
+	if len(progress) == 0 {
+		return nil
+	}
+	// Check every row is COMPLETED or SKIPPED.
+	for _, p := range progress {
+		if p.Status != entity.ProgressCompleted && p.Status != entity.ProgressSkipped {
+			return nil // not all done — no-op
+		}
+	}
+	// All done — update group status.
+	group.Status = entity.GroupCompleted
+	return u.sessionRepo.UpdateSessionGroup(ctx, group)
+}
+
 // isBadgeConflict reports whether err is an app conflict (duplicate-key) error.
 func isBadgeConflict(err error) bool {
 	if err == nil {

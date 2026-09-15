@@ -1236,6 +1236,9 @@
   .cursor-pointer {
     cursor: pointer;
   }
+  .cursor-wait {
+    cursor: wait;
+  }
   .resize-none {
     resize: none;
   }

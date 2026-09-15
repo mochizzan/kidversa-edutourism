@@ -101,6 +101,7 @@ type SessionRepository interface {
 	// Group stage progress.
 	CreateGroupStageProgress(ctx context.Context, p *entity.GroupStageProgress) error
 	ListGroupStageProgress(ctx context.Context, sessionSubstageID string) ([]entity.GroupStageProgress, error)
+	ListGroupStageProgressByGroup(ctx context.Context, groupID string) ([]entity.GroupStageProgress, error)
 
 	// Participants.
 	CreateParticipant(ctx context.Context, p *entity.Participant) error

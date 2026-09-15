@@ -93,7 +93,7 @@ func main() {
 	registry.Session = handler.NewSessionHandler(sessionUC)
 	registry.SessionLifecycle = handler.NewSessionLifecycleHandler(sessionUC)
 	registry.SessionStage = handler.NewSessionStageHandler(sessionUC)
-	registry.SessionGroup = handler.NewSessionGroupHandler(sessionUC)
+	registry.SessionGroup = handler.NewSessionGroupHandler(sessionUC, badgeUC)
 	registry.SessionParticipant = handler.NewSessionParticipantHandler(sessionUC)
 	registry.SessionParticipantBulk = handler.NewSessionParticipantBulkHandler(sessionUC)
 	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, contentRepo, sessionSubstageRepo, liveRepo)

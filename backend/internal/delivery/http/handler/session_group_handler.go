@@ -8,16 +8,18 @@ import (
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/usecase"
+	badgeuc "kidversa-edutourism-backend/internal/usecase/badge"
 )
 
 // SessionGroupHandler serves /api/sessions/:id/groups/*.
 type SessionGroupHandler struct {
-	uc *usecase.SessionUsecase
+	uc      *usecase.SessionUsecase
+	badgeUC *badgeuc.Usecase
 }
 
 // NewSessionGroupHandler builds the session-group sub-handler.
-func NewSessionGroupHandler(uc *usecase.SessionUsecase) *SessionGroupHandler {
-	return &SessionGroupHandler{uc: uc}
+func NewSessionGroupHandler(uc *usecase.SessionUsecase, badgeUC *badgeuc.Usecase) *SessionGroupHandler {
+	return &SessionGroupHandler{uc: uc, badgeUC: badgeUC}
 }
 
 // ListGroups handles GET /api/sessions/:id/groups.
@@ -60,7 +62,20 @@ func (h *SessionGroupHandler) UpdateGroup(c *echo.Context) error {
 	if err := (*c).Bind(&req); err != nil {
 		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
 	}
-	g, err := h.uc.UpdateGroup((*c).Request().Context(), groupID, req.Name, req.Status, appmiddleware.GetTenantID(c), req.FacilitatorID)
+	tenantID := appmiddleware.GetTenantID(c)
+
+	// When setting status to COMPLETED, validate all progress rows first.
+	if req.Status == "COMPLETED" {
+		sessionID, ok := bindUUID(c, "id")
+		if !ok {
+			return nil
+		}
+		if err := h.badgeUC.CheckAndCompleteGroup((*c).Request().Context(), sessionID, groupID, tenantID); err != nil {
+			return err
+		}
+	}
+
+	g, err := h.uc.UpdateGroup((*c).Request().Context(), groupID, req.Name, req.Status, tenantID, req.FacilitatorID)
 	if err != nil {
 		return err
 	}
