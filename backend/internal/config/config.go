@@ -31,6 +31,7 @@ type Config struct {
 	JWTRefreshTTL   time.Duration
 	BcryptCost      int
 	ReportTokenTTL  time.Duration
+	GalleryTokenTTL time.Duration
 	ConsentTokenTTL time.Duration
 	CookieSecure    bool
 	CookieSameSite  string
@@ -110,6 +111,7 @@ func Load() *Config {
 		JWTRefreshTTL:   getEnvDuration("JWT_REFRESH_TTL", 168*time.Hour),
 		BcryptCost:      getEnvInt("BCRYPT_COST", 12),
 		ReportTokenTTL:  getEnvDuration("REPORT_TOKEN_TTL_HOURS", 168*time.Hour),
+		GalleryTokenTTL: getEnvDuration("GALLERY_TOKEN_TTL_HOURS", 168*time.Hour),
 		ConsentTokenTTL: getEnvDuration("CONSENT_TOKEN_TTL_HOURS", 24*time.Hour),
 		CookieSecure:    getEnvBool("COOKIE_SECURE", false),
 		CookieSameSite:  getEnv("COOKIE_SAMESITE", "Lax"),

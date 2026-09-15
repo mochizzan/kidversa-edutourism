@@ -57,6 +57,7 @@ func main() {
 	assessmentRepo := persistence.NewAssessmentRepository(db.DB)
 	photoRepo := persistence.NewPhotoRepository(db.DB)
 	reportRepo := persistence.NewReportRepository(db.DB)
+	galleryRepo := persistence.NewGalleryTokenRepository(db.DB)
 	missionBankRepo := persistence.NewMissionBankRepository(db.DB)
 	participantMissionRepo := persistence.NewParticipantMissionRepository(db.DB, reportRepo)
 	consentRepo := persistence.NewConsentRepository(db.DB, cfg.ConsentTokenTTL)
@@ -81,7 +82,7 @@ func main() {
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, badgeUC)
-	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo)
+	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg)
 
 	// Handlers.
 	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite, sessionRepo)
@@ -111,6 +112,7 @@ func main() {
 	registry.Frame = handler.NewFrameHandler(frameRepo)
 	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, frameRepo, contentRepo, userRepo, consentRepo)
 	registry.Media = handler.NewMediaHandler(cfg, photoRepo, consentRepo, sessionRepo, frameRepo, contentRepo, userRepo)
+	registry.Gallery = handler.NewGalleryHandler(galleryRepo, reportRepo, photoRepo, sessionRepo, consentRepo, cfg)
 
 	deps := httppkg.Deps{
 		Config:   cfg,

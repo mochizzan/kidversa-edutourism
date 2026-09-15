@@ -204,6 +204,28 @@ func (r *GormReportRepository) GetByID(ctx context.Context, id, tenantID string)
 	return e, nil
 }
 
+// GetByIDPublic fetches a report by ID without tenant scoping.
+// Used by the gallery handler where the gallery token is the sole access control.
+func (r *GormReportRepository) GetByIDPublic(ctx context.Context, id string) (*entity.Report, error) {
+	var m ReportModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	e := m.ToEntity()
+	reports := []entity.Report{*e}
+	if err := r.loadMissionIDs(ctx, reports); err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	if err := r.loadGroupNames(ctx, reports); err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	*e = reports[0]
+	return e, nil
+}
+
 // GetByToken resolves a report only if the parent token is valid: present,
 // not revoked, and not expired. Anti-IDOR: the token is unguessable (64hex).
 func (r *GormReportRepository) GetByToken(ctx context.Context, token string) (*entity.Report, error) {

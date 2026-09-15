@@ -32,21 +32,24 @@ type SmartPhoto struct {
 // Report is the generated narrative report for one participant in one session.
 type Report struct {
 	BaseModel
-	ParticipantID        string       `json:"participant_id"`
-	SessionID            string       `json:"session_id"`
-	ProgramStageID       string       `json:"program_stage_id,omitempty"`
-	AINarrativeDraft     string       `json:"ai_narrative_draft,omitempty"`
-	AINarrativeFinal     string       `json:"ai_narrative_final,omitempty"`
-	ReportPDFURL         string       `json:"report_pdf_url,omitempty"`
-	ParentAccessToken    string       `json:"-"`
-	ParentTokenExpiresAt *time.Time   `json:"-"`
-	ParentTokenRevoked   bool         `json:"-"`
-	Status               ReportStatus `json:"status"`
-	GeneratedAt          *time.Time   `json:"generated_at,omitempty"`
-	SentAt               *time.Time   `json:"sent_at,omitempty"`
-	ApprovedBy           *string      `json:"approved_by,omitempty"`
-	MissionIDs           []string     `json:"mission_ids,omitempty" gorm:"-"`
-	GroupName            string       `json:"group_name,omitempty" gorm:"-"`
+	ParticipantID         string       `json:"participant_id"`
+	SessionID             string       `json:"session_id"`
+	ProgramStageID        string       `json:"program_stage_id,omitempty"`
+	AINarrativeDraft      string       `json:"ai_narrative_draft,omitempty"`
+	AINarrativeFinal      string       `json:"ai_narrative_final,omitempty"`
+	ReportPDFURL          string       `json:"report_pdf_url,omitempty"`
+	ParentAccessToken     string       `json:"-"`
+	ParentTokenExpiresAt  *time.Time   `json:"-"`
+	ParentTokenRevoked    bool         `json:"-"`
+	Status                ReportStatus `json:"status"`
+	GeneratedAt           *time.Time   `json:"generated_at,omitempty"`
+	SentAt                *time.Time   `json:"sent_at,omitempty"`
+	ApprovedBy            *string      `json:"approved_by,omitempty"`
+	GalleryAccessToken    string       `json:"gallery_access_token,omitempty"`
+	GalleryTokenExpiresAt *time.Time   `json:"gallery_token_expires_at,omitempty"`
+	GalleryTokenRevoked   bool         `json:"gallery_token_revoked,omitempty"`
+	MissionIDs            []string     `json:"mission_ids,omitempty" gorm:"-"`
+	GroupName             string       `json:"group_name,omitempty" gorm:"-"`
 }
 
 // ParticipantMission links a report to a completed mission from the mission bank.

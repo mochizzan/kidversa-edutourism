@@ -9,6 +9,7 @@ const ParentReportAccessPage = lazy(() => import('../../features/parent/pages/Re
 const ParentConsentFormPage = lazy(() => import('../../features/parent/pages/ConsentFormPage'))
 const ParentReportPage = lazy(() => import('../../features/parent/pages/ReportPage'))
 const ParentMissionsPage = lazy(() => import('../../features/parent/pages/MissionsPage'))
+const ParentGalleryPage = lazy(() => import('../../features/parent/pages/GalleryPage'))
 
 export const parentRoutes: RouteObject[] = [
   // Public parent report view via access token (P1).
@@ -17,6 +18,15 @@ export const parentRoutes: RouteObject[] = [
     element: (
       <SuspenseWrapper>
         <ParentReportAccessPage />
+      </SuspenseWrapper>
+    ),
+  },
+  // Public gallery view via gallery token (QR code on printed rapor).
+  {
+    path: '/gallery',
+    element: (
+      <SuspenseWrapper>
+        <ParentGalleryPage />
       </SuspenseWrapper>
     ),
   },

@@ -26,6 +26,9 @@ type ReportRepository interface {
 	// programStageID may be "" for legacy whole-session reports.
 	GetOrCreateDraft(ctx context.Context, participantID, sessionID, programStageID string) (*entity.Report, error)
 	GetByID(ctx context.Context, id, tenantID string) (*entity.Report, error)
+	// GetByIDPublic fetches a report by ID without tenant scoping.
+	// Used by the gallery handler where the gallery token is the sole access control.
+	GetByIDPublic(ctx context.Context, id string) (*entity.Report, error)
 	// GetByToken resolves a report by a valid, unrevoked, unexpired parent token.
 	GetByToken(ctx context.Context, token string) (*entity.Report, error)
 	List(ctx context.Context, f ReportFilter, page, limit int) (*Paginated[entity.Report], error)

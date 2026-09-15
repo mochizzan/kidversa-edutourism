@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/ai"
@@ -34,7 +35,7 @@ type MissionLLMClient interface {
 const MaxReportMissions = 4
 
 // Usecase implements report business logic: anti-IDOR parent tokens + narrative
-// + AI mission recommendation.
+// + AI mission recommendation + gallery token generation.
 type Usecase struct {
 	repo                   repository.ReportRepository
 	gen                    NarrativeGenerator
@@ -46,6 +47,8 @@ type Usecase struct {
 	participantMissionRepo repository.ParticipantMissionRepository
 	programSubstageRepo    repository.ProgramSubstageRepository
 	sessionSubstageRepo    repository.SessionSubstageRepository
+	galleryRepo            repository.GalleryTokenRepository
+	cfg                    *config.Config
 }
 
 // NewUsecase builds the reports usecase.
@@ -60,6 +63,8 @@ func NewUsecase(
 	participantMissionRepo repository.ParticipantMissionRepository,
 	programSubstageRepo repository.ProgramSubstageRepository,
 	sessionSubstageRepo repository.SessionSubstageRepository,
+	galleryRepo repository.GalleryTokenRepository,
+	cfg *config.Config,
 ) *Usecase {
 	return &Usecase{
 		repo:                   repo,
@@ -72,6 +77,8 @@ func NewUsecase(
 		participantMissionRepo: participantMissionRepo,
 		programSubstageRepo:    programSubstageRepo,
 		sessionSubstageRepo:    sessionSubstageRepo,
+		galleryRepo:            galleryRepo,
+		cfg:                    cfg,
 	}
 }
 
@@ -114,6 +121,22 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 	r.GeneratedAt = &now
 	if err := u.repo.Update(ctx, r); err != nil {
 		return nil, err
+	}
+	// Generate gallery token for QR code (best-effort — don't fail approval).
+	tok, gerr := util.RandomToken()
+	if gerr == nil {
+		gt := &entity.GalleryToken{
+			ReportID:      r.ID,
+			ParticipantID: r.ParticipantID,
+			SessionID:     r.SessionID,
+			TenantID:      tenantID,
+			Token:         tok,
+			ExpiresAt:     time.Now().UTC().Add(u.cfg.GalleryTokenTTL),
+		}
+		_ = u.galleryRepo.Create(ctx, gt)
+		r.GalleryAccessToken = tok
+		r.GalleryTokenExpiresAt = &gt.ExpiresAt
+		_ = u.repo.Update(ctx, r)
 	}
 	// Persist the approved mission selections into participant_missions (the
 	// single source of truth; r.MissionIDs is read-derived from that join).

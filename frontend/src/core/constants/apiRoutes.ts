@@ -7,221 +7,224 @@
  */
 
 export const API_ROUTES = {
-  HEALTH: '/health',
+ HEALTH: '/health',
 
-  AUTH: {
-    LOGIN: '/api/auth/login',
-    REGISTER: '/api/auth/register',
-    REFRESH: '/api/auth/refresh',
-    KIOSK: '/api/auth/kiosk',
-    ME: '/api/auth/me',
-    LOGOUT: '/api/auth/logout',
-    CHANGE_PASSWORD: '/api/auth/change-password',
-  },
+ AUTH: {
+  LOGIN: '/api/auth/login',
+  REGISTER: '/api/auth/register',
+  REFRESH: '/api/auth/refresh',
+  KIOSK: '/api/auth/kiosk',
+  ME: '/api/auth/me',
+  LOGOUT: '/api/auth/logout',
+  CHANGE_PASSWORD: '/api/auth/change-password',
+ },
 
-  CONSENT: {
-    LIST: '/api/consent',
-    BY_SESSION: (sessionId: string) =>
-      `/api/consent?session_id=${encodeURIComponent(sessionId)}`,
-    BY_PARTICIPANT: (participantId: string) =>
-      `/api/consent?participant_id=${encodeURIComponent(participantId)}`,
-    SEND_WHATSAPP: '/api/consent/send-whatsapp',
-    SEND_WHATSAPP_STREAM: (batchId: string) =>
-      `/api/consent/send-whatsapp/stream?batch_id=${encodeURIComponent(batchId)}`,
-    RESPOND_COMBINED: '/api/consent/respond-combined',
-    INFO: (token: string) => `/api/consent/info?token=${encodeURIComponent(token)}`,
-    SUMMARY: '/api/consent/summary',
-  },
+ CONSENT: {
+  LIST: '/api/consent',
+  BY_SESSION: (sessionId: string) =>
+   `/api/consent?session_id=${encodeURIComponent(sessionId)}`,
+  BY_PARTICIPANT: (participantId: string) =>
+   `/api/consent?participant_id=${encodeURIComponent(participantId)}`,
+  SEND_WHATSAPP: '/api/consent/send-whatsapp',
+  SEND_WHATSAPP_STREAM: (batchId: string) =>
+   `/api/consent/send-whatsapp/stream?batch_id=${encodeURIComponent(batchId)}`,
+  RESPOND_COMBINED: '/api/consent/respond-combined',
+  INFO: (token: string) => `/api/consent/info?token=${encodeURIComponent(token)}`,
+  SUMMARY: '/api/consent/summary',
+ },
 
-  SESSIONS: {
-    BASE: '/api/sessions',
-    DETAIL: (id: string) => `/api/sessions/${encodeURIComponent(id)}`,
-    START: (id: string) => `/api/sessions/${encodeURIComponent(id)}/start`,
-    COMPLETE: (id: string) => `/api/sessions/${encodeURIComponent(id)}/complete`,
-    CANCEL: (id: string) => `/api/sessions/${encodeURIComponent(id)}/cancel`,
-    STAGES: (sessionId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/stages`,
-    GROUPS: (sessionId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/groups`,
-    GROUP_DETAIL: (sessionId: string, groupId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/groups/${encodeURIComponent(groupId)}`,
-    PARTICIPANTS: (sessionId: string, groupId?: string) => {
-      const base = `/api/sessions/${encodeURIComponent(sessionId)}/participants`
-      return groupId ? `${base}?group_id=${encodeURIComponent(groupId)}` : base
-    },
-    PARTICIPANT_DETAIL: (sessionId: string, participantId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}`,
-    LINK_PARTICIPANT: (sessionId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/participants/link`,
-    IMPORT_PARTICIPANTS: (sessionId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/participants/import`,
-    LINKABLE_PARTICIPANTS: (sessionId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/participants/linkable`,
-    KIOSK_ACCESS: (sessionId: string) =>
-      `/api/sessions/${encodeURIComponent(sessionId)}/kiosk`,
+ SESSIONS: {
+  BASE: '/api/sessions',
+  DETAIL: (id: string) => `/api/sessions/${encodeURIComponent(id)}`,
+  START: (id: string) => `/api/sessions/${encodeURIComponent(id)}/start`,
+  COMPLETE: (id: string) => `/api/sessions/${encodeURIComponent(id)}/complete`,
+  CANCEL: (id: string) => `/api/sessions/${encodeURIComponent(id)}/cancel`,
+  STAGES: (sessionId: string) =>
+   `/api/sessions/${encodeURIComponent(sessionId)}/stages`,
+  GROUPS: (sessionId: string) =>
+   `/api/sessions/${encodeURIComponent(sessionId)}/groups`,
+  GROUP_DETAIL: (sessionId: string, groupId: string) =>
+   `/api/sessions/${encodeURIComponent(sessionId)}/groups/${encodeURIComponent(groupId)}`,
+  PARTICIPANTS: (sessionId: string, groupId?: string) => {
+   const base = `/api/sessions/${encodeURIComponent(sessionId)}/participants`
+   return groupId ? `${base}?group_id=${encodeURIComponent(groupId)}` : base
   },
+  PARTICIPANT_DETAIL: (sessionId: string, participantId: string) =>
+   `/api/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(participantId)}`,
+  LINK_PARTICIPANT: (sessionId: string) =>
+   `/api/sessions/${encodeURIComponent(sessionId)}/participants/link`,
+  IMPORT_PARTICIPANTS: (sessionId: string) =>
+   `/api/sessions/${encodeURIComponent(sessionId)}/participants/import`,
+  LINKABLE_PARTICIPANTS: (sessionId: string) =>
+   `/api/sessions/${encodeURIComponent(sessionId)}/participants/linkable`,
+  KIOSK_ACCESS: (sessionId: string) =>
+   `/api/sessions/${encodeURIComponent(sessionId)}/kiosk`,
+ },
 
-  PARTICIPANTS: {
-    BASE: '/api/participants',
-    DETAIL: (id: string) => `/api/participants/${encodeURIComponent(id)}`,
-  },
+ PARTICIPANTS: {
+  BASE: '/api/participants',
+  DETAIL: (id: string) => `/api/participants/${encodeURIComponent(id)}`,
+ },
 
-  PROGRAMS: {
-    BASE: '/api/programs',
-    DETAIL: (id: string) => `/api/programs/${encodeURIComponent(id)}`,
-    STAGES: (programId: string) =>
-      `/api/programs/${encodeURIComponent(programId)}/stages`,
-    STAGE_DETAIL: (programId: string, stageId: string) =>
-      `/api/programs/${encodeURIComponent(programId)}/stages/${encodeURIComponent(stageId)}`,
-    REORDER_STAGES: (programId: string) =>
-      `/api/programs/${encodeURIComponent(programId)}/stages/reorder`,
-    TOGGLE_ACTIVE: (id: string) =>
-      `/api/programs/${encodeURIComponent(id)}/toggle-active`,
-    CONTENTS: (substageId: string) =>
-      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents`,
-    CONTENT_DETAIL: (substageId: string, contentId: string) =>
-      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/${encodeURIComponent(contentId)}`,
-    REORDER_CONTENTS: (substageId: string) =>
-      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/reorder`,
-  },
+ PROGRAMS: {
+  BASE: '/api/programs',
+  DETAIL: (id: string) => `/api/programs/${encodeURIComponent(id)}`,
+  STAGES: (programId: string) =>
+   `/api/programs/${encodeURIComponent(programId)}/stages`,
+  STAGE_DETAIL: (programId: string, stageId: string) =>
+   `/api/programs/${encodeURIComponent(programId)}/stages/${encodeURIComponent(stageId)}`,
+  REORDER_STAGES: (programId: string) =>
+   `/api/programs/${encodeURIComponent(programId)}/stages/reorder`,
+  TOGGLE_ACTIVE: (id: string) =>
+   `/api/programs/${encodeURIComponent(id)}/toggle-active`,
+  CONTENTS: (substageId: string) =>
+   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents`,
+  CONTENT_DETAIL: (substageId: string, contentId: string) =>
+   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/${encodeURIComponent(contentId)}`,
+  REORDER_CONTENTS: (substageId: string) =>
+   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/reorder`,
+ },
 
-  USERS: {
-    BASE: '/api/users',
-    DETAIL: (id: string) => `/api/users/${encodeURIComponent(id)}`,
-    APPROVE: (id: string) => `/api/users/${encodeURIComponent(id)}/approve`,
-    REJECT: (id: string) => `/api/users/${encodeURIComponent(id)}/reject`,
-    DEACTIVATE: (id: string) => `/api/users/${encodeURIComponent(id)}/deactivate`,
-    AVATAR: (id: string) => `/api/users/${encodeURIComponent(id)}/avatar`,
-  },
+ USERS: {
+  BASE: '/api/users',
+  DETAIL: (id: string) => `/api/users/${encodeURIComponent(id)}`,
+  APPROVE: (id: string) => `/api/users/${encodeURIComponent(id)}/approve`,
+  REJECT: (id: string) => `/api/users/${encodeURIComponent(id)}/reject`,
+  DEACTIVATE: (id: string) => `/api/users/${encodeURIComponent(id)}/deactivate`,
+  AVATAR: (id: string) => `/api/users/${encodeURIComponent(id)}/avatar`,
+ },
 
-  TENANTS: {
-    BASE: '/api/tenants',
-    STATS: '/api/tenants/stats',
-    DETAIL: (id: string) => `/api/tenants/${encodeURIComponent(id)}`,
-  },
+ TENANTS: {
+  BASE: '/api/tenants',
+  STATS: '/api/tenants/stats',
+  DETAIL: (id: string) => `/api/tenants/${encodeURIComponent(id)}`,
+ },
 
-  // Public tenant list — anonymous, used by the self-service register form to
-  // populate the tenant selector. Exposes only id/name/slug.
-  PUBLIC: {
-    TENANTS: '/api/public/tenants',
-  },
+ // Public tenant list — anonymous, used by the self-service register form to
+ // populate the tenant selector. Exposes only id/name/slug.
+ PUBLIC: {
+  TENANTS: '/api/public/tenants',
+ },
 
-  PHOTOS: {
-    BASE: '/api/photos',
-    DETAIL: (id: string) => `/api/photos/${encodeURIComponent(id)}`,
-    SET_REPORT: (id: string) => `/api/photos/${encodeURIComponent(id)}/set-report-photo`,
-    UPLOAD: '/api/photos/upload',
-  },
+ PHOTOS: {
+  BASE: '/api/photos',
+  DETAIL: (id: string) => `/api/photos/${encodeURIComponent(id)}`,
+  SET_REPORT: (id: string) => `/api/photos/${encodeURIComponent(id)}/set-report-photo`,
+  UPLOAD: '/api/photos/upload',
+ },
 
-  FRAMES: {
-    BASE: '/api/frames',
-    DETAIL: (id: string) => `/api/frames/${encodeURIComponent(id)}`,
-    DEACTIVATE: (id: string) => `/api/frames/${encodeURIComponent(id)}/deactivate`,
-    UPLOAD: '/api/frames/upload',
-  },
+ FRAMES: {
+  BASE: '/api/frames',
+  DETAIL: (id: string) => `/api/frames/${encodeURIComponent(id)}`,
+  DEACTIVATE: (id: string) => `/api/frames/${encodeURIComponent(id)}/deactivate`,
+  UPLOAD: '/api/frames/upload',
+ },
 
-  REPORTS: {
-    BASE: '/api/reports',
-    DETAIL: (id: string) => `/api/reports/${encodeURIComponent(id)}`,
-    BY_SESSION: (sessionId: string) =>
-      `/api/reports?session_id=${encodeURIComponent(sessionId)}`,
-    GENERATE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate`,
-    GENERATE_STREAM: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
-    GENERATE_STREAM_SSE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
-    GENERATE_SESSION: '/api/reports/generate',
-    SUGGEST_MISSIONS: (id: string) =>
-      `/api/reports/${encodeURIComponent(id)}/suggest-missions`,
-    SAVE_MISSIONS: (id: string) =>
-      `/api/reports/${encodeURIComponent(id)}/missions`,
-    APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
-    SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
-    REVOKE_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-token`,
-    ACCESS: '/api/reports/access',
-  },
+ REPORTS: {
+  BASE: '/api/reports',
+  DETAIL: (id: string) => `/api/reports/${encodeURIComponent(id)}`,
+  BY_SESSION: (sessionId: string) =>
+   `/api/reports?session_id=${encodeURIComponent(sessionId)}`,
+  GENERATE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate`,
+  GENERATE_STREAM: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
+  GENERATE_STREAM_SSE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
+  GENERATE_SESSION: '/api/reports/generate',
+  SUGGEST_MISSIONS: (id: string) =>
+   `/api/reports/${encodeURIComponent(id)}/suggest-missions`,
+  SAVE_MISSIONS: (id: string) =>
+   `/api/reports/${encodeURIComponent(id)}/missions`,
+  APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
+  SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
+  REVOKE_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-token`,
+  ACCESS: '/api/reports/access',
+  GALLERY: '/api/reports/gallery',
+  GENERATE_GALLERY_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/gallery-token`,
+  REVOKE_GALLERY_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-gallery-token`,
+ },
 
-  MISSIONS: {
-    BASE: '/api/mission-banks',
-    DETAIL: (id: string) => `/api/mission-banks/${encodeURIComponent(id)}`,
-    TOGGLE_ACTIVE: (id: string) => `/api/mission-banks/${encodeURIComponent(id)}/toggle-active`,
-  },
+ MISSIONS: {
+  BASE: '/api/mission-banks',
+  DETAIL: (id: string) => `/api/mission-banks/${encodeURIComponent(id)}`,
+  TOGGLE_ACTIVE: (id: string) => `/api/mission-banks/${encodeURIComponent(id)}/toggle-active`,
+ },
 
-  PARTICIPANT_MISSIONS: {
-    BASE: '/api/participant-missions',
-    DETAIL: (id: string) => `/api/participant-missions/${encodeURIComponent(id)}`,
-    TOGGLE: (id: string) => `/api/participant-missions/${encodeURIComponent(id)}/toggle`,
-    BY_REPORT: (reportId: string) =>
-      `/api/participant-missions?report_id=${encodeURIComponent(reportId)}`,
-    BY_PARTICIPANT: (participantId: string) =>
-      `/api/participant-missions?participant_id=${encodeURIComponent(participantId)}`,
-  },
+ PARTICIPANT_MISSIONS: {
+  BASE: '/api/participant-missions',
+  DETAIL: (id: string) => `/api/participant-missions/${encodeURIComponent(id)}`,
+  TOGGLE: (id: string) => `/api/participant-missions/${encodeURIComponent(id)}/toggle`,
+  BY_REPORT: (reportId: string) =>
+   `/api/participant-missions?report_id=${encodeURIComponent(reportId)}`,
+  BY_PARTICIPANT: (participantId: string) =>
+   `/api/participant-missions?participant_id=${encodeURIComponent(participantId)}`,
+ },
 
-  ASSESSMENTS: {
-    BASE: '/api/assessments',
-    BY_PARTICIPANT: (participantId: string) =>
-      `/api/assessments?participant_id=${encodeURIComponent(participantId)}`,
-    BY_SESSION: (sessionId: string) =>
-      `/api/assessments?session_id=${encodeURIComponent(sessionId)}`,
-  },
+ ASSESSMENTS: {
+  BASE: '/api/assessments',
+  BY_PARTICIPANT: (participantId: string) =>
+   `/api/assessments?participant_id=${encodeURIComponent(participantId)}`,
+  BY_SESSION: (sessionId: string) =>
+   `/api/assessments?session_id=${encodeURIComponent(sessionId)}`,
+ },
 
-  // Kegiatan (ProgramSubstage) CRUD + reorder, scoped to a SubTopik.
-  PROGRAM_SUBSTAGES: {
-    BASE: '/api/program-substages',
-    BY_STAGE: (programStageId: string) =>
-      `/api/program-substages?program_stage_id=${encodeURIComponent(programStageId)}`,
-    DETAIL: (id: string) => `/api/program-substages/${encodeURIComponent(id)}`,
-    REORDER: '/api/program-substages/reorder',
-  },
+ // Kegiatan (ProgramSubstage) CRUD + reorder, scoped to a SubTopik.
+ PROGRAM_SUBSTAGES: {
+  BASE: '/api/program-substages',
+  BY_STAGE: (programStageId: string) =>
+   `/api/program-substages?program_stage_id=${encodeURIComponent(programStageId)}`,
+  DETAIL: (id: string) => `/api/program-substages/${encodeURIComponent(id)}`,
+  REORDER: '/api/program-substages/reorder',
+ },
 
-  // Participant badges (read-only; SUBTOPIK + FINAL awards).
-  BADGES: {
-    BASE: '/api/badges',
-    BY_PARTICIPANT: (participantId: string) =>
-      `/api/badges?participant_id=${encodeURIComponent(participantId)}`,
-  },
+ // Participant badges (read-only; SUBTOPIK + FINAL awards).
+ BADGES: {
+  BASE: '/api/badges',
+  BY_PARTICIPANT: (participantId: string) =>
+   `/api/badges?participant_id=${encodeURIComponent(participantId)}`,
+ },
 
-  // Session-substage reads (used by Live Monitor, fasilitator, and admin) plus
-  // the "Lanjut SubTopik" complete override for a Kegiatan leaf.
-  SESSION_SUBSTAGES: {
-    BY_SESSION: (sessionId: string) =>
-      `/api/session-substages?session_id=${encodeURIComponent(sessionId)}`,
-    COMPLETE: (id: string) => `/api/session-substages/${encodeURIComponent(id)}/complete`,
-  },
+ // Session-substage reads (used by Live Monitor, fasilitator, and admin) plus
+ // the "Lanjut SubTopik" complete override for a Kegiatan leaf.
+ SESSION_SUBSTAGES: {
+  BY_SESSION: (sessionId: string) =>
+   `/api/session-substages?session_id=${encodeURIComponent(sessionId)}`,
+  COMPLETE: (id: string) => `/api/session-substages/${encodeURIComponent(id)}/complete`,
+ },
 
-  NOTIFICATIONS: {
-    BASE: '/api/notifications',
-    STREAM: '/api/notifications/stream',
-    READ_ALL: '/api/notifications/read-all',
-    READ: (id: string) => `/api/notifications/${encodeURIComponent(id)}/read`,
-  },
+ NOTIFICATIONS: {
+  BASE: '/api/notifications',
+  STREAM: '/api/notifications/stream',
+  READ_ALL: '/api/notifications/read-all',
+  READ: (id: string) => `/api/notifications/${encodeURIComponent(id)}/read`,
+ },
 
-  LIVE: {
-    STREAM: (sessionId: string) => `/api/live/${encodeURIComponent(sessionId)}/stream`,
-    GROUPS: (sessionId: string) => `/api/live/${encodeURIComponent(sessionId)}/groups`,
-    TIMELINE: (sessionId: string) => `/api/live/${encodeURIComponent(sessionId)}/timeline`,
-    UNLOCK_STAGE: (groupId: string, stageId: string) =>
-      `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/unlock`,
-    LOCK_STAGE: (groupId: string) =>
-      `/api/live/groups/${encodeURIComponent(groupId)}/lock`,
-    COMPLETE_STAGE: (groupId: string, stageId: string) =>
-      `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/complete`,
-    EVENTS: '/api/live/events',
-  },
+ LIVE: {
+  STREAM: (sessionId: string) => `/api/live/${encodeURIComponent(sessionId)}/stream`,
+  GROUPS: (sessionId: string) => `/api/live/${encodeURIComponent(sessionId)}/groups`,
+  TIMELINE: (sessionId: string) => `/api/live/${encodeURIComponent(sessionId)}/timeline`,
+  UNLOCK_STAGE: (groupId: string, stageId: string) =>
+   `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/unlock`,
+  LOCK_STAGE: (groupId: string) =>
+   `/api/live/groups/${encodeURIComponent(groupId)}/lock`,
+  COMPLETE_STAGE: (groupId: string, stageId: string) =>
+   `/api/live/groups/${encodeURIComponent(groupId)}/stages/${encodeURIComponent(stageId)}/complete`,
+  EVENTS: '/api/live/events',
+ },
 
-  MEDIA: {
-    BASE: '/api/media',
-  },
+ MEDIA: {
+  BASE: '/api/media',
+ },
 
-  CONTENTS: {
-    BASE: '/api/contents',
-    DETAIL: (id: string) => `/api/contents/${encodeURIComponent(id)}`,
-    UPLOAD: '/api/contents/upload',
-    REPLACE_FILE: (id: string) => `/api/contents/${encodeURIComponent(id)}/replace-file`,
-    USAGE: (id: string) => `/api/contents/${encodeURIComponent(id)}/usage`,
-    ASSIGN: (substageId: string) =>
-      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/assign`,
-    UNASSIGN: (substageId: string, contentId: string) =>
-      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/${encodeURIComponent(contentId)}`,
-    REORDER_CONTENTS: (substageId: string) =>
-      `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/reorder`,
-  },
+ CONTENTS: {
+  BASE: '/api/contents',
+  DETAIL: (id: string) => `/api/contents/${encodeURIComponent(id)}`,
+  UPLOAD: '/api/contents/upload',
+  REPLACE_FILE: (id: string) => `/api/contents/${encodeURIComponent(id)}/replace-file`,
+  USAGE: (id: string) => `/api/contents/${encodeURIComponent(id)}/usage`,
+  ASSIGN: (substageId: string) =>
+   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/assign`,
+  UNASSIGN: (substageId: string, contentId: string) =>
+   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/${encodeURIComponent(contentId)}`,
+  REORDER_CONTENTS: (substageId: string) =>
+   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/reorder`,
+ },
 } as const

@@ -1,153 +1,153 @@
 import MINI_RAPORT_TAILWIND_CSS from './miniRaport.styles.css?inline'
 
 export interface MiniRaportData {
-  programName: string
-  topicName: string
-  childName: string
-  childAge: number
-  childSchool?: string
-  childGroup?: string
-  sessionDate: string
-  photoUrl?: string
-  stages: {
-    name: string
-    sequenceOrder: number
-    kegiatan: { name: string; starRating: number }[]
-  }[]
-  extraTopicsCount?: number
-  narrative: string
-  missions: string[]
-  badges: { badgeName: string; badgeImageUrl?: string }[]
-  facilitatorName: string
-  facilitatorPhotoUrl?: string
-  galleryUrl?: string
-  partnerLogoUrl?: string
-  kidversaLogoUrl?: string
+ programName: string
+ topicName: string
+ childName: string
+ childAge: number
+ childSchool?: string
+ childGroup?: string
+ sessionDate: string
+ photoUrl?: string
+ stages: {
+  name: string
+  sequenceOrder: number
+  kegiatan: { name: string; starRating: number }[]
+ }[]
+ extraTopicsCount?: number
+ narrative: string
+ missions: string[]
+ badges: { badgeName: string; badgeImageUrl?: string }[]
+ facilitatorName: string
+ facilitatorPhotoUrl?: string
+ galleryUrl?: string
+ partnerLogoUrl?: string
+ kidversaLogoUrl?: string
 }
 
 function sanitize(str: string): string {
-  return str.replace(/[\/\\:*?"<>|]/g, '_').trim()
+ return str.replace(/[\/\\:*?"<>|]/g, '_').trim()
 }
 
 /** HTML-escape untuk setiap nilai dinamis yang disisipkan ke markup atau atribut.
  *  Nama Topik/Kegiatan/badge/sekolah/kelompok berasal dari input staff, sehingga
  *  markup mentah di sana akan tereksekusi di preview & capture. */
 function esc(v: unknown): string {
-  return String(v ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+ return String(v ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
 }
 
 function dashIfEmpty(v?: string): string {
-  return v && v.trim() ? esc(v) : '—'
+ return v && v.trim() ? esc(v) : '—'
 }
 
 function starsHTML(rating: number): string {
-  return Array.from({ length: 5 }, (_, i) =>
-    i < rating
-      ? '<i class="fas fa-star text-brand-star"></i>'
-      : '<i class="fas fa-star text-gray-200"></i>'
-  ).join('')
+ return Array.from({ length: 5 }, (_, i) =>
+  i < rating
+   ? '<i class="fas fa-star text-brand-star"></i>'
+   : '<i class="fas fa-star text-gray-200"></i>'
+ ).join('')
 }
 
 function stageRowHTML(
-  stage: MiniRaportData['stages'][0],
-  _index: number,
-  isLast: boolean
+ stage: MiniRaportData['stages'][0],
+ _index: number,
+ isLast: boolean
 ): string {
-  const border = isLast ? '' : 'border-b border-dashed border-gray-200 pb-3'
-  const kegiatan = stage.kegiatan && stage.kegiatan.length
-    ? stage.kegiatan
-        .map(
-          (k) => `
+ const border = isLast ? '' : 'border-b border-dashed border-gray-200 pb-3'
+ const kegiatan = stage.kegiatan && stage.kegiatan.length
+  ? stage.kegiatan
+   .map(
+    (k) => `
           <div class="flex items-center justify-between gap-2">
             <span class="text-[12px] font-semibold text-gray-700 truncate">${esc(k.name)}</span>
             <span class="flex gap-0.5 text-brand-star text-sm shrink-0">${starsHTML(k.starRating)}</span>
           </div>`
-        )
-        .join('')
-    : '<p class="text-[11px] text-gray-400 italic">Belum ada kegiatan tercatat.</p>'
-  return `
+   )
+   .join('')
+  : '<p class="text-[11px] text-gray-400 italic">Belum ada kegiatan tercatat.</p>'
+ return `
     <div class="${border}">
       <div class="flex flex-col gap-1.5">${kegiatan}</div>
     </div>`
 }
 
 function missionsHTML(missions: string[]): string {
-  if (missions.length === 0)
-    return '<p class="text-[12px] text-gray-500 italic">Belum ada misi yang dipilih.</p>'
-  return missions
-    .slice(0, 4)
-    .map(
-      (m) => `
+ if (missions.length === 0)
+  return '<p class="text-[12px] text-gray-500 italic">Belum ada misi yang dipilih.</p>'
+ return missions
+  .slice(0, 4)
+  .map(
+   (m) => `
       <div class="flex items-start gap-2 min-w-0">
         <i class="fas fa-square-check text-brand-green text-base shrink-0 mt-0.5"></i>
         <p class="text-[12px] font-bold text-gray-700 leading-snug line-clamp-2">${esc(m)}</p>
       </div>`
-    )
-    .join('')
+  )
+  .join('')
 }
 
 function badgeHTML(badges: { badgeName: string; badgeImageUrl?: string }[]): string {
-  if (!badges || badges.length === 0)
-    return '<p class="text-[12px] text-gray-500 italic">Belum ada badge yang diraih.</p>'
-  const items = badges
-    .slice(0, 4)
-    .map((b) => {
-      const inner = b.badgeImageUrl
-        ? `<img src="${esc(b.badgeImageUrl)}" alt="${esc(b.badgeName)}" class="w-8 h-8 object-contain rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" />
+ if (!badges || badges.length === 0)
+  return '<p class="text-[12px] text-gray-500 italic">Belum ada badge yang diraih.</p>'
+ const items = badges
+  .slice(0, 4)
+  .map((b) => {
+   const inner = b.badgeImageUrl
+    ? `<img src="${esc(b.badgeImageUrl)}" alt="${esc(b.badgeName)}" class="w-8 h-8 object-contain rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" />
            <i class="fas fa-award text-brand-badge text-xl hidden"></i>`
-        : '<i class="fas fa-award text-brand-badge text-xl"></i>'
-      return `
+    : '<i class="fas fa-award text-brand-badge text-xl"></i>'
+   return `
         <div class="flex items-center gap-2 min-w-0">
           <div class="w-8 h-8 flex items-center justify-center shrink-0">${inner}</div>
           <span class="text-[11px] font-semibold text-gray-700 truncate">${esc(b.badgeName)}</span>
         </div>`
-    })
-    .join('')
-  return `<div class="flex flex-wrap gap-3">${items}</div>`
+  })
+  .join('')
+ return `<div class="flex flex-wrap gap-3">${items}</div>`
 }
 
 function narrativeBlock(data: MiniRaportData): string {
-  const raw = (data.narrative || '').trim()
-  if (!raw) return '<span class="italic text-gray-500">Belum ada ringkasan.</span>'
-  // Buang titik-titik "....." dan spasi di akhir ringkasan
-  const cleaned = raw.replace(/[.\s]+$/, '').trim()
-  return esc(cleaned)
+ const raw = (data.narrative || '').trim()
+ if (!raw) return '<span class="italic text-gray-500">Belum ada ringkasan.</span>'
+ // Buang titik-titik "....." dan spasi di akhir ringkasan
+ const cleaned = raw.replace(/[.\s]+$/, '').trim()
+ return esc(cleaned)
 }
 
 export function generateMiniRaportHTML(data: MiniRaportData): string {
-  const photoBlock = data.photoUrl
-    ? `<img src="${esc(data.photoUrl)}" alt="${esc(data.childName)}" class="w-full h-full object-cover" />`
-    : `<i class="fas fa-image text-5xl opacity-30"></i>
+ const photoBlock = data.photoUrl
+  ? `<img src="${esc(data.photoUrl)}" alt="${esc(data.childName)}" class="w-full h-full object-cover" />`
+  : `<i class="fas fa-image text-5xl opacity-30"></i>
        <span class="font-bold text-sm tracking-widest">[ PLACEHOLDER FOTO ANAK ]</span>`
 
-  const stagesBlock = data.stages.length
-    ? (() => {
-        const shown = data.stages.slice(0, 4)
-        const rows = shown
-          .map((s, i) => stageRowHTML(s, i, i === shown.length - 1))
-          .join('')
-        const extra =
-          data.extraTopicsCount && data.extraTopicsCount > 0
-            ? `<div class="text-[11px] text-gray-400 italic mt-1">Topik lain: ${esc(data.extraTopicsCount)}</div>`
-            : ''
-        return rows + extra
-      })()
-    : '<p class="text-sm text-gray-500 italic">Belum ada data topik.</p>'
+ const stagesBlock = data.stages.length
+  ? (() => {
+   const shown = data.stages.slice(0, 4)
+   const rows = shown
+    .map((s, i) => stageRowHTML(s, i, i === shown.length - 1))
+    .join('')
+   const extra =
+    data.extraTopicsCount && data.extraTopicsCount > 0
+     ? `<div class="text-[11px] text-gray-400 italic mt-1">Topik lain: ${esc(data.extraTopicsCount)}</div>`
+     : ''
+   return rows + extra
+  })()
+  : '<p class="text-sm text-gray-500 italic">Belum ada data topik.</p>'
 
-  const kidversaLogo = data.kidversaLogoUrl
-    ? `<img src="${esc(data.kidversaLogoUrl)}" alt="Kidversa" class="w-full h-16 object-contain" />`
-    : '<img src="/logo.png" alt="Kidversa" class="w-full h-16 object-contain" />'
+ const kidversaLogo = data.kidversaLogoUrl
+  ? `<img src="${esc(data.kidversaLogoUrl)}" alt="Kidversa" class="w-full h-16 object-contain" />`
+  : '<img src="/logo.png" alt="Kidversa" class="w-full h-16 object-contain" />'
 
-  const partnerLogo = data.partnerLogoUrl
-    ? `<img src="${esc(data.partnerLogoUrl)}" alt="Partner" class="w-full h-12 object-contain" />`
-    : ''
+ const partnerLogo = data.partnerLogoUrl
+  ? `<img src="${esc(data.partnerLogoUrl)}" alt="Partner" class="w-full h-12 object-contain" />`
+  : ''
 
-  return `<!DOCTYPE html>
+ return `<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -481,8 +481,11 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                     <div class="text-[9px] font-bold text-white/70 tracking-wider">Galeri Digital</div>
                     <div class="text-[9px] font-semibold text-white/70 italic">Scan untuk melihat galeri</div>
                 </div>
-                <div class="w-14 h-14 bg-white rounded-lg flex items-center justify-center text-gray-400 text-[8px] font-bold text-center leading-tight shrink-0 shadow-sm p-1">
-                    [ QR CODE ]
+                <div class="w-14 h-14 bg-white rounded-lg flex items-center justify-center shrink-0 shadow-sm p-1">
+                    ${data.galleryUrl
+   ? `<img src="${esc(data.galleryUrl)}" alt="QR Galeri" class="w-full h-full object-contain" />`
+   : `<span class="text-gray-400 text-[8px] font-bold text-center leading-tight">[ QR CODE ]</span>`
+  }
                 </div>
             </div>
         </div>

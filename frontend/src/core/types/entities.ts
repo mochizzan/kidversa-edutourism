@@ -1,379 +1,380 @@
 import type { ContentType } from './enums'
 
 export interface User {
-  id: string
-  tenant_id?: string | null
-  email: string
-  password_hash: string
-  role: import('./enums').UserRole
-  name: string
-  phone?: string
-  avatar_url?: string
-  is_active: boolean
-  approval_status: import('./enums').ApprovalStatus
-  approved_at?: string
-  approved_by?: string
-  rejected_at?: string
-  rejected_by?: string
-  rejection_reason?: string
-  created_at: string
-  must_change_password?: boolean
+ id: string
+ tenant_id?: string | null
+ email: string
+ password_hash: string
+ role: import('./enums').UserRole
+ name: string
+ phone?: string
+ avatar_url?: string
+ is_active: boolean
+ approval_status: import('./enums').ApprovalStatus
+ approved_at?: string
+ approved_by?: string
+ rejected_at?: string
+ rejected_by?: string
+ rejection_reason?: string
+ created_at: string
+ must_change_password?: boolean
 }
 
 export interface Tenant {
-  id: string
-  name: string
-  slug: string
-  settings_json?: Record<string, unknown>
-  created_at: string
+ id: string
+ name: string
+ slug: string
+ settings_json?: Record<string, unknown>
+ created_at: string
 }
 
 // Per-tenant user count returned by GET /api/tenants/stats.
 export interface TenantUserCount {
-  tenant_id: string
-  count: number
+ tenant_id: string
+ count: number
 }
 
 export interface TenantStats {
-  user_counts: TenantUserCount[]
+ user_counts: TenantUserCount[]
 }
 
 export interface Program {
-  id: string
-  tenant_id: string
-  name: string
-  description?: string
-  thumbnail_url?: string
-  is_active: boolean
-  // Badge Final Program (cross-session award).
-  final_badge_name?: string
-  final_badge_image_url?: string
-  created_at: string
+ id: string
+ tenant_id: string
+ name: string
+ description?: string
+ thumbnail_url?: string
+ is_active: boolean
+ // Badge Final Program (cross-session award).
+ final_badge_name?: string
+ final_badge_image_url?: string
+ created_at: string
 }
 
 export interface ProgramStage {
-  id: string
-  program_id: string
-  sequence_order: number
-  name: string
-  description?: string
-  content_type: ContentType
-  duration_minutes: number
-  is_photo_stage: boolean
-  // Badge SubTopik (per-SubTopik award; shown after all Kegiatan are scored).
-  badge_name?: string
-  badge_image_url?: string
-  created_at: string
+ id: string
+ program_id: string
+ sequence_order: number
+ name: string
+ description?: string
+ content_type: ContentType
+ duration_minutes: number
+ is_photo_stage: boolean
+ // Badge SubTopik (per-SubTopik award; shown after all Kegiatan are scored).
+ badge_name?: string
+ badge_image_url?: string
+ created_at: string
 }
 
 // Kegiatan — assessed leaf under a ProgramStage (program-substages).
 export interface ProgramSubstage {
-  id: string
-  program_stage_id: string
-  sequence_order: number
-  name: string
-  description?: string
-  duration_minutes: number
-  is_photo_stage: boolean
-  created_at: string
-  updated_at: string
+ id: string
+ program_stage_id: string
+ sequence_order: number
+ name: string
+ description?: string
+ duration_minutes: number
+ is_photo_stage: boolean
+ created_at: string
+ updated_at: string
 }
 
 // Instantiated Kegiatan leaf within a session (session-substages).
 export interface SessionSubstage {
-  id: string
-  created_at: string
-  updated_at: string
-  session_id: string
-  /** Honest parent SubTopik FK (session_stages.id) — do NOT rename; this is a join key. */
-  session_stage_id: string
-  program_substage_id: string
-  status: 'WAITING' | 'ACTIVE' | 'COMPLETED'
-  started_at?: string
-  completed_at?: string
+ id: string
+ created_at: string
+ updated_at: string
+ session_id: string
+ /** Honest parent SubTopik FK (session_stages.id) — do NOT rename; this is a join key. */
+ session_stage_id: string
+ program_substage_id: string
+ status: 'WAITING' | 'ACTIVE' | 'COMPLETED'
+ started_at?: string
+ completed_at?: string
 }
 
 export type BadgeType = 'SUBTOPIK' | 'FINAL'
 
 // Participant badge row (SUBTOPIK rows carry program_stage_id; FINAL rows carry null).
 export interface ParticipantBadge {
-  id: string
-  participant_id: string
-  program_id: string
-  program_stage_id: string | null
-  badge_type: BadgeType
-  badge_name: string
-  badge_image_url: string
-  awarded_at: string
+ id: string
+ participant_id: string
+ program_id: string
+ program_stage_id: string | null
+ badge_type: BadgeType
+ badge_name: string
+ badge_image_url: string
+ awarded_at: string
 }
 
 export interface StageContent {
-  id: string
-  program_stage_id: string
-  title: string
-  file_url: string
-  /**
-   * Present only when the VIDEO content is sourced from YouTube instead of an
-   * uploaded file. Exactly one of `file_url` / `youtube_url` is populated for VIDEO.
-   */
-  youtube_url?: string
-  file_type: import('./enums').StageContentFileType
-  duration_seconds?: number
-  sort_order: number
-  is_active: boolean
-  created_at: string
+ id: string
+ program_stage_id: string
+ title: string
+ file_url: string
+ /**
+  * Present only when the VIDEO content is sourced from YouTube instead of an
+  * uploaded file. Exactly one of `file_url` / `youtube_url` is populated for VIDEO.
+  */
+ youtube_url?: string
+ file_type: import('./enums').StageContentFileType
+ duration_seconds?: number
+ sort_order: number
+ is_active: boolean
+ created_at: string
 }
 
 export interface PhotoFrame {
-  id: string
-  tenant_id: string
-  program_id?: string
-  name: string
-  file_url: string
-  thumbnail_url?: string
-  is_active: boolean
-  sort_order: number
-  created_at: string
+ id: string
+ tenant_id: string
+ program_id?: string
+ name: string
+ file_url: string
+ thumbnail_url?: string
+ is_active: boolean
+ sort_order: number
+ created_at: string
 }
 
 export interface MissionBank {
-  id: string
-  program_id: string
-  title: string
-  related_stage_ids?: string[]
-  is_active: boolean
-  created_at: string
+ id: string
+ program_id: string
+ title: string
+ related_stage_ids?: string[]
+ is_active: boolean
+ created_at: string
 }
 
 export interface Session {
-  id: string
-  tenant_id: string
-  program_id: string
-  program_name?: string  // populated by backend JOIN with programs
-  name: string
-  session_date: string
-  start_time?: string
-  end_time?: string
-  location: string
-  status: import('./enums').SessionStatus
-  notes?: string
-  created_by: string
-  created_at: string
-  is_my_session?: boolean
+ id: string
+ tenant_id: string
+ program_id: string
+ program_name?: string  // populated by backend JOIN with programs
+ name: string
+ session_date: string
+ start_time?: string
+ end_time?: string
+ location: string
+ status: import('./enums').SessionStatus
+ notes?: string
+ created_by: string
+ created_at: string
+ is_my_session?: boolean
 }
 
 export interface SessionStage {
-  id: string
-  session_id: string
-  program_stage_id: string
-  facilitator_id?: string
-  status: import('./enums').SessionStageStatus
-  started_at?: string
-  completed_at?: string
+ id: string
+ session_id: string
+ program_stage_id: string
+ facilitator_id?: string
+ status: import('./enums').SessionStageStatus
+ started_at?: string
+ completed_at?: string
 }
 
 export interface SessionGroup {
-  id: string
-  session_id: string
-  name: string
-  status: import('./enums').GroupStatus
-  current_session_stage_id?: string
-  facilitator_id?: string
-  /** Resolved name of facilitator_id; populated by the backend (Opsi B). */
-  facilitator_name?: string
-  created_at: string
+ id: string
+ session_id: string
+ name: string
+ status: import('./enums').GroupStatus
+ current_session_stage_id?: string
+ facilitator_id?: string
+ /** Resolved name of facilitator_id; populated by the backend (Opsi B). */
+ facilitator_name?: string
+ created_at: string
 }
 
 export interface GroupStageProgress {
-  id: string
-  group_id: string
-  /** Kegiatan-level FK (session_substages.id). */
-  session_substage_id: string
-  status: import('./enums').GroupStageProgressStatus
-  entered_at?: string
-  completed_at?: string
-  unlocked_by?: string
-  unlock_reason?: string
+ id: string
+ group_id: string
+ /** Kegiatan-level FK (session_substages.id). */
+ session_substage_id: string
+ status: import('./enums').GroupStageProgressStatus
+ entered_at?: string
+ completed_at?: string
+ unlocked_by?: string
+ unlock_reason?: string
 }
 
 export interface Participant {
-  id: string
-  tenant_id?: string
-  session_id?: string
-  group_id?: string
-  child_name: string
-  child_age: number
-  school_name?: string
-  parent_name: string
-  parent_phone: string
-  parent_email?: string
-  consent_photo: boolean
-  consent_at?: string
-  created_at: string
+ id: string
+ tenant_id?: string
+ session_id?: string
+ group_id?: string
+ child_name: string
+ child_age: number
+ school_name?: string
+ parent_name: string
+ parent_phone: string
+ parent_email?: string
+ consent_photo: boolean
+ consent_at?: string
+ created_at: string
 }
 
 export interface ParticipantSessionInfo {
-  participant: Participant
-  session_name: string
-  session_id: string
-  program_id: string
+ participant: Participant
+ session_name: string
+ session_id: string
+ program_id: string
 }
 
 export interface LinkParticipantResponse {
-  id: string
-  tenant_id?: string
-  session_id?: string
-  group_id?: string
-  child_name: string
-  child_age: number
-  school_name?: string
-  parent_name: string
-  parent_phone: string
-  parent_email?: string
-  consent_photo: boolean
-  consent_at?: string
-  created_at: string
-  previous_session_id?: string
-  previous_session_name?: string
-  previous_program_id?: string
+ id: string
+ tenant_id?: string
+ session_id?: string
+ group_id?: string
+ child_name: string
+ child_age: number
+ school_name?: string
+ parent_name: string
+ parent_phone: string
+ parent_email?: string
+ consent_photo: boolean
+ consent_at?: string
+ created_at: string
+ previous_session_id?: string
+ previous_session_name?: string
+ previous_program_id?: string
 }
 
 export interface ImportResult {
-  created: Participant[]
-  skipped: Array<{
-    participant_id: string
-    child_name: string
-    parent_phone: string
-    existing_session: string
-  }>
+ created: Participant[]
+ skipped: Array<{
+  participant_id: string
+  child_name: string
+  parent_phone: string
+  existing_session: string
+ }>
 }
 
 export interface Assessment {
-  id: string
-  participant_id: string
-  /** Kegiatan-level FK (session_substages.id). */
-  session_substage_id: string
-  star_rating: number
-  comment?: string
-  assessed_by: string
-  assessed_at: string
-  updated_at: string
-  sync_status: import('./enums').SyncStatus
+ id: string
+ participant_id: string
+ /** Kegiatan-level FK (session_substages.id). */
+ session_substage_id: string
+ star_rating: number
+ comment?: string
+ assessed_by: string
+ assessed_at: string
+ updated_at: string
+ sync_status: import('./enums').SyncStatus
 }
 
 export interface SmartPhoto {
-  id: string
-  participant_id: string
-  session_id: string
-  frame_id?: string
-  original_file_url: string
-  framed_file_url?: string
-  is_report_photo: boolean
-  taken_by: string
-  taken_at: string
-  sync_status: import('./enums').SyncStatus
+ id: string
+ participant_id: string
+ session_id: string
+ frame_id?: string
+ original_file_url: string
+ framed_file_url?: string
+ is_report_photo: boolean
+ taken_by: string
+ taken_at: string
+ sync_status: import('./enums').SyncStatus
 }
 
 export interface Report {
-  id: string
-  participant_id: string
-  session_id: string
-  program_stage_id?: string | null
-  ai_narrative_draft?: string
-  ai_narrative_final?: string
-  mission_ids?: string[]
-  report_pdf_url?: string
-  parent_access_token: string
-  status: import('./enums').ReportStatus
-  generated_at?: string
-  sent_at?: string
-  approved_by?: string
+ id: string
+ participant_id: string
+ session_id: string
+ program_stage_id?: string | null
+ ai_narrative_draft?: string
+ ai_narrative_final?: string
+ mission_ids?: string[]
+ report_pdf_url?: string
+ parent_access_token: string
+ gallery_access_token?: string
+ status: import('./enums').ReportStatus
+ generated_at?: string
+ sent_at?: string
+ approved_by?: string
 }
 
 export interface ParticipantMission {
-  id: string
-  report_id: string
-  participant_id: string
-  mission_bank_id: string
-  is_completed: boolean
-  completed_at?: string
+ id: string
+ report_id: string
+ participant_id: string
+ mission_bank_id: string
+ is_completed: boolean
+ completed_at?: string
 }
 
 export interface ConsentLog {
-  id: string
-  participant_id: string
-  consent_type: import('./enums').ConsentType
-  value: boolean
-  sent_at: string
-  responded_at?: string
-  ip_address?: string
-  user_agent?: string
+ id: string
+ participant_id: string
+ consent_type: import('./enums').ConsentType
+ value: boolean
+ sent_at: string
+ responded_at?: string
+ ip_address?: string
+ user_agent?: string
 }
 
 export interface AuditLog {
-  id: string
-  user_id: string
-  action: string
-  resource_type: string
-  resource_id?: string
-  old_value_json?: Record<string, unknown>
-  new_value_json?: Record<string, unknown>
-  reason?: string
-  ip_address?: string
-  user_agent?: string
-  created_at: string
+ id: string
+ user_id: string
+ action: string
+ resource_type: string
+ resource_id?: string
+ old_value_json?: Record<string, unknown>
+ new_value_json?: Record<string, unknown>
+ reason?: string
+ ip_address?: string
+ user_agent?: string
+ created_at: string
 }
 
 export interface SyncQueue {
-  id: string
-  tenant_id: string | null
-  resource_type: string
-  resource_id: string
-  action: 'create' | 'update' | 'delete' | 'upload'
-  payload_json?: Record<string, unknown>
-  file_url_local?: string
-  media_blob_id?: string
-  status: import('./enums').SyncQueueStatus
-  retry_count: number
-  error_message?: string
-  created_at: string
-  updated_at: string
-  synced_at?: string
+ id: string
+ tenant_id: string | null
+ resource_type: string
+ resource_id: string
+ action: 'create' | 'update' | 'delete' | 'upload'
+ payload_json?: Record<string, unknown>
+ file_url_local?: string
+ media_blob_id?: string
+ status: import('./enums').SyncQueueStatus
+ retry_count: number
+ error_message?: string
+ created_at: string
+ updated_at: string
+ synced_at?: string
 }
 
 // Backend notification entity returned by GET /api/notifications.
 // unreadCount on the list is derived from the badge (`meta.total`).
 export interface Notification {
-  id: string
-  tenant_id: string
-  recipient_user_id: string
-  type: string
-  title?: string
-  message?: string
-  ref_id?: string
-  is_read: boolean
-  created_at?: string
+ id: string
+ tenant_id: string
+ recipient_user_id: string
+ type: string
+ title?: string
+ message?: string
+ ref_id?: string
+ is_read: boolean
+ created_at?: string
 }
 
 // Standalone, tenant-scoped content entity (Content Single-Source model).
 // A Content is independent of any stage and is attached to stages via the
 // stage_contents junction (see StageContent for the JOIN shape).
 export interface Content {
-  id: string
-  tenant_id: string
-  title: string
-  file_url: string
-  youtube_url?: string
-  file_type: import('./enums').StageContentFileType
-  duration_seconds?: number
-  created_at: string
-  updated_at: string
+ id: string
+ tenant_id: string
+ title: string
+ file_url: string
+ youtube_url?: string
+ file_type: import('./enums').StageContentFileType
+ duration_seconds?: number
+ created_at: string
+ updated_at: string
 }
 
 // Where a Content is currently referenced (used by the delete-confirm dialog).
 export interface ContentUsage {
-  program_id: string
-  program_name: string
-  stage_id: string
-  stage_name: string
+ program_id: string
+ program_name: string
+ stage_id: string
+ stage_name: string
 }

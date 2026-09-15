@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import QRCode from 'qrcode'
 import { reportService } from '../../../core/services/reports'
 import { openSSE } from '../../../core/services/backend-client'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
@@ -336,7 +337,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     try {
       const source = openSSE(
         API_ROUTES.REPORTS.GENERATE_STREAM_SSE(report.id),
-        () => {},
+        () => { },
         {
           tenantId: saTenant,
           onError: () => {
@@ -390,7 +391,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     }
   }, [report?.id, narrativeText, addToast, streaming, saTenant])
 
-  const buildRaportHtml = useCallback((): string | null => {
+  const buildRaportHtml = useCallback(async (): Promise<string | null> => {
     if (!participant || !session) return null
 
     const groupName = participant.group_id
@@ -443,6 +444,16 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
     const topicName = topics.find((t) => t.programStageId === activeTopicId)?.name ?? ''
 
+    let galleryUrl: string | undefined
+    if (report?.gallery_access_token) {
+      try {
+        galleryUrl = await QRCode.toDataURL(
+          `${window.location.origin}/gallery?token=${report.gallery_access_token}`,
+          { width: 128, margin: 1, errorCorrectionLevel: 'M' },
+        )
+      } catch { /* leave undefined — placeholder fallback */ }
+    }
+
     return generateMiniRaportHTML({
       programName,
       topicName,
@@ -459,11 +470,12 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       badges: mappedBadges,
       facilitatorName: user?.name || DEFAULT_FACILITATOR_NAME,
       facilitatorPhotoUrl: user?.avatar_url,
+      galleryUrl,
     })
-  }, [participant, session, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, user, programName, activeTopicId, topics])
+  }, [participant, session, report, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, user, programName, activeTopicId, topics])
 
-  const handleCetak = useCallback(() => {
-    const html = buildRaportHtml()
+  const handleCetak = useCallback(async () => {
+    const html = await buildRaportHtml()
     if (!html) return
     const win = window.open('', '_blank')
     if (!win) return
@@ -494,7 +506,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     if (!participant) return
     setActionLoading('pdf')
     try {
-      const html = buildRaportHtml()
+      const html = await buildRaportHtml()
       if (!html) return
       await captureRaportAsPdf(html, `raport-${participant.child_name}.pdf`)
     } catch {
@@ -508,7 +520,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     if (!participant) return
     setActionLoading('png')
     try {
-      const html = buildRaportHtml()
+      const html = await buildRaportHtml()
       if (!html) return
       const blob = await captureRaportAsBlob(html)
       downloadBlob(blob, `raport-${participant.child_name}.png`)
