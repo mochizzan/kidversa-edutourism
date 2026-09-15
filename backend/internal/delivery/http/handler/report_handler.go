@@ -327,6 +327,29 @@ func (h *ReportHandler) SuggestMissions(c *echo.Context) error {
 	return appresp.OK(c, map[string]interface{}{"mission_ids": ids})
 }
 
+// SaveMissions handles POST /api/reports/:id/missions.
+// Persists the selected mission IDs without changing report status. Used for
+// auto-saving mission selections while the admin is still reviewing.
+func (h *ReportHandler) SaveMissions(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	var req dto.ReportSaveMissionsRequest
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	r, err := h.uc.SaveMissions((*c).Request().Context(), id, tenantID, req.MissionIDs)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewReportResponse(r))
+}
+
 // ListReports handles GET /api/reports?session_id= (tenant-scoped via TenantScope).
 // Returns an empty list (not an error) when no reports match (EC4).
 func (h *ReportHandler) ListReports(c *echo.Context) error {

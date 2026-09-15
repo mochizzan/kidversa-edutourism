@@ -131,6 +131,8 @@ export const API_ROUTES = {
     GENERATE_SESSION: '/api/reports/generate',
     SUGGEST_MISSIONS: (id: string) =>
       `/api/reports/${encodeURIComponent(id)}/suggest-missions`,
+    SAVE_MISSIONS: (id: string) =>
+      `/api/reports/${encodeURIComponent(id)}/missions`,
     APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
     SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
     REVOKE_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-token`,

@@ -126,6 +126,29 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 	return r, nil
 }
 
+// SaveMissions persists the selected mission IDs for a report without changing
+// the report status. This allows auto-saving mission selections while the admin
+// is still reviewing (separate from Approve which also sets status + narrative).
+func (u *Usecase) SaveMissions(ctx context.Context, reportID, tenantID string, missionIDs []string) (*entity.Report, error) {
+	r, err := u.repo.GetByID(ctx, reportID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	// Cap at MaxReportMissions (defense-in-depth).
+	if len(missionIDs) > MaxReportMissions {
+		missionIDs = missionIDs[:MaxReportMissions]
+	}
+	if err := u.participantMissionRepo.ReplaceByReport(ctx, tenantID, reportID, buildItems(reportID, missionIDs)); err != nil {
+		return nil, err
+	}
+	// Re-fetch to hydrate r.MissionIDs from the freshly written rows.
+	r, err = u.repo.GetByID(ctx, reportID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
 // buildItems constructs participant-mission rows for a report from mission ids.
 func buildItems(reportID string, missionIDs []string) []entity.ParticipantMission {
 	items := make([]entity.ParticipantMission, 0, len(missionIDs))

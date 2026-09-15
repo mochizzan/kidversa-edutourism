@@ -59,6 +59,21 @@ const send = async (reportId: string, tenantId?: string | null): Promise<ReportT
   return itemRequest<ReportTokenResponse>('POST', API_ROUTES.REPORTS.SEND(reportId), undefined, tenantId)
 }
 
+// saveMissions persists the selected mission IDs without changing report status.
+// Used for auto-saving mission selections while the admin is still reviewing.
+const saveMissions = async (
+  reportId: string,
+  missionIds: string[],
+  tenantId?: string | null,
+): Promise<Report> => {
+  return itemRequest<Report>(
+    'POST',
+    API_ROUTES.REPORTS.SAVE_MISSIONS(reportId),
+    { mission_ids: missionIds },
+    tenantId,
+  )
+}
+
 // suggestMissions calls the AI recommendation endpoint for a report. Returns up
 // to 4 mission IDs scoped to the report's Topic. No persistence — the caller
 // pre-fills the manual selector and persists on Approve.
@@ -104,6 +119,7 @@ export const reportService: ReportService = {
   generateOne,
   approve,
   send,
+  saveMissions,
   suggestMissions,
   generateNarrativeStream,
 }

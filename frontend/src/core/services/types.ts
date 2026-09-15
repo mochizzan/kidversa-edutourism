@@ -153,6 +153,7 @@ export interface ReportService {
     data?: { narrative_final?: string; mission_ids?: string[] },
     tenantId?: string | null,
   ): Promise<Report>
+  saveMissions(reportId: string, missionIds: string[], tenantId?: string | null): Promise<Report>
   send(reportId: string, tenantId?: string | null): Promise<ReportTokenResponse>
   suggestMissions(reportId: string, tenantId?: string | null): Promise<string[]>
   generateNarrativeStream(reportId: string, force?: boolean, tenantId?: string | null): Promise<void>

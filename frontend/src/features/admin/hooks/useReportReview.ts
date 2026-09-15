@@ -88,6 +88,8 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   const [suggesting, setSuggesting] = useState(false)
 
   const prevTextRef = useRef('')
+  const initialLoadDoneRef = useRef(false)
+  const saveTimerRef = useRef<number | null>(null)
 
   const saTenant = isSuperAdmin(user) ? (tenantId ?? undefined) : undefined
 
@@ -199,6 +201,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       setError('Gagal memuat data laporan.')
     } finally {
       setLoading(false)
+      initialLoadDoneRef.current = true
     }
   }, [sessionId, participantId])
 
@@ -215,6 +218,22 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // Auto-save mission selections when they change (debounced).
+  // Skips the initial hydration from loadData to avoid a redundant write.
+  useEffect(() => {
+    if (!initialLoadDoneRef.current || !report?.id) return
+    clearTimeout(saveTimerRef.current ?? undefined)
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null
+      reportService.saveMissions(report.id, assignedMissionIds, saTenant).catch(() => {
+        // Silent — auto-save is best-effort; Approve is the authoritative save.
+      })
+    }, 300)
+    return () => {
+      clearTimeout(saveTimerRef.current ?? undefined)
+    }
+  }, [assignedMissionIds, report?.id, saTenant])
 
   // Topic-scoped mission library (only this Topic's missions) for the modal.
   const loadTopicMissions = useCallback(async (topicId: string) => {

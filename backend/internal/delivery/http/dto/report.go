@@ -96,6 +96,12 @@ type ReportApproveRequest struct {
 	MissionIDs     []string `json:"mission_ids"`
 }
 
+// ReportSaveMissionsRequest carries the mission IDs to persist for a report
+// (auto-save, does not change report status).
+type ReportSaveMissionsRequest struct {
+	MissionIDs []string `json:"mission_ids"`
+}
+
 // ReportGenerateSessionRequest triggers narrative generation for all participants
 // in a session. Creates DRAFT reports for participants that don't have one yet.
 type ReportGenerateSessionRequest struct {
