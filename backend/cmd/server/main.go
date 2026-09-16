@@ -19,6 +19,7 @@ import (
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	"kidversa-edutourism-backend/internal/usecase"
 	assessmentuc "kidversa-edutourism-backend/internal/usecase/assessment"
+	attendanceuc "kidversa-edutourism-backend/internal/usecase/attendance"
 	badgeuc "kidversa-edutourism-backend/internal/usecase/badge"
 	liveuc "kidversa-edutourism-backend/internal/usecase/live"
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
@@ -55,6 +56,7 @@ func main() {
 	liveRepo := persistence.NewLiveRepository(db.DB)
 	notifRepo := persistence.NewNotificationRepository(db.DB)
 	assessmentRepo := persistence.NewAssessmentRepository(db.DB)
+	attendanceRepo := persistence.NewAttendanceRepository(db.DB)
 	photoRepo := persistence.NewPhotoRepository(db.DB)
 	reportRepo := persistence.NewReportRepository(db.DB)
 	galleryRepo := persistence.NewGalleryTokenRepository(db.DB)
@@ -82,6 +84,7 @@ func main() {
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, badgeUC)
+	attendanceUC := attendanceuc.NewUsecase(attendanceRepo)
 	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg)
 
 	// Handlers.
@@ -104,6 +107,7 @@ func main() {
 	registry.Live = handler.NewLiveHandler(liveSvc, hub, cfg.SSEKeepaliveSec)
 	registry.Notification = handler.NewNotificationHandler(liveSvc, hub, cfg.SSEKeepaliveSec)
 	registry.Assessment = handler.NewAssessmentHandler(assessmentUC)
+	registry.Attendance = handler.NewAttendanceHandler(attendanceUC)
 	registry.Photo = handler.NewPhotoHandler(photoRepo)
 	registry.Report = handler.NewReportHandler(reportsUC, cfg, sessionRepo, hub)
 	registry.MissionBank = handler.NewMissionBankHandler(missionBankRepo)

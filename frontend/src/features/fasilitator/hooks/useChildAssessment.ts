@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
+import { attendanceService } from '../../../core/services/attendance'
 import { programService } from '../../../core/services/programs'
 import { programSubstageService } from '../../../core/services/program-substages'
 import { substagesOfStage } from '../../../core/utils/substage'
@@ -106,6 +107,7 @@ export function useChildAssessment(childId: string | undefined) {
   const [error, setError] = useState<string | null>(null)
   const [childDetail, setChildDetail] = useState<ChildDetail | null>(null)
   const [assessmentMap, setAssessmentMap] = useState<Map<string, Assessment>>(new Map())
+  const [isPresent, setIsPresent] = useState(false)
 
   const fetchAssessments = useCallback(async () => {
     if (!childId) return
@@ -127,12 +129,23 @@ export function useChildAssessment(childId: string | undefined) {
       setLoading(true)
       setError(null)
 
-      const { detail } = await findChildInSessions(childId)
+      const { detail, sessionId } = await findChildInSessions(childId)
       if (!detail) {
         setError('Data anak tidak ditemukan')
         return
       }
       setChildDetail(detail)
+
+      // Fetch attendance for this child
+      if (sessionId) {
+        try {
+          const attRes = await attendanceService.getBySession(sessionId)
+          const att = attRes.find(a => a.participant_id === childId)
+          setIsPresent(att?.is_present ?? false)
+        } catch {
+          setIsPresent(false)
+        }
+      }
 
       // Fetch all assessments at once for all kegiatan cards
       if (detail.sessionSubstages.length > 0) {
@@ -161,5 +174,6 @@ export function useChildAssessment(childId: string | undefined) {
     refreshAssessments,
     isMine,
     fetchData,
+    isPresent,
   }
 }

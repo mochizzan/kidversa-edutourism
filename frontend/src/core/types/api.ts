@@ -89,8 +89,14 @@ export interface CreateAssessmentDTO {
   participant_id: string
   session_id: string
   session_substage_id: string
-  star_rating: number
+  star_rating: number  // 0-4 (was 0-5)
   comment?: string
+}
+
+export interface AttendanceUpsertDTO {
+  participant_id: string
+  session_id: string
+  is_present: boolean
 }
 
 // ToggleActiveResult is the minimal response returned by the program/mission

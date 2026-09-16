@@ -1,4 +1,4 @@
-import { Star, Camera } from 'lucide-react'
+import { Star, Camera, CheckCircle, XCircle } from 'lucide-react'
 import { cn } from '../../../core/utils'
 
 interface ChildListItemProps {
@@ -6,6 +6,9 @@ interface ChildListItemProps {
   age: number
   school?: string
   isAssessed: boolean
+  isPresent?: boolean
+  onToggleAttendance?: () => void
+  attendanceLoading?: boolean
   showPhoto?: boolean
   onAssess?: () => void
   onPhoto?: () => void
@@ -17,6 +20,9 @@ export function ChildListItem({
   age,
   school,
   isAssessed,
+  isPresent = false,
+  onToggleAttendance,
+  attendanceLoading = false,
   showPhoto = false,
   onAssess,
   onPhoto,
@@ -45,15 +51,21 @@ export function ChildListItem({
           <p className="text-xs text-on-surface-variant/70 mt-0.5">{school}</p>
         )}
         <div className="mt-1.5">
-          {isAssessed ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-              <Star className="w-3 h-3 fill-current" />
-              Sudah dinilai
-            </span>
+          {isPresent ? (
+            isAssessed ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                <Star className="w-3 h-3 fill-current" />
+                Sudah dinilai
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
+                <Star className="w-3 h-3" />
+                Belum dinilai
+              </span>
+            )
           ) : (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
-              <Star className="w-3 h-3" />
-              Belum dinilai
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+              Tidak hadir
             </span>
           )}
         </div>
@@ -61,6 +73,22 @@ export function ChildListItem({
 
       {/* Actions */}
       <div className="flex items-center gap-1.5 shrink-0">
+        {onToggleAttendance && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleAttendance() }}
+            disabled={attendanceLoading}
+            className={cn(
+              'flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors min-h-[40px] min-w-[48px]',
+              isPresent
+                ? 'bg-green-100 text-green-700 border border-green-300 hover:bg-green-200'
+                : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200',
+              attendanceLoading && 'opacity-60 cursor-wait',
+            )}
+          >
+            {isPresent ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+            <span className="hidden sm:inline">{isPresent ? 'Hadir' : 'Tidak Hadir'}</span>
+          </button>
+        )}
         {onAssess && (
           <button
             onClick={(e) => { e.stopPropagation(); onAssess() }}

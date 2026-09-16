@@ -15,12 +15,11 @@ interface KegiatanCardProps {
 }
 
 const RATING_LABELS: Record<number, string> = {
-  0: 'Tidak Hadir',
-  1: 'Sangat Kurang',
-  2: 'Kurang',
-  3: 'Cukup',
-  4: 'Baik',
-  5: 'Sangat Baik',
+  0: 'Belum Dinilai',
+  1: 'BB - Belum Berkembang',
+  2: 'MB - Mulai Berkembang',
+  3: 'BSH - Berkembang Sesuai Harapan',
+  4: 'BSB - Berkembang Sangat Baik',
 }
 
 function StarRatingInput({
@@ -34,23 +33,7 @@ function StarRatingInput({
 }) {
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => onChange(0)}
-        className={cn(
-          'px-2 py-1 rounded-lg text-xs font-medium transition-all',
-          'hover:scale-105 active:scale-95',
-          disabled && 'cursor-not-allowed opacity-60',
-          value === 0
-            ? 'bg-red-100 text-red-700 border border-red-300'
-            : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200',
-        )}
-        aria-label="Tidak hadir"
-      >
-        Tidak Hadir
-      </button>
-      {[1, 2, 3, 4, 5].map((star) => (
+      {[1, 2, 3, 4].map((star) => (
         <button
           key={star}
           type="button"
@@ -92,7 +75,7 @@ export function KegiatanCard({
   const initialStar = useRef(assessment?.star_rating ?? 1)
   const initialComment = useRef(assessment?.comment ?? '')
 
-  const [starRating, setStarRating] = useState(assessment?.star_rating ?? 1)
+  const [starRating, setStarRating] = useState(assessment?.star_rating ?? 0)
   const [comment, setComment] = useState(assessment?.comment ?? '')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -101,7 +84,7 @@ export function KegiatanCard({
   useEffect(() => {
     initialStar.current = assessment?.star_rating ?? 1
     initialComment.current = assessment?.comment ?? ''
-    setStarRating(assessment?.star_rating ?? 1)
+    setStarRating(assessment?.star_rating ?? 0)
     setComment(assessment?.comment ?? '')
   }, [assessment])
 

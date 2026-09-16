@@ -212,6 +212,17 @@ export interface Participant {
  created_at: string
 }
 
+export interface ParticipantAttendance {
+ id: string
+ participant_id: string
+ session_id: string
+ is_present: boolean
+ marked_at: string
+ marked_by?: string
+ created_at: string
+ updated_at: string
+}
+
 export interface ParticipantSessionInfo {
  participant: Participant
  session_name: string

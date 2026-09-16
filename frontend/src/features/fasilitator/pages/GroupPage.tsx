@@ -9,6 +9,7 @@ import { apiRequest } from '../../../core/services/backend-client'
 import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { parentStageId, substagesOfStage } from '../../../core/utils/substage'
 import { assessmentService } from '../../../core/services/assessments'
+import { attendanceService } from '../../../core/services/attendance'
 import { programService } from '../../../core/services/programs'
 import { useConfirmDialog } from '../../../shared/hooks/useConfirmDialog'
 // NOTE: GroupPage intentionally does NOT call userService — GET /api/users is
@@ -91,6 +92,8 @@ const GroupPage = () => {
   const [sessionSubstages, setSessionSubstages] = useState<SessionSubstage[]>([])
   const [completing, setCompleting] = useState(false)
   const [kioskLoading, setKioskLoading] = useState(false)
+  const [attendanceMap, setAttendanceMap] = useState<Map<string, boolean>>(new Map())
+  const [attendanceLoading, setAttendanceLoading] = useState<Set<string>>(new Set())
 
   const fetchData = useCallback(async () => {
     if (!groupId) return
@@ -164,6 +167,18 @@ const GroupPage = () => {
       const sessionAssessments = await assessmentService.getBySession(detail.id)
       setAssessments(sessionAssessments)
 
+      // Fetch attendance for this session
+      try {
+        const attendanceRes = await attendanceService.getBySession(detail.id)
+        const attMap = new Map<string, boolean>()
+        for (const a of attendanceRes) {
+          attMap.set(a.participant_id, a.is_present)
+        }
+        setAttendanceMap(attMap)
+      } catch {
+        // Non-fatal: attendance defaults to not-present
+      }
+
       setGroupDetail({
         group,
         participants: group.participants,
@@ -203,9 +218,16 @@ const GroupPage = () => {
     return set
   }, [assessments])
 
+  // Check if a participant is present for this session
+  const isPresent = useCallback((participantId: string): boolean => {
+    return attendanceMap.get(participantId) ?? false
+  }, [attendanceMap])
+
   // C7 all-or-nothing: a child counts as assessed for the active SubTopik only
   // when EVERY Kegiatan leaf has an assessment (star_rating >= 1) for them.
+  // Also requires the child to be present.
   const isAssessed = (participantId: string): boolean => {
+    if (!isPresent(participantId)) return false
     if (!groupDetail?.sessionStage || activeLeaves.length === 0) return false
     return activeLeaves.every((leaf) =>
       scoredPairs.has(`${participantId}|${leaf.id}`),
@@ -297,6 +319,34 @@ const GroupPage = () => {
     }
   }
 
+  const handleToggleAttendance = useCallback(async (participantId: string) => {
+    if (!groupDetail) return
+    const current = attendanceMap.get(participantId) ?? false
+    const newValue = !current
+
+    // Optimistic update
+    setAttendanceMap(prev => new Map(prev).set(participantId, newValue))
+    setAttendanceLoading(prev => new Set(prev).add(participantId))
+
+    try {
+      await attendanceService.upsert({
+        participant_id: participantId,
+        session_id: groupDetail.session.id,
+        is_present: newValue,
+      })
+    } catch {
+      // Revert on error
+      setAttendanceMap(prev => new Map(prev).set(participantId, current))
+      addToast({ type: 'error', message: 'Gagal mengubah kehadiran' })
+    } finally {
+      setAttendanceLoading(prev => {
+        const next = new Set(prev)
+        next.delete(participantId)
+        return next
+      })
+    }
+  }, [attendanceMap, groupDetail, addToast])
+
   // ── Loading state ──
   if (loading) {
     return (
@@ -312,7 +362,7 @@ const GroupPage = () => {
   if (error) {
     return (
       <div className="space-y-6">
-          <PageHeader title="Kelompok" breadcrumbs={[{ label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD }, { label: 'Error' }]} />
+        <PageHeader title="Kelompok" breadcrumbs={[{ label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD }, { label: 'Error' }]} />
         <ErrorState message={error} onRetry={fetchData} />
       </div>
     )
@@ -404,6 +454,9 @@ const GroupPage = () => {
               age={participant.child_age}
               school={participant.school_name}
               isAssessed={isAssessed(participant.id)}
+              isPresent={isPresent(participant.id)}
+              onToggleAttendance={isMine ? () => handleToggleAttendance(participant.id) : undefined}
+              attendanceLoading={attendanceLoading.has(participant.id)}
               showPhoto={isPhotoStage}
               onAssess={isMine ? () => handleAssess(participant.id) : undefined}
             />

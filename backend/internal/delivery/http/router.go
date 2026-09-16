@@ -72,6 +72,7 @@ func NewRouter(d Deps) *echo.Echo {
 
 	// Resources.
 	handler.RegisterAssessmentRoutes(api.Group("/assessments"), h.Assessment, d.JWT, d.Revoker)
+	handler.RegisterAttendanceRoutes(api.Group("/attendance"), h.Attendance, d.JWT, d.Revoker)
 	handler.RegisterPhotosRoutes(api.Group("/photos"), h.Photo, d.JWT, d.Revoker)
 	handler.RegisterReportsRoutes(api.Group("/reports"), h.Report, d.JWT, d.Config, d.Revoker)
 	handler.RegisterGalleryRoutes(api.Group("/reports"), h.Gallery, d.JWT, d.Revoker)

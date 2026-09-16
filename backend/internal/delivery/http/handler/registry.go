@@ -20,6 +20,7 @@ type Registry struct {
 	Live                   *LiveHandler
 	Notification           *NotificationHandler
 	Assessment             *AssessmentHandler
+	Attendance             *AttendanceHandler
 	Photo                  *PhotoHandler
 	Report                 *ReportHandler
 	MissionBank            *MissionBankHandler

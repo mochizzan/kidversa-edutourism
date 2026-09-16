@@ -166,6 +166,14 @@ export const API_ROUTES = {
    `/api/assessments?session_id=${encodeURIComponent(sessionId)}`,
  },
 
+ ATTENDANCE: {
+  BASE: '/api/attendance',
+  BY_SESSION: (sessionId: string) =>
+   `/api/attendance?session_id=${encodeURIComponent(sessionId)}`,
+  UPSERT: '/api/attendance/upsert',
+  BULK_UPSERT: '/api/attendance/bulk-upsert',
+ },
+
  // Kegiatan (ProgramSubstage) CRUD + reorder, scoped to a SubTopik.
  PROGRAM_SUBSTAGES: {
   BASE: '/api/program-substages',

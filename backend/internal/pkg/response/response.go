@@ -123,6 +123,10 @@ func MessageForCode(code string) string {
 		return "Setiap kelompok harus memiliki minimal satu peserta"
 	case "grading_incomplete":
 		return "Terdapat peserta yang belum dinilai pada sesi ini"
+	case "attendance_not_found":
+		return "Data kehadiran tidak ditemukan"
+	case "assessment_out_of_range":
+		return "Penilaian harus antara 0 sampai 4"
 	default:
 		return "Terjadi kesalahan"
 	}

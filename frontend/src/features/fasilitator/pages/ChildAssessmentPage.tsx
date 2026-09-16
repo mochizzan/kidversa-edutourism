@@ -22,6 +22,7 @@ const ChildAssessmentPage = () => {
     refreshAssessments,
     isMine,
     fetchData,
+    isPresent,
   } = useChildAssessment(childId)
 
   const [savingAny, setSavingAny] = useState(false)
@@ -142,32 +143,41 @@ const ChildAssessmentPage = () => {
         </div>
       </div>
 
-      {/* Kegiatan Cards */}
-      {childDetail.sessionSubstages.length > 0 ? (
-        <div className="space-y-4">
-          {childDetail.sessionSubstages.map((kegiatan, idx) => (
-            <KegiatanCard
-              key={kegiatan.id}
-              kegiatan={kegiatan}
-              assessment={assessmentMap.get(kegiatan.id)}
-              kegiatanName={
-                childDetail.programSubstageNameMap[kegiatan.program_substage_id] ??
-                `Kegiatan ${idx + 1}`
-              }
-              participantId={participant.id}
-              isMine={isMine}
-              onSave={handleSaveForKegiatan(kegiatan)}
-              isSavingGlobal={savingAny}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50 text-center">
-          <p className="text-sm text-on-surface-variant">
-            Belum ada kegiatan untuk dinilai.
-          </p>
+      {/* Attendance status banner */}
+      {!isPresent && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-700">
+          Anak ini tidak hadir di sesi ini. Penilaian tidak dapat dilakukan.
         </div>
       )}
+
+      {/* Kegiatan Cards */}
+      {isPresent ? (
+        childDetail.sessionSubstages.length > 0 ? (
+          <div className="space-y-4">
+            {childDetail.sessionSubstages.map((kegiatan, idx) => (
+              <KegiatanCard
+                key={kegiatan.id}
+                kegiatan={kegiatan}
+                assessment={assessmentMap.get(kegiatan.id)}
+                kegiatanName={
+                  childDetail.programSubstageNameMap[kegiatan.program_substage_id] ??
+                  `Kegiatan ${idx + 1}`
+                }
+                participantId={participant.id}
+                isMine={isMine}
+                onSave={handleSaveForKegiatan(kegiatan)}
+                isSavingGlobal={savingAny}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50 text-center">
+            <p className="text-sm text-on-surface-variant">
+              Belum ada kegiatan untuk dinilai.
+            </p>
+          </div>
+        )
+      ) : null}
 
       {/* Quick Actions */}
       {programStage?.is_photo_stage && (

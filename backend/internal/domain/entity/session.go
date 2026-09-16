@@ -7,7 +7,7 @@ type Session struct {
 	BaseModel
 	TenantID    *string       `json:"tenant_id,omitempty"`
 	ProgramID   string        `json:"program_id"`
-	ProgramName string        `json:"program_name,omitempty"` // populated via JOIN with programs
+	ProgramName string        `json:"program_name,omitempty" gorm:"-"` // populated via JOIN with programs
 	Name        string        `json:"name"`
 	SessionDate string        `json:"session_date"`
 	StartTime   *string       `json:"start_time,omitempty"`

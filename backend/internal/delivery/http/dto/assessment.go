@@ -8,7 +8,7 @@ type AssessmentUpsertRequest struct {
 	ParticipantID     string `json:"participant_id" validate:"required"`
 	SessionID         string `json:"session_id" validate:"required"`
 	SessionSubstageID string `json:"session_substage_id" validate:"required"`
-	StarRating        int    `json:"star_rating" validate:"min=0,max=5"`
+	StarRating        int    `json:"star_rating" validate:"min=0,max=4"`
 	Comment           string `json:"comment,omitempty"`
 	AssessedAt        string `json:"assessed_at,omitempty"`
 	SyncStatus        string `json:"sync_status,omitempty"`
