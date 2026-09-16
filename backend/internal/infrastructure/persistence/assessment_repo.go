@@ -24,6 +24,19 @@ func NewAssessmentRepository(db *gorm.DB) repository.AssessmentRepository {
 }
 
 func (r *GormAssessmentRepository) Create(ctx context.Context, a *entity.Assessment) error {
+	// Denormalize: fetch participant name and kegiatan name if not set
+	if a.ParticipantName == "" && a.ParticipantID != "" {
+		var name string
+		if err := r.db.WithContext(ctx).Model(&ParticipantModel{}).Select("child_name").Where("id = ?", a.ParticipantID).Scan(&name).Error; err == nil {
+			a.ParticipantName = name
+		}
+	}
+	if a.KegiatanName == "" && a.SessionSubstageID != "" {
+		var name string
+		if err := r.db.WithContext(ctx).Model(&SessionSubstageModel{}).Select("name").Where("id = ?", a.SessionSubstageID).Scan(&name).Error; err == nil {
+			a.KegiatanName = name
+		}
+	}
 	m := assessmentModelFromEntity(a)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		if isDuplicate(err) {

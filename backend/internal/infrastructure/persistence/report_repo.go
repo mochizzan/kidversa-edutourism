@@ -25,6 +25,18 @@ func NewReportRepository(db *gorm.DB) repository.ReportRepository {
 }
 
 func (r *GormReportRepository) Create(ctx context.Context, rep *entity.Report) error {
+	// Denormalize: fetch group name from participant's group if not set
+	if rep.GroupName == "" && rep.ParticipantID != "" {
+		var groupName string
+		if err := r.db.WithContext(ctx).
+			Select("sg.name").
+			Joins("LEFT JOIN session_groups sg ON sg.id = p.group_id").
+			Table("participants p").
+			Where("p.id = ?", rep.ParticipantID).
+			Scan(&groupName).Error; err == nil {
+			rep.GroupName = groupName
+		}
+	}
 	m := reportModelFromEntity(rep)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		if isDuplicate(err) {
@@ -100,6 +112,19 @@ func (r *GormReportRepository) GetOrCreateDraft(ctx context.Context, participant
 		if lerr := r.loadMissionIDs(ctx, reports); lerr != nil {
 			return apperrors.Internal("internal_error", lerr)
 		}
+		// Denormalize: fetch group name if empty
+		if reports[0].GroupName == "" {
+			var groupName string
+			if err := tx.
+				Select("sg.name").
+				Joins("LEFT JOIN session_groups sg ON sg.id = p.group_id").
+				Table("participants p").
+				Where("p.id = ?", got.ParticipantID).
+				Scan(&groupName).Error; err == nil {
+				reports[0].GroupName = groupName
+				tx.Model(&ReportModel{}).Where("id = ?", got.ID).Update("group_name", groupName)
+			}
+		}
 		res = &reports[0]
 		return nil
 	})
@@ -138,42 +163,6 @@ func (r *GormReportRepository) loadMissionIDs(ctx context.Context, reports []ent
 	}
 	for i := range reports {
 		reports[i].MissionIDs = byReport[reports[i].ID]
-	}
-	return nil
-}
-
-// groupNameRow is a lightweight projection of participants + session_groups used
-// only to derive each report's GroupName (avoids scanning full entity rows).
-type groupNameRow struct {
-	ParticipantID string `gorm:"column:participant_id"`
-	GroupName     string `gorm:"column:group_name"`
-}
-
-// loadGroupNames fills each report's derived GroupName from its participant's
-// group (participants.group_id -> session_groups.name). LEFT JOIN → NULL →
-// empty string when the participant has no group.
-func (r *GormReportRepository) loadGroupNames(ctx context.Context, reports []entity.Report) error {
-	if len(reports) == 0 {
-		return nil
-	}
-	ids := make([]string, 0, len(reports))
-	for i := range reports {
-		ids = append(ids, reports[i].ParticipantID)
-	}
-	var rows []groupNameRow
-	if err := r.db.WithContext(ctx).Table("participants AS p").
-		Select("p.id AS participant_id, sg.name AS group_name").
-		Joins("LEFT JOIN session_groups AS sg ON sg.id = p.group_id").
-		Where("p.id IN ?", ids).
-		Scan(&rows).Error; err != nil {
-		return err
-	}
-	byParticipant := make(map[string]string, len(reports))
-	for _, row := range rows {
-		byParticipant[row.ParticipantID] = row.GroupName
-	}
-	for i := range reports {
-		reports[i].GroupName = byParticipant[reports[i].ParticipantID]
 	}
 	return nil
 }
@@ -219,9 +208,6 @@ func (r *GormReportRepository) GetByIDPublic(ctx context.Context, id string) (*e
 	if err := r.loadMissionIDs(ctx, reports); err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	if err := r.loadGroupNames(ctx, reports); err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
 	*e = reports[0]
 	return e, nil
 }
@@ -247,9 +233,6 @@ func (r *GormReportRepository) GetByToken(ctx context.Context, token string) (*e
 	e := m.ToEntity()
 	reports := []entity.Report{*e}
 	if err := r.loadMissionIDs(ctx, reports); err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	if err := r.loadGroupNames(ctx, reports); err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	*e = reports[0]

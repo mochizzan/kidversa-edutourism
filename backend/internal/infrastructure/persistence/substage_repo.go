@@ -67,6 +67,8 @@ func (r *GormProgramSubstageRepository) UpdateSubstage(ctx context.Context, s *e
 		}
 		return apperrors.Internal("internal_error", err)
 	}
+	// Denormalize: sync kegiatan_name in all assessments referencing this substage
+	r.db.WithContext(ctx).Model(&AssessmentModel{}).Where("session_substage_id = ?", s.ID).Update("kegiatan_name", s.Name)
 	return nil
 }
 

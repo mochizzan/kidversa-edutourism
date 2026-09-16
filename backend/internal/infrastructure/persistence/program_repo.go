@@ -93,6 +93,8 @@ func (r *GormProgramRepository) UpdateProgram(ctx context.Context, p *entity.Pro
 		}
 		return apperrors.Internal("internal_error", err)
 	}
+	// Denormalize: sync program_name in all sessions referencing this program
+	r.db.WithContext(ctx).Model(&SessionModel{}).Where("program_id = ?", p.ID).Update("program_name", p.Name)
 	return nil
 }
 
@@ -163,6 +165,8 @@ func (r *GormProgramRepository) UpdateStage(ctx context.Context, s *entity.Progr
 		}
 		return apperrors.Internal("internal_error", err)
 	}
+	// Denormalize: sync program_stage_name in all session_stages referencing this stage
+	r.db.WithContext(ctx).Model(&SessionStageModel{}).Where("program_stage_id = ?", s.ID).Update("program_stage_name", s.Name)
 	return nil
 }
 

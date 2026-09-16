@@ -32,6 +32,13 @@ func (r *GormSessionRepository) Transaction(ctx context.Context, fn func(tx repo
 }
 
 func (r *GormSessionRepository) CreateSession(ctx context.Context, s *entity.Session) error {
+	// Denormalize: fetch program name if not set
+	if s.ProgramName == "" && s.ProgramID != "" {
+		var name string
+		if err := r.db.WithContext(ctx).Model(&ProgramModel{}).Select("name").Where("id = ?", s.ProgramID).Scan(&name).Error; err == nil {
+			s.ProgramName = name
+		}
+	}
 	m := sessionModelFromEntity(s)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
@@ -120,6 +127,13 @@ func (r *GormSessionRepository) DeleteSession(ctx context.Context, id string) er
 // --- Session stages ---
 
 func (r *GormSessionRepository) CreateSessionStage(ctx context.Context, s *entity.SessionStage) error {
+	// Denormalize: fetch program stage name if not set
+	if s.ProgramStageName == "" && s.ProgramStageID != "" {
+		var name string
+		if err := r.db.WithContext(ctx).Model(&ProgramStageModel{}).Select("name").Where("id = ?", s.ProgramStageID).Scan(&name).Error; err == nil {
+			s.ProgramStageName = name
+		}
+	}
 	m := sessionStageModelFromEntity(s)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
@@ -253,6 +267,13 @@ func (r *GormSessionRepository) ListGroupStageProgressByGroup(ctx context.Contex
 // --- Participants ---
 
 func (r *GormSessionRepository) CreateParticipant(ctx context.Context, p *entity.Participant) error {
+	// Denormalize: fetch session name if not set
+	if p.SessionName == "" && p.SessionID != nil && *p.SessionID != "" {
+		var name string
+		if err := r.db.WithContext(ctx).Model(&SessionModel{}).Select("name").Where("id = ?", *p.SessionID).Scan(&name).Error; err == nil {
+			p.SessionName = name
+		}
+	}
 	m := participantModelFromEntity(p)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
@@ -353,6 +374,8 @@ func (r *GormSessionRepository) UpdateParticipant(ctx context.Context, p *entity
 	if err := r.db.WithContext(ctx).Model(&ParticipantModel{}).Where("id = ?", p.ID).Updates(m).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
+	// Denormalize: sync participant_name in all assessments referencing this participant
+	r.db.WithContext(ctx).Model(&AssessmentModel{}).Where("participant_id = ?", p.ID).Update("participant_name", p.ChildName)
 	return nil
 }
 

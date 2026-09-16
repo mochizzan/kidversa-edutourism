@@ -11,6 +11,8 @@ type Assessment struct {
 	StarRating        int        `json:"star_rating"`
 	Comment           string     `json:"comment,omitempty"`
 	AssessedBy        string     `json:"assessed_by"`
+	ParticipantName   string     `json:"participant_name,omitempty"` // denormalized from participants.child_name
+	KegiatanName      string     `json:"kegiatan_name,omitempty"`    // denormalized from session_substages.name
 	AssessedAt        time.Time  `json:"assessed_at"`
 	SyncStatus        SyncStatus `json:"sync_status"`
 }
@@ -49,7 +51,7 @@ type Report struct {
 	GalleryTokenExpiresAt *time.Time   `json:"gallery_token_expires_at,omitempty"`
 	GalleryTokenRevoked   bool         `json:"gallery_token_revoked,omitempty"`
 	MissionIDs            []string     `json:"mission_ids,omitempty" gorm:"-"`
-	GroupName             string       `json:"group_name,omitempty" gorm:"-"`
+	GroupName             string       `json:"group_name,omitempty"` // denormalized from session_groups.name
 }
 
 // ParticipantMission links a report to a completed mission from the mission bank.

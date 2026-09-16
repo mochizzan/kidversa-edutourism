@@ -7,7 +7,7 @@ type Session struct {
 	BaseModel
 	TenantID    *string       `json:"tenant_id,omitempty"`
 	ProgramID   string        `json:"program_id"`
-	ProgramName string        `json:"program_name,omitempty" gorm:"-"` // populated via JOIN with programs
+	ProgramName string        `json:"program_name,omitempty"` // denormalized from programs.name
 	Name        string        `json:"name"`
 	SessionDate string        `json:"session_date"`
 	StartTime   *string       `json:"start_time,omitempty"`
@@ -21,12 +21,13 @@ type Session struct {
 // SessionStage is an instantiation of a Topik within a session.
 type SessionStage struct {
 	BaseModel
-	SessionID      string             `json:"session_id"`
-	ProgramStageID string             `json:"program_stage_id"`
-	FacilitatorID  *string            `json:"facilitator_id,omitempty"`
-	Status         SessionStageStatus `json:"status"`
-	StartedAt      *time.Time         `json:"started_at,omitempty"`
-	CompletedAt    *time.Time         `json:"completed_at,omitempty"`
+	SessionID        string             `json:"session_id"`
+	ProgramStageID   string             `json:"program_stage_id"`
+	ProgramStageName string             `json:"program_stage_name,omitempty"` // denormalized from program_stages.name
+	FacilitatorID    *string            `json:"facilitator_id,omitempty"`
+	Status           SessionStageStatus `json:"status"`
+	StartedAt        *time.Time         `json:"started_at,omitempty"`
+	CompletedAt      *time.Time         `json:"completed_at,omitempty"`
 }
 
 // SessionGroup is a cohort of participants within a session.
@@ -78,6 +79,7 @@ type Participant struct {
 	ParentName   string     `json:"parent_name"`
 	ParentPhone  string     `json:"parent_phone"`
 	ParentEmail  string     `json:"parent_email,omitempty"`
+	SessionName  string     `json:"session_name,omitempty"` // denormalized from sessions.name
 	ConsentPhoto bool       `json:"consent_photo"`
 	ConsentAt    *time.Time `json:"consent_at,omitempty"`
 	// ConsentCombinedToken is a single-use token (per participant) used by the
