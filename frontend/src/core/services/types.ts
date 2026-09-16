@@ -189,10 +189,12 @@ export interface ConsentProgressEvent {
 
 export interface ConsentService {
   sendViaWhatsApp(sessionId: string, force?: boolean): Promise<ConsentSendWhatsAppResponse>
-  submitCombined(token: string, photo: boolean): Promise<void>
+  submitCombined(token: string, photo: boolean, responderName?: string): Promise<void>
   getBySession(sessionId: string): Promise<ConsentLog[]>
   getSummary(sessionIds: string[]): Promise<Record<string, ConsentLog[]>>
   getInfo(token: string): Promise<ConsentInfo>
+  getFlat(): Promise<import('../types').ConsentFlatItem[]>
+  sendSingle(participantId: string, force?: boolean): Promise<void>
 }
 
 export interface ConsentInfo {

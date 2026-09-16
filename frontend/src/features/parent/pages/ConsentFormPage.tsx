@@ -178,7 +178,7 @@ function ConsentForm() {
     setSubmitting(true)
 
     try {
-      await consentService.submitCombined(token, photoConsent)
+      await consentService.submitCombined(token, photoConsent, parentName)
       setSuccess(true)
     } catch (err) {
       const code = err instanceof ApiError ? err.code : ''

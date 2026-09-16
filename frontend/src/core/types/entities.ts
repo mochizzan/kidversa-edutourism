@@ -322,6 +322,22 @@ export interface ConsentLog {
  user_agent?: string
 }
 
+export interface ConsentFlatItem {
+ participant_id: string
+ child_name: string
+ parent_name: string
+ parent_phone: string
+ session_id: string
+ session_name: string
+ session_date: string
+ location: string
+ program_name: string
+ consent_status: 'granted' | 'pending' | 'not_sent' | 'denied'
+ responded_at?: string
+ responder_name?: string
+ has_token: boolean
+}
+
 export interface AuditLog {
  id: string
  user_id: string

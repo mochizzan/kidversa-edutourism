@@ -1,88 +1,87 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
-import { sessionService } from '../../../core/services/sessions'
 import { consentService } from '../../../core/services/consent'
-import { ApiError } from '../../../core/services/backend-client'
 import { useConsentProgress } from '../../../shared/hooks/useConsentProgress'
-import type { Session, Participant, ConsentLog } from '../../../core/types'
-import { ConsentType } from '../../../core/types'
-
-export interface SessionConsentData {
-  session: Session
-  participants: Participant[]
-  logs: ConsentLog[]
-  consentedPhoto: number
-  pendingCount: number
-}
+import type { ConsentFlatItem } from '../../../core/types'
 
 export type ConsentStatus = 'not_sent' | 'pending' | 'granted' | 'denied'
 
-export function useConsentMonitor() {
+const PAGE_SIZE = 20
+
+export interface ConsentFlatData {
+  items: ConsentFlatItem[]
+  filtered: ConsentFlatItem[]
+  paged: ConsentFlatItem[]
+  loading: boolean
+  error: string | null
+  search: string
+  setSearch: (s: string) => void
+  filterStatus: ConsentStatus | 'all'
+  setFilterStatus: (f: ConsentStatus | 'all') => void
+  page: number
+  setPage: (p: number) => void
+  pageSize: number
+  totalPages: number
+  totalItems: number
+  sendSingle: (participantId: string, force?: boolean) => Promise<void>
+  sendAll: () => Promise<void>
+  refresh: () => Promise<void>
+  sending: Record<string, boolean>
+  batchSending: boolean
+  activeBatch: string | null
+  progress: { sent: number; failed: number; total: number }
+}
+
+export function useConsentMonitor(): ConsentFlatData {
   const { addToast } = useGlobalToast()
 
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [consentData, setConsentData] = useState<Record<string, SessionConsentData>>({})
+  const [items, setItems] = useState<ConsentFlatItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [expandedSession, setExpandedSession] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<ConsentStatus | 'all'>('all')
+  const [page, setPage] = useState(1)
   const [sending, setSending] = useState<Record<string, boolean>>({})
-  const [activeBatch, setActiveBatch] = useState<{
-    sessionId: string
-    batchId: string
-    total: number
-  } | null>(null)
+  const [activeBatch, setActiveBatch] = useState<string | null>(null)
 
-  const { progress, connected, failed } = useConsentProgress(activeBatch?.batchId ?? null)
-  const sseEverConnected = useRef(false)
+  const { progress, connected } = useConsentProgress(activeBatch)
 
+  // Reset page when search or filter changes
+  useEffect(() => {
+    setPage(1)
+  }, [search, filterStatus])
+
+  // Client-side filtered list
+  const filtered = useMemo(() => {
+    let result = items
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      result = result.filter((item) => item.child_name.toLowerCase().includes(q))
+    }
+
+    if (filterStatus !== 'all') {
+      result = result.filter((item) => item.consent_status === filterStatus)
+    }
+
+    return result
+  }, [items, search, filterStatus])
+
+  // Client-side pagination
+  const paged = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filtered.slice(start, start + PAGE_SIZE)
+  }, [filtered, page])
+
+  const totalPages = useMemo(() => Math.ceil(filtered.length / PAGE_SIZE), [filtered])
+
+  // Load data
   const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await sessionService.getAll({ limit: 100 })
-      const loadedSessions = res.data
-      setSessions(loadedSessions)
-
-      if (loadedSessions.length === 0) {
-        setConsentData({})
-        return
-      }
-
-      const consentMap = await consentService.getSummary(loadedSessions.map((s) => s.id))
-
-      const participantResults = await Promise.all(
-        loadedSessions.map((s) => sessionService.getParticipants(s.id)),
-      )
-
-      const dataMap: Record<string, SessionConsentData> = {}
-      loadedSessions.forEach((session, i) => {
-        const participants = participantResults[i]
-        const logs = consentMap[session.id] ?? []
-
-        const consentedPhoto = participants.filter((p) =>
-          logs.some(
-            (l) => l.participant_id === p.id && l.consent_type === ConsentType.PHOTO && l.value,
-          ),
-        ).length
-
-        const pendingCount = participants.filter((p) => {
-          const hasPhoto = logs.some(
-            (l) =>
-              l.participant_id === p.id && l.consent_type === ConsentType.PHOTO && l.responded_at,
-          )
-          return !hasPhoto
-        }).length
-
-        dataMap[session.id] = {
-          session,
-          participants,
-          logs,
-          consentedPhoto,
-          pendingCount,
-        }
-      })
-
-      setConsentData(dataMap)
+      const data = await consentService.getFlat()
+      setItems(data)
     } catch {
       setError('Gagal memuat data consent')
     } finally {
@@ -94,99 +93,121 @@ export function useConsentMonitor() {
     loadData()
   }, [loadData])
 
+  // Handle SSE completion
   useEffect(() => {
-    if (connected) sseEverConnected.current = true
-  }, [connected])
-
-  useEffect(() => {
-    if (activeBatch && failed) {
-      addToast({
-        type: 'error',
-        message: 'Gagal mengirim permintaan consent. Silakan coba lagi.',
-      })
-      setActiveBatch(null)
-    }
-  }, [failed, activeBatch, addToast])
-
-  useEffect(() => {
-    if (activeBatch && sseEverConnected.current && !connected && progress?.type !== 'done') {
-      addToast({
-        type: 'warning',
-        message: 'Koneksi SSE terputus. Klik "Kirim via WhatsApp" untuk mengulang.',
-      })
-      setActiveBatch(null)
-    }
-  }, [connected, activeBatch, progress, addToast])
-
-  useEffect(() => {
-    if (!activeBatch) return
     if (progress?.type === 'done') {
       addToast({
         type: 'success',
-        message: `Pengiriman selesai: ${progress.data.sent ?? 0}/${progress.data.total ?? 0} peserta`,
+        message: `Selesai: ${progress.data.sent ?? 0}/${progress.data.total ?? 0} berhasil`,
       })
       setActiveBatch(null)
       loadData()
     }
-  }, [progress, activeBatch, addToast, loadData])
+  }, [progress, addToast, loadData])
 
-  const handleSendWhatsApp = useCallback(
-    async (sessionId: string, force = false) => {
-      setSending((prev) => ({ ...prev, [sessionId]: true }))
+  // Handle SSE disconnection
+  useEffect(() => {
+    if (activeBatch && !connected && progress?.type !== 'done') {
+      // Connection lost but we still have an active batch — let the progress handle it
+    }
+  }, [connected, activeBatch, progress])
+
+  const refresh = useCallback(async () => {
+    await loadData()
+  }, [loadData])
+
+  const sendSingle = useCallback(
+    async (participantId: string, force = false) => {
+      setSending((prev) => ({ ...prev, [participantId]: true }))
       try {
-        const res = await consentService.sendViaWhatsApp(sessionId, force)
-        setActiveBatch({ sessionId, batchId: res.batch_id, total: res.total })
-        addToast({
-          type: 'info',
-          message: force
-            ? `Mengirim ulang permintaan consent via WhatsApp ke ${res.total} peserta...`
-            : `Mengirim permintaan consent via WhatsApp ke ${res.total} peserta...`,
-        })
-      } catch (err) {
-        let message = 'Gagal mengirim permintaan consent'
-        if (err instanceof ApiError) {
-          if (err.code === 'nothing_to_send') {
-            message = 'Permintaan sudah dikirim sebelumnya. Gunakan "Kirim Ulang" untuk mengirim ulang.'
-          } else {
-            message = err.message
-          }
-        }
+        await consentService.sendSingle(participantId, force)
+        addToast({ type: 'success', message: 'Berhasil mengirim permintaan consent' })
+        await loadData()
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : 'Gagal mengirim permintaan consent'
         addToast({ type: 'error', message })
       } finally {
-        setSending((prev) => ({ ...prev, [sessionId]: false }))
+        setSending((prev) => {
+          const next = { ...prev }
+          delete next[participantId]
+          return next
+        })
       }
     },
-    [addToast],
+    [addToast, loadData],
   )
 
-  const getConsentStatus = useCallback(
-    (participantId: string, consentType: ConsentType, logs: ConsentLog[]): ConsentStatus => {
-      const log = logs.find(
-        (l) => l.participant_id === participantId && l.consent_type === consentType,
-      )
-      if (!log) return 'not_sent'
-      if (!log.responded_at) return 'pending'
-      return log.value ? 'granted' : 'denied'
-    },
-    [],
-  )
+  const sendAll = useCallback(async () => {
+    // Collect unique session_ids from eligible participants
+    const eligibleSessionIds = [
+      ...new Set(
+        filtered
+          .filter(
+            (item) =>
+              item.consent_status === 'not_sent' || item.consent_status === 'pending',
+          )
+          .map((item) => item.session_id),
+      ),
+    ]
 
-  const toggleSession = useCallback((sessionId: string) => {
-    setExpandedSession((prev) => (prev === sessionId ? null : sessionId))
-  }, [])
+    if (eligibleSessionIds.length === 0) {
+      addToast({
+        type: 'warning',
+        message: 'Tidak ada peserta yang perlu dikirimi permintaan consent',
+      })
+      return
+    }
+
+    // Count eligible participants
+    const eligibleCount = filtered.filter(
+      (item) =>
+        item.consent_status === 'not_sent' || item.consent_status === 'pending',
+    ).length
+
+    addToast({
+      type: 'info',
+      message: `Mengirim ke ${eligibleCount} peserta...`,
+    })
+
+    // Send batch for each session
+    for (const sessionId of eligibleSessionIds) {
+      try {
+        const res = await consentService.sendViaWhatsApp(sessionId, true)
+        if (!activeBatch) {
+          setActiveBatch(res.batch_id)
+        }
+      } catch {
+        // Individual session failures are logged but don't stop the loop
+      }
+    }
+  }, [filtered, addToast, activeBatch])
 
   return {
-    sessions,
-    consentData,
+    items,
+    filtered,
+    paged,
     loading,
     error,
-    expandedSession,
+    search,
+    setSearch,
+    filterStatus,
+    setFilterStatus,
+    page,
+    setPage,
+    pageSize: PAGE_SIZE,
+    totalPages,
+    totalItems: filtered.length,
+    sendSingle,
+    sendAll,
+    refresh,
     sending,
+    batchSending: activeBatch !== null && progress?.type !== 'done',
     activeBatch,
-    progress,
-    loadData,
-    handleSendWhatsApp,
-    getConsentStatus,
-    toggleSession,
+    progress: progress?.type === 'done'
+      ? { sent: progress.data.sent ?? 0, failed: progress.data.failed ?? 0, total: progress.data.total ?? 0 }
+      : progress?.type === 'progress'
+        ? { sent: 0, failed: 0, total: 0 }
+        : { sent: 0, failed: 0, total: 0 },
   }
 }

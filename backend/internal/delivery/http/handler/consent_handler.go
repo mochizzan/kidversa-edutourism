@@ -52,7 +52,7 @@ func (h *ConsentHandler) Respond(c *echo.Context) error {
 	ip := (*c).RealIP()
 	ua := (*c).Request().UserAgent()
 	if err := h.consent.RespondConsent((*c).Request().Context(), req.ParticipantID, req.SessionID,
-		entity.ConsentType(req.ConsentType), req.Value, ip, ua); err != nil {
+		entity.ConsentType(req.ConsentType), req.Value, ip, ua, ""); err != nil {
 		return err
 	}
 	return appresp.OK(c, map[string]string{"status": "recorded"})
@@ -263,7 +263,7 @@ func (h *ConsentHandler) RespondCombined(c *echo.Context) error {
 	ip := (*c).RealIP()
 	ua := (*c).Request().UserAgent()
 	if rerr := h.consent.RespondConsent((*c).Request().Context(), participant.ID, sessionID,
-		entity.ConsentPhoto, req.Photo, ip, ua); rerr != nil {
+		entity.ConsentPhoto, req.Photo, ip, ua, req.ResponderName); rerr != nil {
 		return rerr
 	}
 
@@ -368,6 +368,111 @@ func (h *ConsentHandler) List(c *echo.Context) error {
 		return err
 	}
 	return appresp.OK(c, dto.NewConsentListResponse(items))
+}
+
+// Flat handles GET /api/consent/flat (JWT, tenant-scoped): returns a flat
+// projection of all participants across sessions with their consent status.
+func (h *ConsentHandler) Flat(c *echo.Context) error {
+	tenantID := appmiddleware.GetTenantID(c)
+	rows, err := h.consent.ListConsentFlat((*c).Request().Context(), tenantID)
+	if err != nil {
+		return err
+	}
+	items := make([]dto.ConsentFlatItem, len(rows))
+	for i, r := range rows {
+		items[i] = dto.ConsentFlatItem{
+			ParticipantID: r.ParticipantID,
+			ChildName:     r.ChildName,
+			ParentName:    r.ParentName,
+			ParentPhone:   r.ParentPhone,
+			SessionID:     r.SessionID,
+			SessionName:   r.SessionName,
+			SessionDate:   r.SessionDate,
+			Location:      r.Location,
+			ProgramName:   r.ProgramName,
+			ConsentStatus: r.ConsentStatus,
+			ResponderName: r.ResponderName,
+			HasToken:      r.HasToken,
+		}
+		if r.RespondedAt != nil {
+			ts := r.RespondedAt.Format(time.RFC3339)
+			items[i].RespondedAt = &ts
+		}
+	}
+	return appresp.OK(c, dto.ConsentFlatResponse{Data: items})
+}
+
+// SendSingle handles POST /api/consent/send-whatsapp/single (JWT, tenant-scoped):
+// sends a WhatsApp consent request to a single participant by ID.
+func (h *ConsentHandler) SendSingle(c *echo.Context) error {
+	var req dto.ConsentSendSingleRequest
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	force := (*c).QueryParam("force") == "true"
+	ctx := (*c).Request().Context()
+
+	participant, err := h.sessionRepo.GetParticipantByID(ctx, req.ParticipantID, tenantID)
+	if err != nil {
+		return err
+	}
+
+	if participant.SessionID == nil || *participant.SessionID == "" {
+		return apperrors.BadRequest("participant_not_linked", fmt.Errorf("participant not linked to a session"))
+	}
+	sessionID := *participant.SessionID
+
+	// Already consented?
+	photoGranted, _ := h.consent.GetConsentValue(ctx, participant.ID, sessionID, entity.ConsentPhoto)
+	if photoGranted {
+		return apperrors.Conflict("already_consented", fmt.Errorf("participant has already consented"))
+	}
+
+	// Check active token (unless force).
+	now := time.Now().UTC()
+	if !force && participant.ConsentCombinedToken != nil && participant.ConsentCombinedTokenExpiresAt != nil && participant.ConsentCombinedTokenExpiresAt.After(now) {
+		return apperrors.Conflict("already_sent", fmt.Errorf("consent request already sent"))
+	}
+
+	if force {
+		if cerr := h.sessionRepo.ClearParticipantTokens(ctx, sessionID, tenantID); cerr != nil {
+			return cerr
+		}
+	}
+
+	// Generate token.
+	token, terr := util.RandomToken()
+	if terr != nil {
+		return apperrors.Internal("internal_error", terr)
+	}
+	expiresAt := now.Add(h.cfg.ConsentTokenTTL)
+	ok, uerr := h.sessionRepo.UpdateParticipantTokenIfAvailable(ctx, participant.ID, token, expiresAt)
+	if uerr != nil {
+		return uerr
+	}
+	if !ok {
+		return apperrors.Conflict("already_sent", fmt.Errorf("token already set by concurrent request"))
+	}
+
+	session, serr := h.sessionRepo.GetSessionByID(ctx, sessionID, tenantID)
+	if serr != nil {
+		return serr
+	}
+
+	chatID := normalizeWhatsAppPhone(participant.ParentPhone) + "@c.us"
+	url := fmt.Sprintf("%s?token=%s", h.cfg.ParentConsentBaseURL, token)
+	msg := buildConsentMessage(participant.ParentName, participant.ChildName, session.Name, formatSessionDateID(session.SessionDate), session.Location, url)
+	if smerr := h.messaging.SendTextMessage(ctx, chatID, msg); smerr != nil {
+		return apperrors.Internal("whatsapp_failed", smerr)
+	}
+
+	// Audit trail (non-fatal).
+	if sErr := h.consent.SendConsentRequest(ctx, participant.ID, sessionID, entity.ConsentPhoto); sErr != nil {
+		log.Printf("consent: send-request record failed for %s PHOTO: %v", participant.ID, sErr)
+	}
+
+	return appresp.OK(c, dto.ConsentSendSingleResponse{Status: "sent"})
 }
 
 // digitRe matches any non-digit character, used to strip formatting from phone numbers.

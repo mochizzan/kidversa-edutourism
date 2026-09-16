@@ -524,6 +524,7 @@ CREATE TABLE IF NOT EXISTS `consent_logs` (
   `responded_at` datetime(3) DEFAULT NULL,
   `ip_address` varchar(64) DEFAULT NULL,
   `user_agent` varchar(512) DEFAULT NULL,
+  `responder_name` varchar(200) DEFAULT NULL,
   `consent_token` varchar(64) DEFAULT NULL,
   `consumed_at` datetime(3) DEFAULT NULL,
   `expires_at` datetime(3) DEFAULT NULL,

@@ -24,6 +24,10 @@ func RegisterConsentRoutes(g *echo.Group, h *ConsentHandler, jm *auth.JWTManager
 	g.GET("/info", h.Info)
 	// Record a consent decision (JWT, tenant-scoped) — kept for admin manual override.
 	g.POST("/respond", h.Respond, authMW, roleMW, scopeMW)
+	// Flat consent view: all participants across sessions (JWT, tenant-scoped).
+	g.GET("/flat", h.Flat, authMW, roleMW, scopeMW)
+	// Single-participant WhatsApp send (JWT, tenant-scoped).
+	g.POST("/send-whatsapp/single", h.SendSingle, authMW, roleMW, scopeMW)
 	// Batch consent summary: ?session_ids=comma,separated (JWT, tenant-scoped).
 	g.GET("/summary", h.Summary, authMW, roleMW, scopeMW)
 	// List consent rows: ?session_id= → by session, otherwise ?participant_id= → by participant (JWT, tenant-scoped).

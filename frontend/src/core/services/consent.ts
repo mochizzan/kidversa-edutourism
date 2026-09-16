@@ -1,4 +1,4 @@
-import type { ConsentLog } from '../types'
+import type { ConsentLog, ConsentFlatItem } from '../types'
 import type {
   ConsentService,
   ConsentSendWhatsAppResponse,
@@ -46,11 +46,25 @@ const sendViaWhatsApp = async (
 const submitCombined = async (
   token: string,
   photo: boolean,
+  responderName?: string,
 ): Promise<void> => {
   await apiRequest<unknown>('POST', API_ROUTES.CONSENT.RESPOND_COMBINED, {
     token,
     photo,
+    responder_name: responderName,
   })
+}
+
+const getFlat = async (): Promise<ConsentFlatItem[]> => {
+  return itemsRequest<ConsentFlatItem>('GET', API_ROUTES.CONSENT.FLAT)
+}
+
+const sendSingle = async (participantId: string, force = false): Promise<void> => {
+  await itemRequest<{ status: string }>(
+    'POST',
+    API_ROUTES.CONSENT.SEND_SINGLE + (force ? '?force=true' : ''),
+    { participant_id: participantId },
+  )
 }
 
 const getInfo = async (token: string): Promise<ConsentInfo> => {
@@ -63,4 +77,6 @@ export const consentService: ConsentService = {
   getBySession,
   getSummary,
   getInfo,
+  getFlat,
+  sendSingle,
 }

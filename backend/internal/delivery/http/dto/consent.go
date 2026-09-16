@@ -68,8 +68,9 @@ type ConsentParticipantResult struct {
 
 // ConsentRespondCombinedRequest is the public combined-consent payload.
 type ConsentRespondCombinedRequest struct {
-	Token string `json:"token" validate:"required"`
-	Photo bool   `json:"photo"`
+	Token         string `json:"token" validate:"required"`
+	Photo         bool   `json:"photo"`
+	ResponderName string `json:"responder_name"`
 }
 
 // ConsentRespondCombinedResponse is returned after a combined consent is recorded.
@@ -77,6 +78,38 @@ type ConsentRespondCombinedResponse struct {
 	Status     string `json:"status"` // "recorded"
 	ChildName  string `json:"child_name"`
 	ParentName string `json:"parent_name"`
+}
+
+// ConsentFlatItem is the read representation of a flat consent row.
+type ConsentFlatItem struct {
+	ParticipantID string  `json:"participant_id"`
+	ChildName     string  `json:"child_name"`
+	ParentName    string  `json:"parent_name"`
+	ParentPhone   string  `json:"parent_phone"`
+	SessionID     string  `json:"session_id"`
+	SessionName   string  `json:"session_name"`
+	SessionDate   string  `json:"session_date"`
+	Location      string  `json:"location"`
+	ProgramName   string  `json:"program_name"`
+	ConsentStatus string  `json:"consent_status"`
+	RespondedAt   *string `json:"responded_at,omitempty"`
+	ResponderName string  `json:"responder_name,omitempty"`
+	HasToken      bool    `json:"has_token"`
+}
+
+// ConsentFlatResponse wraps the flat consent list.
+type ConsentFlatResponse struct {
+	Data []ConsentFlatItem `json:"data"`
+}
+
+// ConsentSendSingleRequest is the payload for POST /api/consent/send-whatsapp/single.
+type ConsentSendSingleRequest struct {
+	ParticipantID string `json:"participant_id" validate:"required"`
+}
+
+// ConsentSendSingleResponse is returned after a single send.
+type ConsentSendSingleResponse struct {
+	Status string `json:"status"`
 }
 
 // ConsentInfoResponse is the public, stripped payload for a consent token (no

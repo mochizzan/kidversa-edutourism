@@ -56,7 +56,7 @@ func (r *GormConsentRepository) GetConsentValue(ctx context.Context, participant
 
 // RespondConsent records a parent's consent decision. It upserts the latest value for
 // the (participant, session, type) tuple: updates existing row or creates new.
-func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType, value bool, ip, ua string) error {
+func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType, value bool, ip, ua, responderName string) error {
 	now := time.Now().UTC()
 	log := &entity.ConsentLog{
 		ParticipantID: participantID,
@@ -67,6 +67,7 @@ func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantI
 		RespondedAt:   &now,
 		IPAddress:     ip,
 		UserAgent:     ua,
+		ResponderName: responderName,
 	}
 	// Upsert: try to find existing row first.
 	existing := ConsentLogModel{}
@@ -78,11 +79,12 @@ func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantI
 		return r.db.WithContext(ctx).
 			Model(&existing).
 			Updates(map[string]interface{}{
-				"value":        value,
-				"sent_at":      now,
-				"responded_at": &now,
-				"ip_address":   ip,
-				"user_agent":   ua,
+				"value":          value,
+				"sent_at":        now,
+				"responded_at":   &now,
+				"ip_address":     ip,
+				"user_agent":     ua,
+				"responder_name": responderName,
 			}).Error
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -200,4 +202,43 @@ func (r *GormConsentRepository) GetParticipantByConsentToken(ctx context.Context
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	return m.ToEntity(), nil
+}
+
+// ListConsentFlat returns a flat projection joining participants, sessions, and consent_logs.
+func (r *GormConsentRepository) ListConsentFlat(ctx context.Context, tenantID string) ([]repository.ConsentFlatRow, error) {
+	var rows []repository.ConsentFlatRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			p.id AS participant_id,
+			p.child_name,
+			p.parent_name,
+			p.parent_phone,
+			s.id AS session_id,
+			s.name AS session_name,
+			CAST(s.session_date AS CHAR) AS session_date,
+			s.location,
+			s.program_name,
+			CASE
+				WHEN cl.id IS NOT NULL AND cl.value = 1 AND cl.responded_at IS NOT NULL THEN 'granted'
+				WHEN cl.id IS NOT NULL AND cl.value = 0 AND cl.responded_at IS NOT NULL THEN 'denied'
+				WHEN cl.id IS NOT NULL AND cl.responded_at IS NULL THEN 'pending'
+				ELSE 'not_sent'
+			END AS consent_status,
+			cl.responded_at,
+			cl.responder_name,
+			CASE WHEN p.consent_combined_token IS NOT NULL AND p.consent_combined_token_expires_at > NOW() THEN 1 ELSE 0 END AS has_token
+		FROM participants p
+		JOIN sessions s ON p.session_id = s.id
+		LEFT JOIN consent_logs cl ON cl.participant_id = p.id
+			AND cl.session_id = s.id
+			AND cl.consent_type = 'PHOTO'
+		WHERE s.tenant_id = ?
+			AND s.deleted_at IS NULL
+			AND p.deleted_at IS NULL
+		ORDER BY s.program_name, s.session_date DESC, p.child_name
+	`, tenantID).Scan(&rows).Error
+	if err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return rows, nil
 }

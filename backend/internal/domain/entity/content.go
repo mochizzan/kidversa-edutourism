@@ -74,6 +74,7 @@ type ConsentLog struct {
 	RespondedAt   *time.Time  `json:"responded_at,omitempty"`
 	IPAddress     string      `json:"ip_address,omitempty"`
 	UserAgent     string      `json:"user_agent,omitempty"`
+	ResponderName string      `json:"responder_name,omitempty"`
 	ConsentToken  string      `json:"consent_token,omitempty"`
 	ConsumedAt    *time.Time  `json:"consumed_at,omitempty"`
 	ExpiresAt     *time.Time  `json:"expires_at,omitempty"`

@@ -31,6 +31,8 @@ export const API_ROUTES = {
   RESPOND_COMBINED: '/api/consent/respond-combined',
   INFO: (token: string) => `/api/consent/info?token=${encodeURIComponent(token)}`,
   SUMMARY: '/api/consent/summary',
+  FLAT: '/api/consent/flat',
+  SEND_SINGLE: '/api/consent/send-whatsapp/single',
  },
 
  SESSIONS: {
