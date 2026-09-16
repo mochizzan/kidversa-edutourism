@@ -88,7 +88,8 @@ func (h *PhotoHandler) Update(c *echo.Context) error {
 		}
 	}
 	if req.FrameID != "" {
-		fields["frame_id"] = req.FrameID
+		fid := req.FrameID
+		fields["frame_id"] = &fid
 	}
 	if err := h.photos.UpdatePhotoFields((*c).Request().Context(), id, fields); err != nil {
 		return err

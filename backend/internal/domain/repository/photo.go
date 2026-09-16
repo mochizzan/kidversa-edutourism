@@ -30,6 +30,6 @@ type PhotoRepository interface {
 type PhotoFilter struct {
 	ParticipantID string
 	SessionID     string
-	FrameID       string
+	FrameID       *string
 	IsReportPhoto *bool
 }

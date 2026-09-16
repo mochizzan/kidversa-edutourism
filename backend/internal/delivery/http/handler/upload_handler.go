@@ -101,12 +101,14 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 		BaseModel:       entity.BaseModel{ID: uuid.NewString()},
 		ParticipantID:   (*c).FormValue("participant_id"),
 		SessionID:       (*c).FormValue("session_id"),
-		FrameID:         (*c).FormValue("frame_id"),
 		OriginalFileURL: storedRel,
 		IsReportPhoto:   isReport,
 		TakenBy:         takenBy,
 		TakenAt:         takenAt,
 		SyncStatus:      entity.SyncLocal,
+	}
+	if fid := strings.TrimSpace((*c).FormValue("frame_id")); fid != "" {
+		rec.FrameID = &fid
 	}
 	if err := h.photos.CreatePhoto((*c).Request().Context(), rec); err != nil {
 		// Roll back the stored file so we don't leave orphans.

@@ -103,8 +103,8 @@ func (r *GormPhotoRepository) ListPhotos(ctx context.Context, f repository.Photo
 	if f.SessionID != "" {
 		q = q.Where("session_id = ?", f.SessionID)
 	}
-	if f.FrameID != "" {
-		q = q.Where("frame_id = ?", f.FrameID)
+	if f.FrameID != nil {
+		q = q.Where("frame_id = ?", *f.FrameID)
 	}
 	if f.IsReportPhoto != nil {
 		q = q.Where("is_report_photo = ?", *f.IsReportPhoto)

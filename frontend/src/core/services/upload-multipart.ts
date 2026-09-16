@@ -11,80 +11,115 @@
 // error-handling layer (which checks `instanceof ApiError`) can surface the
 // status/code/message consistently.
 
-import { getApiBaseUrl, getTokens, ApiError } from './backend-client'
+import {
+ getApiBaseUrl,
+ getTokens,
+ refreshAccessToken,
+ fireUnauthorized,
+ ApiError,
+} from './backend-client'
 
 export interface UploadMultipartOptions {
-  // Called with a 0–100 percentage as the request body uploads.
-  onProgress?: (percent: number) => void
-  // Optional AbortSignal to cancel the upload.
-  signal?: AbortSignal
-  // AbortSignal.timeout() may not exist on older targets; if provided we also
-  // honor a manual timeout (ms) by aborting the XHR.
-  timeoutMs?: number
+ // Called with a 0–100 percentage as the request body uploads.
+ onProgress?: (percent: number) => void
+ // Optional AbortSignal to cancel the upload.
+ signal?: AbortSignal
+ // AbortSignal.timeout() may not exist on older targets; if provided we also
+ // honor a manual timeout (ms) by aborting the XHR.
+ timeoutMs?: number
+}
+
+/**
+ * Wraps a single multipart POST attempt in a Promise.
+ * Returns the parsed response body or throws an ApiError.
+ */
+function sendMultipart<T>(
+ path: string,
+ form: FormData,
+ token: string | null,
+ options: Pick<UploadMultipartOptions, 'onProgress' | 'signal' | 'timeoutMs'>,
+): Promise<T> {
+ const { onProgress, signal, timeoutMs } = options
+
+ return new Promise<T>((resolve, reject) => {
+  const xhr = new XMLHttpRequest()
+  xhr.open('POST', `${getApiBaseUrl()}${path}`, true)
+  if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+  xhr.withCredentials = true
+
+  if (timeoutMs && timeoutMs > 0) {
+   xhr.timeout = timeoutMs
+  }
+
+  xhr.upload.onprogress = (e: ProgressEvent) => {
+   if (!onProgress || !e.lengthComputable) return
+   onProgress(Math.round((e.loaded / e.total) * 100))
+  }
+
+  xhr.onload = () => {
+   let parsed: { data?: T; error?: string; code?: string } = {}
+   try {
+    parsed = JSON.parse(xhr.responseText)
+   } catch {
+    // keep defaults
+   }
+   if (xhr.status >= 200 && xhr.status < 300) {
+    resolve((parsed.data ?? parsed) as T)
+    return
+   }
+   const message =
+    typeof parsed.error === 'string'
+     ? parsed.error
+     : `Upload failed with status ${xhr.status}`
+   const code = typeof parsed.code === 'string' ? parsed.code : 'unknown'
+   reject(new ApiError(message, code, xhr.status))
+  }
+
+  xhr.onerror = () => {
+   reject(new ApiError('Network error during upload', 'network_error', 0))
+  }
+
+  xhr.ontimeout = () => {
+   reject(new ApiError('Upload timed out', 'timeout', 0))
+  }
+
+  xhr.onabort = () => {
+   reject(new DOMException('Upload aborted', 'AbortError'))
+  }
+
+  if (signal) {
+   if (signal.aborted) {
+    xhr.abort()
+    return
+   }
+   signal.addEventListener('abort', () => xhr.abort(), { once: true })
+  }
+
+  xhr.send(form)
+ })
 }
 
 export async function uploadMultipart<T>(
-  path: string,
-  form: FormData,
-  options: UploadMultipartOptions = {},
+ path: string,
+ form: FormData,
+ options: UploadMultipartOptions = {},
 ): Promise<T> {
-  const { onProgress, signal, timeoutMs } = options
-  const token = getTokens().accessToken
+ let token = getTokens().accessToken
 
-  return new Promise<T>((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', `${getApiBaseUrl()}${path}`, true)
-    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-    xhr.withCredentials = true
-
-    if (timeoutMs && timeoutMs > 0) {
-      xhr.timeout = timeoutMs
-    }
-
-    xhr.upload.onprogress = (e: ProgressEvent) => {
-      if (!onProgress || !e.lengthComputable) return
-      onProgress(Math.round((e.loaded / e.total) * 100))
-    }
-
-    xhr.onload = () => {
-      let parsed: { data?: T; error?: string; code?: string } = {}
-      try {
-        parsed = JSON.parse(xhr.responseText)
-      } catch {
-        // keep defaults
-      }
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve((parsed.data ?? parsed) as T)
-        return
-      }
-      const message =
-        typeof parsed.error === 'string'
-          ? parsed.error
-          : `Upload failed with status ${xhr.status}`
-      const code = typeof parsed.code === 'string' ? parsed.code : 'unknown'
-      reject(new ApiError(message, code, xhr.status))
-    }
-
-    xhr.onerror = () => {
-      reject(new ApiError('Network error during upload', 'network_error', 0))
-    }
-
-    xhr.ontimeout = () => {
-      reject(new ApiError('Upload timed out', 'timeout', 0))
-    }
-
-    xhr.onabort = () => {
-      reject(new DOMException('Upload aborted', 'AbortError'))
-    }
-
-    if (signal) {
-      if (signal.aborted) {
-        xhr.abort()
-        return
-      }
-      signal.addEventListener('abort', () => xhr.abort(), { once: true })
-    }
-
-    xhr.send(form)
-  })
+ try {
+  return await sendMultipart<T>(path, form, token, options)
+ } catch (err) {
+  // On 401 — attempt a single token refresh + retry, mirroring apiRequest.
+  if (err instanceof ApiError && err.status === 401) {
+   try {
+    await refreshAccessToken()
+    token = getTokens().accessToken
+    return await sendMultipart<T>(path, form, token, options)
+   } catch {
+    fireUnauthorized()
+    throw new ApiError('Session expired', 'refresh_failed', 401)
+   }
+  }
+  throw err
+ }
 }

@@ -20,7 +20,7 @@ type SmartPhoto struct {
 	BaseModel
 	ParticipantID   string     `json:"participant_id"`
 	SessionID       string     `json:"session_id"`
-	FrameID         string     `json:"frame_id,omitempty"`
+	FrameID         *string    `json:"frame_id,omitempty"`
 	OriginalFileURL string     `json:"original_file_url"`
 	FramedFileURL   string     `json:"framed_file_url,omitempty"`
 	IsReportPhoto   bool       `json:"is_report_photo"`
