@@ -4,6 +4,9 @@
 // `limit`, and as the default `pageSize` for useCrudList).
 export const PAGE_SIZE = 10
 
+// Default page size for client-side paginated admin tables.
+export const DEFAULT_CLIENT_PAGE_SIZE = 25
+
 // Backend hard cap on a single page of results (apiEnvelope loops beyond this).
 export const FETCH_ALL_LIMIT = 100
 

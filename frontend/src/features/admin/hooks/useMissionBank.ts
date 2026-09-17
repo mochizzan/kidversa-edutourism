@@ -1,26 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientList'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { missionService } from '../../../core/services/missions'
 import { programService } from '../../../core/services/programs'
 import type { MissionBank, Program, ProgramStage } from '../../../core/types'
 
-const PAGE_SIZE = 10
-
 export function useMissionBank() {
   const { addToast } = useGlobalToast()
+  const { tenantId } = useTenantScope()
 
   const [selectedProgram, setSelectedProgram] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  const [missions, setMissions] = useState<MissionBank[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-
   const [programs, setPrograms] = useState<Program[]>([])
-
   const [stageMap, setStageMap] = useState<Record<string, ProgramStage>>({})
 
   const [deactivateTarget, setDeactivateTarget] = useState<MissionBank | null>(null)
@@ -33,57 +24,71 @@ export function useMissionBank() {
     programService.getAll({ limit: 100 }).then((res) => setPrograms(res.data))
   }, [])
 
+  const textFilter = makeTextFilter<MissionBank>(['title'])
+
+  const filterFn = useCallback(
+    (items: MissionBank[], search: string) => {
+      let result = items
+      if (selectedProgram) {
+        result = result.filter((m) => m.program_id === selectedProgram)
+      }
+      return textFilter(result, search)
+    },
+    [selectedProgram, textFilter],
+  )
+
+  const {
+    data: missions,
+    allData,
+    loading,
+    error,
+    page,
+    totalItems,
+    totalPages,
+    setPage,
+    setSearch,
+    refresh,
+  } = useClientList<MissionBank>({
+    fetchFn: () => missionService.getAll({ limit: 1000 }).then((r) => r.data),
+    filterFn,
+    deps: [tenantId],
+  })
+
+  // Reset page when program filter changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery)
-      setPage(1)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
+    setPage(1)
+  }, [selectedProgram, setPage])
 
-  const loadMissions = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await missionService.getAll({
-        page,
-        limit: PAGE_SIZE,
-        search: debouncedSearch || undefined,
-        filters: {
-          ...(selectedProgram ? { program_id: selectedProgram } : {}),
-        },
-      })
-      setMissions(res.data)
-      setTotal(res.total)
+  // Build stage map from all mission data so stages are available across pages
+  useEffect(() => {
+    let cancelled = false
 
-      // Build stage lookup from unique program_ids in displayed missions
+    const loadStages = async () => {
       const programIds = [
-        ...new Set(res.data.map((m) => m.program_id).filter(Boolean)),
+        ...new Set(allData.map((m) => m.program_id).filter(Boolean)),
       ]
-      if (programIds.length > 0) {
-        const stageLookup: Record<string, ProgramStage> = {}
-        await Promise.all(
-          programIds.map(async (pid) => {
-            try {
-              const stages = await programService.getStages(pid)
-              stages.forEach((s) => { stageLookup[s.id] = s })
-            } catch {
-              /* ignore per-program stage fetch errors */
-            }
-          }),
-        )
+      if (programIds.length === 0) return
+
+      const stageLookup: Record<string, ProgramStage> = {}
+      await Promise.all(
+        programIds.map(async (pid) => {
+          try {
+            const stages = await programService.getStages(pid)
+            stages.forEach((s) => { stageLookup[s.id] = s })
+          } catch {
+            /* ignore per-program stage fetch errors */
+          }
+        }),
+      )
+
+      if (!cancelled) {
         setStageMap(stageLookup)
       }
-    } catch {
-      setError('Gagal memuat data misi')
-    } finally {
-      setLoading(false)
     }
-  }, [page, debouncedSearch, selectedProgram])
 
-  useEffect(() => {
-    loadMissions()
-  }, [loadMissions])
+    void loadStages()
+    return () => { cancelled = true }
+  }, [allData])
 
   const handleToggleActive = useCallback(
     async (mission: MissionBank) => {
@@ -101,14 +106,14 @@ export function useMissionBank() {
         type: 'success',
         message: deactivateTarget.is_active ? 'Misi dinonaktifkan' : 'Misi diaktifkan',
       })
-      loadMissions()
+      refresh()
     } catch {
       addToast({ type: 'error', message: 'Gagal mengubah status misi' })
     } finally {
       setDeactivating(false)
       setDeactivateTarget(null)
     }
-  }, [deactivateTarget, addToast, loadMissions])
+  }, [deactivateTarget, addToast, refresh])
 
   const handleDelete = useCallback(
     async (mission: MissionBank) => {
@@ -123,20 +128,19 @@ export function useMissionBank() {
     try {
       await missionService.delete(deleteTarget.id)
       addToast({ type: 'success', message: 'Misi berhasil dihapus' })
-      loadMissions()
+      refresh()
     } catch {
       addToast({ type: 'error', message: 'Gagal menghapus misi' })
     } finally {
       setDeleting(false)
       setDeleteTarget(null)
     }
-  }, [deleteTarget, addToast, loadMissions])
+  }, [deleteTarget, addToast, refresh])
 
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const searchQuery = '' // controlled by DataTable via setSearch only
 
   const changeProgram = useCallback((value: string) => {
     setSelectedProgram(value)
-    setPage(1)
   }, [])
 
   return {
@@ -145,7 +149,7 @@ export function useMissionBank() {
     loading,
     error,
     page,
-    total,
+    total: totalItems,
     totalPages,
     selectedProgram,
     searchQuery,
@@ -153,12 +157,12 @@ export function useMissionBank() {
     deactivating,
     deleteTarget,
     deleting,
-    setSearchQuery,
+    setSearchQuery: setSearch,
     setPage,
     setSelectedProgram: changeProgram,
     setDeactivateTarget,
     setDeleteTarget,
-    loadMissions,
+    loadMissions: refresh,
     handleToggleActive,
     confirmToggle,
     handleDelete,

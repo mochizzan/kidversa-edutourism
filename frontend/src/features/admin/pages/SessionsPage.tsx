@@ -9,9 +9,11 @@ import { DataTable } from '../../../shared/components/data/DataTable'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
-import { useCrudList } from '../../../shared/hooks/useCrudList'
+import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientList'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { sessionService } from '../../../core/services/sessions'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import { assessmentService } from '../../../core/services/assessments'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Session } from '../../../core/types'
@@ -21,9 +23,11 @@ import { friendlyError } from '../../../core/utils/errorMessages'
 
 const SessionsPage = () => {
   const navigate = useNavigate()
-  const { data: sessions, loading, error, page, total, setPage, setSearch, refresh } = useCrudList<Session>({
-    fetchFn: (params) => sessionService.getAll({ ...params, limit: 10 }),
-    scopeToTenant: true,
+  const { tenantId } = useTenantScope()
+  const { data: sessions, loading, error, page, totalItems, setPage, setSearch, refresh } = useClientList<Session>({
+    fetchFn: () => sessionService.getAll({ limit: 1000 }).then((r) => r.data),
+    filterFn: makeTextFilter(['name', 'location']),
+    deps: [tenantId],
   })
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
@@ -173,7 +177,7 @@ const SessionsPage = () => {
       header: 'Aksi',
       align: 'right',
       render: (item: Session) => (
-          <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip="Lihat Detail" onClick={() => navigate(`/admin/sessions/${item.id}`)} />
           {item.status === 'DRAFT' && (
             <Button
@@ -230,7 +234,8 @@ const SessionsPage = () => {
         columns={columns}
         loading={loading}
         page={page}
-        total={total}
+        total={totalItems}
+        pageSize={DEFAULT_CLIENT_PAGE_SIZE}
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item: Session) => item.id}

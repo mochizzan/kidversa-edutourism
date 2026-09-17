@@ -11,6 +11,7 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import type { Column } from '../../../shared/components/data/DataTable'
 import { useMissionBank } from '../hooks/useMissionBank'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { MissionBank } from '../../../core/types'
 
 const MissionBankPage = () => {
@@ -169,7 +170,7 @@ const MissionBankPage = () => {
         columns={columns}
         loading={loading}
         page={page}
-        pageSize={10}
+        pageSize={DEFAULT_CLIENT_PAGE_SIZE}
         total={total}
         onPageChange={setPage}
         onSearch={setSearchQuery}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Pencil, Trash2, Eye, Plus } from 'lucide-react'
+import { Pencil, Trash2, Eye, Plus, AlertCircle } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -12,7 +12,8 @@ import { participantService } from '../../../core/services/participants'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { Modal } from '../../../shared/components/ui/Modal'
-import { useCrudList } from '../../../shared/hooks/useCrudList'
+import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientList'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { Assessment, Participant, Session } from '../../../core/types'
 import { SessionStatus } from '../../../core/types'
 import { friendlyError } from '../../../core/utils/errorMessages'
@@ -35,9 +36,20 @@ const getSessionStatusLabel = (session?: Session | null) => {
 const ParticipantsPage = () => {
   const { addToast } = useGlobalToast()
   const { tenantId } = useTenantScope()
-  const { data: participants, loading, page, total, setPage, setSearch, refresh } = useCrudList<Participant>({
-    fetchFn: (params) => participantService.getAll({ ...params, limit: 10 }),
-    scopeToTenant: true,
+  const {
+    data: participants,
+    loading,
+    error,
+    page,
+    totalItems,
+    setPage,
+    setSearch,
+    refresh,
+    adjustPageOnDelete,
+  } = useClientList<Participant>({
+    fetchFn: () => participantService.getAll({ limit: 1000 }).then((r) => r.data),
+    filterFn: makeTextFilter(['child_name', 'parent_name', 'school_name']),
+    deps: [tenantId],
   })
   const [sessionsById, setSessionsById] = useState<Record<string, Session>>({})
   const [assessmentsByParticipant, setAssessmentsByParticipant] = useState<Record<string, Assessment[]>>({})
@@ -130,11 +142,7 @@ const ParticipantsPage = () => {
       await sessionService.removeParticipant(target.session_id, deleteId)
       addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
       setDeleteId(null)
-      if (page > 1 && participants.length === 1) {
-        setPage(page - 1)
-      } else {
-        refresh()
-      }
+      adjustPageOnDelete()
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
     }
@@ -214,13 +222,20 @@ const ParticipantsPage = () => {
         }
       />
 
+      {error && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
+          <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
+          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+        </div>
+      )}
+
       <DataTable
         data={rows}
         columns={columns}
         loading={loading}
         page={page}
-        total={total}
-        pageSize={10}
+        total={totalItems}
+        pageSize={DEFAULT_CLIENT_PAGE_SIZE}
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item) => item.id}

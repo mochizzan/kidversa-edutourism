@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
 import {
@@ -32,7 +32,11 @@ import {
   NO_REPORT_LABEL,
 } from '../../../core/constants/reportStatus'
 import { useReportSession } from '../hooks/useReportSession'
+import { CompactPagination } from '../../../shared/components/data/CompactPagination'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { Participant } from '../../../core/types'
+
+const REPORT_PAGE_SIZE = DEFAULT_CLIENT_PAGE_SIZE
 
 const ReportSessionPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -80,6 +84,18 @@ const ReportSessionPage = () => {
     skippedParticipants: Participant[]
   } | null>(null)
   const [showConfirmSend, setShowConfirmSend] = useState(false)
+  const [reportPage, setReportPage] = useState(1)
+
+  useEffect(() => {
+    setReportPage(1)
+  }, [activeTopicId, search])
+
+  const reportTotalPages = Math.max(1, Math.ceil(topicFilteredReports.length / REPORT_PAGE_SIZE))
+  const safeReportPage = Math.min(reportPage, reportTotalPages)
+  const pagedReports = useMemo(() => {
+    const start = (safeReportPage - 1) * REPORT_PAGE_SIZE
+    return topicFilteredReports.slice(start, start + REPORT_PAGE_SIZE)
+  }, [topicFilteredReports, safeReportPage])
 
   const onGenerate = async () => {
     const result = await handleGenerateAll()
@@ -157,11 +173,10 @@ const ReportSessionPage = () => {
               key={t.programStageId}
               type="button"
               onClick={() => setActiveTopicId(t.programStageId)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                activeTopicId === t.programStageId
-                  ? 'bg-primary text-on-primary border-primary'
-                  : 'bg-surface text-on-surface border-outline-variant hover:border-primary'
-              }`}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${activeTopicId === t.programStageId
+                ? 'bg-primary text-on-primary border-primary'
+                : 'bg-surface text-on-surface border-outline-variant hover:border-primary'
+                }`}
             >
               {t.name}
             </button>
@@ -264,7 +279,7 @@ const ReportSessionPage = () => {
         />
       ) : (
         <div className="grid gap-3">
-          {topicFilteredReports.map((item) => {
+          {pagedReports.map((item) => {
             const isClickable = item.status === 'has_report'
             const showGenerateBtn = item.status === 'ready_to_generate'
             const isIncomplete = item.status === 'incomplete'
@@ -377,6 +392,15 @@ const ReportSessionPage = () => {
           })}
         </div>
       )}
+
+      <CompactPagination
+        page={safeReportPage}
+        totalPages={reportTotalPages}
+        totalItems={topicFilteredReports.length}
+        pageSize={REPORT_PAGE_SIZE}
+        onPageChange={setReportPage}
+        itemLabel="peserta"
+      />
 
       <Modal
         open={!!generateResult}

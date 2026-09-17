@@ -7,7 +7,7 @@ package constants
 import "time"
 
 // DefaultPageLimit is the fallback page size for list endpoints.
-const DefaultPageLimit = 20
+const DefaultPageLimit = 25
 
 // MaxPageLimit caps the page size a client may request on list endpoints.
 const MaxPageLimit = 100

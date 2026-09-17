@@ -1,7 +1,7 @@
 import type { Report } from '../types'
 import type { ReportService, ReportTokenResponse } from './types'
 import { apiRequest } from './backend-client'
-import { itemRequest, itemsRequest, nullableItemRequest } from './api-envelope'
+import { itemRequest, itemsRequest, nullableItemRequest, listRequest } from './api-envelope'
 import { useAuthStore } from '../stores/authStore'
 import { API_ROUTES } from '../constants/apiRoutes'
 
@@ -22,6 +22,13 @@ interface SuggestMissionsResponse {
 
 const getBySession = async (sessionId: string): Promise<Report[]> => {
   return itemsRequest<Report>('GET', API_ROUTES.REPORTS.BY_SESSION(sessionId))
+}
+
+const getBySessionPaginated = async (
+  sessionId: string,
+  params?: { page?: number; limit?: number },
+): Promise<{ data: Report[]; total: number }> => {
+  return listRequest<Report>(API_ROUTES.REPORTS.BY_SESSION(sessionId), params)
 }
 
 const getById = async (id: string): Promise<Report | null> => {
@@ -114,6 +121,7 @@ const getPublicReport = async (token: string): Promise<PublicReportResponse | nu
 
 export const reportService: ReportService = {
   getBySession,
+  getBySessionPaginated,
   getById,
   generate,
   generateOne,

@@ -8,6 +8,8 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { sessionService } from '../../../core/services/sessions'
 import { reportService } from '../../../core/services/reports'
+import { CompactPagination } from '../../../shared/components/data/CompactPagination'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { Session, Report } from '../../../core/types'
 import { ReportStatus } from '../../../core/types/enums'
 import { cn } from '../../../core/utils'
@@ -32,11 +34,14 @@ interface SessionWithReports {
 }
 
 /* ── Page ── */
+const REPORT_PAGE_SIZE = DEFAULT_CLIENT_PAGE_SIZE
+
 const ReportListPage = () => {
   const [sessions, setSessions] = useState<SessionWithReports[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('all')
+  const [reportPage, setReportPage] = useState(1)
 
   const loadData = async () => {
     setLoading(true)
@@ -82,6 +87,10 @@ const ReportListPage = () => {
     loadData()
   }, [])
 
+  useEffect(() => {
+    setReportPage(1)
+  }, [filter])
+
   const filteredSessions = useMemo(() => {
     if (filter === 'all') return sessions
     if (filter === 'has_reports') return sessions.filter((s) => s.reportCount > 0)
@@ -90,6 +99,13 @@ const ReportListPage = () => {
     if (filter === 'sent') return sessions.filter((s) => s.sentCount > 0)
     return sessions
   }, [sessions, filter])
+
+  const reportTotalPages = Math.max(1, Math.ceil(filteredSessions.length / REPORT_PAGE_SIZE))
+  const safeReportPage = Math.min(reportPage, reportTotalPages)
+  const pagedSessions = useMemo(() => {
+    const start = (safeReportPage - 1) * REPORT_PAGE_SIZE
+    return filteredSessions.slice(start, start + REPORT_PAGE_SIZE)
+  }, [filteredSessions, safeReportPage])
 
   /* ── Loading ── */
   if (loading) {
@@ -182,7 +198,7 @@ const ReportListPage = () => {
         />
       ) : (
         <div className="grid gap-4">
-          {filteredSessions.map(({ session, reportCount, sentCount, draftCount, overallStatus }) => (
+          {pagedSessions.map(({ session, reportCount, sentCount, draftCount, overallStatus }) => (
             <Link
               key={session.id}
               to={`/admin/reports/${session.id}`}
@@ -244,6 +260,15 @@ const ReportListPage = () => {
           ))}
         </div>
       )}
+
+      <CompactPagination
+        page={safeReportPage}
+        totalPages={reportTotalPages}
+        totalItems={filteredSessions.length}
+        pageSize={REPORT_PAGE_SIZE}
+        onPageChange={setReportPage}
+        itemLabel="sesi"
+      />
     </div>
   )
 }

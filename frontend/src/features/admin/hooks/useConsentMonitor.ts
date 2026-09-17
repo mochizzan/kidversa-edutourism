@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { consentService } from '../../../core/services/consent'
 import { useConsentProgress } from '../../../shared/hooks/useConsentProgress'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { ConsentFlatItem } from '../../../core/types'
 
 export type ConsentStatus = 'not_sent' | 'pending' | 'granted' | 'denied'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = DEFAULT_CLIENT_PAGE_SIZE
 
 export interface ConsentFlatData {
   items: ConsentFlatItem[]

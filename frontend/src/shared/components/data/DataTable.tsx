@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
-import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronUp, ChevronDown, Search } from 'lucide-react'
 import { cn } from '../../../core/utils'
+import { CompactPagination } from './CompactPagination'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 
 export interface Column<T> {
   key: string
@@ -35,7 +37,7 @@ export function DataTable<T>({
   columns,
   loading = false,
   page = 1,
-  pageSize = 10,
+  pageSize = DEFAULT_CLIENT_PAGE_SIZE,
   total = 0,
   onPageChange,
   onSearch,
@@ -238,34 +240,13 @@ export function DataTable<T>({
           </table>
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-outline-variant">
-            <div className="text-sm text-on-surface-variant">
-              Menampilkan {(page - 1) * pageSize + 1} sampai {Math.min(page * pageSize, total)} dari {total} data
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onPageChange?.(page - 1)}
-                disabled={page === 1}
-                aria-label="Halaman sebelumnya"
-                className="p-2 rounded-xl border border-outline-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-sm text-on-surface-variant">
-                Halaman {page} dari {totalPages}
-              </span>
-              <button
-                onClick={() => onPageChange?.(page + 1)}
-                disabled={page === totalPages}
-                aria-label="Halaman berikutnya"
-                className="p-2 rounded-xl border border-outline-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        <CompactPagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={(p) => onPageChange?.(p)}
+        />
       </div>
     </div>
   )

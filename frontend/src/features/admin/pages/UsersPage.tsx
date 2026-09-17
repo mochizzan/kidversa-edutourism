@@ -9,7 +9,8 @@ import { Tabs } from '../../../shared/components/ui/Tabs'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
-import { useCrudList } from '../../../shared/hooks/useCrudList'
+import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientList'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import { UserRole } from '../../../core/types/enums'
 import { userService } from '../../../core/services/users'
 import { tenantService } from '../../../core/services/tenants'
@@ -73,32 +74,36 @@ const UsersPage = () => {
 
   const tenantMap = new Map(tenants.map((t) => [t.id, t]))
 
-  const buildFilters = useCallback(() => {
-    const filters: Record<string, string | boolean | undefined> = {}
+  const textFilter = makeTextFilter<User>(['name', 'email', 'role'])
 
-    if (activeTab === 'pending') {
-      filters.approval_status = ApprovalStatus.PENDING
-    } else if (activeTab === 'active') {
-      filters.is_active = true
-      filters.approval_status = ApprovalStatus.APPROVED
-    } else if (activeTab === 'inactive') {
-      filters.is_active = false
-      filters.approval_status = ApprovalStatus.APPROVED
-    } else if (activeTab === 'rejected') {
-      filters.approval_status = ApprovalStatus.REJECTED
-    }
+  const filterFn = useCallback(
+    (items: User[], search: string) => {
+      let result = items
 
-    const effectiveTenant = isSuperAdminView ? tenantFilter : tenantId
-    if (effectiveTenant) {
-      filters.tenant_id = effectiveTenant
-    }
+      if (activeTab === 'pending') {
+        result = result.filter((u) => u.approval_status === ApprovalStatus.PENDING)
+      } else if (activeTab === 'active') {
+        result = result.filter((u) => u.approval_status === ApprovalStatus.APPROVED && u.is_active)
+      } else if (activeTab === 'inactive') {
+        result = result.filter((u) => u.approval_status === ApprovalStatus.APPROVED && !u.is_active)
+      } else if (activeTab === 'rejected') {
+        result = result.filter((u) => u.approval_status === ApprovalStatus.REJECTED)
+      }
 
-    return filters
-  }, [activeTab, tenantFilter, isSuperAdminView, tenantId])
+      const effectiveTenant = isSuperAdminView ? tenantFilter : tenantId
+      if (effectiveTenant) {
+        result = result.filter((u) => u.tenant_id === effectiveTenant)
+      }
 
-  const { data: users, loading, error, page, total, setPage, setSearch, refresh } = useCrudList<User>({
-    fetchFn: (params) => userService.getAll({ ...params, limit: 10, filters: buildFilters() }),
-    additionalFilters: buildFilters(),
+      return textFilter(result, search)
+    },
+    [activeTab, tenantFilter, isSuperAdminView, tenantId],
+  )
+
+  const { data: users, loading, error, page, totalItems, setPage, setSearch, refresh } = useClientList<User>({
+    fetchFn: () => userService.getAll({ limit: 1000 }).then((r) => r.data),
+    filterFn,
+    deps: [tenantId],
   })
 
   useEffect(() => {
@@ -193,16 +198,16 @@ const UsersPage = () => {
     },
     ...(isSuperAdminView
       ? [
-          {
-            key: 'tenant',
-            header: 'Tenant',
-            render: (item: User) => (
-              <span className="text-sm text-on-surface-variant">
-                {item.tenant_id ? tenantMap.get(item.tenant_id)?.name || '-' : 'Platform'}
-              </span>
-            ),
-          } as Column<User>,
-        ]
+        {
+          key: 'tenant',
+          header: 'Tenant',
+          render: (item: User) => (
+            <span className="text-sm text-on-surface-variant">
+              {item.tenant_id ? tenantMap.get(item.tenant_id)?.name || '-' : 'Platform'}
+            </span>
+          ),
+        } as Column<User>,
+      ]
       : []),
     {
       key: 'approval_status',
@@ -314,7 +319,8 @@ const UsersPage = () => {
         columns={columns}
         loading={loading}
         page={page}
-        total={total}
+        total={totalItems}
+        pageSize={DEFAULT_CLIENT_PAGE_SIZE}
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item: User) => item.id}

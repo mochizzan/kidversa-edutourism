@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, FolderOpen } from 'lucide-react'
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, FolderOpen, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -9,17 +9,21 @@ import { DataTable } from '../../../shared/components/data/DataTable'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
-import { useCrudList } from '../../../shared/hooks/useCrudList'
+import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientList'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { programService } from '../../../core/services/programs'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Program } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 
 const ProgramsPage = () => {
   const navigate = useNavigate()
-  const { data: programs, loading, page, total, setPage, setSearch, refresh } = useCrudList<Program>({
-    fetchFn: (params) => programService.getAll({ ...params, limit: 10 }),
-    scopeToTenant: true,
+  const { tenantId } = useTenantScope()
+  const { data: programs, loading, error, page, totalItems, setPage, setSearch, refresh } = useClientList<Program>({
+    fetchFn: () => programService.getAll({ limit: 1000 }).then((r) => r.data),
+    filterFn: makeTextFilter(['name', 'description']),
+    deps: [tenantId],
   })
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const { getHighlightClass } = useHighlight()
@@ -65,7 +69,7 @@ const ProgramsPage = () => {
       header: 'Aksi',
       align: 'right',
       render: (item: Program) => (
-          <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" onClick={() => navigate(`/admin/programs/${item.id}`)} />
           <Button
             variant="ghost"
@@ -90,12 +94,20 @@ const ProgramsPage = () => {
         }
       />
 
+      {error && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
+          <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
+          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+        </div>
+      )}
+
       <DataTable
         data={programs}
         columns={columns}
         loading={loading}
         page={page}
-        total={total}
+        total={totalItems}
+        pageSize={DEFAULT_CLIENT_PAGE_SIZE}
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item: Program) => item.id}

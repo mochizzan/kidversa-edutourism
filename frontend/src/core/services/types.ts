@@ -145,6 +145,7 @@ export interface ReportTokenResponse {
 
 export interface ReportService {
   getBySession(sessionId: string): Promise<Report[]>
+  getBySessionPaginated?(sessionId: string, params?: { page?: number; limit?: number }): Promise<{ data: Report[]; total: number }>
   getById(id: string): Promise<Report | null>
   generate(sessionId: string): Promise<Report[]>
   generateOne: (sessionId: string, participantId: string) => Promise<Report[]>

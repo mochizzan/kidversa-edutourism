@@ -1,8 +1,9 @@
-import { Send, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Send, RefreshCw } from 'lucide-react'
 import type { ConsentFlatItem } from '../../../core/types'
 import { ConsentStatusBadge } from './ConsentStatusBadge'
 import { formatDate, formatDateTime } from '../../../shared/utils'
 import { Button } from '../../../shared/components/ui/Button'
+import { CompactPagination } from '../../../shared/components/data/CompactPagination'
 
 interface ConsentTableProps {
   items: ConsentFlatItem[]
@@ -12,6 +13,7 @@ interface ConsentTableProps {
   page: number
   totalPages: number
   totalItems: number
+  pageSize?: number
   onPageChange: (page: number) => void
 }
 
@@ -23,11 +25,9 @@ export function ConsentTable({
   page,
   totalPages,
   totalItems,
+  pageSize = 25,
   onPageChange,
 }: ConsentTableProps) {
-  const start = (page - 1) * 20 + 1
-  const end = Math.min(page * 20, totalItems)
-
   return (
     <div>
       {/* Table */}
@@ -126,38 +126,14 @@ export function ConsentTable({
         )}
       </div>
 
-      {/* Pagination */}
-      {totalItems > 0 && (
-        <div className="flex items-center justify-between mt-4 px-1">
-          <span className="text-sm text-on-surface-variant">
-            Menampilkan {start}-{end} dari {totalItems} peserta
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<ChevronLeft />}
-              onClick={() => onPageChange(page - 1)}
-              disabled={page <= 1}
-            >
-              Sebelumnya
-            </Button>
-            <span className="text-sm text-on-surface-variant">
-              {page} / {totalPages}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<ChevronRight />}
-              iconPosition="right"
-              onClick={() => onPageChange(page + 1)}
-              disabled={page >= totalPages}
-            >
-              Selanjutnya
-            </Button>
-          </div>
-        </div>
-      )}
+      <CompactPagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        pageSize={pageSize}
+        onPageChange={onPageChange}
+        itemLabel="peserta"
+      />
     </div>
   )
 }
