@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Camera, ShieldCheck, ShieldX } from 'lucide-react'
 import { ROUTES } from '../../../core/constants/app'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
@@ -13,6 +13,8 @@ import type { CreateAssessmentDTO } from '../../../core/types'
 const ChildAssessmentPage = () => {
   const { groupId, childId } = useParams<{ groupId: string; childId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const sessionId = (location.state as { sessionId?: string } | null)?.sessionId
 
   const {
     loading,
@@ -23,7 +25,7 @@ const ChildAssessmentPage = () => {
     isMine,
     fetchData,
     isPresent,
-  } = useChildAssessment(childId)
+  } = useChildAssessment(childId, sessionId)
 
   const [savingAny, setSavingAny] = useState(false)
 

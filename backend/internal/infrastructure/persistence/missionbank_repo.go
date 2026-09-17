@@ -127,7 +127,7 @@ func (r *GormMissionBankRepository) List(ctx context.Context, f repository.Missi
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	var models []MissionBankModel
-	if err := paginate(q, page, limit, "mission_banks.sort_order ASC, mission_banks.created_at DESC").Find(&models).Error; err != nil {
+	if err := paginate(q, page, limit, "mission_banks.created_at DESC").Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.MissionBank, 0, len(models))

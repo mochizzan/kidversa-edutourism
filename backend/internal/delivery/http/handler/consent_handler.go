@@ -399,7 +399,7 @@ func (h *ConsentHandler) Flat(c *echo.Context) error {
 			items[i].RespondedAt = &ts
 		}
 	}
-	return appresp.OK(c, dto.ConsentFlatResponse{Data: items})
+	return appresp.OK(c, dto.ConsentFlatResponse{Items: items})
 }
 
 // SendSingle handles POST /api/consent/send-whatsapp/single (JWT, tenant-scoped):
@@ -423,9 +423,10 @@ func (h *ConsentHandler) SendSingle(c *echo.Context) error {
 	}
 	sessionID := *participant.SessionID
 
-	// Already consented?
+	// Already consented? When force=true, allow resend (user explicitly chose
+	// "Kirim Ulang") — skip this guard so a new token + WhatsApp message is sent.
 	photoGranted, _ := h.consent.GetConsentValue(ctx, participant.ID, sessionID, entity.ConsentPhoto)
-	if photoGranted {
+	if photoGranted && !force {
 		return apperrors.Conflict("already_consented", fmt.Errorf("participant has already consented"))
 	}
 

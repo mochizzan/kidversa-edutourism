@@ -72,7 +72,7 @@ export function KegiatanCard({
   onSave,
   isSavingGlobal,
 }: KegiatanCardProps) {
-  const initialStar = useRef(assessment?.star_rating ?? 1)
+  const initialStar = useRef(assessment?.star_rating ?? 0)
   const initialComment = useRef(assessment?.comment ?? '')
 
   const [starRating, setStarRating] = useState(assessment?.star_rating ?? 0)
@@ -82,7 +82,7 @@ export function KegiatanCard({
 
   // Reset local state when assessment prop changes (e.g. after refresh)
   useEffect(() => {
-    initialStar.current = assessment?.star_rating ?? 1
+    initialStar.current = assessment?.star_rating ?? 0
     initialComment.current = assessment?.comment ?? ''
     setStarRating(assessment?.star_rating ?? 0)
     setComment(assessment?.comment ?? '')

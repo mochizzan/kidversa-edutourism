@@ -99,7 +99,7 @@ type ConsentFlatItem struct {
 
 // ConsentFlatResponse wraps the flat consent list.
 type ConsentFlatResponse struct {
-	Data []ConsentFlatItem `json:"data"`
+	Items []ConsentFlatItem `json:"items"`
 }
 
 // ConsentSendSingleRequest is the payload for POST /api/consent/send-whatsapp/single.

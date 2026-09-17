@@ -275,7 +275,9 @@ const GroupPage = () => {
   }
 
   const handleAssess = (participantId: string) => {
-    navigate(`/fasilitator/groups/${groupId}/children/${participantId}`)
+    navigate(`/fasilitator/groups/${groupId}/children/${participantId}`, {
+      state: { sessionId: groupDetail?.session.id },
+    })
   }
 
   const handleOpenKiosk = async () => {

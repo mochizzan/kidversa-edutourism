@@ -100,7 +100,7 @@ async function findChildInSessions(childId: string): Promise<{ detail: ChildDeta
   return { detail: null }
 }
 
-export function useChildAssessment(childId: string | undefined) {
+export function useChildAssessment(childId: string | undefined, sessionId?: string) {
   const { isMine } = useGroupOwnership(childId)
 
   const [loading, setLoading] = useState(true)
@@ -129,17 +129,80 @@ export function useChildAssessment(childId: string | undefined) {
       setLoading(true)
       setError(null)
 
-      const { detail, sessionId } = await findChildInSessions(childId)
+      let detail: ChildDetail | null = null
+      let resolvedSessionId: string | undefined = sessionId
+
+      if (sessionId) {
+        // Fast path: caller provided the session — fetch it directly
+        const sessionDetail = await sessionService.getById(sessionId)
+        if (sessionDetail) {
+          const participant = sessionDetail.groups
+            .flatMap((g) => g.participants)
+            .find((p) => p.id === childId)
+          const group = sessionDetail.groups.find((g) => g.participants.some((p) => p.id === childId))
+
+          if (participant && group) {
+            let currentStage = sessionDetail.stages.find((s) => s.id === group.current_session_stage_id)
+            if (!currentStage && sessionDetail.stages.length > 0) {
+              currentStage = sessionDetail.stages.find((s) => s.status === 'ACTIVE') ?? sessionDetail.stages[0]
+            }
+
+            let sessionSubstages: SessionSubstage[] = []
+            if (currentStage) {
+              try {
+                const all = await sessionService.getSubstages(sessionId)
+                sessionSubstages = substagesOfStage(all, currentStage.id)
+              } catch {
+                sessionSubstages = []
+              }
+            }
+
+            const programStages = await programService.getStages(sessionDetail.program_id)
+            const programStage = currentStage
+              ? programStages.find((ps) => ps.id === currentStage!.program_stage_id)
+              : undefined
+
+            const programSubstageNameMap: Record<string, string> = {}
+            const substageIds = Array.from(new Set(sessionSubstages.map((s) => s.program_substage_id)))
+            if (substageIds.length > 0) {
+              try {
+                const substagePromises = programStages.map((ps) => programSubstageService.listByStage(ps.id))
+                const allSubs = (await Promise.all(substagePromises)).flat()
+                for (const sub of allSubs) {
+                  programSubstageNameMap[sub.id] = sub.name
+                }
+              } catch {
+                // Leave empty
+              }
+            }
+
+            detail = {
+              participant,
+              group,
+              programStage,
+              sessionStage: currentStage,
+              sessionSubstages,
+              programSubstageNameMap,
+            }
+          }
+        }
+      } else {
+        // Slow path: search all sessions for this child
+        const result = await findChildInSessions(childId)
+        detail = result.detail
+        resolvedSessionId = result.sessionId
+      }
+
       if (!detail) {
         setError('Data anak tidak ditemukan')
         return
       }
       setChildDetail(detail)
 
-      // Fetch attendance for this child
-      if (sessionId) {
+      // Fetch attendance for this child using the correct session
+      if (resolvedSessionId) {
         try {
-          const attRes = await attendanceService.getBySession(sessionId)
+          const attRes = await attendanceService.getBySession(resolvedSessionId)
           const att = attRes.find(a => a.participant_id === childId)
           setIsPresent(att?.is_present ?? false)
         } catch {
@@ -156,7 +219,7 @@ export function useChildAssessment(childId: string | undefined) {
     } finally {
       setLoading(false)
     }
-  }, [childId, fetchAssessments])
+  }, [childId, sessionId, fetchAssessments])
 
   useEffect(() => {
     fetchData()

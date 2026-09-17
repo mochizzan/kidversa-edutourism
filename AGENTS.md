@@ -116,7 +116,7 @@ Hub.Publish (in-memory broadcast) → handler writes SSE frames + keepalive
 | `backend/internal/infrastructure/persistence/` | GORM models (model wrappers with `ToEntity()`/`fromEntity()` mappers) |
 | `backend/internal/pkg/errors/` | `AppError{Status, Code, Err}` with typed constructors |
 | `backend/internal/pkg/response/` | Envelope helpers: `OK()`, `OKWithMeta()`, `Created()`, `Fail()` |
-| `backend/migrations/` | golang-migrate zero-padded SQL files (000001_init_schema → 000016_*) |
+| `backend/migrations/` | golang-migrate zero-padded SQL files (000001_init_schema → 000016_*). Single migration file with 28 tables. Runner retries transient errors up to 3×, skips dirty state. |
 | `nginx/` | Reverse proxy configs: `default.conf` (local), `vps.conf` (production) |
 | `data/` | Persistent data: `mariadb/` (DB), `wa-engine/` (WhatsApp sessions) |
 | `compose.yml` | Production stack: MariaDB, backend, frontend, wa-engine |
@@ -141,6 +141,8 @@ go test ./...                   # Vacuously passes (0 *_test.go files)
 go run ./cmd/migrate            # Migrations + superadmin bootstrap (needs .env + MariaDB)
 go run ./cmd/server             # API on :8080
 ```
+
+Hot-reload via Air (config: `backend/.air.toml`): watches `.go/.toml/.yaml/.sql`, builds `./cmd/server` → `./tmp/main`.
 
 ### Full Stack (Docker Compose)
 ```bash
@@ -302,8 +304,8 @@ const useAuthStore = create<AuthState>((set, get) => ({
 
 ### Configuration
 - `backend/go.mod` — module `kidversa-edutourism-backend`, Go 1.26.4, Echo v5, GORM, JWT v5, validator v10, golang-migrate v4
-- `backend/.env` / `backend/.env.example` — All config env-driven: JWT_SECRET (≥32 bytes), BOOTSTRAP_SUPERADMIN_PASSWORD, DB_HOST, etc.
-- `backend/.github/workflows/ci.yml` — CI: gofmt + go vet + go build + go test (backend), pnpm install + pnpm build (frontend)
+- `backend/.env` / `backend/.env.example` — All config env-driven: JWT_SECRET (≥32 bytes), BOOTSTRAP_SUPERADMIN_PASSWORD, DB_HOST, etc. 30 env vars organized into groups: Database, JWT/Auth, Cookie, Server, Rate limiting, Realtime, Bootstrap, WhatsApp, AI (OpenRouter), Test DB.
+- `backend/.github/workflows/ci.yml` — CI: gofmt + go vet + go build + go test (backend), pnpm install + pnpm build (frontend). Note: workflow is inside `backend/`, not repo root.
 - `frontend/package.json` — React 19.2.7, Vite 8.1.3, Tailwind v4.3.2, TypeScript ~6.0.3, `@tanstack/react-query` (present but unused)
 - `frontend/tsconfig.json` — ES2020 target, strict mode, `noUnusedLocals`, `noUnusedParameters`, path alias `@/*`
 - `frontend/vite.config.ts` — PWA plugin, Tailwind v4 Vite plugin, `/api` proxy → `VITE_API_TARGET || 'http://localhost:8080'`

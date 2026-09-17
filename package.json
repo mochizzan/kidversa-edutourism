@@ -3,6 +3,7 @@
     "mysql2": "^3.24.4"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "puppeteer-core": "^25.11.0"
   }
 }
