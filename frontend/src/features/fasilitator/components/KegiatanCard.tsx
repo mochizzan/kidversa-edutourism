@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Star, Clipboard, ShieldX } from 'lucide-react'
 import { cn } from '../../../core/utils'
 import { Button } from '../../../shared/components/ui/Button'
+import { RATING_LABELS, MAX_STAR_RATING } from '../../../core/constants/assessment'
 import type { Assessment, CreateAssessmentDTO, SessionSubstage } from '../../../core/types'
 
 interface KegiatanCardProps {
@@ -12,14 +13,6 @@ interface KegiatanCardProps {
   isMine: boolean
   onSave: (data: CreateAssessmentDTO) => Promise<void>
   isSavingGlobal: boolean
-}
-
-const RATING_LABELS: Record<number, string> = {
-  0: 'Belum Dinilai',
-  1: 'BB - Belum Berkembang',
-  2: 'MB - Mulai Berkembang',
-  3: 'BSH - Berkembang Sesuai Harapan',
-  4: 'BSB - Berkembang Sangat Baik',
 }
 
 function StarRatingInput({
@@ -44,7 +37,7 @@ function StarRatingInput({
             'hover:scale-110 active:scale-95',
             disabled && 'cursor-not-allowed opacity-60',
           )}
-          aria-label={`Nilai ${star} bintang`}
+          aria-label={`Nilai ${star} dari ${MAX_STAR_RATING} bintang`}
         >
           <Star
             className={cn(
@@ -57,7 +50,7 @@ function StarRatingInput({
         </button>
       ))}
       <span className="ml-2 text-sm font-medium text-gray-600">
-        {RATING_LABELS[value] ?? `${value}/5`}
+        {RATING_LABELS[value] ?? `${value}/${MAX_STAR_RATING}`}
       </span>
     </div>
   )
