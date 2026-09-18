@@ -41,7 +41,6 @@ interface GroupDetail {
   programStageName?: string
   session: Session
   sessionStage: SessionStage | undefined
-  isPhotoStage: boolean
 }
 
 function findGroupInSessions(
@@ -160,10 +159,6 @@ const GroupPage = () => {
         currentStage =
           detail.stages.find((s) => s.status === 'ACTIVE') ?? detail.stages[0]
       }
-      const programStage = currentStage
-        ? programStages.find((ps) => ps.id === currentStage.program_stage_id)
-        : undefined
-
       // Get assessments for this session
       const sessionAssessments = await assessmentService.getBySession(detail.id)
       setAssessments(sessionAssessments)
@@ -188,7 +183,6 @@ const GroupPage = () => {
           : undefined,
         session: detail,
         sessionStage: currentStage,
-        isPhotoStage: programStage?.is_photo_stage ?? false,
       })
     } catch (err) {
       setError(friendlyError(err))
@@ -385,7 +379,7 @@ const GroupPage = () => {
     )
   }
 
-  const { group, participants, programStageName, isPhotoStage } = groupDetail
+  const { group, participants, programStageName } = groupDetail
   const openableStageId = groupDetail.sessionStage?.id ?? groupDetail.group.current_session_stage_id
   // PIC name is resolved server-side (Opsi B) and sent on each group, so it is
   // safe for any role that can open this page — no admin-only call needed.
@@ -468,7 +462,7 @@ const GroupPage = () => {
               isPresent={isPresent(participant.id)}
               onToggleAttendance={isMine ? () => handleToggleAttendance(participant.id) : undefined}
               attendanceLoading={attendanceLoading.has(participant.id)}
-              showPhoto={isPhotoStage}
+              showPhoto={participant.consent_photo}
               onAssess={isMine && isSessionActive ? () => handleAssess(participant.id) : undefined}
             />
           ))}

@@ -60,7 +60,9 @@ export interface RouteAccess {
 export const ADMIN_ROUTE_ACCESS: RouteAccess[] = [
   { path: 'dashboard', section: 'OVERVIEW', label: 'Dashboard', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'live', section: 'OVERVIEW', label: 'Live Monitor', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'programs', section: 'PROGRAM', label: 'Programs', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'programs', section: 'PROGRAM', label: 'Daftar Program', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'topics', section: 'PROGRAM', label: 'Daftar Topik', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'activities', section: 'PROGRAM', label: 'Daftar Kegiatan', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'sessions', section: 'PROGRAM', label: 'Sessions', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'participants', section: 'PROGRAM', label: 'Peserta', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'reports', section: 'PROGRAM', label: 'Reports', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },

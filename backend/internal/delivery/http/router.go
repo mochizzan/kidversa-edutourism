@@ -6,6 +6,7 @@ import (
 	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/delivery/http/handler"
 	"kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	"kidversa-edutourism-backend/internal/infrastructure/persistence"
 	"kidversa-edutourism-backend/internal/pkg/sse"
@@ -54,6 +55,9 @@ func NewRouter(d Deps) *echo.Echo {
 
 	// Programs + stages + contents.
 	handler.RegisterProgramsRoutes(api.Group("/programs"), h.Program, d.JWT, d.Revoker)
+
+	// Topik global list (/api/program-stages).
+	api.GET("/program-stages", h.Program.ListProgramStages, middleware.JWTAuth(d.JWT, "", d.Revoker), middleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator, entity.RoleFasilitator), middleware.TenantScope())
 
 	// Program substages (Kegiatan) CRUD.
 	handler.RegisterProgramSubstagesRoutes(api.Group("/program-substages"), h.ProgramSubstage, d.JWT, d.Revoker)

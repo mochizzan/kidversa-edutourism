@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"gorm.io/gorm"
 
@@ -57,6 +58,36 @@ func (r *GormProgramSubstageRepository) ListSubstages(ctx context.Context, progr
 		items = append(items, *models[i].ToEntity())
 	}
 	return items, nil
+}
+
+func (r *GormProgramSubstageRepository) ListPaginatedSubstages(ctx context.Context, filter repository.SubstageFilter, page, limit int) (*repository.Paginated[entity.ProgramSubstage], error) {
+	q := r.db.WithContext(ctx).Model(&ProgramSubstageModel{}).Joins("JOIN program_stages ps ON ps.id = program_substages.program_stage_id")
+	if filter.ProgramStageID != "" {
+		q = q.Where("program_substages.program_stage_id = ?", filter.ProgramStageID)
+	}
+	if filter.ProgramID != "" {
+		q = q.Where("ps.program_id = ?", filter.ProgramID)
+	}
+	if filter.Search != "" {
+		like := "%" + strings.ToLower(filter.Search) + "%"
+		q = q.Where("LOWER(program_substages.name) LIKE ? OR LOWER(program_substages.description) LIKE ?", like, like)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+
+	var models []ProgramSubstageModel
+	offset := (page - 1) * limit
+	if err := q.Order("program_substages.sequence_order ASC, program_substages.created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.ProgramSubstage, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return &repository.Paginated[entity.ProgramSubstage]{Items: items, Total: int(total)}, nil
 }
 
 func (r *GormProgramSubstageRepository) UpdateSubstage(ctx context.Context, s *entity.ProgramSubstage) error {

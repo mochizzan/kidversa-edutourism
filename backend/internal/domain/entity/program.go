@@ -19,9 +19,8 @@ type ProgramStage struct {
 	SequenceOrder   int         `json:"sequence_order"`
 	Name            string      `json:"name"`
 	Description     string      `json:"description,omitempty"`
-	ContentType     ContentType `json:"content_type"`
-	DurationMinutes int         `json:"duration_minutes"`
-	IsPhotoStage    bool        `json:"is_photo_stage"`
+	ContentType  ContentType `json:"content_type"`
+	IsPhotoStage bool        `json:"is_photo_stage"`
 	BadgeName       string      `json:"badge_name,omitempty"`
 	BadgeImageURL   string      `json:"badge_image_url,omitempty"`
 }

@@ -21,6 +21,8 @@ export interface CreateProgramDTO {
   name: string
   description?: string
   thumbnail_url?: string
+  final_badge_name?: string
+  final_badge_image_url?: string
 }
 
 export interface UpdateProgramDTO extends Partial<CreateProgramDTO> {
@@ -35,7 +37,6 @@ export interface CreateStageDTO {
   name: string
   description?: string
   content_type: ContentType
-  duration_minutes: number
   is_photo_stage?: boolean
 }
 

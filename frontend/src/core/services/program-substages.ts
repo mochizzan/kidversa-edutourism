@@ -1,20 +1,20 @@
-// programSubstages.ts — backend-backed Kegiatan (ProgramSubstage) service.
+// program-substages.ts — backend-backed Kegiatan (ProgramSubstage) service.
 //
-// Mirrors the backend /api/program-substages contract (Fase 5): list Kegiatan
-// for a SubTopik, create/update/reorder/delete, and the per-leaf badge image
-// upload. Uses the shared apiEnvelope helpers (tenant header + envelope
-// unwrap) so auth/tenant scoping is identical to every other service.
+// Mirrors the backend /api/program-substages contract: paginated list, detail,
+// list by stage, create/update/reorder/delete, and the per-leaf badge image
+// upload. Uses the shared apiEnvelope helpers (tenant header + envelope unwrap)
+// so auth/tenant scoping is identical to every other service.
 
-import type { ProgramSubstage } from '../types'
-import { arrayRequest, itemRequest, voidRequest } from './api-envelope'
+import type { ProgramSubstage, PaginatedResponse } from '../types'
+import { listRequest, itemRequest, voidRequest, arrayRequest, nullableItemRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
-export interface ProgramSubstageService {
-  listByStage(programStageId: string): Promise<ProgramSubstage[]>
-  create(data: CreateProgramSubstageDTO): Promise<ProgramSubstage>
-  update(id: string, data: UpdateProgramSubstageDTO): Promise<ProgramSubstage>
-  reorder(orderedIds: string[]): Promise<void>
-  remove(id: string): Promise<void>
+export interface GetSubstagesParams {
+  programId?: string
+  programStageId?: string
+  search?: string
+  page?: number
+  limit?: number
 }
 
 export interface CreateProgramSubstageDTO {
@@ -22,58 +22,68 @@ export interface CreateProgramSubstageDTO {
   sequence_order: number
   name: string
   description?: string
-  duration_minutes: number
-  is_photo_stage: boolean
 }
 
 export type UpdateProgramSubstageDTO = Partial<CreateProgramSubstageDTO>
 
-const listByStage = async (programStageId: string): Promise<ProgramSubstage[]> => {
-  return arrayRequest<ProgramSubstage>(
-    'GET',
-    API_ROUTES.PROGRAM_SUBSTAGES.BY_STAGE(programStageId),
-  ).then((items) =>
-    [...items].sort((a, b) => a.sequence_order - b.sequence_order),
-  )
+export interface ProgramSubstageService {
+  getAll(params?: GetSubstagesParams): Promise<PaginatedResponse<ProgramSubstage>>
+  getById(id: string): Promise<ProgramSubstage | null>
+  listByStage(programStageId: string): Promise<ProgramSubstage[]>
+  create(data: CreateProgramSubstageDTO): Promise<ProgramSubstage>
+  update(id: string, data: UpdateProgramSubstageDTO): Promise<ProgramSubstage>
+  reorder(orderedIds: string[]): Promise<void>
+  remove(id: string): Promise<void>
 }
 
-const create = async (data: CreateProgramSubstageDTO): Promise<ProgramSubstage> => {
-  return itemRequest<ProgramSubstage>('POST', API_ROUTES.PROGRAM_SUBSTAGES.BASE, {
-    program_stage_id: data.program_stage_id,
-    sequence_order: data.sequence_order,
-    name: data.name,
-    description: data.description ?? '',
-    duration_minutes: data.duration_minutes,
-    is_photo_stage: data.is_photo_stage,
-  })
+function sortSubstages(substages: ProgramSubstage[]): ProgramSubstage[] {
+  return [...substages].sort((a, b) => a.sequence_order - b.sequence_order)
 }
 
-const update = async (
-  id: string,
-  data: UpdateProgramSubstageDTO,
-): Promise<ProgramSubstage> => {
-  const body: Record<string, unknown> = {}
-  if (data.program_stage_id !== undefined) body.program_stage_id = data.program_stage_id
-  if (data.sequence_order !== undefined) body.sequence_order = data.sequence_order
-  if (data.name !== undefined) body.name = data.name
-  if (data.description !== undefined) body.description = data.description
-  if (data.duration_minutes !== undefined) body.duration_minutes = data.duration_minutes
-  if (data.is_photo_stage !== undefined) body.is_photo_stage = data.is_photo_stage
-  return itemRequest<ProgramSubstage>('PUT', API_ROUTES.PROGRAM_SUBSTAGES.DETAIL(id), body)
-}
-
-const reorder = async (orderedIds: string[]): Promise<void> => {
-  await voidRequest('POST', API_ROUTES.PROGRAM_SUBSTAGES.REORDER, { ordered_ids: orderedIds })
-}
-
-const remove = async (id: string): Promise<void> => {
-  await voidRequest('DELETE', API_ROUTES.PROGRAM_SUBSTAGES.DETAIL(id))
+function buildProgramSubstagesPath(params?: GetSubstagesParams): string {
+  const query = new URLSearchParams()
+  if (params?.programId) query.set('program_id', params.programId)
+  if (params?.programStageId) query.set('program_stage_id', params.programStageId)
+  if (params?.search) query.set('search', params.search)
+  if (params?.page !== undefined) query.set('page', String(params.page))
+  if (params?.limit !== undefined) query.set('limit', String(params.limit))
+  const qs = query.toString()
+  return qs ? `/api/program-substages?${qs}` : '/api/program-substages'
 }
 
 export const programSubstageService: ProgramSubstageService = {
-  listByStage,
-  create,
-  update,
-  reorder,
-  remove,
+  getAll: (params) =>
+    listRequest<ProgramSubstage>(buildProgramSubstagesPath(params), {
+      page: params?.page,
+      limit: params?.limit,
+      search: params?.search,
+    }),
+
+  getById: (id) => nullableItemRequest<ProgramSubstage>('GET', API_ROUTES.PROGRAM_SUBSTAGES.DETAIL(id)),
+
+  listByStage: (programStageId) =>
+    arrayRequest<ProgramSubstage>('GET', API_ROUTES.PROGRAM_SUBSTAGES.BY_STAGE(programStageId)).then(
+      sortSubstages,
+    ),
+
+  create: (data) =>
+    itemRequest<ProgramSubstage>('POST', API_ROUTES.PROGRAM_SUBSTAGES.BASE, {
+      program_stage_id: data.program_stage_id,
+      sequence_order: data.sequence_order,
+      name: data.name,
+      description: data.description ?? '',
+    }),
+
+  update: (id, data) => {
+    const body: Record<string, unknown> = {}
+    if (data.program_stage_id !== undefined) body.program_stage_id = data.program_stage_id
+    if (data.sequence_order !== undefined) body.sequence_order = data.sequence_order
+    if (data.name !== undefined) body.name = data.name
+    if (data.description !== undefined) body.description = data.description
+    return itemRequest<ProgramSubstage>('PUT', API_ROUTES.PROGRAM_SUBSTAGES.DETAIL(id), body)
+  },
+
+  reorder: (orderedIds) => voidRequest('POST', API_ROUTES.PROGRAM_SUBSTAGES.REORDER, { ordered_ids: orderedIds }),
+
+  remove: (id) => voidRequest('DELETE', API_ROUTES.PROGRAM_SUBSTAGES.DETAIL(id)),
 }

@@ -28,11 +28,9 @@ func NewProgramSubstageHandler(repo repository.ProgramSubstageRepository) *Progr
 // SubstageRequest is the create/update payload (Kegiatan leaf).
 type SubstageRequest struct {
 	ProgramStageID  string `json:"program_stage_id" validate:"required"`
-	SequenceOrder   int    `json:"sequence_order"`
-	Name            string `json:"name" validate:"required"`
-	Description     string `json:"description,omitempty"`
-	DurationMinutes int    `json:"duration_minutes"`
-	IsPhotoStage    bool   `json:"is_photo_stage"`
+	SequenceOrder int    `json:"sequence_order"`
+	Name          string `json:"name" validate:"required"`
+	Description   string `json:"description,omitempty"`
 }
 
 // Create handles POST /api/program-substages.
@@ -42,12 +40,10 @@ func (h *ProgramSubstageHandler) Create(c *echo.Context) error {
 		return err
 	}
 	s := &entity.ProgramSubstage{
-		ProgramStageID:  req.ProgramStageID,
-		SequenceOrder:   req.SequenceOrder,
-		Name:            req.Name,
-		Description:     req.Description,
-		DurationMinutes: req.DurationMinutes,
-		IsPhotoStage:    req.IsPhotoStage,
+		ProgramStageID: req.ProgramStageID,
+		SequenceOrder:  req.SequenceOrder,
+		Name:           req.Name,
+		Description:    req.Description,
 	}
 	if err := h.repo.CreateSubstage((*c).Request().Context(), s); err != nil {
 		return err
@@ -68,17 +64,22 @@ func (h *ProgramSubstageHandler) Get(c *echo.Context) error {
 	return appresp.OK(c, s)
 }
 
-// List handles GET /api/program-substages?program_stage_id=.
+// List handles GET /api/program-substages?program_stage_id=...&program_id=...&search=...&page=...&limit=...
 func (h *ProgramSubstageHandler) List(c *echo.Context) error {
 	programStageID := (*c).QueryParam("program_stage_id")
-	if programStageID == "" {
-		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
+	programID := (*c).QueryParam("program_id")
+
+	page, limit := pagination(c)
+	f := repository.SubstageFilter{
+		ProgramStageID: programStageID,
+		ProgramID:      programID,
+		Search:         (*c).QueryParam("search"),
 	}
-	items, err := h.repo.ListSubstages((*c).Request().Context(), programStageID)
+	res, err := h.repo.ListPaginatedSubstages((*c).Request().Context(), f, page, limit)
 	if err != nil {
 		return err
 	}
-	return appresp.OK(c, items)
+	return appresp.OKWithMeta(c, res.Items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
 }
 
 // Update handles PUT /api/program-substages/:id.
@@ -98,8 +99,6 @@ func (h *ProgramSubstageHandler) Update(c *echo.Context) error {
 	s.SequenceOrder = req.SequenceOrder
 	s.Name = req.Name
 	s.Description = req.Description
-	s.DurationMinutes = req.DurationMinutes
-	s.IsPhotoStage = req.IsPhotoStage
 	if err := h.repo.UpdateSubstage((*c).Request().Context(), s); err != nil {
 		return err
 	}

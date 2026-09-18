@@ -43,6 +43,8 @@ export const programService: ProgramService = {
       name: data.name,
       description: data.description,
       thumbnail_url: data.thumbnail_url,
+      final_badge_name: data.final_badge_name,
+      final_badge_image_url: data.final_badge_image_url,
     }),
 
   update: (id, data: UpdateProgramDTO) =>
@@ -69,7 +71,6 @@ export const programService: ProgramService = {
       name: data.name,
       description: data.description,
       content_type: data.content_type,
-      duration_minutes: data.duration_minutes,
       is_photo_stage: data.is_photo_stage,
     }),
 
@@ -79,7 +80,6 @@ export const programService: ProgramService = {
       name: data.name,
       description: data.description,
       content_type: data.content_type,
-      duration_minutes: data.duration_minutes,
       is_photo_stage: data.is_photo_stage,
       badge_name: data.badge_name,
       badge_image_url: data.badge_image_url,

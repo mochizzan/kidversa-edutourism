@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { ChevronUp, ChevronDown, Search } from 'lucide-react'
+import { useState, useMemo, Fragment } from 'react'
+import { ChevronUp, ChevronDown, ChevronRight, ChevronDown as ChevronDownIcon, Search } from 'lucide-react'
 import { cn } from '../../../core/utils'
 import { CompactPagination } from './CompactPagination'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
@@ -27,6 +27,7 @@ interface DataTableProps<T> {
   onSelectionChange?: (ids: string[]) => void
   getRowId: (item: T) => string
   rowClassName?: (item: T) => string
+  expandedRowRender?: (item: T) => React.ReactNode
   emptyState?: React.ReactNode
   actions?: React.ReactNode
   ariaLabel?: string
@@ -46,6 +47,7 @@ export function DataTable<T>({
   onSelectionChange,
   getRowId,
   rowClassName,
+  expandedRowRender,
   emptyState,
   actions,
   ariaLabel,
@@ -53,6 +55,10 @@ export function DataTable<T>({
   const [searchQuery, setSearchQuery] = useState('')
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+
+  const hasExpansion = !!expandedRowRender
+  const cellColSpan = columns.length + (selectable ? 1 : 0) + (hasExpansion ? 1 : 0)
 
   const sortedData = useMemo(() => {
     if (!sortKey) return data
@@ -102,6 +108,10 @@ export function DataTable<T>({
     }
   }
 
+  const toggleExpandRow = (id: string) => {
+    setExpandedRowId((prev) => (prev === id ? null : id))
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -138,6 +148,9 @@ export function DataTable<T>({
                       className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
                     />
                   </th>
+                )}
+                {hasExpansion && (
+                  <th className="w-12 px-4 py-3" aria-label="Expand row" />
                 )}
                 {columns.map((column) => (
                   <th
@@ -181,6 +194,11 @@ export function DataTable<T>({
                         <div className="h-4 w-4 bg-surface-container-high rounded" />
                       </td>
                     )}
+                    {hasExpansion && (
+                      <td className="px-4 py-3">
+                        <div className="h-4 w-4 bg-surface-container-high rounded" />
+                      </td>
+                    )}
                     {columns.map((_, colIndex) => (
                       <td key={colIndex} className="px-4 py-3">
                         <div className="h-4 bg-surface-container-high rounded" />
@@ -190,7 +208,7 @@ export function DataTable<T>({
                 ))
               ) : sortedData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + (selectable ? 1 : 0)}>
+                  <td colSpan={cellColSpan}>
                     {emptyState || (
                       <div className="py-12 text-center text-on-surface-variant">Tidak ada data</div>
                     )}
@@ -200,39 +218,65 @@ export function DataTable<T>({
                 sortedData.map((item) => {
                   const rowId = getRowId(item)
                   const isSelected = selectedRows.includes(rowId)
+                  const isExpanded = expandedRowId === rowId
                   return (
-                    <tr
-                      key={rowId}
-                      className={cn(
-                        'hover:bg-surface-container-low/50 transition-colors',
-                        isSelected && 'bg-primary-container/30',
-                        rowClassName?.(item)
+                    <Fragment key={`${rowId}-fragment`}>
+                      <tr
+                        key={rowId}
+                        className={cn(
+                          'hover:bg-surface-container-low/50 transition-colors',
+                          isSelected && 'bg-primary-container/30',
+                          rowClassName?.(item)
+                        )}
+                      >
+                        {selectable && (
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelectRow(rowId)}
+                              aria-label={`Select row ${rowId}`}
+                              className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                            />
+                          </td>
+                        )}
+                        {hasExpansion && (
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandRow(rowId)}
+                              aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
+                              className="p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors"
+                            >
+                              {isExpanded ? (
+                                <ChevronDownIcon className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </button>
+                          </td>
+                        )}
+                        {columns.map((column) => (
+                          <td
+                            key={column.key}
+                            className={cn(
+                              'px-4 py-3 text-sm text-on-surface',
+                              column.align === 'center' && 'text-center',
+                              column.align === 'right' && 'text-right'
+                            )}
+                          >
+                            {column.render ? column.render(item) : (item as Record<string, unknown>)[column.key] as string}
+                          </td>
+                        ))}
+                      </tr>
+                      {hasExpansion && isExpanded && (
+                        <tr key={`${rowId}-expanded`} className="bg-surface-container-low/30">
+                          <td colSpan={cellColSpan} className="px-0 py-0">
+                            {expandedRowRender?.(item)}
+                          </td>
+                        </tr>
                       )}
-                    >
-                      {selectable && (
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleSelectRow(rowId)}
-                            aria-label={`Select row ${rowId}`}
-                            className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
-                          />
-                        </td>
-                      )}
-                      {columns.map((column) => (
-                        <td
-                          key={column.key}
-                          className={cn(
-                            'px-4 py-3 text-sm text-on-surface',
-                            column.align === 'center' && 'text-center',
-                            column.align === 'right' && 'text-right'
-                          )}
-                        >
-                          {column.render ? column.render(item) : (item as Record<string, unknown>)[column.key] as string}
-                        </td>
-                      ))}
-                    </tr>
+                    </Fragment>
                   )
                 })
               )}

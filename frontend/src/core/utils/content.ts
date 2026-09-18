@@ -55,7 +55,6 @@ export async function syncStageMeta(
   const contents = await programService.getContents(substageId)
   await programService.updateStage(programId, stageId, {
     content_type: detectContentType(contents),
-    duration_minutes: computeDurationMinutes(contents),
   })
 }
 

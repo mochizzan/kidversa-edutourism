@@ -13,6 +13,12 @@ type ProgramFilter struct {
 	Search   string
 }
 
+// StageFilter narrows a paginated Topik list query.
+type StageFilter struct {
+	ProgramID string
+	Search    string
+}
+
 // ProgramRepository is the persistence contract for programs (and their stages/contents).
 type ProgramRepository interface {
 	CreateProgram(ctx context.Context, p *entity.Program) error
@@ -25,6 +31,7 @@ type ProgramRepository interface {
 	CreateStage(ctx context.Context, s *entity.ProgramStage) error
 	GetStageByID(ctx context.Context, id string) (*entity.ProgramStage, error)
 	ListStages(ctx context.Context, programID string) ([]entity.ProgramStage, error)
+	ListPaginatedStages(ctx context.Context, filter StageFilter, page, limit int) (*Paginated[entity.ProgramStage], error)
 	UpdateStage(ctx context.Context, s *entity.ProgramStage) error
 	DeleteStage(ctx context.Context, id string) error
 	ReorderStages(ctx context.Context, programID string, orderedIDs []string) error

@@ -7,6 +7,7 @@ import (
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/domain/entity"
+	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
@@ -23,6 +24,20 @@ func (h *ProgramHandler) ListStages(c *echo.Context) error {
 	return appresp.OK(c, stages)
 }
 
+// ListProgramStages handles GET /api/program-stages?program_id=...&search=...&page=...&limit=...
+func (h *ProgramHandler) ListProgramStages(c *echo.Context) error {
+	page, limit := pagination(c)
+	f := repository.StageFilter{
+		ProgramID: (*c).QueryParam("program_id"),
+		Search:    (*c).QueryParam("search"),
+	}
+	res, err := h.repo.ListPaginatedStages((*c).Request().Context(), f, page, limit)
+	if err != nil {
+		return err
+	}
+	return appresp.OKWithMeta(c, res.Items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
+}
+
 // CreateStage handles POST /api/programs/:id/stages.
 func (h *ProgramHandler) CreateStage(c *echo.Context) error {
 	programID, ok := bindUUID(c, "id")
@@ -35,8 +50,7 @@ func (h *ProgramHandler) CreateStage(c *echo.Context) error {
 	}
 	s := &entity.ProgramStage{
 		ProgramID: programID, SequenceOrder: req.SequenceOrder, Name: req.Name,
-		Description: req.Description, ContentType: req.ContentType, DurationMinutes: req.DurationMinutes,
-		IsPhotoStage: req.IsPhotoStage,
+		Description: req.Description, ContentType: req.ContentType, IsPhotoStage: req.IsPhotoStage,
 	}
 	if err := h.repo.CreateStage((*c).Request().Context(), s); err != nil {
 		return err
@@ -68,7 +82,6 @@ func (h *ProgramHandler) UpdateStage(c *echo.Context) error {
 		s.ContentType = req.ContentType
 	}
 	s.SequenceOrder = req.SequenceOrder
-	s.DurationMinutes = req.DurationMinutes
 	s.IsPhotoStage = req.IsPhotoStage
 	if err := h.repo.UpdateStage((*c).Request().Context(), s); err != nil {
 		return err

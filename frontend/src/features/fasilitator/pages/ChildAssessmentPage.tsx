@@ -49,7 +49,7 @@ const ChildAssessmentPage = () => {
     navigate(`/fasilitator/groups/${groupId}`)
   }
 
-  const { participant, programStage } = childDetail ?? {}
+  const { participant } = childDetail ?? {}
   const isSessionActive = childDetail?.session.status === SessionStatus.ACTIVE
   const hasConsentPhoto = participant?.consent_photo ?? false
 
@@ -155,19 +155,17 @@ const ChildAssessmentPage = () => {
 
         {/* Consent status */}
         <div className="flex items-center gap-4 flex-wrap">
-          {programStage?.is_photo_stage && (
-            <div className="flex items-center gap-1.5 text-xs">
-              {hasConsentPhoto ? (
-                <span className="flex items-center gap-1 text-green-600">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Izin Foto
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-yellow-600">
-                  <ShieldX className="w-3.5 h-3.5" /> Tidak Ada Izin Foto
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-1.5 text-xs">
+            {hasConsentPhoto ? (
+              <span className="flex items-center gap-1 text-green-600">
+                <ShieldCheck className="w-3.5 h-3.5" /> Izin Foto
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-yellow-600">
+                <ShieldX className="w-3.5 h-3.5" /> Tidak Ada Izin Foto
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -208,35 +206,31 @@ const ChildAssessmentPage = () => {
       ) : null}
 
       {/* Quick Actions */}
-      {programStage?.is_photo_stage && (
-        <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50">
-          <h3 className="text-sm font-semibold text-on-surface mb-4">Aksi Cepat</h3>
-          <div className="flex flex-wrap gap-3">
-            {programStage.is_photo_stage && (
-              <div className="flex-1 min-w-[180px]">
-                {hasConsentPhoto && isMine ? (
-                  <button
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-medium text-sm hover:bg-primary-container/80 transition-colors"
-                    onClick={() =>
-                      navigate(
-                        `/fasilitator/groups/${groupId}/children/${childId}/photo`,
-                      )
-                    }
-                  >
-                    <Camera className="w-5 h-5" />
-                    Ambil Foto
-                  </button>
-                ) : (
-                  <div className="w-full px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm flex items-center gap-2">
-                    <ShieldX className="w-4 h-4 shrink-0" />
-                    <span>Tidak ada izin foto</span>
-                  </div>
-                )}
+      <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50">
+        <h3 className="text-sm font-semibold text-on-surface mb-4">Aksi Cepat</h3>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex-1 min-w-[180px]">
+            {hasConsentPhoto && isMine ? (
+              <button
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-medium text-sm hover:bg-primary-container/80 transition-colors"
+                onClick={() =>
+                  navigate(
+                    `/fasilitator/groups/${groupId}/children/${childId}/photo`,
+                  )
+                }
+              >
+                <Camera className="w-5 h-5" />
+                Ambil Foto
+              </button>
+            ) : (
+              <div className="w-full px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm flex items-center gap-2">
+                <ShieldX className="w-4 h-4 shrink-0" />
+                <span>Tidak ada izin foto</span>
               </div>
             )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Back button */}
       <div className="flex sm:justify-start">

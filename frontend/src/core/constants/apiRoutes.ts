@@ -176,11 +176,41 @@ export const API_ROUTES = {
   BULK_UPSERT: '/api/attendance/bulk-upsert',
  },
 
+ // ProgramStage list/read endpoint.
+ PROGRAM_STAGES: {
+  BASE: '/api/program-stages',
+ },
+
  // Kegiatan (ProgramSubstage) CRUD + reorder, scoped to a SubTopik.
  PROGRAM_SUBSTAGES: {
   BASE: '/api/program-substages',
-  BY_STAGE: (programStageId: string) =>
-   `/api/program-substages?program_stage_id=${encodeURIComponent(programStageId)}`,
+  LIST: (params?: {
+   program_id?: string
+   program_stage_id?: string
+   search?: string
+   page?: number | string
+   limit?: number | string
+  }) => {
+   const q = new URLSearchParams()
+   if (params?.program_id) q.set('program_id', params.program_id)
+   if (params?.program_stage_id) q.set('program_stage_id', params.program_stage_id)
+   if (params?.search) q.set('search', params.search)
+   if (params?.page !== undefined) q.set('page', String(params.page))
+   if (params?.limit !== undefined) q.set('limit', String(params.limit))
+   return q.toString() ? `/api/program-substages?${q.toString()}` : '/api/program-substages'
+  },
+  BY_STAGE: (programStageId?: string, params?: {
+   search?: string
+   page?: number | string
+   limit?: number | string
+  }) => {
+   const q = new URLSearchParams()
+   if (programStageId) q.set('program_stage_id', programStageId)
+   if (params?.search) q.set('search', params.search)
+   if (params?.page !== undefined) q.set('page', String(params.page))
+   if (params?.limit !== undefined) q.set('limit', String(params.limit))
+   return q.toString() ? `/api/program-substages?${q.toString()}` : '/api/program-substages'
+  },
   DETAIL: (id: string) => `/api/program-substages/${encodeURIComponent(id)}`,
   REORDER: '/api/program-substages/reorder',
  },

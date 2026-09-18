@@ -39,6 +39,10 @@ export const ROUTES = {
     MISSION_NEW: '/admin/missions/new',
     CONTENT: '/admin/content',
     CONTENT_NEW: '/admin/content/new',
+    TOPICS: '/admin/topics',
+    TOPIC_NEW: '/admin/topics/new',
+    ACTIVITIES: '/admin/activities',
+    ACTIVITY_NEW: '/admin/activities/new',
     FRAMES: '/admin/frames',
     FRAME_UPLOAD: '/admin/frames/upload',
     USERS: '/admin/users',
@@ -65,10 +69,40 @@ export const ROUTES = {
 } as const
 
 // Parameterized path builders (backward-compatible)
+
+// Small helper to append optional search params to a base path.
+const withSearch = (base: string, params: Record<string, string | number | undefined>) => {
+  const entries = Object.entries(params).filter(([, v]) => v !== undefined) as [string, string | number][]
+  if (!entries.length) return base
+  const q = new URLSearchParams()
+  entries.forEach(([k, v]) => q.set(k, String(v)))
+  return `${base}?${q.toString()}`
+}
+
 export const programListPath = () => ROUTES.ADMIN.PROGRAMS
 export const programDetailPath = (id: string) => `${ROUTES.ADMIN.PROGRAMS}/${id}`
 export const programStagePath = (programId: string, stageId: string) =>
   `${ROUTES.ADMIN.PROGRAMS}/${programId}/stages/${stageId}`
+
+export const topicListPath = (params?: { programId?: string }) =>
+  withSearch(ROUTES.ADMIN.TOPICS, { programId: params?.programId })
+
+export const topicNewPath = (params?: { programId?: string }) =>
+  withSearch(ROUTES.ADMIN.TOPIC_NEW, { programId: params?.programId })
+
+export const topicDetailPath = (id: string) => `${ROUTES.ADMIN.TOPICS}/${id}`
+
+export const topicEditPath = (id: string) => `${ROUTES.ADMIN.TOPICS}/${id}/edit`
+
+export const activityListPath = (params?: { programId?: string; stageId?: string }) =>
+  withSearch(ROUTES.ADMIN.ACTIVITIES, { programId: params?.programId, stageId: params?.stageId })
+
+export const activityNewPath = (params?: { programId?: string; stageId?: string }) =>
+  withSearch(ROUTES.ADMIN.ACTIVITY_NEW, { programId: params?.programId, stageId: params?.stageId })
+
+export const activityDetailPath = (id: string) => `${ROUTES.ADMIN.ACTIVITIES}/${id}`
+
+export const activityEditPath = (id: string) => `${ROUTES.ADMIN.ACTIVITIES}/${id}/edit`
 
 export const contentNewPath = (params?: { programId?: string; stageId?: string }) => {
   const base = ROUTES.ADMIN.CONTENT_NEW

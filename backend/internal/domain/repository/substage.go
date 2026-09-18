@@ -8,10 +8,18 @@ import (
 
 // ProgramSubstageRepository is the persistence contract for Kegiatan
 // (assessed leaves under a Topik).
+// SubstageFilter narrows a paginated Kegiatan list query.
+type SubstageFilter struct {
+	ProgramID      string
+	ProgramStageID string
+	Search         string
+}
+
 type ProgramSubstageRepository interface {
 	CreateSubstage(ctx context.Context, s *entity.ProgramSubstage) error
 	GetSubstageByID(ctx context.Context, id string) (*entity.ProgramSubstage, error)
 	ListSubstages(ctx context.Context, programStageID string) ([]entity.ProgramSubstage, error)
+	ListPaginatedSubstages(ctx context.Context, filter SubstageFilter, page, limit int) (*Paginated[entity.ProgramSubstage], error)
 	UpdateSubstage(ctx context.Context, s *entity.ProgramSubstage) error
 	DeleteSubstage(ctx context.Context, id string) error
 	// ReorderSubstages renumbers sequence_order 1..n to match orderedIDs.

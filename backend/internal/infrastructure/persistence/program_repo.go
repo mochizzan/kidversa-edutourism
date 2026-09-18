@@ -157,9 +157,44 @@ func (r *GormProgramRepository) ListStages(ctx context.Context, programID string
 	return items, nil
 }
 
+func (r *GormProgramRepository) ListPaginatedStages(ctx context.Context, filter repository.StageFilter, page, limit int) (*repository.Paginated[entity.ProgramStage], error) {
+	q := r.db.WithContext(ctx).Model(&ProgramStageModel{})
+	if filter.ProgramID != "" {
+		q = q.Where("program_id = ?", filter.ProgramID)
+	}
+	if filter.Search != "" {
+		like := "%" + strings.ToLower(filter.Search) + "%"
+		q = q.Where("LOWER(name) LIKE ? OR LOWER(description) LIKE ?", like, like)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+
+	var models []ProgramStageModel
+	offset := (page - 1) * limit
+	if err := q.Order("sequence_order ASC, created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.ProgramStage, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return &repository.Paginated[entity.ProgramStage]{Items: items, Total: int(total)}, nil
+}
+
 func (r *GormProgramRepository) UpdateStage(ctx context.Context, s *entity.ProgramStage) error {
-	m := programStageModelFromEntity(s)
-	if err := r.db.WithContext(ctx).Model(&ProgramStageModel{}).Where("id = ?", s.ID).Updates(m).Error; err != nil {
+	// Map-form update so zero/false/empty values are not skipped by GORM and
+	// dropped columns are not referenced.
+	fields := map[string]interface{}{
+		"sequence_order": s.SequenceOrder,
+		"name":           s.Name,
+		"description":    s.Description,
+		"content_type":   s.ContentType,
+		"is_photo_stage": s.IsPhotoStage,
+	}
+	if err := r.db.WithContext(ctx).Model(&ProgramStageModel{}).Where("id = ?", s.ID).Updates(fields).Error; err != nil {
 		if isDuplicate(err) {
 			return apperrors.Conflict("conflict", err)
 		}

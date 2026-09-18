@@ -9,8 +9,14 @@ const LiveMonitorPage = lazy(() => import('../../features/admin/pages/LiveMonito
 
 // ── Program ──
 const ProgramsPage = lazy(() => import('../../features/admin/pages/ProgramsPage'))
+const ProgramFormPage = lazy(() => import('../../features/admin/pages/ProgramFormPage'))
 const ProgramDetailPage = lazy(() => import('../../features/admin/pages/ProgramDetailPage'))
-const ProgramStagePage = lazy(() => import('../../features/admin/pages/ProgramStagePage'))
+const TopicsPage = lazy(() => import('../../features/admin/pages/TopicsPage'))
+const TopicFormPage = lazy(() => import('../../features/admin/pages/TopicFormPage'))
+const TopicDetailPage = lazy(() => import('../../features/admin/pages/TopicDetailPage'))
+const ActivitiesPage = lazy(() => import('../../features/admin/pages/ActivitiesPage'))
+const ActivityFormPage = lazy(() => import('../../features/admin/pages/ActivityFormPage'))
+const ActivityDetailPage = lazy(() => import('../../features/admin/pages/ActivityDetailPage'))
 const SessionsPage = lazy(() => import('../../features/admin/pages/SessionsPage'))
 const SessionDetailPage = lazy(() => import('../../features/admin/pages/SessionDetailPage'))
 const ParticipantsPage = lazy(() => import('../../features/admin/pages/ParticipantsPage'))
@@ -49,8 +55,23 @@ export const adminRoutes: RouteObject[] = [
 
       // ── Program ──
       guardedRoute('programs', 'programs', ProgramsPage),
+      guardedRoute('programs/new', 'programs', ProgramFormPage),
       guardedRoute('programs/:programId', 'programs', ProgramDetailPage),
-      guardedRoute('programs/:programId/stages/:stageId', 'programs', ProgramStagePage),
+      guardedRoute('programs/:programId/edit', 'programs', ProgramFormPage),
+
+      // ── Topics ──
+      guardedRoute('topics', 'programs', TopicsPage),
+      guardedRoute('topics/new', 'programs', TopicFormPage),
+      guardedRoute('topics/:topicId', 'programs', TopicDetailPage),
+      guardedRoute('topics/:topicId/edit', 'programs', TopicFormPage),
+
+      // ── Activities ──
+      guardedRoute('activities', 'programs', ActivitiesPage),
+      guardedRoute('activities/new', 'programs', ActivityFormPage),
+      guardedRoute('activities/:activityId', 'programs', ActivityDetailPage),
+      guardedRoute('activities/:activityId/edit', 'programs', ActivityFormPage),
+
+      // ── Sessions ──
       guardedRoute('sessions', 'sessions', SessionsPage),
       guardedRoute('sessions/new', 'sessions', SessionDetailPage),
       guardedRoute('sessions/:sessionId', 'sessions', SessionDetailPage),
