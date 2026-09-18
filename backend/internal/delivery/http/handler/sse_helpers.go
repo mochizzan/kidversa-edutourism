@@ -12,9 +12,23 @@ import (
 	"kidversa-edutourism-backend/internal/pkg/sse"
 )
 
-// getFlusher returns the http.Flusher for an SSE response writer.
-func getFlusher(w http.ResponseWriter) http.Flusher {
-	return w.(http.Flusher)
+// flushWriter combines a response writer with a controller that can flush
+// and report flush errors. It lets writeSSE/writeKeepalive detect a dropped
+// client at the exact moment a frame is pushed.
+type flushWriter struct {
+	w  http.ResponseWriter
+	rc *http.ResponseController
+}
+
+func newFlushWriter(w http.ResponseWriter) *flushWriter {
+	return &flushWriter{
+		w:  w,
+		rc: http.NewResponseController(w),
+	}
+}
+
+func (fw *flushWriter) Flush() error {
+	return fw.rc.Flush()
 }
 
 // streamSSE subscribes to ch on hub and streams events to the client until the
@@ -35,12 +49,17 @@ func streamSSE(c *echo.Context, hub *sse.Hub, ch string, initial *sse.Event, kee
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
-	f := getFlusher(w)
-	f.Flush()
+	fw := newFlushWriter(w)
+	if err := fw.Flush(); err != nil {
+		return nil
+	}
 
 	if initial != nil {
-		writeSSE(w, f, *initial)
+		if err := writeSSE(fw, *initial); err != nil {
+			return nil
+		}
 	}
 
 	// Replay any events already buffered for this channel so a client that
@@ -57,7 +76,9 @@ func streamSSE(c *echo.Context, hub *sse.Hub, ch string, initial *sse.Event, kee
 			if ev.Type == "error" {
 				continue
 			}
-			writeSSE(w, f, ev)
+			if err := writeSSE(fw, ev); err != nil {
+				return nil
+			}
 		}
 	}
 
@@ -76,31 +97,47 @@ func streamSSE(c *echo.Context, hub *sse.Hub, ch string, initial *sse.Event, kee
 			if !ok {
 				return nil
 			}
-			writeSSE(w, f, ev)
+			if err := writeSSE(fw, ev); err != nil {
+				return nil
+			}
 		case <-keep:
-			writeKeepalive(w, f)
+			if err := writeKeepalive(fw); err != nil {
+				return nil
+			}
 		}
 	}
 }
 
 // writeSSE serializes one SSE event and flushes it to the client.
-func writeSSE(w http.ResponseWriter, f http.Flusher, ev sse.Event) {
+// It returns any write/flush error so the caller can stop the stream when
+// the client has disconnected.
+func writeSSE(fw *flushWriter, ev sse.Event) error {
 	b, err := json.Marshal(ev.Data)
 	if err != nil {
-		return
+		return err
 	}
 	if ev.ID != 0 {
-		fmt.Fprintf(w, "id: %d\n", ev.ID)
+		if _, err := fmt.Fprintf(fw.w, "id: %d\n", ev.ID); err != nil {
+			return err
+		}
 	}
 	if ev.Type != "" {
-		fmt.Fprintf(w, "event: %s\n", ev.Type)
+		if _, err := fmt.Fprintf(fw.w, "event: %s\n", ev.Type); err != nil {
+			return err
+		}
 	}
-	fmt.Fprintf(w, "data: %s\n\n", b)
-	f.Flush()
+	if _, err := fmt.Fprintf(fw.w, "data: %s\n\n", b); err != nil {
+		return err
+	}
+	return fw.Flush()
 }
 
 // writeKeepalive emits an SSE comment frame so proxies don't drop an idle stream.
-func writeKeepalive(w http.ResponseWriter, f http.Flusher) {
-	fmt.Fprintf(w, ": keepalive\n\n")
-	f.Flush()
+// It returns any write/flush error so the caller can stop the stream when
+// the client has disconnected.
+func writeKeepalive(fw *flushWriter) error {
+	if _, err := fmt.Fprintf(fw.w, ": keepalive\n\n"); err != nil {
+		return err
+	}
+	return fw.Flush()
 }
