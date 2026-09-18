@@ -59,8 +59,13 @@ export default defineConfig({
         target: process.env.VITE_API_TARGET || 'http://localhost:8080',
         changeOrigin: true,
         configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('Connection', 'close')
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.url && req.url.includes('/stream')) {
+              proxyReq.setHeader('Connection', 'keep-alive')
+              proxyReq.setHeader('Cache-Control', 'no-cache')
+            } else {
+              proxyReq.setHeader('Connection', 'close')
+            }
           })
         },
       }
