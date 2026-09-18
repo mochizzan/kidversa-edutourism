@@ -83,7 +83,7 @@ func main() {
 	sessionUC.SetUserRepo(userRepo)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
-	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, badgeUC)
+	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, sessionRepo, badgeUC)
 	attendanceUC := attendanceuc.NewUsecase(attendanceRepo)
 	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg)
 

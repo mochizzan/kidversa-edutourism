@@ -15,8 +15,9 @@ import (
 
 // Usecase implements assessment business logic (upsert + list).
 type Usecase struct {
-	repo    repository.AssessmentRepository
-	badgeUC BadgeEvaluator
+	repo        repository.AssessmentRepository
+	sessionRepo repository.SessionRepository
+	badgeUC     BadgeEvaluator
 }
 
 // BadgeEvaluator is the minimal contract the assessment usecase needs to trigger
@@ -27,8 +28,8 @@ type BadgeEvaluator interface {
 
 // NewUsecase builds the assessment usecase. badgeUC may be nil (badge
 // recomputation is then skipped, preserving prior behavior).
-func NewUsecase(repo repository.AssessmentRepository, badgeUC BadgeEvaluator) *Usecase {
-	return &Usecase{repo: repo, badgeUC: badgeUC}
+func NewUsecase(repo repository.AssessmentRepository, sessionRepo repository.SessionRepository, badgeUC BadgeEvaluator) *Usecase {
+	return &Usecase{repo: repo, sessionRepo: sessionRepo, badgeUC: badgeUC}
 }
 
 // isNotFound reports whether err is an app-level NotFound.
@@ -74,6 +75,16 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	syncStatus = string(normSync) // may be "" -> defaults preserved
 	if err := u.assertOwnership(ctx, req.ParticipantID, actorID, actorRole); err != nil {
 		return nil, err
+	}
+	if req.SessionID == "" {
+		return nil, apperrors.BadRequest("validation_error", nil)
+	}
+	sess, err := u.sessionRepo.GetSessionByID(ctx, req.SessionID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if sess.Status != entity.SessionActive {
+		return nil, apperrors.Forbidden("session_not_active", errors.New("assessment can only be submitted when session is active"))
 	}
 	if starRating < 0 {
 		return nil, apperrors.BadRequest("validation_error", nil)
