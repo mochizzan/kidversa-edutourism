@@ -83,3 +83,5 @@ tasks/
 .omp/
 .codebase-index/
 tmp/
+# CocoIndex Code (ccc)
+/.cocoindex_code/

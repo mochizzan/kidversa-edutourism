@@ -20,7 +20,7 @@ import (
 // via BOOTSTRAP_SUPERADMIN_PASSWORD. Tenant slugs are stable identifiers used by
 // the seed logic and by operations tooling.
 const (
-	bootstrapSuperadminEmail   = "superadmin@kidversa.id"
+	bootstrapSuperadminEmail   = "superadmin@kidversa.fun"
 	bootstrapTenantBandungSlug = "tenant-bandung"
 )
 

@@ -17,7 +17,7 @@ import (
 const openRouterMaxBodySize = 64 * 1024
 
 // openRouterHTTPReferer is sent as the HTTP-Referer header on OpenRouter requests.
-const openRouterHTTPReferer = "https://kidversa.id"
+const openRouterHTTPReferer = "https://kidversa.fun"
 
 type openRouterRequest struct {
 	Model       string              `json:"model"`

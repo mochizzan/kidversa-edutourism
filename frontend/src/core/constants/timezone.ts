@@ -4,4 +4,4 @@
 export const WIB = 'Asia/Jakarta'
 
 /** Public support contact address shown on error/help surfaces. */
-export const SUPPORT_EMAIL = 'support@kidversa.id'
+export const SUPPORT_EMAIL = 'support@kidversa.fun'
