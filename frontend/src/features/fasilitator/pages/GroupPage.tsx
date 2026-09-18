@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Users, Target, Monitor, User } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
+import { SessionStatus } from '../../../core/types/enums'
 import { liveService } from '../../../core/services/live'
 import { ROUTES } from '../../../core/constants/app'
 import { kioskAccessPath } from '../../../core/constants/app'
@@ -395,6 +396,8 @@ const GroupPage = () => {
   const isMine =
     !user || user.role !== 'FASILITATOR' || group.facilitator_id === user.id
 
+  const isSessionActive = groupDetail.session.status === SessionStatus.ACTIVE
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -423,6 +426,12 @@ const GroupPage = () => {
           </div>
         }
       />
+
+      {!isSessionActive && (
+        <div className="flex items-center gap-2 rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-700">
+          Sesi belum dimulai. Penilaian akan tersedia setelah sesi aktif.
+        </div>
+      )}
 
       {!isMine ? (
         <div className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
@@ -460,7 +469,7 @@ const GroupPage = () => {
               onToggleAttendance={isMine ? () => handleToggleAttendance(participant.id) : undefined}
               attendanceLoading={attendanceLoading.has(participant.id)}
               showPhoto={isPhotoStage}
-              onAssess={isMine ? () => handleAssess(participant.id) : undefined}
+              onAssess={isMine && isSessionActive ? () => handleAssess(participant.id) : undefined}
             />
           ))}
         </div>
