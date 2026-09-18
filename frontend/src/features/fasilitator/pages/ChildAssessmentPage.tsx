@@ -8,6 +8,7 @@ import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { useChildAssessment } from '../hooks/useChildAssessment'
 import { KegiatanCard } from '../components/KegiatanCard'
 import { assessmentService } from '../../../core/services/assessments'
+import { SessionStatus } from '../../../core/types/enums'
 import type { CreateAssessmentDTO } from '../../../core/types'
 
 const ChildAssessmentPage = () => {
@@ -49,6 +50,7 @@ const ChildAssessmentPage = () => {
   }
 
   const { participant, programStage } = childDetail ?? {}
+  const isSessionActive = childDetail?.session.status === SessionStatus.ACTIVE
   const hasConsentPhoto = participant?.consent_photo ?? false
 
   // ── Loading state ──
@@ -89,6 +91,30 @@ const ChildAssessmentPage = () => {
       <div className="space-y-6">
         <PageHeader title="Penilaian Anak" />
         <ErrorState message="Data anak tidak ditemukan" onRetry={fetchData} />
+      </div>
+    )
+  }
+
+  // ── Session not active state ──
+  if (!isSessionActive) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Penilaian Anak"
+          breadcrumbs={[
+            { label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD },
+            { label: participant.child_name },
+          ]}
+        />
+        <ErrorState
+          message="Sesi belum dimulai. Penilaian tidak dapat dilakukan."
+          onRetry={fetchData}
+        />
+        <div className="flex sm:justify-start">
+          <Button variant="secondary" onClick={handleBack} className="w-full sm:w-auto">
+            Kembali ke Kelompok
+          </Button>
+        </div>
       </div>
     )
   }

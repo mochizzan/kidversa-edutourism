@@ -9,6 +9,7 @@ import { friendlyError } from '../../../core/utils/errorMessages'
 import { useGroupOwnership } from './useGroupOwnership'
 import type {
   Participant,
+  Session,
   SessionGroup,
   Assessment,
   SessionStage,
@@ -20,6 +21,7 @@ export interface ChildDetail {
   participant: Participant
   group: SessionGroup | undefined
   programStage?: ProgramStage
+  session: Session
   sessionStage: SessionStage | undefined
   // Kegiatan (session_substage) leaves for the current session stage. The
   // assessment is scored per leaf, not per session stage.
@@ -90,6 +92,7 @@ async function findChildInSessions(childId: string): Promise<{ detail: ChildDeta
         participant,
         group,
         programStage,
+        session: detail,
         sessionStage: currentStage,
         sessionSubstages,
         programSubstageNameMap,
@@ -180,6 +183,7 @@ export function useChildAssessment(childId: string | undefined, sessionId?: stri
               participant,
               group,
               programStage,
+              session: sessionDetail,
               sessionStage: currentStage,
               sessionSubstages,
               programSubstageNameMap,
