@@ -1,4 +1,5 @@
 import MINI_RAPORT_TAILWIND_CSS from './miniRaport.styles.css?inline'
+import { RATING_LABELS, MAX_STAR_RATING } from '../../core/constants/assessment'
 
 export interface MiniRaportData {
  programName: string
@@ -46,7 +47,7 @@ function dashIfEmpty(v?: string): string {
 }
 
 function starsHTML(rating: number): string {
- return Array.from({ length: 5 }, (_, i) =>
+ return Array.from({ length: MAX_STAR_RATING }, (_, i) =>
   i < rating
    ? '<i class="fas fa-star text-brand-star"></i>'
    : '<i class="fas fa-star text-gray-200"></i>'
@@ -65,7 +66,10 @@ function stageRowHTML(
     (k) => `
           <div class="flex items-center justify-between gap-2">
             <span class="text-[12px] font-semibold text-gray-700 truncate">${esc(k.name)}</span>
-            <span class="flex gap-0.5 text-brand-star text-sm shrink-0">${starsHTML(k.starRating)}</span>
+            <span class="flex items-center gap-2 shrink-0">
+              <span class="flex gap-0.5 text-brand-star text-sm">${starsHTML(k.starRating)}</span>
+              <span class="text-[11px] text-gray-600 shrink-0">${RATING_LABELS[k.starRating] ?? ''}</span>
+            </span>
           </div>`
    )
    .join('')
