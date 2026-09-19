@@ -18,7 +18,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { DataTable } from '../../../shared/components/data/DataTable'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientList'
@@ -288,11 +288,10 @@ const ProgramsPage = () => {
         rowClassName={(item: Program) => getHighlightClass(item.id)}
         expandedRowRender={(item: Program) => <ExpandedTopicsPanel programId={item.id} />}
         emptyState={
-          <EmptyState
+          <ListEmptyState
             icon={<FolderOpen className="w-12 h-12" />}
             title="Belum ada program"
             description="Buat program pertama untuk memulai."
-            action={{ label: 'Buat Program', onClick: () => navigate(ROUTES.ADMIN.PROGRAM_NEW) }}
           />
         }
       />

@@ -6,7 +6,7 @@ import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Tabs } from '../../../shared/components/ui/Tabs'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
 import { programSubstageService } from '../../../core/services/program-substages'
@@ -214,14 +214,10 @@ const TopicDetailPage = () => {
           {kegiatanLoading ? (
             <p className="text-sm text-on-surface-variant py-4">Memuat kegiatan…</p>
           ) : kegiatan.length === 0 ? (
-            <EmptyState
+            <ListEmptyState
               icon={<FolderOpen className="w-10 h-10" />}
               title="Belum ada kegiatan"
-              description="Tambahkan kegiatan untuk topik ini."
-              action={{
-                label: 'Tambah Kegiatan',
-                onClick: () => navigate(activityPath),
-              }}
+              description="Klik 'Tambah Kegiatan' di atas untuk menambahkan kegiatan pertama."
             />
           ) : (
             <ol className="divide-y divide-outline-variant/50">

@@ -5,7 +5,7 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
@@ -187,14 +187,10 @@ const ActivityDetailPage = () => {
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : contents.length === 0 ? (
-          <EmptyState
+          <ListEmptyState
             icon={<Play className="w-10 h-10" />}
             title="Belum ada konten"
-            description="Tambahkan konten (video, gambar, game) ke kegiatan ini."
-            action={{
-              label: 'Tambah Konten',
-              onClick: () => navigate(newContentHref),
-            }}
+            description="Klik 'Tambah Konten' di atas untuk menambahkan konten ke kegiatan ini."
           />
         ) : (
           <ul className="space-y-2">

@@ -4,7 +4,7 @@ import { Plus, Pencil, Trash2, Info, FolderOpen, AlertCircle } from 'lucide-reac
 import { Button } from '../../../shared/components/ui/Button'
 import { Select } from '../../../shared/components/ui/Select'
 import { DataTable } from '../../../shared/components/data/DataTable'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
@@ -289,15 +289,10 @@ const ActivitiesPage = () => {
           </div>
         }
         emptyState={
-          <EmptyState
+          <ListEmptyState
             icon={<FolderOpen className="w-12 h-12" />}
             title="Belum ada kegiatan"
             description="Buat kegiatan pertama untuk program dan topik yang dipilih."
-            action={{
-              label: 'Tambah Kegiatan',
-              onClick: () =>
-                navigate(activityNewPath({ programId: programFilter || undefined, stageId: stageFilter || undefined })),
-            }}
           />
         }
       />

@@ -5,7 +5,7 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { DataTable, type Column } from '../../../shared/components/data/DataTable'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { participantService } from '../../../core/services/participants'
@@ -240,7 +240,7 @@ const ParticipantsPage = () => {
         onSearch={setSearch}
         getRowId={(item) => item.id}
         ariaLabel="Daftar peserta"
-        emptyState={<EmptyState title="Belum ada peserta" description="Tambahkan peserta baru untuk memulai." />}
+        emptyState={<ListEmptyState title="Belum ada peserta" description="Klik 'Tambah Peserta' di atas untuk menambahkan peserta pertama." />}
       />
 
       <Modal

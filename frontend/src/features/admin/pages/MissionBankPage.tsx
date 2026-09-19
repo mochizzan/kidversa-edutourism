@@ -7,7 +7,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Select } from '../../../shared/components/ui/Select'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { DataTable } from '../../../shared/components/data/DataTable'
 import type { Column } from '../../../shared/components/data/DataTable'
 import { useMissionBank } from '../hooks/useMissionBank'
@@ -191,18 +191,13 @@ const MissionBankPage = () => {
           </div>
         }
         emptyState={
-          <EmptyState
+          <ListEmptyState
             icon={<FileText className="w-12 h-12" />}
             title="Belum ada misi"
             description={
               selectedProgram
-                ? 'Belum ada misi untuk program ini. Klik "Tambah Misi Baru" untuk memulai.'
-                : 'Pilih program atau klik "Tambah Misi Baru" untuk membuat misi pertama.'
-            }
-            action={
-              selectedProgram
-                ? { label: 'Tambah Misi Baru', onClick: () => navigate(ROUTES.ADMIN.MISSION_NEW) }
-                : undefined
+                ? 'Belum ada misi untuk program ini. Klik "Tambah Misi Baru" di atas untuk membuat misi pertama.'
+                : 'Pilih program, lalu klik "Tambah Misi Baru" di atas untuk membuat misi pertama.'
             }
           />
         }

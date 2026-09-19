@@ -7,7 +7,7 @@ import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Card } from '../../../shared/components/ui/Card'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { frameService } from '../../../core/services/frames'
 import { programService } from '../../../core/services/programs'
@@ -77,11 +77,10 @@ const FramesPage = () => {
             <Button variant="secondary" size="sm" onClick={load}>Coba Lagi</Button>
           </div>
         ) : frames.length === 0 ? (
-          <EmptyState
+          <ListEmptyState
             icon={<Image className="w-12 h-12" />}
             title="Belum ada frame"
-            description="Upload frame PNG untuk mulai menggunakan Smart Photo."
-            action={{ label: 'Upload Frame', onClick: () => navigate(ROUTES.ADMIN.FRAME_UPLOAD) }}
+            description="Klik 'Upload Frame' di atas untuk mengupload frame PNG pertama."
           />
         ) : (
           frames.map((frame) => (

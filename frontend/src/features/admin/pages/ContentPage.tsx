@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { ROUTES, contentEditPath } from '../../../core/constants/app'
 import { Plus, Pencil, Trash2, Play, Image, Gamepad2, Loader2, Search } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -8,7 +8,7 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { Select } from '../../../shared/components/ui/Select'
 import { Card } from '../../../shared/components/ui/Card'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { contentService } from '../../../core/services'
 import { cn } from '../../../core/utils'
@@ -44,7 +44,6 @@ const FILE_TYPE_FILTER_OPTIONS = [
 // ── Component ──
 
 const ContentPage = () => {
-  const navigate = useNavigate()
   const { addToast } = useGlobalToast()
 
   const [loading, setLoading] = useState(true)
@@ -159,15 +158,14 @@ const ContentPage = () => {
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState
+        <ListEmptyState
           icon={<Image className="w-12 h-12" />}
           title="Belum ada konten"
           description={
             contents.length === 0
-              ? 'Buat konten baru untuk mengisinya.'
+              ? 'Klik "Tambah Konten" di atas untuk membuat konten pertama.'
               : 'Tidak ada konten yang cocok dengan filter.'
           }
-          action={{ label: 'Tambah Konten', onClick: () => navigate(ROUTES.ADMIN.CONTENT_NEW) }}
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

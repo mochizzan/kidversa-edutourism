@@ -168,31 +168,6 @@ const AdminLayout = () => {
                   {section.section}
                 </h3>
                 <div className="flex flex-col gap-1">
-                  {otherItems.map((item) => {
-                    const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-                    return (
-                      <Tooltip key={item.path} content={isCollapsed ? item.label : ''}>
-                        <Link
-                          to={item.path}
-                          onClick={closeDrawer}
-                          className={cn(
-                            'flex items-center py-3 rounded-xl transition-all duration-200 w-full',
-                            isCollapsed ? 'px-[18px]' : 'px-3',
-                            isActive
-                              ? 'bg-primary-container text-on-primary-container font-medium'
-                              : 'text-on-surface-variant hover:bg-surface-container'
-                          )}
-                        >
-                          <span className="flex items-center justify-center shrink-0 w-5 h-5">{item.icon}</span>
-                          <span className={cn(
-                            'text-sm truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
-                            isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
-                          )}>{item.label}</span>
-                        </Link>
-                      </Tooltip>
-                    )
-                  })}
-
                   {isProgram && programItems.length > 0 && (
                     <>
                       {!isCollapsed && (
@@ -239,6 +214,31 @@ const AdminLayout = () => {
                       })}
                     </>
                   )}
+
+                  {otherItems.map((item) => {
+                    const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
+                    return (
+                      <Tooltip key={item.path} content={isCollapsed ? item.label : ''}>
+                        <Link
+                          to={item.path}
+                          onClick={closeDrawer}
+                          className={cn(
+                            'flex items-center py-3 rounded-xl transition-all duration-200 w-full',
+                            isCollapsed ? 'px-[18px]' : 'px-3',
+                            isActive
+                              ? 'bg-primary-container text-on-primary-container font-medium'
+                              : 'text-on-surface-variant hover:bg-surface-container'
+                          )}
+                        >
+                          <span className="flex items-center justify-center shrink-0 w-5 h-5">{item.icon}</span>
+                          <span className={cn(
+                            'text-sm truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
+                            isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
+                          )}>{item.label}</span>
+                        </Link>
+                      </Tooltip>
+                    )
+                  })}
                 </div>
               </div>
             )

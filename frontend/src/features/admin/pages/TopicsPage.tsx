@@ -12,7 +12,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Select } from '../../../shared/components/ui/Select'
 import { DataTable } from '../../../shared/components/data/DataTable'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
@@ -302,14 +302,10 @@ const TopicsPage = () => {
           />
         }
         emptyState={
-          <EmptyState
+          <ListEmptyState
             icon={<FolderOpen className="w-12 h-12" />}
             title="Belum ada topik"
             description="Buat topik pertama untuk program yang dipilih."
-            action={{
-              label: 'Tambah Topik',
-              onClick: () => navigate(topicNewPath({ programId: programFilter || undefined })),
-            }}
           />
         }
       />

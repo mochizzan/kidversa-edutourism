@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
 import { cn } from '../../../core/utils'
 
-interface EmptyStateProps {
+export interface EmptyStateProps {
   icon?: ReactNode
   title: string
   description?: string

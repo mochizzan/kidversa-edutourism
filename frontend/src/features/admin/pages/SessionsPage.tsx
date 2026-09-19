@@ -6,7 +6,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { DataTable } from '../../../shared/components/data/DataTable'
-import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { useHighlight } from '../../../shared/hooks/useHighlight'
 import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientList'
@@ -241,11 +241,10 @@ const SessionsPage = () => {
         getRowId={(item: Session) => item.id}
         rowClassName={(item: Session) => getHighlightClass(item.id)}
         emptyState={
-          <EmptyState
+          <ListEmptyState
             icon={<Calendar className="w-12 h-12" />}
             title="Belum ada sesi"
             description="Buat sesi pertama untuk memulai."
-            action={{ label: 'Buat Sesi', onClick: () => navigate(ROUTES.ADMIN.SESSION_NEW) }}
           />
         }
       />
