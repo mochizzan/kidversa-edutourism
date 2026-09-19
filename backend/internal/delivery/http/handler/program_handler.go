@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
@@ -46,10 +48,27 @@ func (h *ProgramHandler) List(c *echo.Context) error {
 	return appresp.OKWithMeta(c, res.Items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
 }
 
+// bindAndValidateStrict is a Program-scoped strict binder. It decodes the JSON
+// body with DisallowUnknownFields() so legacy payloads containing removed fields
+// (e.g. thumbnail_url) are rejected with 400 invalid_body before reaching the
+// repository. It then runs the standard validator (400 validation_error on
+// failure). This does NOT replace the shared bindAndValidate used by other endpoints.
+func bindAndValidateStrict(c *echo.Context, req interface{}) error {
+	decoder := json.NewDecoder((*c).Request().Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(req); err != nil {
+		return apperrors.BadRequest("invalid_body", err)
+	}
+	if err := (*c).Validate(req); err != nil {
+		return apperrors.BadRequest("validation_error", err)
+	}
+	return nil
+}
+
 // Create handles POST /api/programs.
 func (h *ProgramHandler) Create(c *echo.Context) error {
 	var req dto.ProgramRequest
-	if err := bindAndValidate(c, &req); err != nil {
+	if err := bindAndValidateStrict(c, &req); err != nil {
 		return err
 	}
 	if strings.TrimSpace(derefString(req.Name)) == "" {
@@ -64,7 +83,14 @@ func (h *ProgramHandler) Create(c *echo.Context) error {
 	if tenantID != "" {
 		tp = &tenantID
 	}
-	p := &entity.Program{Name: derefString(req.Name), Description: derefString(req.Description), ThumbnailURL: derefString(req.ThumbnailURL), IsActive: active, TenantID: tp}
+	p := &entity.Program{
+		Name:               derefString(req.Name),
+		Description:        derefString(req.Description),
+		FinalBadgeName:     derefString(req.FinalBadgeName),
+		FinalBadgeImageURL: derefString(req.FinalBadgeImageURL),
+		IsActive:           active,
+		TenantID:           tp,
+	}
 	if err := h.repo.CreateProgram((*c).Request().Context(), p); err != nil {
 		return err
 	}
@@ -99,7 +125,7 @@ func (h *ProgramHandler) Update(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusForbidden, "forbidden")
 	}
 	var req dto.ProgramRequest
-	if err := bindAndValidate(c, &req); err != nil {
+	if err := bindAndValidateStrict(c, &req); err != nil {
 		return err
 	}
 	if req.Name != nil {
@@ -111,11 +137,14 @@ func (h *ProgramHandler) Update(c *echo.Context) error {
 	if req.Description != nil {
 		p.Description = *req.Description
 	}
-	if req.ThumbnailURL != nil {
-		p.ThumbnailURL = *req.ThumbnailURL
-	}
 	if req.IsActive != nil {
 		p.IsActive = *req.IsActive
+	}
+	if req.FinalBadgeName != nil {
+		p.FinalBadgeName = *req.FinalBadgeName
+	}
+	if req.FinalBadgeImageURL != nil {
+		p.FinalBadgeImageURL = *req.FinalBadgeImageURL
 	}
 	if err := h.repo.UpdateProgram((*c).Request().Context(), p); err != nil {
 		return err

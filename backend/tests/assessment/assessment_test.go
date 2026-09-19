@@ -1,4 +1,4 @@
-package assessment
+package assessment_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/usecase/assessment"
 )
 
 type fakeAssessmentRepo struct {
@@ -23,7 +24,9 @@ type fakeAssessmentRepo struct {
 	ownerErr                          error
 }
 
-func (r *fakeAssessmentRepo) Create(ctx context.Context, a *entity.Assessment) error { return r.createErr }
+func (r *fakeAssessmentRepo) Create(ctx context.Context, a *entity.Assessment) error {
+	return r.createErr
+}
 func (r *fakeAssessmentRepo) GetByID(ctx context.Context, id, tenantID string) (*entity.Assessment, error) {
 	return nil, nil
 }
@@ -36,8 +39,12 @@ func (r *fakeAssessmentRepo) GetByParticipantStageIncludingDeleted(ctx context.C
 func (r *fakeAssessmentRepo) List(ctx context.Context, f repository.AssessmentFilter, page, limit int) (*repository.Paginated[entity.Assessment], error) {
 	return nil, nil
 }
-func (r *fakeAssessmentRepo) Update(ctx context.Context, a *entity.Assessment) error { return r.updateErr }
-func (r *fakeAssessmentRepo) Revive(ctx context.Context, a *entity.Assessment) error { return r.reviveErr }
+func (r *fakeAssessmentRepo) Update(ctx context.Context, a *entity.Assessment) error {
+	return r.updateErr
+}
+func (r *fakeAssessmentRepo) Revive(ctx context.Context, a *entity.Assessment) error {
+	return r.reviveErr
+}
 func (r *fakeAssessmentRepo) Delete(ctx context.Context, id string) error { return nil }
 func (r *fakeAssessmentRepo) GetGroupFacilitatorIDByParticipant(ctx context.Context, participantID string) (*string, error) {
 	return r.ownerID, r.ownerErr
@@ -56,29 +63,41 @@ func (r *fakeSessionRepo) ListSessions(ctx context.Context, f repository.Session
 	return nil, nil
 }
 func (r *fakeSessionRepo) UpdateSession(ctx context.Context, s *entity.Session) error { return nil }
-func (r *fakeSessionRepo) DeleteSession(ctx context.Context, id string) error { return nil }
-func (r *fakeSessionRepo) CreateSessionStage(ctx context.Context, s *entity.SessionStage) error { return nil }
+func (r *fakeSessionRepo) DeleteSession(ctx context.Context, id string) error         { return nil }
+func (r *fakeSessionRepo) CreateSessionStage(ctx context.Context, s *entity.SessionStage) error {
+	return nil
+}
 func (r *fakeSessionRepo) ListSessionStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
 	return nil, nil
 }
-func (r *fakeSessionRepo) UpdateSessionStage(ctx context.Context, s *entity.SessionStage) error { return nil }
-func (r *fakeSessionRepo) CreateSessionGroup(ctx context.Context, g *entity.SessionGroup) error { return nil }
+func (r *fakeSessionRepo) UpdateSessionStage(ctx context.Context, s *entity.SessionStage) error {
+	return nil
+}
+func (r *fakeSessionRepo) CreateSessionGroup(ctx context.Context, g *entity.SessionGroup) error {
+	return nil
+}
 func (r *fakeSessionRepo) GetSessionGroupByID(ctx context.Context, id, tenantID string) (*entity.SessionGroup, error) {
 	return nil, nil
 }
 func (r *fakeSessionRepo) ListSessionGroups(ctx context.Context, sessionID string) ([]entity.SessionGroup, error) {
 	return nil, nil
 }
-func (r *fakeSessionRepo) UpdateSessionGroup(ctx context.Context, g *entity.SessionGroup) error { return nil }
+func (r *fakeSessionRepo) UpdateSessionGroup(ctx context.Context, g *entity.SessionGroup) error {
+	return nil
+}
 func (r *fakeSessionRepo) DeleteSessionGroup(ctx context.Context, id string) error { return nil }
-func (r *fakeSessionRepo) CreateGroupStageProgress(ctx context.Context, p *entity.GroupStageProgress) error { return nil }
+func (r *fakeSessionRepo) CreateGroupStageProgress(ctx context.Context, p *entity.GroupStageProgress) error {
+	return nil
+}
 func (r *fakeSessionRepo) ListGroupStageProgress(ctx context.Context, sessionSubstageID string) ([]entity.GroupStageProgress, error) {
 	return nil, nil
 }
 func (r *fakeSessionRepo) ListGroupStageProgressByGroup(ctx context.Context, groupID string) ([]entity.GroupStageProgress, error) {
 	return nil, nil
 }
-func (r *fakeSessionRepo) CreateParticipant(ctx context.Context, p *entity.Participant) error { return nil }
+func (r *fakeSessionRepo) CreateParticipant(ctx context.Context, p *entity.Participant) error {
+	return nil
+}
 func (r *fakeSessionRepo) GetParticipantByID(ctx context.Context, id, tenantID string) (*entity.Participant, error) {
 	return nil, nil
 }
@@ -91,7 +110,9 @@ func (r *fakeSessionRepo) ListParticipants(ctx context.Context, sessionID, group
 func (r *fakeSessionRepo) ListParticipantsPaginated(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*repository.Paginated[entity.Participant], error) {
 	return nil, nil
 }
-func (r *fakeSessionRepo) UpdateParticipant(ctx context.Context, p *entity.Participant) error { return nil }
+func (r *fakeSessionRepo) UpdateParticipant(ctx context.Context, p *entity.Participant) error {
+	return nil
+}
 func (r *fakeSessionRepo) UpdateParticipantFields(ctx context.Context, id string, fields map[string]interface{}) error {
 	return nil
 }
@@ -99,7 +120,9 @@ func (r *fakeSessionRepo) UpdateParticipantTokenIfAvailable(ctx context.Context,
 	return false, nil
 }
 func (r *fakeSessionRepo) DeleteParticipant(ctx context.Context, id string) error { return nil }
-func (r *fakeSessionRepo) ClearParticipantTokens(ctx context.Context, sessionID, tenantID string) error { return nil }
+func (r *fakeSessionRepo) ClearParticipantTokens(ctx context.Context, sessionID, tenantID string) error {
+	return nil
+}
 func (r *fakeSessionRepo) FindParticipantSessionInfo(ctx context.Context, participantIDs []string, tenantID string) ([]repository.ParticipantSessionInfo, error) {
 	return nil, nil
 }
@@ -128,8 +151,8 @@ func (b *fakeBadgeEvaluator) EvaluateAfterAssessment(ctx context.Context, partic
 	return nil
 }
 
-func newUsecase(assessmentRepo *fakeAssessmentRepo, sessionRepo *fakeSessionRepo) *Usecase {
-	return NewUsecase(assessmentRepo, sessionRepo, &fakeBadgeEvaluator{})
+func newUsecase(assessmentRepo *fakeAssessmentRepo, sessionRepo *fakeSessionRepo) *assessment.Usecase {
+	return assessment.NewUsecase(assessmentRepo, sessionRepo, &fakeBadgeEvaluator{})
 }
 
 func requireAppErrorCode(t *testing.T, err error, want string) {

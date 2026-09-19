@@ -27,10 +27,10 @@ func NewProgramSubstageHandler(repo repository.ProgramSubstageRepository) *Progr
 
 // SubstageRequest is the create/update payload (Kegiatan leaf).
 type SubstageRequest struct {
-	ProgramStageID  string `json:"program_stage_id" validate:"required"`
-	SequenceOrder int    `json:"sequence_order"`
-	Name          string `json:"name" validate:"required"`
-	Description   string `json:"description,omitempty"`
+	ProgramStageID string `json:"program_stage_id" validate:"required"`
+	SequenceOrder  int    `json:"sequence_order"`
+	Name           string `json:"name" validate:"required"`
+	Description    string `json:"description,omitempty"`
 }
 
 // Create handles POST /api/program-substages.

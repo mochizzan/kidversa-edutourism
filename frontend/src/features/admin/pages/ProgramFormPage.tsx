@@ -19,7 +19,6 @@ const ProgramFormPage = () => {
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [thumbnailUrl, setThumbnailUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [finalBadgeName, setFinalBadgeName] = useState('')
   const [finalBadgeImageUrl, setFinalBadgeImageUrl] = useState('')
@@ -36,7 +35,6 @@ const ProgramFormPage = () => {
           if (cancelled || !program) return
           setName(program.name)
           setDescription(program.description ?? '')
-          setThumbnailUrl(program.thumbnail_url ?? '')
           setIsActive(program.is_active)
           setFinalBadgeName(program.final_badge_name ?? '')
           setFinalBadgeImageUrl(program.final_badge_image_url ?? '')
@@ -62,7 +60,6 @@ const ProgramFormPage = () => {
       const payload = {
         name: trimmedName,
         description,
-        thumbnail_url: thumbnailUrl,
         final_badge_name: finalBadgeName,
         final_badge_image_url: finalBadgeImageUrl,
       }
@@ -119,14 +116,6 @@ const ProgramFormPage = () => {
               disabled={saving}
             />
           </div>
-
-          <Input
-            label="Thumbnail URL"
-            value={thumbnailUrl}
-            onChange={(e) => setThumbnailUrl(e.target.value)}
-            placeholder="https://example.com/image.jpg"
-            disabled={saving}
-          />
 
           {isEdit && (
             <div className="flex items-center gap-2">

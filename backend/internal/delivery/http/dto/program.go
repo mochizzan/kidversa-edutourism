@@ -4,19 +4,20 @@ import "kidversa-edutourism-backend/internal/domain/entity"
 
 // ProgramRequest is the create/update payload for programs.
 type ProgramRequest struct {
-	Name         *string `json:"name,omitempty"`
-	Description  *string `json:"description,omitempty"`
-	ThumbnailURL *string `json:"thumbnail_url,omitempty"`
-	IsActive     *bool   `json:"is_active,omitempty"`
+	Name               *string `json:"name,omitempty"`
+	Description        *string `json:"description,omitempty"`
+	IsActive           *bool   `json:"is_active,omitempty"`
+	FinalBadgeName     *string `json:"final_badge_name,omitempty"`
+	FinalBadgeImageURL *string `json:"final_badge_image_url,omitempty"`
 }
 
 // ProgramStageRequest is the create/update payload for Topik.
 type ProgramStageRequest struct {
-	SequenceOrder   int                `json:"sequence_order,omitempty"`
-	Name            string             `json:"name" validate:"required"`
-	Description     string             `json:"description,omitempty"`
-	ContentType  entity.ContentType `json:"content_type" validate:"required"`
-	IsPhotoStage bool               `json:"is_photo_stage,omitempty"`
+	SequenceOrder int                `json:"sequence_order,omitempty"`
+	Name          string             `json:"name" validate:"required"`
+	Description   string             `json:"description,omitempty"`
+	ContentType   entity.ContentType `json:"content_type" validate:"required"`
+	IsPhotoStage  bool               `json:"is_photo_stage,omitempty"`
 }
 
 // ContentRequest is the create/update payload for the standalone Content entity

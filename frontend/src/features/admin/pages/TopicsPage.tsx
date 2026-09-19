@@ -6,8 +6,6 @@ import {
   Trash2,
   FolderOpen,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
   Info,
 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -70,7 +68,7 @@ function ActivityPreview({ stageId }: { stageId: string }) {
     programSubstageService
       .listByStage(stageId)
       .then((list) => {
-        if (!cancelled) setItems(list.slice(0, 5))
+        if (!cancelled) setItems(list)
       })
       .catch(() => {
         if (!cancelled) setItems([])
@@ -105,7 +103,6 @@ const TopicsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const programFilter = searchParams.get('programId') || ''
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<TopicRow | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -229,15 +226,6 @@ const TopicsPage = () => {
     },
   ]
 
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -290,6 +278,11 @@ const TopicsPage = () => {
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item) => item.id}
+        expandedRowRender={(item: TopicRow) => (
+          <div className="p-4 border-t border-outline-variant/50">
+            <ActivityPreview stageId={item.id} />
+          </div>
+        )}
         actions={
           <Select
             label="Program"
@@ -320,53 +313,6 @@ const TopicsPage = () => {
           />
         }
       />
-
-      {filteredRows.map((row) =>
-        expandedIds.has(row.id) ? (
-          <div
-            key={`expand-${row.id}`}
-            className="-mt-4 mx-1 bg-surface-container-low rounded-b-2xl p-4 border-t border-outline-variant/50"
-          >
-            <button
-              onClick={() => toggleExpand(row.id)}
-              className="flex items-center gap-1 text-xs font-medium text-primary mb-1"
-            >
-              Sembunyikan Kegiatan <ChevronUp className="w-3.5 h-3.5" />
-            </button>
-            <ActivityPreview stageId={row.id} />
-          </div>
-        ) : null,
-      )}
-
-      {allData.length > 0 && (
-        <button
-          onClick={() => {
-            // Toggle expand all visible rows (no-op if none)
-            const visibleIds = new Set(filteredRows.map((r) => r.id))
-            setExpandedIds((prev) => {
-              const allVisibleExpanded = Array.from(visibleIds).every((id) => prev.has(id))
-              const next = new Set(prev)
-              if (allVisibleExpanded) {
-                visibleIds.forEach((id) => next.delete(id))
-              } else {
-                visibleIds.forEach((id) => next.add(id))
-              }
-              return next
-            })
-          }}
-          className="flex items-center gap-1 text-sm text-primary"
-        >
-          {filteredRows.every((r) => expandedIds.has(r.id)) ? (
-            <>
-              Sembunyikan Semua <ChevronUp className="w-4 h-4" />
-            </>
-          ) : (
-            <>
-              Tampilkan Kegiatan <ChevronDown className="w-4 h-4" />
-            </>
-          )}
-        </button>
-      )}
 
       <ConfirmDialog
         open={!!deleteTarget}

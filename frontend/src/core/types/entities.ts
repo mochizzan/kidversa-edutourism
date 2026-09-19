@@ -43,7 +43,6 @@ export interface Program {
  tenant_id: string
  name: string
  description?: string
- thumbnail_url?: string
  is_active: boolean
  // Badge Final Program (cross-session award).
  final_badge_name?: string

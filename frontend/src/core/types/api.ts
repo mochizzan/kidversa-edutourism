@@ -20,7 +20,6 @@ export interface ListParams {
 export interface CreateProgramDTO {
   name: string
   description?: string
-  thumbnail_url?: string
   final_badge_name?: string
   final_badge_image_url?: string
 }

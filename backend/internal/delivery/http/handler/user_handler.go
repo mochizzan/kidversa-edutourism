@@ -114,7 +114,8 @@ func (h *UserHandler) Update(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
 	}
 	role, tid := actor(c)
-	user, err := h.userUC.UpdateUser((*c).Request().Context(), id, req.Name, req.Phone, req.Role, req.IsActive, role, tid)
+	actorID := appmiddleware.GetUserID(c)
+	user, err := h.userUC.UpdateUser((*c).Request().Context(), id, req.Name, req.Phone, req.Role, req.IsActive, actorID, role, tid)
 	if err != nil {
 		return err
 	}

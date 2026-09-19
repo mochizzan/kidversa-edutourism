@@ -42,7 +42,6 @@ export const programService: ProgramService = {
     itemRequest<Program>('POST', API_ROUTES.PROGRAMS.BASE, {
       name: data.name,
       description: data.description,
-      thumbnail_url: data.thumbnail_url,
       final_badge_name: data.final_badge_name,
       final_badge_image_url: data.final_badge_image_url,
     }),
@@ -51,7 +50,6 @@ export const programService: ProgramService = {
     itemRequest<Program>('PUT', API_ROUTES.PROGRAMS.DETAIL(id), {
       name: data.name,
       description: data.description,
-      thumbnail_url: data.thumbnail_url,
       is_active: data.is_active,
       final_badge_name: data.final_badge_name,
       final_badge_image_url: data.final_badge_image_url,

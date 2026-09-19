@@ -131,7 +131,19 @@ func (u *UserUsecase) GetUser(ctx context.Context, id, actorRole, actorTenantID 
 }
 
 // UpdateUser updates mutable user fields, enforcing tenant scope for ADMIN.
-func (u *UserUsecase) UpdateUser(ctx context.Context, id, name, phone string, role entity.UserRole, isActive *bool, actorRole, actorTenantID string) (*entity.User, error) {
+//
+// Self-role-change guard: a user may never reassign their own role. This
+// closes a self-lockout vector where a SUPER_ADMIN could demote themselves to
+// a non-SUPER_ADMIN role, leaving the tenant (and the whole platform) with
+// zero SUPER_ADMIN accounts. It also blocks any actor from a self-demotion /
+// privilege-reduction trick. Only the role field is gated — name, phone and
+// is_active remain freely editable on oneself.
+func (u *UserUsecase) UpdateUser(ctx context.Context, id, name, phone string, role entity.UserRole, isActive *bool, actorID, actorRole, actorTenantID string) (*entity.User, error) {
+	// Reject self role-change before touching storage so the failure leaks
+	// nothing about the target user's existence.
+	if id == actorID && role != "" {
+		return nil, apperrors.Forbidden("self_role_change_not_allowed", errors.New("tidak dapat mengubah role diri sendiri"))
+	}
 	user, err := u.users.GetByID(ctx, id)
 	if err != nil {
 		return nil, err

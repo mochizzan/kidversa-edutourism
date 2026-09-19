@@ -15,6 +15,7 @@ import { AvatarUploadModal } from '../../../shared/components/ui/AvatarUploadMod
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
+import { useAuth } from '../../../core/hooks/useAuth'
 import { redirectToLogin } from '../../../core/stores/authStore'
 import { getMediaUrl } from '../../../core/utils/media'
 import { ApiError } from '../../../core/services/backend-client'
@@ -68,11 +69,15 @@ const UserFormPage = () => {
   const { userId } = useParams()
   const { addToast } = useGlobalToast()
   const { tenantId, requiresSelection } = useTenantScope()
+  const { user: currentUser } = useAuth()
   const isEdit = Boolean(userId)
+  // A user may never reassign their own role (backend enforces this too);
+  // disable the field and strip role from the payload on self-edit.
+  const isSelfEdit = Boolean(userId && currentUser?.id === userId)
 
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(isEdit)
-  
+
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const avatarFileRef = useRef<File | null>(null)
@@ -128,8 +133,12 @@ const UserFormPage = () => {
         const payload: UpdateUserDTO = {
           name: data.name,
           email: data.email,
-          role: data.role,
           phone: data.phone || undefined,
+        }
+        // Never send role on a self-edit: the backend rejects self-role-change,
+        // but we also avoid persisting any stale value via the disabled control.
+        if (!isSelfEdit) {
+          payload.role = data.role
         }
         const updated = await userService.update(userId, payload)
         // Upload the avatar file separately (if changed) so it's stored as a
@@ -196,7 +205,7 @@ const UserFormPage = () => {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-2xl">
         <div className="bg-surface rounded-2xl p-6 shadow-sm space-y-6">
-           
+
           <div className="flex items-center gap-4 pb-6 border-b border-outline-variant">
             <div className="relative w-16 h-16 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0">
               {avatarPreview ? (
@@ -268,6 +277,7 @@ const UserFormPage = () => {
               label="Role"
               options={roleOptions}
               error={errors.role?.message}
+              disabled={isSelfEdit}
               {...register('role')}
             />
           </div>
