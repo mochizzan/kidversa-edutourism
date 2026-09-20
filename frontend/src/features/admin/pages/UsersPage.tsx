@@ -249,20 +249,20 @@ const UsersPage = () => {
               </>
             )}
             {isApprovedActive && (
-              <>
-                <Link to={`/admin/users/${item.id}/edit`}>
-                  <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" />
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={<Ban className="w-4 h-4 text-error" />}
-                  tooltip="Nonaktifkan"
-                  onClick={() => setDeactivateId(item.id)}
-                />
-              </>
+              <Link to={`/admin/users/${item.id}/edit`}>
+                <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" />
+              </Link>
             )}
-            {isSuperAdminView && item.id !== currentUser?.id && (
+            {isApprovedActive && item.role !== UserRole.SUPER_ADMIN && (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Ban className="w-4 h-4 text-error" />}
+                tooltip="Nonaktifkan"
+                onClick={() => setDeactivateId(item.id)}
+              />
+            )}
+            {isSuperAdminView && item.id !== currentUser?.id && item.role !== UserRole.SUPER_ADMIN && (
               <Button
                 variant="ghost"
                 size="sm"
