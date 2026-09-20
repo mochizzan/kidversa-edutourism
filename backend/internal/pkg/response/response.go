@@ -127,6 +127,10 @@ func MessageForCode(code string) string {
 		return "Data kehadiran tidak ditemukan"
 	case "assessment_out_of_range":
 		return "Penilaian harus antara 0 sampai 4"
+	case "user_not_deactivatable":
+		return "Akun ini tidak dapat dinonaktifkan"
+	case "user_not_deletable":
+		return "Akun ini tidak dapat dihapus"
 	default:
 		return "Terjadi kesalahan"
 	}

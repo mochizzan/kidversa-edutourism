@@ -172,16 +172,19 @@ func (u *UserUsecase) UpdateUser(ctx context.Context, id, name, phone string, ro
 	return user, nil
 }
 
-// DeleteUser removes a user, enforcing tenant scope for ADMIN.
+// DeleteUser hard-removes a user. SUPER_ADMIN accounts are protected and
+// cannot be deleted. ADMIN is tenant-scoped; SUPER_ADMIN acts globally.
 func (u *UserUsecase) DeleteUser(ctx context.Context, id, actorRole, actorTenantID string) error {
-	if actorRole != string(entity.RoleSuperAdmin) {
-		user, err := u.users.GetByID(ctx, id)
-		if err != nil {
-			return err
-		}
-		if !sameTenant(user.TenantID, actorTenantID) {
-			return apperrors.Forbidden("forbidden", errors.New("cross-tenant access"))
-		}
+	user, err := u.users.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if user.Role == entity.RoleSuperAdmin {
+		return apperrors.Forbidden("user_not_deletable",
+			errors.New("superadmin tidak dapat dihapus"))
+	}
+	if actorRole != string(entity.RoleSuperAdmin) && !sameTenant(user.TenantID, actorTenantID) {
+		return apperrors.Forbidden("forbidden", errors.New("cross-tenant access"))
 	}
 	return u.users.HardDelete(ctx, id)
 }
@@ -239,8 +242,18 @@ func derefStr(s *string) string {
 	return *s
 }
 
-// DeactivateUser deactivates a user (SUPER_ADMIN only at the handler layer).
+// DeactivateUser deactivates a user. SUPER_ADMIN accounts are protected and
+// cannot be deactivated — deactivating the platform's privileged account would
+// lock it out (Login rejects inactive users). SUPER_ADMIN-only at the handler layer.
 func (u *UserUsecase) DeactivateUser(ctx context.Context, id string) (*entity.User, error) {
+	user, err := u.users.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if user.Role == entity.RoleSuperAdmin {
+		return nil, apperrors.Forbidden("user_not_deactivatable",
+			errors.New("superadmin tidak dapat dinonaktifkan"))
+	}
 	return u.users.Deactivate(ctx, id)
 }
 

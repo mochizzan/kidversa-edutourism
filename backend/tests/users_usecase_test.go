@@ -201,3 +201,74 @@ func TestUpdateUser_Admin_CanUpdateOwnNameWithoutRole(t *testing.T) {
 		t.Fatalf("expected success updating own name without role, got %v", err)
 	}
 }
+
+// TestDeactivateUser_SuperAdmin_Protected verifies a SUPER_ADMIN account can
+// never be deactivated — neither by itself nor by another superadmin — because
+// a deactivated superadmin cannot log back in (Login rejects inactive users),
+// which would lock out the platform's privileged account(s).
+func TestDeactivateUser_SuperAdmin_Protected(t *testing.T) {
+	saID := "superadmin-1"
+	repo := &fakeUserRepo{
+		users: map[string]*entity.User{
+			saID: {
+				BaseModel:      entity.BaseModel{ID: saID},
+				Email:          "sa@kidversa.test",
+				Name:           "Super Admin",
+				Role:           entity.RoleSuperAdmin,
+				IsActive:       true,
+				ApprovalStatus: entity.ApprovalApproved,
+			},
+		},
+	}
+	uc := newUserUsecase(repo)
+
+	_, err := uc.DeactivateUser(context.Background(), saID)
+
+	requireAppErrorCode(t, err, "user_not_deactivatable")
+}
+
+// TestDeleteUser_SuperAdmin_Protected verifies a SUPER_ADMIN account can never
+// be hard-deleted, even by a SUPER_ADMIN actor (the route allows SA delete).
+func TestDeleteUser_SuperAdmin_Protected(t *testing.T) {
+	saID := "superadmin-1"
+	repo := &fakeUserRepo{
+		users: map[string]*entity.User{
+			saID: {
+				BaseModel:      entity.BaseModel{ID: saID},
+				Email:          "sa@kidversa.test",
+				Name:           "Super Admin",
+				Role:           entity.RoleSuperAdmin,
+				IsActive:       true,
+				ApprovalStatus: entity.ApprovalApproved,
+			},
+		},
+	}
+	uc := newUserUsecase(repo)
+
+	err := uc.DeleteUser(context.Background(), saID, string(entity.RoleSuperAdmin), "")
+
+	requireAppErrorCode(t, err, "user_not_deletable")
+}
+
+// TestDeactivateUser_NormalUser_Allowed is a positive control: a non-SUPER_ADMIN
+// target must still deactivate successfully (no over-block).
+func TestDeactivateUser_NormalUser_Allowed(t *testing.T) {
+	id := "admin-1"
+	repo := &fakeUserRepo{
+		users: map[string]*entity.User{
+			id: {
+				BaseModel:      entity.BaseModel{ID: id},
+				Email:          "admin@kidversa.test",
+				Name:           "Admin",
+				Role:           entity.RoleAdmin,
+				IsActive:       true,
+				ApprovalStatus: entity.ApprovalApproved,
+			},
+		},
+	}
+	uc := newUserUsecase(repo)
+
+	if _, err := uc.DeactivateUser(context.Background(), id); err != nil {
+		t.Fatalf("expected normal user deactivation to succeed, got %v", err)
+	}
+}
