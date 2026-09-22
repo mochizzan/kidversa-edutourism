@@ -2,20 +2,18 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Baby, Loader2, Save, Users } from 'lucide-react'
 import { ROUTES } from '../../../core/constants/app'
-import {
-  PARTICIPANT_AGE,
-  PARTICIPANT_AGE_ERROR,
-} from '../../../core/constants/participant'
+import { validateParticipantForm, needsAgeConfirm } from '@/core/utils/participantValidation'
 import { Button } from '../../../shared/components/ui/Button'
 import { Card } from '../../../shared/components/ui/Card'
 import { Input } from '../../../shared/components/ui/Input'
+import { Modal } from '../../../shared/components/ui/Modal'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
+import { PhoneInput } from '../../../shared/components/ui/PhoneInput'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { participantService } from '../../../core/services/participants'
 import { sessionService } from '../../../core/services/sessions'
 import { ApiError } from '../../../core/services/backend-client'
 import { friendlyError } from '../../../core/utils/errorMessages'
-import { isValidEmail } from '../../../core/utils/validation'
 import { redirectToLogin } from '../../../core/stores/authStore'
 
 type ParticipantFormState = {
@@ -33,12 +31,11 @@ type ParticipantFormErrors = {
   school_name?: string
   parent_name?: string
   parent_phone?: string
-  parent_email?: string
 }
 
 const emptyForm: ParticipantFormState = {
   child_name: '',
-  child_age: String(PARTICIPANT_AGE.DEFAULT),
+  child_age: '',
   school_name: '',
   parent_name: '',
   parent_phone: '',
@@ -55,6 +52,7 @@ const ParticipantFormPage = () => {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<ParticipantFormState>(emptyForm)
   const [errors, setErrors] = useState<ParticipantFormErrors>({})
+  const [ageConfirmOpen, setAgeConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!isEdit || !participantId) {
@@ -101,44 +99,16 @@ const ParticipantFormPage = () => {
   }, [isEdit, participantId, addToast, navigate])
 
   const validate = (): boolean => {
-    const next: ParticipantFormErrors = {}
-    const childAge = Number.parseInt(form.child_age, 10)
-
-    if (!form.child_name.trim()) {
-      next.child_name = 'Nama anak harus diisi'
-    }
-
-    if (!Number.isInteger(childAge) || childAge < PARTICIPANT_AGE.MIN || childAge > PARTICIPANT_AGE.MAX) {
-      next.child_age = PARTICIPANT_AGE_ERROR
-    }
-
-    if (!form.parent_name.trim()) {
-      next.parent_name = 'Nama orang tua harus diisi'
-    }
-
-    if (!form.parent_phone.trim()) {
-      next.parent_phone = 'No. HP orang tua harus diisi'
-    }
-
-    const trimmedEmail = form.parent_email.trim()
-    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
-      next.parent_email = 'Format email tidak valid'
-    }
-
-    setErrors(next)
-    return Object.keys(next).length === 0
+    const errs = validateParticipantForm(form)
+    setErrors(errs)
+    return Object.keys(errs).length === 0
   }
 
   const handleChange = (key: keyof ParticipantFormState, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validate()) return
-
-    const childAge = Number.parseInt(form.child_age, 10)
+  const doSubmit = async (childAge: number) => {
     const trimmedEmail = form.parent_email.trim()
 
     setSaving(true)
@@ -191,6 +161,19 @@ const ParticipantFormPage = () => {
     }
   }
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validate()) return
+
+    const n = Number.parseInt(form.child_age, 10)
+    if (needsAgeConfirm(n)) {
+      setAgeConfirmOpen(true)
+      return
+    }
+    void doSubmit(n)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -198,6 +181,8 @@ const ParticipantFormPage = () => {
       </div>
     )
   }
+
+  const n = Number.parseInt(form.child_age, 10)
 
   return (
     <div className="space-y-6">
@@ -233,13 +218,11 @@ const ParticipantFormPage = () => {
             <Input
               label="Usia Anak *"
               type="number"
-              min={PARTICIPANT_AGE.MIN}
-              max={PARTICIPANT_AGE.MAX}
               required
               value={form.child_age}
               onChange={(e) => handleChange('child_age', e.target.value)}
-              placeholder={String(PARTICIPANT_AGE.DEFAULT)}
-              hint={`Usia antara ${PARTICIPANT_AGE.MIN}-${PARTICIPANT_AGE.MAX} tahun`}
+              placeholder="Contoh: 6"
+              hint="Usia 1–120 tahun; di luar 4–17 akan muncul konfirmasi"
               error={errors.child_age}
             />
 
@@ -270,14 +253,15 @@ const ParticipantFormPage = () => {
               error={errors.parent_name}
             />
 
-            <Input
-              label="No. HP Orang Tua *"
-              type="tel"
+            <PhoneInput
+              id="parent_phone"
+              label="No. HP Orang Tua"
               required
               value={form.parent_phone}
-              onChange={(e) => handleChange('parent_phone', e.target.value)}
-              placeholder="Contoh: 081234567890"
+              onChange={(v) => handleChange('parent_phone', v)}
               error={errors.parent_phone}
+              hint="Tanpa 0 di depan — kode negara otomatis"
+              placeholder="8123456789"
             />
 
             <Input
@@ -286,7 +270,6 @@ const ParticipantFormPage = () => {
               value={form.parent_email}
               onChange={(e) => handleChange('parent_email', e.target.value)}
               placeholder="Contoh: andi@mail.com (opsional)"
-              error={errors.parent_email}
             />
           </div>
         </Card>
@@ -304,6 +287,32 @@ const ParticipantFormPage = () => {
           </Button>
         </div>
       </form>
+
+      <Modal
+        open={ageConfirmOpen}
+        onClose={() => setAgeConfirmOpen(false)}
+        title="Konfirmasi Usia"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-on-surface">
+            {`Usia ${n} tahun terlihat tidak biasa. Apakah benar usia anak ${form.child_name.trim()} ${n} tahun?`}
+          </p>
+          <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
+            <Button variant="secondary" onClick={() => setAgeConfirmOpen(false)}>
+              Kembali
+            </Button>
+            <Button
+              onClick={() => {
+                setAgeConfirmOpen(false)
+                void doSubmit(n)
+              }}
+            >
+              Ya, lanjutkan
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

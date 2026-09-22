@@ -2,14 +2,14 @@ import { useState, useEffect, useMemo } from 'react'
 import { Search, User, ArrowRightLeft } from 'lucide-react'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
+import { PhoneInput } from '../../../shared/components/ui/PhoneInput'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { cn } from '../../../core/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
-import { PARTICIPANT_AGE, PARTICIPANT_AGE_ERROR } from '../../../core/constants/participant'
+import { validateParticipantForm, needsAgeConfirm } from '@/core/utils/participantValidation'
 import type { Participant, ParticipantSessionInfo } from '../../../core/types'
-import { isValidEmail } from '../../../core/utils/validation'
 
 type ParticipantFormData = {
   child_name: string
@@ -19,6 +19,8 @@ type ParticipantFormData = {
   parent_phone: string
   parent_email?: string
 }
+
+type ModalFormState = Omit<ParticipantFormData, 'child_age'> & { child_age: string }
 
 interface ParticipantFormModalProps {
   open: boolean
@@ -39,7 +41,6 @@ interface FormErrors {
   child_age?: string
   parent_name?: string
   parent_phone?: string
-  parent_email?: string
 }
 
 export function ParticipantFormModal({
@@ -55,9 +56,9 @@ export function ParticipantFormModal({
   currentSessionId,
   participantSessionInfos,
 }: ParticipantFormModalProps) {
-  const [formData, setFormData] = useState<ParticipantFormData>({
+  const [formData, setFormData] = useState<ModalFormState>({
     child_name: '',
-    child_age: PARTICIPANT_AGE.DEFAULT,
+    child_age: '',
     school_name: '',
     parent_name: '',
     parent_phone: '',
@@ -69,6 +70,7 @@ export function ParticipantFormModal({
   const [errors, setErrors] = useState<FormErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [migrateConfirm, setMigrateConfirm] = useState<ParticipantSessionInfo | null>(null)
+  const [ageConfirmOpen, setAgeConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -77,14 +79,16 @@ export function ParticipantFormModal({
       setSelectError('')
       setMigrateConfirm(null)
       setFormData(
-        initialData || {
-          child_name: '',
-          child_age: PARTICIPANT_AGE.DEFAULT,
-          school_name: '',
-          parent_name: '',
-          parent_phone: '',
-          parent_email: '',
-        }
+        initialData
+          ? { ...initialData, child_age: String(initialData.child_age) }
+          : {
+            child_name: '',
+            child_age: '',
+            school_name: '',
+            parent_name: '',
+            parent_phone: '',
+            parent_email: '',
+          }
       )
       setErrors({})
     }
@@ -183,47 +187,19 @@ export function ParticipantFormModal({
   }
 
   const validate = (): boolean => {
-    const newErrors: FormErrors = {}
-
-    if (!formData.child_name.trim()) {
-      newErrors.child_name = 'Nama anak harus diisi'
-    }
-
-    if (!formData.child_age || formData.child_age < PARTICIPANT_AGE.MIN || formData.child_age > PARTICIPANT_AGE.MAX) {
-      newErrors.child_age = PARTICIPANT_AGE_ERROR
-    }
-
-    if (!formData.parent_name.trim()) {
-      newErrors.parent_name = 'Nama orang tua harus diisi'
-    }
-
-    if (!formData.parent_phone.trim()) {
-      newErrors.parent_phone = 'No. HP orang tua harus diisi'
-    }
-
-    if (formData.parent_email && formData.parent_email.trim()) {
-      if (!isValidEmail(formData.parent_email.trim())) {
-        newErrors.parent_email = 'Format email tidak valid'
-      }
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const errs = validateParticipantForm(formData)
+    setErrors(errs)
+    return Object.keys(errs).length === 0
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validate()) {
-      return
-    }
+  const doSubmit = async () => {
     if (!onSubmit) return
 
     setSubmitting(true)
     try {
       const validatedData: ParticipantFormData = {
         child_name: formData.child_name.trim(),
-        child_age: formData.child_age,
+        child_age: Number.parseInt(formData.child_age, 10),
         school_name: formData.school_name?.trim() || undefined,
         parent_name: formData.parent_name.trim(),
         parent_phone: formData.parent_phone.trim(),
@@ -236,6 +212,19 @@ export function ParticipantFormModal({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validate()) {
+      return
+    }
+    if (needsAgeConfirm(Number.parseInt(formData.child_age, 10))) {
+      setAgeConfirmOpen(true)
+      return
+    }
+    void doSubmit()
   }
 
   if (selectOnly && mode === 'create') {
@@ -331,83 +320,111 @@ export function ParticipantFormModal({
     )
   }
 
+  const n = Number.parseInt(formData.child_age, 10)
+
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={mode === 'create' ? 'Tambah Peserta' : 'Edit Peserta'}
-      size="md"
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-3">
-          <Input
-            label="Nama Anak"
-            placeholder="Contoh: Budi Santoso"
-            value={formData.child_name}
-            onChange={(e) => setFormData({ ...formData, child_name: e.target.value })}
-            error={errors.child_name}
-            required
-            autoFocus
-          />
+    <>
+      <Modal
+        open={open}
+        onClose={onClose}
+        title={mode === 'create' ? 'Tambah Peserta' : 'Edit Peserta'}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-3">
+            <Input
+              label="Nama Anak"
+              placeholder="Contoh: Budi Santoso"
+              value={formData.child_name}
+              onChange={(e) => setFormData({ ...formData, child_name: e.target.value })}
+              error={errors.child_name}
+              required
+              autoFocus
+            />
 
-          <Input
-            label="Usia Anak"
-            type="number"
-            min={PARTICIPANT_AGE.MIN}
-            max={PARTICIPANT_AGE.MAX}
-            placeholder={String(PARTICIPANT_AGE.DEFAULT)}
-            value={formData.child_age}
-            onChange={(e) => setFormData({ ...formData, child_age: parseInt(e.target.value, 10) })}
-            error={errors.child_age}
-            hint={`Usia antara ${PARTICIPANT_AGE.MIN}-${PARTICIPANT_AGE.MAX} tahun`}
-            required
-          />
+            <Input
+              label="Usia Anak"
+              type="number"
+              placeholder="Contoh: 6"
+              value={formData.child_age}
+              onChange={(e) => setFormData({ ...formData, child_age: e.target.value })}
+              error={errors.child_age}
+              hint="Usia 1–120 tahun; di luar 4–17 akan muncul konfirmasi"
+              required
+            />
 
-          <Input
-            label="Nama Sekolah"
-            placeholder="Contoh: TK Harapan Bangsa (opsional)"
-            value={formData.school_name}
-            onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
-          />
+            <Input
+              label="Nama Sekolah"
+              placeholder="Contoh: TK Harapan Bangsa (opsional)"
+              value={formData.school_name}
+              onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
+            />
 
-          <Input
-            label="Nama Orang Tua"
-            placeholder="Contoh: Andi Santoso"
-            value={formData.parent_name}
-            onChange={(e) => setFormData({ ...formData, parent_name: e.target.value })}
-            error={errors.parent_name}
-            required
-          />
+            <Input
+              label="Nama Orang Tua"
+              placeholder="Contoh: Andi Santoso"
+              value={formData.parent_name}
+              onChange={(e) => setFormData({ ...formData, parent_name: e.target.value })}
+              error={errors.parent_name}
+              required
+            />
 
-          <Input
-            label="No. HP Orang Tua"
-            type="tel"
-            placeholder="Contoh: 081234567890"
-            value={formData.parent_phone}
-            onChange={(e) => setFormData({ ...formData, parent_phone: e.target.value })}
-            error={errors.parent_phone}
-            required
-          />
+            <PhoneInput
+              id="parent_phone"
+              label="No. HP Orang Tua"
+              required
+              value={formData.parent_phone}
+              onChange={(v) => setFormData({ ...formData, parent_phone: v })}
+              error={errors.parent_phone}
+              hint="Tanpa 0 di depan — kode negara otomatis"
+              placeholder="8123456789"
+            />
 
-          <Input
-            label="Email Orang Tua"
-            type="email"
-            placeholder="Contoh: andi@mail.com (opsional)"
-            value={formData.parent_email}
-            onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
-            error={errors.parent_email}
-          />
+            <Input
+              label="Email Orang Tua"
+              type="email"
+              placeholder="Contoh: andi@mail.com (opsional)"
+              value={formData.parent_email}
+              onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
+              Batal
+            </Button>
+            <Button type="submit" loading={submitting}>
+              {mode === 'create' ? 'Tambah' : 'Simpan'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={ageConfirmOpen}
+        onClose={() => setAgeConfirmOpen(false)}
+        title="Konfirmasi Usia"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-on-surface">
+            {`Usia ${n} tahun terlihat tidak biasa. Apakah benar usia anak ${formData.child_name.trim()} ${n} tahun?`}
+          </p>
+          <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
+            <Button variant="secondary" onClick={() => setAgeConfirmOpen(false)}>
+              Kembali
+            </Button>
+            <Button
+              onClick={() => {
+                setAgeConfirmOpen(false)
+                void doSubmit()
+              }}
+            >
+              Ya, lanjutkan
+            </Button>
+          </div>
         </div>
-
-        <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-            Batal
-          </Button>
-          <Button type="submit" loading={submitting}>
-            {mode === 'create' ? 'Tambah' : 'Simpan'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+      </Modal>
+    </>
   )
 }

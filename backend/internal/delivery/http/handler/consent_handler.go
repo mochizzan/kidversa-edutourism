@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/pkg/phoneutil"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/pkg/sse"
 	"kidversa-edutourism-backend/internal/pkg/util"
@@ -103,7 +103,7 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 		if !force && p.ConsentCombinedToken != nil && p.ConsentCombinedTokenExpiresAt != nil && p.ConsentCombinedTokenExpiresAt.After(now) {
 			continue
 		}
-		if !isValidWhatsAppPhone(p.ParentPhone) {
+		if _, derr := phoneutil.WhatsAppDigits(p.ParentPhone); derr != nil {
 			continue
 		}
 		eligible = append(eligible, p)
@@ -175,7 +175,11 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 			status = "failed"
 			errMsg = "token tidak tersedia"
 		} else {
-			chatID := normalizeWhatsAppPhone(p.ParentPhone) + "@c.us"
+			digits, derr := phoneutil.WhatsAppDigits(p.ParentPhone)
+			if derr != nil {
+				continue
+			}
+			chatID := digits + "@c.us"
 			url := fmt.Sprintf("%s?token=%s", h.cfg.ParentConsentBaseURL, *p.ConsentCombinedToken)
 			msg := buildConsentMessage(p.ParentName, p.ChildName, session.Name, formatSessionDateID(session.SessionDate), session.Location, url)
 			if serr := h.messaging.SendTextMessage(ctx, chatID, msg); serr != nil {
@@ -210,7 +214,7 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 		})
 
 		if i < total-1 {
-			delay := time.Duration(15+rand.Intn(30)) * time.Second
+			delay := time.Duration(15+rand.IntN(30)) * time.Second
 			time.Sleep(delay)
 		}
 	}
@@ -461,7 +465,11 @@ func (h *ConsentHandler) SendSingle(c *echo.Context) error {
 		return serr
 	}
 
-	chatID := normalizeWhatsAppPhone(participant.ParentPhone) + "@c.us"
+	digits, derr := phoneutil.WhatsAppDigits(participant.ParentPhone)
+	if derr != nil {
+		return apperrors.BadRequest("validation_error", derr)
+	}
+	chatID := digits + "@c.us"
 	url := fmt.Sprintf("%s?token=%s", h.cfg.ParentConsentBaseURL, token)
 	msg := buildConsentMessage(participant.ParentName, participant.ChildName, session.Name, formatSessionDateID(session.SessionDate), session.Location, url)
 	if smerr := h.messaging.SendTextMessage(ctx, chatID, msg); smerr != nil {
@@ -474,28 +482,6 @@ func (h *ConsentHandler) SendSingle(c *echo.Context) error {
 	}
 
 	return appresp.OK(c, dto.ConsentSendSingleResponse{Status: "sent"})
-}
-
-// digitRe matches any non-digit character, used to strip formatting from phone numbers.
-var digitRe = regexp.MustCompile(`\D`)
-
-// isValidWhatsAppPhone reports whether the phone looks like an Indonesian number.
-func isValidWhatsAppPhone(phone string) bool {
-	digits := digitRe.ReplaceAllString(phone, "")
-	if len(digits) < 9 {
-		return false
-	}
-	return strings.HasPrefix(digits, "0") || strings.HasPrefix(digits, "62")
-}
-
-// normalizeWhatsAppPhone converts a local Indonesian number to the international
-// format used by WhatsApp chat IDs (e.g. "08123123456" → "628123123456").
-func normalizeWhatsAppPhone(phone string) string {
-	digits := digitRe.ReplaceAllString(phone, "")
-	if strings.HasPrefix(digits, "0") {
-		digits = "62" + digits[1:]
-	}
-	return digits
 }
 
 // indoMonths maps a 1-based month number to its Indonesian name.

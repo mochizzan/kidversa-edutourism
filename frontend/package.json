@@ -24,6 +24,7 @@
     "html-to-image": "1.11.12",
     "idb": "^7.1.1",
     "jspdf": "^4.2.1",
+    "libphonenumber-js": "^1.13.13",
     "lucide-react": "^1.23.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",

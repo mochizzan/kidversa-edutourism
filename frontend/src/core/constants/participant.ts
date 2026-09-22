@@ -1,12 +1,10 @@
-// participant.ts — single source of truth for participant form rules.
-// The backend only enforces `child_age >= 0`; the 4–10 window is a product
-// rule enforced on the frontend, so it must live here rather than as literals
-// duplicated across ParticipantFormPage and ParticipantFormModal.
 export const PARTICIPANT_AGE = {
-  MIN: 4,
-  MAX: 10,
-  DEFAULT: 6,
+  /** Batas keras — divalidasi FE & BE. */
+  HARD_MIN: 1,
+  HARD_MAX: 120,
+  /** Di luar rentang ini form memunculkan modal konfirmasi. */
+  SOFT_MIN: 4,
+  SOFT_MAX: 17,
 } as const
 
-export const PARTICIPANT_AGE_ERROR =
-  `Usia anak harus antara ${PARTICIPANT_AGE.MIN}-${PARTICIPANT_AGE.MAX} tahun`
+export const PARTICIPANT_AGE_ERROR = 'Usia anak harus 1–120 tahun'

@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
@@ -50,8 +48,8 @@ func (h *SessionParticipantBulkHandler) UpdateParticipant(c *echo.Context) error
 		return nil
 	}
 	var req dto.UpdateParticipantRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
 	}
 	p, err := h.uc.UpdateParticipant((*c).Request().Context(), pid,
 		req.ChildName, req.ChildAge, req.SchoolName, req.ParentName, req.ParentPhone,

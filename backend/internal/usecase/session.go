@@ -2,10 +2,12 @@ package usecase
 
 import (
 	"context"
+	"strings"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/pkg/phoneutil"
 	"kidversa-edutourism-backend/internal/pkg/util"
 )
 
@@ -446,6 +448,15 @@ func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessio
 		g := groupID
 		gid = &g
 	}
+	childName = strings.TrimSpace(childName)
+	schoolName = strings.TrimSpace(schoolName)
+	parentName = strings.TrimSpace(parentName)
+	parentEmail = strings.TrimSpace(parentEmail)
+	normPhone, perr := phoneutil.Normalize(parentPhone)
+	if perr != nil {
+		return nil, apperrors.BadRequest("validation_error", perr)
+	}
+	parentPhone = normPhone
 	p := &entity.Participant{
 		TenantID:     tp,
 		SessionID:    sid,
@@ -468,6 +479,19 @@ func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessio
 // Duplicate participants (same child_name + parent_phone within the same program)
 // are skipped and reported in the result.
 func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessionID string, rows []repository.ParticipantInput) (*repository.ImportResult, error) {
+	// Sanitize BEFORE the duplicate query below: rows arrive raw ("08…") while
+	// stored rows are normalized ("+62…") — dedup must compare uniform forms.
+	for i := range rows {
+		rows[i].ChildName = strings.TrimSpace(rows[i].ChildName)
+		rows[i].SchoolName = strings.TrimSpace(rows[i].SchoolName)
+		rows[i].ParentName = strings.TrimSpace(rows[i].ParentName)
+		rows[i].ParentEmail = strings.TrimSpace(rows[i].ParentEmail)
+		norm, perr := phoneutil.Normalize(rows[i].ParentPhone)
+		if perr != nil {
+			return nil, apperrors.BadRequest("validation_error", perr)
+		}
+		rows[i].ParentPhone = norm
+	}
 	result := &repository.ImportResult{
 		Created: make([]entity.Participant, 0, len(rows)),
 		Skipped: make([]repository.DuplicateParticipantInfo, 0),
@@ -605,6 +629,18 @@ func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, c
 	p, err := u.sessionRepo.GetParticipantByID(ctx, participantID, "")
 	if err != nil {
 		return nil, err
+	}
+	childName = strings.TrimSpace(childName)
+	schoolName = strings.TrimSpace(schoolName)
+	parentName = strings.TrimSpace(parentName)
+	parentEmail = strings.TrimSpace(parentEmail)
+	parentPhone = strings.TrimSpace(parentPhone)
+	if parentPhone != "" {
+		norm, perr := phoneutil.Normalize(parentPhone)
+		if perr != nil {
+			return nil, apperrors.BadRequest("validation_error", perr)
+		}
+		parentPhone = norm
 	}
 	if childName != "" {
 		p.ChildName = childName

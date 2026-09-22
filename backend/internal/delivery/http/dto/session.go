@@ -40,24 +40,24 @@ type UpdateGroupRequest struct {
 
 // CreateParticipantRequest is the payload for POST /api/sessions/:id/participants.
 type CreateParticipantRequest struct {
-	ChildName    string `json:"child_name" validate:"required"`
-	ChildAge     int    `json:"child_age" validate:"gte=0"`
+	ChildName    string `json:"child_name" validate:"required,min=2,max=200,hasletter"`
+	ChildAge     int    `json:"child_age" validate:"gte=1,lte=120"`
 	SchoolName   string `json:"school_name,omitempty"`
-	ParentName   string `json:"parent_name" validate:"required"`
-	ParentPhone  string `json:"parent_phone" validate:"required"`
-	ParentEmail  string `json:"parent_email,omitempty"`
+	ParentName   string `json:"parent_name" validate:"required,min=2,max=200,hasletter"`
+	ParentPhone  string `json:"parent_phone" validate:"required,phone"`
+	ParentEmail  string `json:"parent_email,omitempty" validate:"omitempty,email,max=200"`
 	GroupID      string `json:"group_id,omitempty"`
 	ConsentPhoto bool   `json:"consent_photo"`
 }
 
 // UpdateParticipantRequest is the payload for PUT /api/sessions/:id/participants/:participantId.
 type UpdateParticipantRequest struct {
-	ChildName    string `json:"child_name,omitempty"`
-	ChildAge     int    `json:"child_age,omitempty"`
+	ChildName    string `json:"child_name,omitempty" validate:"omitempty,min=2,max=200,hasletter"`
+	ChildAge     int    `json:"child_age,omitempty" validate:"omitempty,gte=1,lte=120"`
 	SchoolName   string `json:"school_name,omitempty"`
-	ParentName   string `json:"parent_name,omitempty"`
-	ParentPhone  string `json:"parent_phone,omitempty"`
-	ParentEmail  string `json:"parent_email,omitempty"`
+	ParentName   string `json:"parent_name,omitempty" validate:"omitempty,min=2,max=200,hasletter"`
+	ParentPhone  string `json:"parent_phone,omitempty" validate:"omitempty,phone"`
+	ParentEmail  string `json:"parent_email,omitempty" validate:"omitempty,email,max=200"`
 	GroupID      string `json:"group_id,omitempty"`
 	ConsentPhoto bool   `json:"consent_photo"`
 }
