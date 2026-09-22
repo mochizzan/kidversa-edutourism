@@ -18,6 +18,7 @@ import {
  fireUnauthorized,
  ApiError,
 } from './backend-client'
+import { getActiveTenantId } from '../utils/tenant'
 
 export interface UploadMultipartOptions {
  // Called with a 0–100 percentage as the request body uploads.
@@ -45,6 +46,11 @@ function sendMultipart<T>(
   const xhr = new XMLHttpRequest()
   xhr.open('POST', `${getApiBaseUrl()}${path}`, true)
   if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+  // SUPER_ADMIN JWT carries no tenant — inject the active tenant from localStorage
+  // so TenantScope middleware resolves correctly. Non-SA roles return null → no
+  // header sent (middleware uses JWT tid). Mirrors apiRequest (backend-client.ts:338).
+  const tid = getActiveTenantId()
+  if (tid) xhr.setRequestHeader('X-Tenant-Id', tid)
   xhr.withCredentials = true
 
   if (timeoutMs && timeoutMs > 0) {
@@ -57,7 +63,7 @@ function sendMultipart<T>(
   }
 
   xhr.onload = () => {
-   let parsed: { data?: T; error?: string; code?: string } = {}
+   let parsed: { data?: T; error?: string | { code?: string; message?: string }; code?: string } = {}
    try {
     parsed = JSON.parse(xhr.responseText)
    } catch {
@@ -67,11 +73,14 @@ function sendMultipart<T>(
     resolve((parsed.data ?? parsed) as T)
     return
    }
+   // Backend errors use the envelope shape { error: { code, message } };
+   // legacy flat shapes ({ error: string, top-level code }) still parse.
+   const err = parsed.error
+   const envelope = typeof err === 'object' && err !== null ? err : null
    const message =
-    typeof parsed.error === 'string'
-     ? parsed.error
-     : `Upload failed with status ${xhr.status}`
-   const code = typeof parsed.code === 'string' ? parsed.code : 'unknown'
+    envelope?.message ||
+    (typeof err === 'string' ? err : `Upload failed with status ${xhr.status}`)
+   const code = envelope?.code || (typeof parsed.code === 'string' ? parsed.code : 'unknown')
    reject(new ApiError(message, code, xhr.status))
   }
 

@@ -6,6 +6,8 @@
 // This module centralizes that translation so every display site resolves a
 // stored path (or entity reference) into a servable URL consistently.
 
+import { getActiveTenantId } from './tenant'
+
 export type MediaKind = 'photo' | 'frame' | 'content' | 'avatar'
 
 // Resolve an entity-relative media id into a streamable URL.
@@ -13,8 +15,14 @@ export type MediaKind = 'photo' | 'frame' | 'content' | 'avatar'
 // (same-origin from the browser's perspective), ensuring the httpOnly
 // session cookie is automatically attached.  Absolute URLs bypass the
 // proxy and may lose the cookie on cross-origin requests.
+//
+// <img> requests carry no custom headers, so SUPER_ADMIN (whose JWT has no
+// tenant claim) must scope via the ?tenant_id= query fallback honored by the
+// TenantScope middleware — same pattern as openSSE.
 export function getMediaUrl(kind: MediaKind, id: string): string {
-  return `/api/media/${kind}/${id}`
+ const tenantId = getActiveTenantId()
+ const suffix = tenantId ? `?tenant_id=${tenantId}` : ''
+ return `/api/media/${kind}/${id}${suffix}`
 }
 
 /**
@@ -24,15 +32,15 @@ export function getMediaUrl(kind: MediaKind, id: string): string {
  * `getMediaUrl(kind, entity.id)` directly instead.
  */
 export function resolveStoredUpload(
-  storedPath: string | undefined | null,
-  kind: MediaKind,
+ storedPath: string | undefined | null,
+ kind: MediaKind,
 ): string | null {
-  if (!storedPath) return null
-  // Already a full/absolute URL or data URL — pass through unchanged.
-  if (/^(https?:|data:|blob:)/.test(storedPath)) return storedPath
-  const base = storedPath.includes('/') ? storedPath.split('/').pop()! : storedPath
-  const dot = base.lastIndexOf('.')
-  const id = dot > 0 ? base.slice(0, dot) : base
-  if (!id) return null
-  return getMediaUrl(kind, id)
+ if (!storedPath) return null
+ // Already a full/absolute URL or data URL — pass through unchanged.
+ if (/^(https?:|data:|blob:)/.test(storedPath)) return storedPath
+ const base = storedPath.includes('/') ? storedPath.split('/').pop()! : storedPath
+ const dot = base.lastIndexOf('.')
+ const id = dot > 0 ? base.slice(0, dot) : base
+ if (!id) return null
+ return getMediaUrl(kind, id)
 }
