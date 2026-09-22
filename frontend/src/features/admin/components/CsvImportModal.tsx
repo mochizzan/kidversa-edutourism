@@ -122,11 +122,10 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
-              className={`border-2 border-dashed rounded-2xl p-10 text-center transition-colors cursor-pointer ${
-                dragOver
-                  ? 'border-primary bg-primary-container/20'
-                  : 'border-outline-variant bg-surface-container-low hover:border-primary hover:bg-primary-container/10'
-              }`}
+              className={`border-2 border-dashed rounded-2xl p-10 text-center transition-colors cursor-pointer ${dragOver
+                ? 'border-primary bg-primary-container/20'
+                : 'border-outline-variant bg-surface-container-low hover:border-primary hover:bg-primary-container/10'
+                }`}
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload className="w-10 h-10 mx-auto mb-3 text-on-surface-variant" />
@@ -143,7 +142,7 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
                 ref={fileInputRef}
                 type="file"
                 accept=".csv"
-                className="hidden"
+                className="absolute m-0 h-px w-px opacity-0"
                 onChange={handleFileChange}
               />
             </div>

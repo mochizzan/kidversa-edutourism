@@ -133,7 +133,7 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            className="hidden"
+            className="absolute m-0 h-px w-px opacity-0"
             onChange={(e) => handleFile(e.target.files?.[0])}
           />
         </div>

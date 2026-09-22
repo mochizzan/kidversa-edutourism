@@ -91,7 +91,7 @@ export function BadgeEditor({
                 alt={name || 'badge'}
                 className="h-full w-full object-cover"
                 onError={(e) => {
-                  ;(e.target as HTMLImageElement).style.display = 'none'
+                  ; (e.target as HTMLImageElement).style.display = 'none'
                 }}
               />
             ) : (
@@ -114,7 +114,7 @@ export function BadgeEditor({
             ref={fileRef}
             type="file"
             accept="image/*"
-            className="hidden"
+            className="absolute m-0 h-px w-px opacity-0"
             onChange={handleFile}
           />
           <Button

@@ -32,7 +32,14 @@ export function FrameDropZone({ onFilesSelected }: FrameDropZoneProps) {
       <Upload className="mx-auto mb-3 h-12 w-12 text-on-surface-variant" />
       <p className="text-base text-on-surface-variant">Seret &amp; lepas gambar atau klik untuk memilih</p>
       <p className="mt-1 text-sm text-on-surface-variant/60">PNG atau JPEG, maksimal 2MB per file</p>
-      <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" multiple className="hidden" onChange={handleFileSelect} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg"
+        multiple
+        className="absolute m-0 h-px w-px opacity-0"
+        onChange={handleFileSelect}
+      />
     </div>
   )
 }

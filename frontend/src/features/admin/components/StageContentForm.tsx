@@ -51,18 +51,18 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
   const [form, setForm] = useState<StageContentFormValues>(
     initial
       ? {
-          title: initial.title ?? '',
-          file_url: initial.file_url ?? '',
-          youtube_url: initial.youtube_url ?? '',
-          file_type: initial.file_type ?? StageContentFileTypeEnum.VIDEO,
-          // A VIDEO carrying a youtube_url is a YouTube source; otherwise it's an upload.
-          source_mode:
-            initial.file_type === StageContentFileTypeEnum.VIDEO && initial.youtube_url
-              ? 'youtube'
-              : 'upload',
-          duration_seconds: initial.duration_seconds ?? 0,
-          is_active: initial.is_active ?? true,
-        }
+        title: initial.title ?? '',
+        file_url: initial.file_url ?? '',
+        youtube_url: initial.youtube_url ?? '',
+        file_type: initial.file_type ?? StageContentFileTypeEnum.VIDEO,
+        // A VIDEO carrying a youtube_url is a YouTube source; otherwise it's an upload.
+        source_mode:
+          initial.file_type === StageContentFileTypeEnum.VIDEO && initial.youtube_url
+            ? 'youtube'
+            : 'upload',
+        duration_seconds: initial.duration_seconds ?? 0,
+        is_active: initial.is_active ?? true,
+      }
       : EMPTY
   )
 
@@ -347,7 +347,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
             type="file"
             accept={CONTENT_FILE_ACCEPT}
             onChange={onFileInputChange}
-            className="hidden"
+            className="absolute m-0 h-px w-px opacity-0"
           />
           {fileError && <p className="text-sm text-error">{fileError}</p>}
 
