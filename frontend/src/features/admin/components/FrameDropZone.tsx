@@ -25,7 +25,7 @@ export function FrameDropZone({ onFilesSelected }: FrameDropZoneProps) {
       onDragOver={handleDragOver}
       onClick={() => fileInputRef.current?.click()}
       className={cn(
-        'cursor-pointer rounded-2xl border-2 border-dashed border-outline-variant p-12 text-center',
+        'relative cursor-pointer rounded-2xl border-2 border-dashed border-outline-variant p-12 text-center',
         'transition-colors hover:border-primary hover:bg-primary-container/10',
       )}
     >

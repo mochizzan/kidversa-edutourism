@@ -82,7 +82,7 @@ export function BadgeEditor({
             placeholder="Contoh: Penjelajah Berani"
           />
         </div>
-        <div className="w-full shrink-0">
+        <div className="relative w-full shrink-0">
           <span className="mb-1 block text-xs font-medium text-on-surface-variant">Gambar</span>
           <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm ring-1 ring-inset ring-black/5">
             {imageUrl ? (

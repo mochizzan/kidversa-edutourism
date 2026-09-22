@@ -299,7 +299,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
           hint="Tempel tautan YouTube (watch / youtu.be / embed). Kiosk akan menampilkan via embed."
         />
       ) : (
-        <div className="space-y-2">
+        <div className="relative space-y-2">
           <span className="block text-sm font-medium text-on-surface mb-1">File</span>
           {form.file_url ? (
             <div className="flex items-center justify-between p-3 bg-surface rounded-lg border border-outline-variant">
