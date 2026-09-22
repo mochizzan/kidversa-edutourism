@@ -17,7 +17,7 @@ export function TopSessions({ data, title = 'Partisipasi per Sesi' }: TopSession
     <div className="bg-surface rounded-3xl p-6 shadow-sm">
       <h2 className="text-lg font-bold text-on-surface mb-4">{title}</h2>
       {data.length === 0 ? (
-        <p className="text-sm text-on-surface-variant py-4">Belum ada sesi aktif.</p>
+        <p className="text-sm text-on-surface-variant py-4">Belum ada sesi pada filter ini.</p>
       ) : (
         <div className="space-y-2">
           {data.map((item) => {

@@ -24,7 +24,7 @@ export function ConsentOverview({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Camera className="w-4 h-4 text-accent" />
-                <span className="text-sm font-medium text-on-surface">Konsent Foto</span>
+                <span className="text-sm font-medium text-on-surface">Persetujuan Foto</span>
               </div>
               <span className="text-sm font-bold text-on-surface">{photoPct.toFixed(0)}%</span>
             </div>

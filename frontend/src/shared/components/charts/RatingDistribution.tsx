@@ -1,45 +1,83 @@
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+
 interface RatingDistributionProps {
-  data: Array<{ rating: number; count: number }>
-  title?: string
+ data: Array<{ rating: number; count: number }>
+ title?: string
+ subtitle?: string
 }
 
-export function RatingDistribution({ data, title = 'Distribusi Penilaian' }: RatingDistributionProps) {
-  const maxCount = Math.max(...data.map((d) => d.count), 1)
+interface RatingTooltipProps {
+ active?: boolean
+ payload?: Array<{ payload?: { name?: string; count?: number; pct?: number } }>
+}
 
-  return (
-    <div className="bg-surface rounded-3xl p-6 shadow-sm">
-      <h2 className="text-lg font-bold text-on-surface mb-4">{title}</h2>
-      {data.length === 0 ? (
-        <p className="text-sm text-on-surface-variant py-4">Belum ada penilaian.</p>
-      ) : (
-        <div className="space-y-3">
-          {data.map((item) => {
-            const pct = (item.count / maxCount) * 100
-            return (
-              <div key={item.rating} className="flex items-center gap-3">
-                <span className="text-xs text-on-surface-variant w-16 shrink-0">{item.rating} ★</span>
-                <div className="flex-1 bg-surface-container-low rounded-full h-5 relative overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-500"
-                    style={{ width: `${pct}%` }}
-                  />
-                  {item.count > 0 && (
-                    <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-on-surface">
-                      {item.count}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-          <div className="flex items-center justify-between pt-2 border-t border-outline-variant/50">
-            <span className="text-xs text-on-surface-variant">Total Penilaian</span>
-            <span className="text-sm font-bold text-on-surface">
-              {data.reduce((sum, d) => sum + d.count, 0)}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+function RatingTooltip({ active, payload }: RatingTooltipProps) {
+ const row = payload?.[0]?.payload
+ if (!active || !row) return null
+ return (
+  <div className="rounded-xl bg-surface px-3 py-2 shadow-lg border border-outline-variant/50">
+   <p className="text-xs font-semibold text-on-surface">{row.name}</p>
+   <p className="text-xs text-on-surface-variant">
+    {row.count} penilaian · {row.pct?.toFixed(1)}% dari total
+   </p>
+  </div>
+ )
+}
+
+/**
+ * Star-rating distribution (1–5) as a horizontal bar chart with hover
+ * tooltips showing count and share of the filtered total.
+ */
+export function RatingDistribution({
+ data,
+ title = 'Distribusi Penilaian',
+ subtitle = 'Sebaran bintang 1–5 dari sesi terfilter — arahkan kursor untuk detail',
+}: RatingDistributionProps) {
+ const total = data.reduce((sum, d) => sum + d.count, 0)
+ const rows = data.map((d) => ({
+  name: `${d.rating} ★`,
+  count: d.count,
+  pct: total > 0 ? (d.count / total) * 100 : 0,
+ }))
+
+ return (
+  <div className="bg-surface rounded-3xl p-6 shadow-sm">
+   <h2 className="text-lg font-bold text-on-surface mb-1">{title}</h2>
+   <p className="text-xs text-on-surface-variant mb-4">{subtitle}</p>
+   {total === 0 ? (
+    <p className="text-sm text-on-surface-variant py-4">Belum ada penilaian pada filter ini.</p>
+   ) : (
+    <>
+     <div className="h-56">
+      <ResponsiveContainer width="100%" height="100%">
+       <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-outline-variant)" horizontal={false} />
+        <XAxis
+         type="number"
+         allowDecimals={false}
+         tick={{ fontSize: 10, fill: 'var(--color-on-surface-variant)' }}
+         tickLine={false}
+         axisLine={{ stroke: 'var(--color-outline-variant)' }}
+        />
+        <YAxis
+         type="category"
+         dataKey="name"
+         width={44}
+         tick={{ fontSize: 11, fill: 'var(--color-on-surface-variant)' }}
+         tickLine={false}
+         axisLine={false}
+        />
+        <Tooltip content={<RatingTooltip />} cursor={{ fill: 'var(--color-surface-container-low)' }} />
+        <Bar dataKey="count" name="Penilaian" fill="var(--color-primary)" radius={[0, 8, 8, 0]} barSize={18} />
+       </BarChart>
+      </ResponsiveContainer>
+     </div>
+     <div className="flex items-center justify-between pt-3 mt-2 border-t border-outline-variant/50">
+      <span className="text-xs text-on-surface-variant">Total Penilaian</span>
+      <span className="text-sm font-bold text-on-surface">{total}</span>
+     </div>
+    </>
+   )}
+  </div>
+ )
 }

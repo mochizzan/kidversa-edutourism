@@ -7,13 +7,20 @@ import { CategoryCard } from '../../../shared/components/ui/CategoryCard'
 import { SessionCarousel } from '../../../shared/components/data/SessionCarousel'
 import { DonutStat } from '../../../shared/components/charts/DonutStat'
 import { TeamList } from '../../../shared/components/data/TeamList'
-import { ActivityBarChart } from '../../../shared/components/charts/ActivityBarChart'
 import { KpiCard } from '../../../shared/components/charts/KpiCard'
 import { RatingDistribution } from '../../../shared/components/charts/RatingDistribution'
-import { ReportPipeline } from '../../../shared/components/charts/ReportPipeline'
+import { AnalyticsTrendChart } from '../../../shared/components/charts/AnalyticsTrendChart'
 import { ConsentOverview } from '../../../shared/components/charts/ConsentOverview'
 import { TopSessions } from '../../../shared/components/charts/TopSessions'
 import { AnalyticsFilters } from '../components/AnalyticsFilters'
+import {
+  buildDailySeries,
+  dateKeysBetween,
+  lastNDays,
+  todayWibDateKey,
+  wibDateKey,
+} from '../utils/analytics'
+import { FETCH_ALL_LIMIT } from '../../../core/constants/api'
 import { programService } from '../../../core/services/programs'
 import { sessionService } from '../../../core/services/sessions'
 import { participantService } from '../../../core/services/participants'
@@ -74,8 +81,10 @@ const DashboardPage = () => {
   const [participantCounts, setParticipantCounts] = useState<Record<string, number>>({})
   const [participants, setParticipants] = useState<Participant[]>([])
   const [allSessions, setAllSessions] = useState<Session[]>([])
-  const [allReports, setAllReports] = useState<Array<{ status: string }>>([])
-  const [allAssessments, setAllAssessments] = useState<Array<{ star_rating: number }>>([])
+  const [allReports, setAllReports] = useState<Array<{ status: string; session_id: string }>>([])
+  const [allAssessments, setAllAssessments] = useState<
+    Array<{ star_rating: number; session_id: string; assessed_at: string }>
+  >([])
   const [allPrograms, setAllPrograms] = useState<Array<{ id: string; name: string }>>([])
   const [dateRange, setDateRange] = useState('30')
   const [selectedProgram, setSelectedProgram] = useState('')
@@ -89,7 +98,7 @@ const DashboardPage = () => {
         setLoading(true)
 
         const [programsRes, sessionsRes, usersRes, participantsRes] = await Promise.all([
-          programService.getAll({ limit: 1 }),
+          programService.getAll({ limit: FETCH_ALL_LIMIT }),
           sessionService.getAll({ limit: 100 }),
           userService.getAll({ limit: 100 }),
           participantService.getAll({ limit: 1 }),
@@ -100,14 +109,14 @@ const DashboardPage = () => {
         const sessions = sessionsRes.data
         const active = sessions.filter((s) => s.status === SessionStatus.ACTIVE)
 
-        const [allParticipants, allReports] = await Promise.all([
+        const [participantLists, reportLists] = await Promise.all([
           Promise.all(sessions.map((s) => sessionService.getParticipants(s.id).catch(() => []))),
           Promise.all(sessions.map((s) => reportService.getBySession(s.id).catch(() => []))),
         ])
 
         if (cancelled) return
 
-        const allAssessments = await Promise.all(
+        const assessmentLists = await Promise.all(
           sessions.map((s) => assessmentService.getBySession(s.id).catch(() => [])),
         )
         if (cancelled) return
@@ -118,10 +127,25 @@ const DashboardPage = () => {
         const totalParticipants = participantsRes.total
 
         let pendingReportsCount = 0
-        const reportsFlat = allReports.flat()
-        for (const reports of allReports) {
+        for (const reports of reportLists) {
           pendingReportsCount += reports.filter((r) => r.status === ReportStatus.PENDING_REVIEW).length
         }
+        const reportsFlat = reportLists.flatMap((reports, index) => {
+          const sessionId = sessions[index]?.id
+          return sessionId
+            ? reports.map((r) => ({ status: r.status, session_id: r.session_id || sessionId }))
+            : []
+        })
+        const assessmentsFlat = assessmentLists.flatMap((list, index) => {
+          const sessionId = sessions[index]?.id
+          return sessionId
+            ? list.map((a) => ({
+              star_rating: a.star_rating,
+              session_id: sessionId,
+              assessed_at: a.assessed_at,
+            }))
+            : []
+        })
 
         setStats({
           totalPrograms: programsRes.total,
@@ -140,10 +164,10 @@ const DashboardPage = () => {
         )
 
         setParticipantCounts(
-          allParticipants.reduce<Record<string, number>>((acc, participants, index) => {
+          participantLists.reduce<Record<string, number>>((acc, sessionParticipants, index) => {
             const session = sessions[index]
             if (session) {
-              acc[session.id] = participants.length
+              acc[session.id] = sessionParticipants.length
             }
             return acc
           }, {}),
@@ -151,7 +175,7 @@ const DashboardPage = () => {
 
         setAllSessions(sessions)
         setAllReports(reportsFlat)
-        setAllAssessments(allAssessments.flat())
+        setAllAssessments(assessmentsFlat)
 
         setActiveSessions(active.slice(0, 6))
 
@@ -218,16 +242,6 @@ const DashboardPage = () => {
     return () => { cancelled = true }
   }, [])
 
-  const weeklyRegistrations = Array.from({ length: 7 }).map((_, index) => {
-    const date = new Date()
-    date.setDate(date.getDate() - (6 - index))
-    const dateKey = date.toISOString().slice(0, 10)
-    return {
-      week: date.toLocaleDateString('id-ID', { weekday: 'short' }),
-      count: participants.filter((participant) => participant.created_at.slice(0, 10) === dateKey).length,
-    }
-  })
-
   const sessionCards = activeSessions.map((session) => ({
     id: session.id,
     name: session.name,
@@ -246,18 +260,51 @@ const DashboardPage = () => {
     avatar: user.avatar_url,
   }))
 
+  const rangeText = dateRange === 'all' ? 'semua waktu' : `${dateRange} hari terakhir`
   const now = new Date()
 
-  const filteredSessions = allSessions.filter((s: Session) => {
-    if (selectedProgram && s.program_id !== selectedProgram) return false
-    if (statusFilter.length > 0 && !statusFilter.includes(s.status)) return false
-    if (dateRange !== 'all') {
-      const daysAgo = new Date(now)
-      daysAgo.setDate(daysAgo.getDate() - parseInt(dateRange, 10))
-      if (s.session_date && s.session_date < daysAgo.toISOString().slice(0, 10)) return false
+  const passesProgramStatus = (s: Session) =>
+    (!selectedProgram || s.program_id === selectedProgram) &&
+    (statusFilter.length === 0 || statusFilter.includes(s.status))
+
+  const sessionsInProgramStatus = allSessions.filter(passesProgramStatus)
+  const sessionById = new Map(allSessions.map((s) => [s.id, s]))
+  const sessionsInProgramStatusIds = new Set(sessionsInProgramStatus.map((s) => s.id))
+
+  // Registrations: program/status resolve through the linked session.
+  // Participants not yet linked to a session only count when no session-level
+  // filter (program/status) is active — otherwise they belong to no program.
+  const registrationPool = participants.filter((p) => {
+    if (p.session_id) {
+      const session = sessionById.get(p.session_id)
+      return session ? passesProgramStatus(session) : false
     }
-    return true
+    return !selectedProgram && statusFilter.length === 0
   })
+
+  const assessmentsInProgramStatus = allAssessments.filter((a) =>
+    sessionsInProgramStatusIds.has(a.session_id),
+  )
+
+  // Canonical date window (WIB) for every metric. "all" spans from the
+  // earliest known event up to today; dateKeysBetween caps the span.
+  const todayKey = todayWibDateKey(now)
+  const earliestEventDate = [
+    ...sessionsInProgramStatus.map((s) => s.session_date),
+    ...registrationPool.map((p) => wibDateKey(p.created_at)),
+    ...assessmentsInProgramStatus.map((a) => wibDateKey(a.assessed_at)),
+  ]
+    .filter((d): d is string => Boolean(d))
+    .sort()[0]
+  const rangeDates =
+    dateRange === 'all'
+      ? dateKeysBetween(earliestEventDate ?? todayKey, todayKey)
+      : lastNDays(parseInt(dateRange, 10), now)
+  const rangeSet = new Set(rangeDates)
+
+  const filteredSessions = sessionsInProgramStatus.filter(
+    (s) => !s.session_date || rangeSet.has(s.session_date),
+  )
 
   const filteredSessionIds = new Set(filteredSessions.map((s) => s.id))
 
@@ -265,22 +312,31 @@ const DashboardPage = () => {
     (p) => p.session_id && filteredSessionIds.has(p.session_id),
   )
 
-  const totalParticipantsInFiltered = filteredParticipants.length
+  const registeredInRange = registrationPool.filter((p) => rangeSet.has(wibDateKey(p.created_at)))
+
+  const ratedAssessments = assessmentsInProgramStatus.filter(
+    (a) => a.assessed_at && rangeSet.has(wibDateKey(a.assessed_at)),
+  )
+
+  const filteredReports = allReports.filter((r) => filteredSessionIds.has(r.session_id))
+
   const activeInFiltered = filteredSessions.filter((s) => s.status === SessionStatus.ACTIVE).length
 
   const avgRating =
-    allAssessments.length > 0
-      ? (allAssessments.reduce((sum, a) => sum + a.star_rating, 0) / allAssessments.length).toFixed(1)
+    ratedAssessments.length > 0
+      ? (
+        ratedAssessments.reduce((sum, a) => sum + a.star_rating, 0) / ratedAssessments.length
+      ).toFixed(1)
       : '-'
 
   const ratingDistribution = [1, 2, 3, 4, 5].map((rating) => ({
     rating,
-    count: allAssessments.filter((a) => a.star_rating === rating).length,
+    count: ratedAssessments.filter((a) => a.star_rating === rating).length,
   }))
 
   const reportCountsByStatus = (Object.values(ReportStatus) as ReportStatus[]).map((status) => ({
     status,
-    count: allReports.filter((r) => r.status === status).length,
+    count: filteredReports.filter((r) => r.status === status).length,
   }))
 
   const photoConsented = filteredParticipants.filter((p) => p.consent_photo).length
@@ -301,18 +357,11 @@ const DashboardPage = () => {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8)
 
-  const reportPipelineData = reportCountsByStatus.map((item) => {
-    const colorMap: Record<ReportStatus, string> = {
-      [ReportStatus.DRAFT]: 'bg-surface-variant',
-      [ReportStatus.PENDING_REVIEW]: 'bg-yellow-100',
-      [ReportStatus.APPROVED]: 'bg-green-100',
-      [ReportStatus.SENT]: 'bg-primary-container',
-    }
-    return {
-      status: item.status,
-      count: item.count,
-      color: colorMap[item.status],
-    }
+  const trendSeries = buildDailySeries({
+    dates: rangeDates,
+    sessions: filteredSessions,
+    participants: registrationPool,
+    assessments: ratedAssessments,
   })
 
   const formatTimeAgo = (timestamp: string) => {
@@ -401,9 +450,8 @@ const DashboardPage = () => {
                         key={activity.id}
                         onClick={() => activity.route && navigate(activity.route)}
                         disabled={!activity.route}
-                        className={`w-full flex items-start gap-4 p-3 rounded-xl transition-all ${
-                          activity.route ? 'hover:bg-surface-container-low cursor-pointer' : 'cursor-default'
-                        }`}
+                        className={`w-full flex items-start gap-4 p-3 rounded-xl transition-all ${activity.route ? 'hover:bg-surface-container-low cursor-pointer' : 'cursor-default'
+                          }`}
                       >
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activity.color}`}>
                           <Icon className="w-5 h-5" />
@@ -438,44 +486,45 @@ const DashboardPage = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
               icon={<Users className="w-5 h-5" />}
-              value={totalParticipantsInFiltered}
-              label="Total Peserta"
-              subtitle="Dalam sesi terfilter"
+              value={registeredInRange.length}
+              label="Pendaftar"
+              subtitle={`Dibuat dalam ${rangeText}`}
               accent="purple"
             />
             <KpiCard
               icon={<Calendar className="w-5 h-5" />}
               value={activeInFiltered}
               label="Sesi Aktif"
-              subtitle="Sesi aktif dalam rentang"
+              subtitle={`Status aktif dalam ${rangeText}`}
               accent="amber"
             />
             <KpiCard
               icon={<Star className="w-5 h-5" />}
               value={avgRating}
               label="Rata-rata Penilaian"
-              subtitle="Dari seluruh penilaian"
+              subtitle={
+                ratedAssessments.length > 0
+                  ? `Rata-rata 1–5 ★ dari ${ratedAssessments.length} penilaian`
+                  : 'Belum ada penilaian'
+              }
               accent="green"
             />
             <KpiCard
               icon={<FileText className="w-5 h-5" />}
               value={reportCountsByStatus.find((r) => r.status === ReportStatus.SENT)?.count ?? 0}
               label="Laporan Terkirim"
-              subtitle={`${allReports.length} total laporan`}
+              subtitle={`Dari ${filteredReports.length} laporan sesi terfilter`}
               accent="purple"
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ActivityBarChart title="Pendaftaran Peserta" data={weeklyRegistrations} />
-            <RatingDistribution data={ratingDistribution} />
-          </div>
+          <AnalyticsTrendChart data={trendSeries} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ReportPipeline data={reportPipelineData} />
+            <RatingDistribution data={ratingDistribution} />
             <ConsentOverview
               photoConsented={photoConsented}
-              total={filteredParticipants.length || 1}
+              total={filteredParticipants.length}
             />
           </div>
 
