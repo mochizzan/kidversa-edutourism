@@ -28,7 +28,7 @@ export function FrameUploadCard({
   return (
     <Card padding="sm" className="space-y-3">
       <div className="aspect-[4/3] overflow-hidden rounded-xl bg-surface-container-high">
-        <img src={preview} alt={name} className="h-full w-full object-cover" />
+        <img src={preview} alt={name} className="h-full w-full object-contain" />
       </div>
       <div className="space-y-3">
         <Input label="Nama Frame" value={name} onChange={(e) => onUpdateName(id, e.target.value)} required />

@@ -120,7 +120,7 @@ const FrameFormPage = () => {
               onChange={(e) => setForm((prev) => ({ ...prev, program_id: e.target.value }))}
             />
           </div>
-          
+
           <div className="w-full md:w-48 shrink-0">
             <label className="block text-sm font-medium text-on-surface mb-1">Preview</label>
             <div className="w-full aspect-[4/3] rounded-xl bg-surface-container-high flex items-center justify-center overflow-hidden border border-outline-variant">
@@ -128,7 +128,7 @@ const FrameFormPage = () => {
                 <img
                   src={frameId ? getMediaUrl('frame', frameId) : undefined}
                   alt={form.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
               ) : (
                 <Image className="w-8 h-8 text-on-surface-variant/50" />

@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { frameService } from '../../../core/services/frames'
+import { ApiError } from '../../../core/services/backend-client'
 import { ROUTES } from '../../../core/constants/app'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 
-interface UploadItem {
+export interface UploadItem {
   id: string
   file: File
   preview: string
@@ -12,7 +13,7 @@ interface UploadItem {
   programId: string
 }
 
-interface UseFrameUploadQueueResult {
+export interface UseFrameUploadQueueResult {
   items: UploadItem[]
   warnings: string[]
   errorMessage: string | null
@@ -61,13 +62,17 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
   }, [])
 
   const processFiles = useCallback((fileList: FileList | File[]) => {
+    // Snapshot at call time: React may defer this updater until the next
+    // render, and the click path (FrameDropZone.handleFileSelect) runs
+    // input.value = '' as soon as we return — emptying the same live FileList.
+    const files = Array.from(fileList)
     setItems((currentItems) => {
       const seenInBatch = new Set<string>()
       const existingKeys = new Set(currentItems.map((i) => `${i.file.name}-${i.file.size}`))
       const batch: UploadItem[] = []
       const msgs: string[] = []
 
-      Array.from(fileList).forEach((file) => {
+      files.forEach((file) => {
         const key = `${file.name}-${file.size}`
         if (!ACCEPTED_TYPES.includes(file.type)) {
           msgs.push(`"${file.name}" bukan file PNG/JPEG.`)
@@ -173,8 +178,10 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
         ),
       )
       navigate(ROUTES.ADMIN.FRAMES)
-    } catch {
-      setErrorMessage('Gagal menyimpan frame. Silakan coba lagi.')
+    } catch (err) {
+      setErrorMessage(
+        err instanceof ApiError ? err.message : 'Gagal menyimpan frame. Silakan coba lagi.',
+      )
     } finally {
       setIsSaving(false)
     }

@@ -1,10 +1,8 @@
 import { Check } from 'lucide-react'
 import { cn } from '../../../core/utils'
 import { getMediaUrl } from '../../../core/utils/media'
+import { IMAGE_FALLBACK_SRC } from '../../../core/constants/app'
 import type { PhotoFrame } from '../../../core/types'
-
-const FALLBACK_SVG =
-  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect fill="%23e0e0e0" width="200" height="200"/><text x="50%" y="50%" fill="%23999" text-anchor="middle" dy=".3em" font-size="14" font-family="sans-serif">Gagal Muat</text></svg>'
 
 interface FramePickerProps {
   frames: PhotoFrame[]
@@ -45,9 +43,9 @@ export const FramePicker = ({ frames, selectedFrameId, onSelect }: FramePickerPr
           <img
             src={getMediaUrl('frame', frame.id)}
             alt={frame.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             onError={(e) => {
-              ;(e.target as HTMLImageElement).src = FALLBACK_SVG
+              ; (e.target as HTMLImageElement).src = IMAGE_FALLBACK_SRC
             }}
           />
         ) : (

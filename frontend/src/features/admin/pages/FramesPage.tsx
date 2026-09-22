@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ROUTES } from '../../../core/constants/app'
+import { ROUTES, IMAGE_FALLBACK_SRC } from '../../../core/constants/app'
 import { Upload, Image, Pencil, Trash2, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -22,6 +22,7 @@ const FramesPage = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [programError, setProgramError] = useState<string | null>(null)
   const { getHighlightClass } = useHighlight()
 
   const programMap = useMemo(
@@ -45,7 +46,10 @@ const FramesPage = () => {
   useEffect(() => { load() }, [])
 
   useEffect(() => {
-    programService.getAll({ limit: 100 }).then(res => setPrograms(res.data))
+    programService
+      .getAll({ limit: 100 })
+      .then((res) => setPrograms(res.data))
+      .catch(() => setProgramError('Gagal memuat daftar program. Nama program mungkin tidak lengkap.'))
   }, [])
 
   const handleDelete = async () => {
@@ -64,6 +68,13 @@ const FramesPage = () => {
           <Button icon={<Upload className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.FRAME_UPLOAD)}>Upload Frame</Button>
         }
       />
+
+      {programError && (
+        <div className="flex items-start gap-2 rounded-2xl bg-amber-50 p-4 text-sm text-amber-700">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <p className="flex-1">{programError}</p>
+        </div>
+      )}
 
       <div className="space-y-3">
         {loading ? (
@@ -93,6 +104,9 @@ const FramesPage = () => {
                       src={getMediaUrl('frame', frame.id)}
                       alt={frame.name}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        ; (e.target as HTMLImageElement).src = IMAGE_FALLBACK_SRC
+                      }}
                     />
                   ) : (
                     <Image className="w-6 h-6 text-on-surface-variant/30" />

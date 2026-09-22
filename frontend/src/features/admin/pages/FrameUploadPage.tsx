@@ -16,6 +16,7 @@ const FrameUploadPage = () => {
   const navigate = useNavigate()
   const [programs, setPrograms] = useState<Program[]>([])
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [programError, setProgramError] = useState<string | null>(null)
 
   const {
     items, warnings, errorMessage, isSaving, hasEmptyName,
@@ -25,7 +26,10 @@ const FrameUploadPage = () => {
   } = useFrameUploadQueue()
 
   useEffect(() => {
-    programService.getAll({ limit: 100 }).then((res) => setPrograms(res.data)).catch(() => {})
+    programService
+      .getAll({ limit: 100 })
+      .then((res) => setPrograms(res.data))
+      .catch(() => setProgramError('Gagal memuat daftar program. Pilihan program tidak tersedia.'))
   }, [])
 
   const onClearAll = () => {
@@ -76,6 +80,13 @@ const FrameUploadPage = () => {
             {warnings.map((msg, i) => <p key={i}>{msg}</p>)}
           </div>
           <button onClick={clearWarnings} className="shrink-0 font-medium hover:underline">Tutup</button>
+        </div>
+      )}
+
+      {programError && (
+        <div className="flex items-start gap-2 rounded-2xl bg-amber-50 p-4 text-sm text-amber-700">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+          <p className="flex-1">{programError}</p>
         </div>
       )}
 

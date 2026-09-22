@@ -15,6 +15,11 @@ export const COLORS = {
   black: '#000000',
 } as const
 
+// Placeholder src for <img> elements whose remote media fails to load —
+// shows "Gagal Muat" instead of the browser's broken-image glyph.
+export const IMAGE_FALLBACK_SRC =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect fill="%23e0e0e0" width="200" height="200"/><text x="50%" y="50%" fill="%23999" text-anchor="middle" dy=".3em" font-size="14" font-family="sans-serif">Gagal Muat</text></svg>'
+
 // Routes
 export const ROUTES = {
   HOME: '/',
