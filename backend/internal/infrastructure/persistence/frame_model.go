@@ -11,8 +11,6 @@ import (
 // PhotoFrameModel is the GORM persistence model for decorative photo frames.
 type PhotoFrameModel struct {
 	entity.PhotoFrame
-	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
 }
 
