@@ -52,7 +52,8 @@ func (r *GormFrameRepository) List(ctx context.Context, f repository.FrameFilter
 		q = q.Where("tenant_id = ?", f.TenantID)
 	}
 	if f.ProgramID != "" {
-		q = q.Where("program_id = ?", f.ProgramID)
+		// Include global frames (program_id = "" or NULL) alongside program-specific ones.
+		q = q.Where("(program_id = ? OR program_id = '' OR program_id IS NULL)", f.ProgramID)
 	}
 	if f.IsActive != nil {
 		q = q.Where("is_active = ?", *f.IsActive)
