@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { combinePhone, detectCountry, getCountryOptions } from '@/core/utils/phone'
+import { combinePhone, detectCountry, getCountryOptions, normalizePhone } from '@/core/utils/phone'
 
 describe('combinePhone', () => {
   it('membuang satu leading 0 lalu menggabung dial code', () => {
@@ -48,5 +48,29 @@ describe('getCountryOptions', () => {
     expect(id!.dialCode).toBe('62')
     expect(id!.name).toBe('Indonesia')
     expect(id!.flag).toBe('🇮🇩')
+  })
+})
+
+describe('normalizePhone', () => {
+  it('input E.164 non-Indonesia (+65…) lolos tanpa disandera +62', () => {
+    expect(normalizePhone('+6512345678')).toBe('+6512345678')
+  })
+
+  it('input E.164 Indonesia (+62…) dipertahankan apa adanya', () => {
+    expect(normalizePhone('+6281234567890')).toBe('+6281234567890')
+  })
+
+  it('legacy lokal leading 0 → +62', () => {
+    expect(normalizePhone('081234567890')).toBe('+6281234567890')
+  })
+
+  it('legacy tanpa leading 0 (62…) → +62', () => {
+    expect(normalizePhone('6281234567890')).toBe('+6281234567890')
+  })
+
+  it('empty/whitespace/undefined → undefined', () => {
+    expect(normalizePhone('')).toBeUndefined()
+    expect(normalizePhone(undefined)).toBeUndefined()
+    expect(normalizePhone('   ')).toBeUndefined()
   })
 })

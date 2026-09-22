@@ -11,6 +11,7 @@ import { API_ROUTES } from '../../../core/constants/apiRoutes'
 import { cn } from '../../../core/utils'
 import { apiRequest } from '../../../core/services/backend-client'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { zEmail, zPassword } from '../../../core/utils/validation'
 import type { Tenant } from '../../../core/types'
 import { WizardTimeline } from '../components/WizardTimeline'
 import { RegisterStepName } from '../components/RegisterStepName'
@@ -19,11 +20,11 @@ import { RegisterStepPassword } from '../components/RegisterStepPassword'
 import { RegisterStepTerms } from '../components/RegisterStepTerms'
 import { Logo } from '../../../shared/components/ui/Logo'
 
-const registerSchema = z
+export const registerSchema = z
   .object({
     name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
-    email: z.string().email('Format email tidak valid'),
-    password: z.string().min(8, 'Password minimal 8 karakter').regex(/[A-Z]/, 'Harus ada huruf besar').regex(/[a-z]/, 'Harus ada huruf kecil').regex(/[0-9]/, 'Harus ada angka'),
+    email: zEmail({ required: true }),
+    password: zPassword,
     confirmPassword: z.string(),
     tenant_id: z.string().min(1, 'Pilih cabang/tenant'),
     role: z.enum([UserRole.ADMIN, UserRole.KOORDINATOR, UserRole.FASILITATOR], { message: 'Pilih peran yang valid' }),

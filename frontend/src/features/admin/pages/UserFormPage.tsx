@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { Resolver } from 'react-hook-form'
 import { z } from 'zod'
@@ -12,6 +12,7 @@ import { Select } from '../../../shared/components/ui/Select'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
 import { AvatarUploadModal } from '../../../shared/components/ui/AvatarUploadModal'
+import { PhoneInput } from '../../../shared/components/ui/PhoneInput'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
@@ -22,6 +23,7 @@ import { ApiError } from '../../../core/services/backend-client'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { UserRole } from '../../../core/types'
 import type { UpdateUserDTO } from '../../../core/types'
+import { zEmail, zPassword, zPhone } from '../../../core/utils/validation'
 import { PasswordStrengthBar } from '../../auth/components/PasswordStrengthBar'
 
 // zodResolver returns a schema-specific resolver; when isEdit is true the
@@ -31,27 +33,22 @@ function toCreateResolver(r: Resolver<CreateFormData | UpdateFormData>): Resolve
   return r as Resolver<CreateFormData>
 }
 
-const createUserSchema = z.object({
+export const createUserSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
-  email: z.string().email('Format email tidak valid'),
-  password: z
-    .string()
-    .min(8, 'Password minimal 8 karakter')
-    .regex(/[A-Z]/, 'Harus ada huruf besar')
-    .regex(/[a-z]/, 'Harus ada huruf kecil')
-    .regex(/[0-9]/, 'Harus ada angka'),
+  email: zEmail({ required: true }),
+  password: zPassword,
   confirmPassword: z.string(),
-  phone: z.string().optional(),
+  phone: zPhone({ required: false }),
   role: z.nativeEnum(UserRole),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Password tidak cocok',
   path: ['confirmPassword'],
 })
 
-const updateUserSchema = z.object({
+export const updateUserSchema = z.object({
   name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
-  email: z.string().email('Format email tidak valid'),
-  phone: z.string().optional(),
+  email: zEmail({ required: true }),
+  phone: zPhone({ required: false }),
   role: z.nativeEnum(UserRole),
 })
 
@@ -94,7 +91,7 @@ const UserFormPage = () => {
     },
   })
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = form
+  const { register, handleSubmit, reset, watch, control, formState: { errors } } = form
 
   useEffect(() => {
     if (isEdit && userId) {
@@ -267,10 +264,20 @@ const UserFormPage = () => {
               </>
             )}
 
-            <Input
-              label="No. HP"
-              error={errors.phone?.message}
-              {...register('phone')}
+            <Controller
+              control={control}
+              name="phone"
+              render={({ field, fieldState }) => (
+                <PhoneInput
+                  id="user_phone"
+                  label="No. HP"
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  error={fieldState.error?.message}
+                  hint="Opsional — kode negara otomatis"
+                  placeholder="8123456789"
+                />
+              )}
             />
 
             <Select

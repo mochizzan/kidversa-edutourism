@@ -7,7 +7,7 @@ type CreateUserRequest struct {
 	Email    string          `json:"email" validate:"required,email"`
 	Password string          `json:"password" validate:"required,min=6"`
 	Name     string          `json:"name" validate:"required"`
-	Phone    string          `json:"phone,omitempty"`
+	Phone    string          `json:"phone,omitempty" validate:"omitempty,phone"`
 	Role     entity.UserRole `json:"role" validate:"required"`
 	TenantID string          `json:"tenant_id,omitempty"`
 }
@@ -15,7 +15,7 @@ type CreateUserRequest struct {
 // UpdateUserRequest is the payload for PUT /api/users/:id.
 type UpdateUserRequest struct {
 	Name     string          `json:"name,omitempty"`
-	Phone    string          `json:"phone,omitempty"`
+	Phone    string          `json:"phone,omitempty" validate:"omitempty,phone"`
 	Role     entity.UserRole `json:"role,omitempty"`
 	IsActive *bool           `json:"is_active,omitempty"`
 }

@@ -1,4 +1,5 @@
 import { PARTICIPANT_AGE, PARTICIPANT_AGE_ERROR } from '@/core/constants/participant'
+import { emailError } from './validation'
 
 export type ParticipantFormValues = {
   child_name: string
@@ -15,10 +16,11 @@ export type ParticipantFormErrors = {
   school_name?: string
   parent_name?: string
   parent_phone?: string
+  parent_email?: string
 }
 
 // Nama: setelah trim 2–200 karakter dan minimal satu huruf Unicode.
-// school_name & parent_email sengaja TIDAK divalidasi FE (backend yang handle).
+// school_name sengaja TIDAK divalidasi FE (backend yang handle).
 const nameError = (value: string, label: string): string | undefined => {
   const trimmed = value.trim()
   if (!trimmed) return `${label} harus diisi`
@@ -51,6 +53,12 @@ export function validateParticipantForm(values: ParticipantFormValues): Particip
 
   // Cleanup-only: satu-satunya aturan phone di FE adalah wajib diisi.
   if (!values.parent_phone.trim()) errors.parent_phone = 'No. HP orang tua wajib diisi'
+
+  const email = values.parent_email?.trim()
+  if (email) {
+    const err = emailError(email, { required: false })
+    if (err) errors.parent_email = err
+  }
 
   return errors
 }

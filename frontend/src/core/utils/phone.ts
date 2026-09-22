@@ -8,6 +8,9 @@ export function normalizePhone(phone?: string): string | undefined {
   if (!phone) return undefined
   const trimmed = phone.trim()
   if (!trimmed) return undefined
+  // Already-E.164 input (PhoneInput emits '+'-prefixed values for ANY country)
+  // passes through untouched; only raw local input gets the +62 treatment.
+  if (trimmed.startsWith('+')) return trimmed
   const digits = trimmed.replace(/[^\d]/g, '')
   if (digits.length === 0) return undefined
   let national: string

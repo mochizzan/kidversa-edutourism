@@ -83,14 +83,34 @@ describe('validateParticipantForm', () => {
     expect(errs.parent_phone).toBeUndefined()
   })
 
-  it('email & school tidak divalidasi FE (tanpa key error)', () => {
-    const errs = validateParticipantForm({
-      ...valid(),
-      parent_email: 'bukan-email',
-      school_name: '',
-    })
-    expect('parent_email' in errs).toBe(false)
+  it('school_name tetap tidak divalidasi FE (tanpa key error)', () => {
+    const errs = validateParticipantForm({ ...valid(), school_name: '' })
     expect('school_name' in errs).toBe(false)
+  })
+
+  it("parent_email '' / dihapus → tanpa key error", () => {
+    expect('parent_email' in validateParticipantForm({ ...valid(), parent_email: '' })).toBe(false)
+    expect(
+      'parent_email' in validateParticipantForm({ ...valid(), parent_email: undefined }),
+    ).toBe(false)
+  })
+
+  it("parent_email valid → tanpa error", () => {
+    expect(
+      validateParticipantForm({ ...valid(), parent_email: 'budi@example.com' }).parent_email,
+    ).toBeUndefined()
+  })
+
+  it("parent_email 'budi@' → Format email tidak valid", () => {
+    expect(validateParticipantForm({ ...valid(), parent_email: 'budi@' }).parent_email).toBe(
+      'Format email tidak valid',
+    )
+  })
+
+  it("parent_email berspasi valid ' budi@example.com ' → tanpa error (trim dulu)", () => {
+    expect(
+      validateParticipantForm({ ...valid(), parent_email: ' budi@example.com ' }).parent_email,
+    ).toBeUndefined()
   })
 })
 

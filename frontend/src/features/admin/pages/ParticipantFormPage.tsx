@@ -31,6 +31,7 @@ type ParticipantFormErrors = {
   school_name?: string
   parent_name?: string
   parent_phone?: string
+  parent_email?: string
 }
 
 const emptyForm: ParticipantFormState = {
@@ -259,6 +260,7 @@ const ParticipantFormPage = () => {
               value={form.parent_email}
               onChange={(e) => handleChange('parent_email', e.target.value)}
               placeholder="Contoh: andi@mail.com (opsional)"
+              error={errors.parent_email}
             />
 
             <div className="md:col-span-2">

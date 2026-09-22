@@ -9,14 +9,15 @@ import { useAuthStore } from '../../../core/stores/authStore'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { ROUTES } from '../../../core/constants/app'
 import { changePassword } from '../../../core/services/users'
+import { zPassword } from '../../../core/utils/validation'
 import { PasswordStrengthBar } from '../components/PasswordStrengthBar'
 import { Logo } from '../../../shared/components/ui/Logo'
 import { Button } from '../../../shared/components/ui/Button'
 
-const changePasswordSchema = z
+export const changePasswordSchema = z
   .object({
     old_password: z.string().min(8, 'Password lama minimal 8 karakter'),
-    new_password: z.string().min(8, 'Password baru minimal 8 karakter'),
+    new_password: zPassword,
     confirm: z.string(),
   })
   .refine((data) => data.new_password === data.confirm, {

@@ -41,6 +41,7 @@ interface FormErrors {
   child_age?: string
   parent_name?: string
   parent_phone?: string
+  parent_email?: string
 }
 
 export function ParticipantFormModal({
@@ -386,6 +387,7 @@ export function ParticipantFormModal({
               placeholder="Contoh: andi@mail.com (opsional)"
               value={formData.parent_email}
               onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
+              error={errors.parent_email}
             />
           </div>
 
