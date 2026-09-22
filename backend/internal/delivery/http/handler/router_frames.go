@@ -17,4 +17,5 @@ func RegisterFramesRoutes(g *echo.Group, h *FrameHandler, jm *auth.JWTManager, r
 	g.PUT("/:id", h.Update, authMW, scopeMW)
 	g.DELETE("/:id", h.Delete, authMW, scopeMW)
 	g.POST("/:id/deactivate", h.Deactivate, authMW, scopeMW)
+	g.POST("/:id/activate", h.Activate, authMW, scopeMW)
 }

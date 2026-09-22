@@ -119,6 +119,7 @@ export const API_ROUTES = {
   BASE: '/api/frames',
   DETAIL: (id: string) => `/api/frames/${encodeURIComponent(id)}`,
   DEACTIVATE: (id: string) => `/api/frames/${encodeURIComponent(id)}/deactivate`,
+  ACTIVATE: (id: string) => `/api/frames/${encodeURIComponent(id)}/activate`,
   UPLOAD: '/api/frames/upload',
  },
 

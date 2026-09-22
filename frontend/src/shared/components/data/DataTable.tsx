@@ -22,6 +22,7 @@ interface DataTableProps<T> {
   total?: number
   onPageChange?: (page: number) => void
   onSearch?: (query: string) => void
+  onSort?: (key: string, order: 'asc' | 'desc') => void
   selectable?: boolean
   selectedRows?: string[]
   onSelectionChange?: (ids: string[]) => void
@@ -42,6 +43,7 @@ export function DataTable<T>({
   total = 0,
   onPageChange,
   onSearch,
+  onSort,
   selectable = false,
   selectedRows = [],
   onSelectionChange,
@@ -81,12 +83,10 @@ export function DataTable<T>({
   }
 
   const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      setSortOrder('asc')
-    }
+    const next: 'asc' | 'desc' = sortKey === key && sortOrder === 'asc' ? 'desc' : 'asc'
+    setSortKey(key)
+    setSortOrder(next)
+    onSort?.(key, next)
   }
 
   const allSelected = sortedData.length > 0 && selectedRows.length === sortedData.length

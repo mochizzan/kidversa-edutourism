@@ -1,49 +1,80 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES, IMAGE_FALLBACK_SRC } from '../../../core/constants/app'
-import { Upload, Image, Pencil, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { Upload, Image, Pencil, Trash2, ToggleLeft, ToggleRight, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
-import { Card } from '../../../shared/components/ui/Card'
+import { Select } from '../../../shared/components/ui/Select'
+import { DataTable } from '../../../shared/components/data/DataTable'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
-import { useHighlight } from '../../../shared/hooks/useHighlight'
+import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientList'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { frameService } from '../../../core/services/frames'
 import { programService } from '../../../core/services/programs'
+import { cn } from '../../../core/utils'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import { getMediaUrl } from '../../../core/utils/media'
+import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import { formatDate } from '../../../shared/utils'
+import { FramePreviewOverlay } from '../components/FramePreviewOverlay'
+import type { Column } from '../../../shared/components/data/DataTable'
 import type { PhotoFrame, Program } from '../../../core/types'
+
+const frameTextFilter = makeTextFilter<PhotoFrame>(['name'])
+
+const STATUS_FILTERS: { key: 'all' | 'active' | 'inactive'; label: string }[] = [
+  { key: 'all', label: 'Semua' },
+  { key: 'active', label: 'Aktif' },
+  { key: 'inactive', label: 'Nonaktif' },
+]
 
 const FramesPage = () => {
   const navigate = useNavigate()
-  const [frames, setFrames] = useState<PhotoFrame[]>([])
+  const { tenantId } = useTenantScope()
+  const { addToast } = useGlobalToast()
   const [programs, setPrograms] = useState<Program[]>([])
-  const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [programError, setProgramError] = useState<string | null>(null)
-  const { getHighlightClass } = useHighlight()
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [programFilter, setProgramFilter] = useState('all')
+  const [sort, setSort] = useState<{ key: 'name' | 'created_at'; dir: 'asc' | 'desc' }>({
+    key: 'created_at',
+    dir: 'desc',
+  })
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [preview, setPreview] = useState<PhotoFrame | null>(null)
 
   const programMap = useMemo(
     () => new Map(programs.map((p) => [p.id, p.name])),
     [programs],
   )
 
-  const load = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await frameService.getAll({ page: 1, limit: 100 })
-      setFrames(res.data)
-    } catch {
-      setError('Gagal memuat daftar frame. Silakan coba lagi.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const filterFn = useCallback((items: PhotoFrame[], search: string) => {
+    let out = frameTextFilter(items, search)
+    if (statusFilter === 'active') out = out.filter((f) => f.is_active)
+    else if (statusFilter === 'inactive') out = out.filter((f) => !f.is_active)
+    if (programFilter !== 'all') out = out.filter((f) => (f.program_id ?? '') === programFilter)
+    return out
+  }, [statusFilter, programFilter])
 
-  useEffect(() => { load() }, [])
+  const sortFn = useCallback((items: PhotoFrame[]) => {
+    const mul = sort.dir === 'asc' ? 1 : -1
+    return [...items].sort((a, b) =>
+      sort.key === 'name'
+        ? mul * String(a.name).localeCompare(String(b.name), 'id-ID')
+        : mul * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    )
+  }, [sort])
+
+  const { data, loading, error, page, totalItems, setPage, setSearch, refresh, adjustPageOnDelete } =
+    useClientList<PhotoFrame>({
+      fetchFn: () => frameService.getAll({ limit: 1000 }).then((r) => r.data),
+      filterFn,
+      sortFn,
+      deps: [tenantId],
+    })
 
   useEffect(() => {
     programService
@@ -52,12 +83,107 @@ const FramesPage = () => {
       .catch(() => setProgramError('Gagal memuat daftar program. Nama program mungkin tidak lengkap.'))
   }, [])
 
+  const handleToggle = async (frame: PhotoFrame) => {
+    try {
+      if (frame.is_active) await frameService.deactivate(frame.id)
+      else await frameService.activate(frame.id)
+      refresh()
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
+    }
+  }
+
   const handleDelete = async () => {
     if (!deleteId) return
-    await frameService.deactivate(deleteId)
-    setDeleteId(null)
-    load()
+    try {
+      await frameService.delete(deleteId)
+      adjustPageOnDelete()
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
+    } finally {
+      setDeleteId(null)
+    }
   }
+
+  const columns: Column<PhotoFrame>[] = [
+    {
+      key: 'thumbnail',
+      header: 'Thumbnail',
+      render: (item: PhotoFrame) => (
+        <button
+          type="button"
+          aria-label={'Pratinjau ' + item.name}
+          className="cursor-zoom-in"
+          onClick={() => setPreview(item)}
+        >
+          <img
+            src={getMediaUrl('frame', item.id)}
+            alt={item.name}
+            onError={(e) => {
+              ; (e.currentTarget as HTMLImageElement).src = IMAGE_FALLBACK_SRC
+            }}
+            className="h-12 w-12 rounded-lg bg-surface-container-high object-cover"
+          />
+        </button>
+      ),
+    },
+    {
+      key: 'name',
+      header: 'Nama',
+      sortable: true,
+      render: (item: PhotoFrame) => <span className="font-medium text-on-surface">{item.name}</span>,
+    },
+    {
+      key: 'program',
+      header: 'Program',
+      render: (item: PhotoFrame) => programMap.get(item.program_id ?? '') ?? 'Semua Program',
+    },
+    {
+      key: 'is_active',
+      header: 'Status',
+      render: (item: PhotoFrame) => (
+        <Badge variant={item.is_active ? 'success' : 'neutral'}>
+          {item.is_active ? 'Aktif' : 'Nonaktif'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'created_at',
+      header: 'Dibuat',
+      sortable: true,
+      render: (item: PhotoFrame) => formatDate(item.created_at),
+    },
+    {
+      key: 'actions',
+      header: 'Aksi',
+      align: 'right',
+      render: (item: PhotoFrame) => (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Pencil className="w-4 h-4" />}
+            tooltip="Edit"
+            onClick={() => navigate('/admin/frames/' + item.id + '/edit')}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={item.is_active ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
+            tooltip={item.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+            onClick={() => handleToggle(item)}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 className="w-4 h-4 text-error" />}
+            tooltip="Hapus"
+            onClick={() => setDeleteId(item.id)}
+          />
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -76,71 +202,81 @@ const FramesPage = () => {
         </div>
       )}
 
-      <div className="space-y-3">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : error ? (
-          <div className="text-center py-12 space-y-3">
-            <AlertCircle className="w-10 h-10 mx-auto text-error" />
-            <p className="text-sm text-on-surface-variant">{error}</p>
-            <Button variant="secondary" size="sm" onClick={load}>Coba Lagi</Button>
-          </div>
-        ) : frames.length === 0 ? (
+      {error && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
+          <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
+          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+        </div>
+      )}
+
+      <div
+        role="group"
+        aria-label="Filter status"
+        className="flex w-fit gap-1 rounded-full bg-surface-container-low p-1"
+      >
+        {STATUS_FILTERS.map((filter) => (
+          <button
+            key={filter.key}
+            type="button"
+            aria-pressed={statusFilter === filter.key}
+            onClick={() => {
+              setStatusFilter(filter.key)
+              setPage(1)
+            }}
+            className={cn(
+              'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
+              statusFilter === filter.key
+                ? 'bg-primary text-white'
+                : 'text-on-surface-variant hover:text-on-surface',
+            )}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
+      <DataTable
+        data={data}
+        columns={columns}
+        loading={loading}
+        page={page}
+        total={totalItems}
+        pageSize={DEFAULT_CLIENT_PAGE_SIZE}
+        onPageChange={setPage}
+        onSearch={setSearch}
+        onSort={(key, dir) => setSort({ key: key as 'name' | 'created_at', dir })}
+        getRowId={(item: PhotoFrame) => item.id}
+        actions={
+          <Select
+            aria-label="Program"
+            value={programFilter}
+            onChange={(e) => {
+              setProgramFilter(e.target.value)
+              setPage(1)
+            }}
+            className="w-56"
+            options={[
+              { value: 'all', label: 'Semua Program' },
+              ...programs.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+          />
+        }
+        emptyState={
           <ListEmptyState
             icon={<Image className="w-12 h-12" />}
             title="Belum ada frame"
             description="Klik 'Upload Frame' di atas untuk mengupload frame PNG pertama."
           />
-        ) : (
-          frames.map((frame) => (
-            <Card key={frame.id} padding="sm" className={`hover:shadow-md transition-shadow ${getHighlightClass(frame.id)}`}>
-              <div className="flex items-start gap-4">
-                {/* Thumbnail */}
-                <div className="relative w-20 h-16 shrink-0 rounded-xl bg-surface-container-high overflow-hidden flex items-center justify-center">
-                  {frame.thumbnail_url || frame.file_url ? (
-                    <img
-                      src={getMediaUrl('frame', frame.id)}
-                      alt={frame.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        ; (e.target as HTMLImageElement).src = IMAGE_FALLBACK_SRC
-                      }}
-                    />
-                  ) : (
-                    <Image className="w-6 h-6 text-on-surface-variant/30" />
-                  )}
-                  <Badge
-                    variant={frame.is_active ? 'success' : 'neutral'}
-                    size="sm"
-                    className="absolute top-1 right-1 !text-[10px] !px-1.5"
-                  >
-                    {frame.is_active ? 'Aktif' : 'Nonaktif'}
-                  </Badge>
-                </div>
+        }
+      />
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-on-surface truncate">{frame.name}</p>
-                  <p className="text-sm text-on-surface-variant mt-0.5">
-                    {programMap.get(frame.program_id ?? '') || 'Semua Program'}
-                  </p>
-                  <p className="text-xs text-on-surface-variant/60 mt-0.5">
-                    Urutan ke-{frame.sort_order} · {formatDate(frame.created_at)}
-                  </p>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0 self-center">
-                  <Button variant="ghost" size="sm" icon={<Pencil className="w-3.5 h-3.5" />} tooltip="Edit" onClick={() => navigate(`/admin/frames/${frame.id}/edit`)} />
-                  <Button variant="ghost" size="sm" icon={<Trash2 className="w-3.5 h-3.5 text-error" />} tooltip="Hapus" onClick={() => setDeleteId(frame.id)} />
-                </div>
-              </div>
-            </Card>
-          ))
-        )}
-      </div>
+      {preview && (
+        <FramePreviewOverlay
+          src={getMediaUrl('frame', preview.id)}
+          alt={preview.name}
+          onClose={() => setPreview(null)}
+        />
+      )}
 
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Hapus Frame" footer={
         <div className="flex justify-end gap-2">

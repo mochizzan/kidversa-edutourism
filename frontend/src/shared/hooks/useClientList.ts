@@ -7,6 +7,7 @@ export interface UseClientListOptions<T> {
   fetchFn: () => Promise<T[]>
   pageSize?: number
   filterFn?: (items: T[], search: string) => T[]
+  sortFn?: (items: T[]) => T[]
   deps?: React.DependencyList
 }
 
@@ -43,7 +44,7 @@ export function makeTextFilter<T>(fields: (keyof T)[]) {
 export function useClientList<T>(
   options: UseClientListOptions<T>,
 ): UseClientListResult<T> {
-  const { fetchFn, pageSize = DEFAULT_CLIENT_PAGE_SIZE, filterFn, deps = [] } = options
+  const { fetchFn, pageSize = DEFAULT_CLIENT_PAGE_SIZE, filterFn, sortFn, deps = [] } = options
   const { addToast } = useGlobalToast()
 
   const fetchFnRef = useRef(fetchFn)
@@ -94,14 +95,16 @@ export function useClientList<T>(
     [filterFn, rawData, search],
   )
 
-  const totalItems = filtered.length
+  const sorted = useMemo(() => (sortFn ? sortFn(filtered) : filtered), [filtered, sortFn])
+
+  const totalItems = sorted.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
 
   const safePage = Math.min(page, totalPages)
   const start = (safePage - 1) * pageSize
   const data = useMemo(
-    () => filtered.slice(start, start + pageSize),
-    [filtered, safePage, pageSize],
+    () => sorted.slice(start, start + pageSize),
+    [sorted, safePage, pageSize],
   )
 
   useEffect(() => {
@@ -124,7 +127,7 @@ export function useClientList<T>(
 
   return {
     data,
-    allData: filtered,
+    allData: sorted,
     rawData,
     loading,
     error,

@@ -123,6 +123,10 @@ export interface FrameService {
   create(data: Omit<PhotoFrame, 'id' | 'created_at'>): Promise<PhotoFrame>
   update(id: string, data: Partial<Omit<PhotoFrame, 'id' | 'created_at'>>): Promise<PhotoFrame>
   deactivate(id: string): Promise<PhotoFrame>
+  /** Reactivate a deactivated frame. */
+  activate(id: string): Promise<PhotoFrame>
+  /** Soft-delete a frame (backend uses gorm soft delete). */
+  delete(id: string): Promise<void>
   upload(data: { name: string; programId?: string; file: File }): Promise<PhotoFrame>
 }
 

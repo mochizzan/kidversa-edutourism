@@ -1,7 +1,7 @@
 import type { PaginatedResponse, ListParams, PhotoFrame } from '../types'
 import type { FrameService } from './types'
 import { apiRequest } from './backend-client'
-import { itemRequest, fetchAllPages, normalizeTenantId, type ItemsListEnvelope } from './api-envelope'
+import { itemRequest, voidRequest, fetchAllPages, normalizeTenantId, type ItemsListEnvelope } from './api-envelope'
 import { uploadMultipart } from './upload-multipart'
 import { API_ROUTES } from '../constants/apiRoutes'
 
@@ -93,6 +93,14 @@ const deactivate = async (id: string): Promise<PhotoFrame> => {
   return itemRequest<PhotoFrame>('POST', API_ROUTES.FRAMES.DEACTIVATE(id))
 }
 
+const activate = async (id: string): Promise<PhotoFrame> => {
+  return itemRequest<PhotoFrame>('POST', API_ROUTES.FRAMES.ACTIVATE(id))
+}
+
+const remove = async (id: string): Promise<void> => {
+  await voidRequest('DELETE', API_ROUTES.FRAMES.DETAIL(id))
+}
+
 const upload = async (data: {
   name: string
   programId?: string
@@ -111,5 +119,7 @@ export const frameService: FrameService = {
   create,
   update,
   deactivate,
+  activate,
+  delete: remove,
   upload,
 }

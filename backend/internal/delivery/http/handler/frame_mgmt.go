@@ -46,13 +46,18 @@ func (h *FrameHandler) Delete(c *echo.Context) error {
 	return appresp.NoContent(c)
 }
 
-// Deactivate handles POST /api/frames/:id/deactivate (set IsActive=false via map, C2).
-func (h *FrameHandler) Deactivate(c *echo.Context) error {
+// Activate handles POST /api/frames/:id/activate: sets is_active=true.
+func (h *FrameHandler) Activate(c *echo.Context) error { return h.setActive(c, true) }
+
+// Deactivate handles POST /api/frames/:id/deactivate: sets is_active=false.
+func (h *FrameHandler) Deactivate(c *echo.Context) error { return h.setActive(c, false) }
+
+func (h *FrameHandler) setActive(c *echo.Context, active bool) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
 		return nil
 	}
-	fields := map[string]interface{}{"is_active": false}
+	fields := map[string]interface{}{"is_active": active}
 	if err := h.repo.UpdateFields((*c).Request().Context(), id, fields); err != nil {
 		return err
 	}
