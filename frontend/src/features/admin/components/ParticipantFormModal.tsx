@@ -349,7 +349,7 @@ export function ParticipantFormModal({
               value={formData.child_age}
               onChange={(e) => setFormData({ ...formData, child_age: e.target.value })}
               error={errors.child_age}
-              hint="Usia 1–120 tahun; di luar 4–17 akan muncul konfirmasi"
+              hint="Masukkan usia anak dalam tahun"
               required
             />
 

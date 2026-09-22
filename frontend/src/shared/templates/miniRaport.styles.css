@@ -1098,6 +1098,9 @@
   .max-w-5xl {
     max-width: var(--container-5xl);
   }
+  .max-w-\[45\%\] {
+    max-width: 45%;
+  }
   .max-w-\[120px\] {
     max-width: 120px;
   }

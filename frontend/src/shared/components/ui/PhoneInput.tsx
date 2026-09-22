@@ -69,7 +69,7 @@ export function PhoneInput({
           onChange={(e) => handleCountryChange(e.target.value)}
           disabled={disabled}
           className={cn(
-            'rounded-l-xl border border-r-0 border-outline-variant bg-surface px-2 py-2 text-sm',
+            'min-w-0 max-w-[45%] rounded-l-xl border border-r-0 border-outline-variant bg-surface px-2 py-2 text-sm',
             'focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none',
             'disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant',
             error && 'border-error focus:border-error focus:ring-error-container'
@@ -83,7 +83,7 @@ export function PhoneInput({
         </select>
         <div
           className={cn(
-            'flex flex-1 items-center rounded-r-xl border border-outline-variant bg-surface',
+            'flex min-w-0 flex-1 items-center rounded-r-xl border border-outline-variant bg-surface',
             'focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-container',
             'disabled:cursor-not-allowed disabled:bg-surface-container-low',
             error && 'border-error focus-within:border-error focus-within:ring-error-container'

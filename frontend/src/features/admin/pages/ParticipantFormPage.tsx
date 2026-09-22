@@ -222,7 +222,7 @@ const ParticipantFormPage = () => {
               value={form.child_age}
               onChange={(e) => handleChange('child_age', e.target.value)}
               placeholder="Contoh: 6"
-              hint="Usia 1–120 tahun; di luar 4–17 akan muncul konfirmasi"
+              hint="Masukkan usia anak dalam tahun"
               error={errors.child_age}
             />
 
@@ -253,17 +253,6 @@ const ParticipantFormPage = () => {
               error={errors.parent_name}
             />
 
-            <PhoneInput
-              id="parent_phone"
-              label="No. HP Orang Tua"
-              required
-              value={form.parent_phone}
-              onChange={(v) => handleChange('parent_phone', v)}
-              error={errors.parent_phone}
-              hint="Tanpa 0 di depan — kode negara otomatis"
-              placeholder="8123456789"
-            />
-
             <Input
               label="Email Orang Tua"
               type="email"
@@ -271,6 +260,19 @@ const ParticipantFormPage = () => {
               onChange={(e) => handleChange('parent_email', e.target.value)}
               placeholder="Contoh: andi@mail.com (opsional)"
             />
+
+            <div className="md:col-span-2">
+              <PhoneInput
+                id="parent_phone"
+                label="No. HP Orang Tua"
+                required
+                value={form.parent_phone}
+                onChange={(v) => handleChange('parent_phone', v)}
+                error={errors.parent_phone}
+                hint="Tanpa 0 di depan — kode negara otomatis"
+                placeholder="8123456789"
+              />
+            </div>
           </div>
         </Card>
 
