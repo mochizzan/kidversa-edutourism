@@ -264,21 +264,22 @@ const UserFormPage = () => {
               </>
             )}
 
-            <Controller
-              control={control}
-              name="phone"
-              render={({ field, fieldState }) => (
-                <PhoneInput
-                  id="user_phone"
-                  label="No. HP"
-                  value={field.value || ''}
-                  onChange={field.onChange}
-                  error={fieldState.error?.message}
-                  hint="Opsional — kode negara otomatis"
-                  placeholder="8123456789"
-                />
-              )}
-            />
+            <div className="md:col-span-2">
+              <Controller
+                control={control}
+                name="phone"
+                render={({ field, fieldState }) => (
+                  <PhoneInput
+                    id="user_phone"
+                    label="No. HP"
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    error={fieldState.error?.message}
+                    placeholder="8123456789"
+                  />
+                )}
+              />
+            </div>
 
             <Select
               label="Role"
