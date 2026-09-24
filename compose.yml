@@ -1,6 +1,6 @@
 # Kidversa Edutourism — Production compose (no dev / watch / profile config).
 #
-#   docker compose up -d --build     ← build + run the production stack
+#   docker compose pull && docker compose up -d     ← tarik image GHCR + jalankan stack
 #   docker compose down              ← stop stack (does NOT touch bind-mount data)
 #   docker compose logs -f backend
 #
@@ -38,9 +38,7 @@ services:
     restart: unless-stopped
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/mochizzan/kidversa-edutourism-backend:latest
     env_file: ./backend/.env
     environment:
       # Override: in Docker, DB_HOST = service name (not localhost).
@@ -75,9 +73,7 @@ services:
           memory: 128M
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ghcr.io/mochizzan/kidversa-edutourism-frontend:latest
     # Centralized, bind-mounted reverse-proxy config (read-only at runtime).
     # Published to 127.0.0.1:8002 only; the host nginx (nginx/vps.conf) proxies
     # public traffic here. Internal container port stays 8080.
