@@ -104,7 +104,8 @@
       "placeholder": "写评论..."
     },
     "phone": {
-      "countryCode": "国家代码"
+      "countryCode": "国家代码",
+      "emptyCountry": "未找到国家"
     },
     "greeting": {
       "morning": "早上好",

@@ -104,7 +104,8 @@
       "placeholder": "เขียนความคิดเห็น..."
     },
     "phone": {
-      "countryCode": "รหัสประเทศ"
+      "countryCode": "รหัสประเทศ",
+      "emptyCountry": "ไม่พบประเทศ"
     },
     "greeting": {
       "morning": "สวัสดีตอนเช้า",

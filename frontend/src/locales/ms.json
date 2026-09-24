@@ -104,7 +104,8 @@
       "placeholder": "Tulis komen..."
     },
     "phone": {
-      "countryCode": "Kod negara"
+      "countryCode": "Kod negara",
+      "emptyCountry": "Negara tidak dijumpai"
     },
     "greeting": {
       "morning": "Selamat Pagi",

@@ -104,7 +104,8 @@
       "placeholder": "Write a comment..."
     },
     "phone": {
-      "countryCode": "Country code"
+      "countryCode": "Country code",
+      "emptyCountry": "Country not found"
     },
     "greeting": {
       "morning": "Good Morning",

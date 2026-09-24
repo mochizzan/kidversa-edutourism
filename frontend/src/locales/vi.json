@@ -104,7 +104,8 @@
       "placeholder": "Viết bình luận..."
     },
     "phone": {
-      "countryCode": "Mã quốc gia"
+      "countryCode": "Mã quốc gia",
+      "emptyCountry": "Không tìm thấy quốc gia"
     },
     "greeting": {
       "morning": "Chào buổi sáng",

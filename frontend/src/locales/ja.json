@@ -104,7 +104,8 @@
       "placeholder": "コメントを入力..."
     },
     "phone": {
-      "countryCode": "国コード"
+      "countryCode": "国コード",
+      "emptyCountry": "国が見つかりません"
     },
     "greeting": {
       "morning": "おはようございます",

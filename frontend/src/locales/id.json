@@ -103,7 +103,7 @@
       "aria": "Komentar",
       "placeholder": "Tulis komentar..."
     },
-    "phone": { "countryCode": "Kode negara" },
+    "phone": { "countryCode": "Kode negara", "emptyCountry": "Negara tidak ditemukan" },
     "greeting": {
       "morning": "Selamat Pagi",
       "afternoon": "Selamat Siang",

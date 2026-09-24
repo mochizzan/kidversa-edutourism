@@ -104,7 +104,8 @@
       "placeholder": "Sumulat ng komento..."
     },
     "phone": {
-      "countryCode": "Country code"
+      "countryCode": "Country code",
+      "emptyCountry": "Walang nahanap na bansa"
     },
     "greeting": {
       "morning": "Magandang Umaga",
