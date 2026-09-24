@@ -3,6 +3,8 @@ export interface GalleryPhoto {
   original_file_url: string
   framed_file_url?: string
   is_report_photo: boolean
+  /** True when this photo backs the report token's topic (pick wins; fallback is_report_photo). */
+  report_photo: boolean
   taken_at: string
   taken_by: string
 }

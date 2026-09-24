@@ -24,6 +24,7 @@ import type {
   UpdateUserDTO,
   PhotoFrame,
   SmartPhoto,
+  ReportPhotoPick,
   Report,
   ConsentLog,
   Assessment,
@@ -138,6 +139,23 @@ export interface PhotoService {
   upload(participantId: string, sessionId: string, file: File): Promise<SmartPhoto>
   update(photoId: string, data: Partial<SmartPhoto>): Promise<SmartPhoto>
   delete(id: string): Promise<void>
+  /** Exclusive session default for the mini-raport fallback (POST /:id/set-report-photo). */
+  setReportPhoto(photoId: string): Promise<SmartPhoto>
+  /** All topic picks for one participant+session. */
+  getReportPicks(participantId: string, sessionId: string): Promise<ReportPhotoPick[]>
+  /** Upsert the picked photo for one topic (last write wins). */
+  setReportPick(data: {
+    participant_id: string
+    session_id: string
+    program_stage_id: string
+    photo_id: string
+  }): Promise<SmartPhoto>
+  /** Clear the pick for one topic. */
+  clearReportPick(params: {
+    participant_id: string
+    session_id: string
+    program_stage_id: string
+  }): Promise<void>
 }
 
 // Reports

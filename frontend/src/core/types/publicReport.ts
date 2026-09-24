@@ -10,5 +10,7 @@ export interface PublicReport {
   ai_narrative_final?: string
   mission_ids?: string[]
   report_pdf_url?: string
+  /** Token-free access-photo path; absent when no photo resolves or consent is off. */
+  photo_url?: string
   group_name?: string
 }

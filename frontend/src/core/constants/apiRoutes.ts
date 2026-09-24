@@ -113,6 +113,9 @@ export const API_ROUTES = {
   DETAIL: (id: string) => `/api/photos/${encodeURIComponent(id)}`,
   SET_REPORT: (id: string) => `/api/photos/${encodeURIComponent(id)}/set-report-photo`,
   UPLOAD: '/api/photos/upload',
+  // Pilihan foto per topik (satu per participant+session+topic, uq_photo_pick).
+  REPORT_PICK: '/api/photos/report-pick',
+  REPORT_PICKS: '/api/photos/report-picks',
  },
 
  FRAMES: {
@@ -140,6 +143,7 @@ export const API_ROUTES = {
   SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
   REVOKE_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-token`,
   ACCESS: '/api/reports/access',
+  ACCESS_PHOTO: '/api/reports/access/photo',
   GALLERY: '/api/reports/gallery',
   GENERATE_GALLERY_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/gallery-token`,
   REVOKE_GALLERY_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-gallery-token`,

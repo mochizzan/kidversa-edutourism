@@ -281,6 +281,12 @@ export interface SmartPhoto {
  sync_status: import('./enums').SyncStatus
 }
 
+/** One topic's chosen report photo, as returned by GET /api/photos/report-picks. */
+export interface ReportPhotoPick {
+ program_stage_id: string
+ photo_id: string
+}
+
 export interface Report {
  id: string
  participant_id: string
