@@ -88,6 +88,15 @@ func (h *GalleryHandler) GetByToken(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusForbidden, "consent_required")
 	}
 
+	resolved, err := resolveReportPhoto(ctx, h.photoRepo, gt.ParticipantID, gt.SessionID, report.ProgramStageID)
+	if err != nil {
+		return err
+	}
+	var reportPhotoID string
+	if resolved != nil {
+		reportPhotoID = resolved.ID
+	}
+
 	photos, err := h.photoRepo.ListPhotos(ctx, repository.PhotoFilter{
 		ParticipantID: gt.ParticipantID,
 		SessionID:     gt.SessionID,
@@ -96,7 +105,7 @@ func (h *GalleryHandler) GetByToken(c *echo.Context) error {
 		return err
 	}
 
-	return appresp.OK(c, dto.NewPublicGalleryDTO(report, participant, photos.Items))
+	return appresp.OK(c, dto.NewPublicGalleryDTO(report, participant, photos.Items, reportPhotoID))
 }
 
 // GenerateToken handles POST /api/reports/:id/gallery-token (JWT).

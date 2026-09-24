@@ -20,13 +20,17 @@ type GalleryPhotoDTO struct {
 	OriginalFileURL string `json:"original_file_url"`
 	FramedFileURL   string `json:"framed_file_url,omitempty"`
 	IsReportPhoto   bool   `json:"is_report_photo"`
-	TakenAt         string `json:"taken_at"`
-	TakenBy         string `json:"taken_by"`
+	// ReportPhoto marks the photo backing the report token's topic (pick wins;
+	// is_report_photo only when the topic has no pick). Computed server-side.
+	ReportPhoto bool   `json:"report_photo"`
+	TakenAt     string `json:"taken_at"`
+	TakenBy     string `json:"taken_by"`
 }
 
 // NewPublicGalleryDTO builds the safe public gallery view (no PII beyond child
-// name, no token, no admin-only fields).
-func NewPublicGalleryDTO(report *entity.Report, participant *entity.Participant, photos []entity.SmartPhoto) *PublicGalleryDTO {
+// name, no token, no admin-only fields). reportPhotoID is the ID of the photo
+// backing the report token's topic ("" when none resolves).
+func NewPublicGalleryDTO(report *entity.Report, participant *entity.Participant, photos []entity.SmartPhoto, reportPhotoID string) *PublicGalleryDTO {
 	dtos := make([]GalleryPhotoDTO, len(photos))
 	for i, p := range photos {
 		dtos[i] = GalleryPhotoDTO{
@@ -34,6 +38,7 @@ func NewPublicGalleryDTO(report *entity.Report, participant *entity.Participant,
 			OriginalFileURL: p.OriginalFileURL,
 			FramedFileURL:   p.FramedFileURL,
 			IsReportPhoto:   p.IsReportPhoto,
+			ReportPhoto:     p.ID == reportPhotoID,
 			TakenAt:         p.TakenAt.Format("2006-01-02T15:04:05Z07:00"),
 			TakenBy:         p.TakenBy,
 		}

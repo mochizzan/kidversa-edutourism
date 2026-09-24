@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -8,9 +10,47 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"kidversa-edutourism-backend/internal/domain/entity"
+	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/pkg/constants"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
+
+// resolveReportPhoto returns the photo backing a report for one participant,
+// session and topic (program stage). An explicit report_photo_picks row wins;
+// when no pick row exists the session's exclusive is_report_photo default is
+// the fallback. A pick whose photo was deleted resolves to (nil, nil) — no
+// fallback, no dangling reference (spec §1 + §5.1; see plan R2).
+func resolveReportPhoto(ctx context.Context, photos repository.PhotoRepository,
+	participantID, sessionID, programStageID string) (*entity.SmartPhoto, error) {
+	pick, err := photos.GetReportPhotoPick(ctx, participantID, sessionID, programStageID)
+	if err != nil {
+		return nil, err
+	}
+	if pick != nil {
+		rec, err := photos.GetPhotoByID(ctx, pick.PhotoID, "")
+		if err != nil {
+			var ae *apperrors.AppError
+			if errors.As(err, &ae) && ae.Status == http.StatusNotFound {
+				return nil, nil // pick's photo deleted/soft-removed: gugur, tanpa fallback
+			}
+			return nil, err
+		}
+		return rec, nil
+	}
+	isTrue := true
+	page, err := photos.ListPhotos(ctx, repository.PhotoFilter{
+		ParticipantID: participantID, SessionID: sessionID, IsReportPhoto: &isTrue,
+	}, 1, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(page.Items) == 0 {
+		return nil, nil
+	}
+	return &page.Items[0], nil // Paginated.Items bersifat nilai (T, bukan *T)
+}
 
 // bindUUID pulls a path param, validates it is a UUID, and responds 400 if not.
 // Returns (id, true) on success.

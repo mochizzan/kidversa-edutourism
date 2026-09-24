@@ -5,7 +5,10 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/labstack/echo/v5"
@@ -32,12 +35,14 @@ type ReportHandler struct {
 	cfg         *config.Config
 	sessionRepo repository.SessionRepository
 	hub         *sse.Hub
+	consent     repository.ConsentRepository
+	photos      repository.PhotoRepository
 	genMu       sync.Map
 }
 
 // NewReportHandler builds the report handler.
-func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository, hub *sse.Hub) *ReportHandler {
-	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo, hub: hub}
+func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository, hub *sse.Hub, consent repository.ConsentRepository, photos repository.PhotoRepository) *ReportHandler {
+	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo, hub: hub, consent: consent, photos: photos}
 }
 
 // tenantGuard rejects an empty tenant ID with 400 "tenant_required" before any
@@ -53,7 +58,9 @@ func tenantGuard(c *echo.Context, tenantID string) error {
 
 // GetByAccessToken handles GET /api/reports/access?token=... (PUBLIC).
 // Verifies the token (64hex, not revoked, not expired) and returns a DTO
-// stripped of PII and the token itself.
+// stripped of PII and the token itself. photo_url is set only when photo
+// consent is granted AND a photo resolves for the report's topic; the token
+// itself never enters the DTO — the client composes the photo URL.
 func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 	token := (*c).QueryParam("token")
 	if token == "" {
@@ -62,11 +69,76 @@ func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 	if !tokenFormat.MatchString(token) {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
-	r, err := h.uc.Repo().GetByToken((*c).Request().Context(), token)
+	ctx := (*c).Request().Context()
+	r, err := h.uc.Repo().GetByToken(ctx, token)
 	if err != nil {
 		return err
 	}
-	return appresp.OK(c, dto.NewPublicReportDTO(r))
+	photoURL := ""
+	granted, err := h.consent.GetConsentValue(ctx, r.ParticipantID, r.SessionID, entity.ConsentPhoto)
+	if err != nil {
+		return err
+	}
+	if granted {
+		resolved, err := resolveReportPhoto(ctx, h.photos, r.ParticipantID, r.SessionID, r.ProgramStageID)
+		if err != nil {
+			return err
+		}
+		if resolved != nil {
+			photoURL = "/api/reports/access/photo"
+		}
+	}
+	return appresp.OK(c, dto.NewPublicReportDTO(r, photoURL))
+}
+
+// GetAccessPhoto serves the report's resolved topic photo as raw bytes for
+// the parent-facing mini-raport <img>. Token is validated like the sibling
+// access endpoint but with spec §2.6 codes; consent is mandatory.
+func (h *ReportHandler) GetAccessPhoto(c *echo.Context) error {
+	ctx := (*c).Request().Context()
+	token := (*c).QueryParam("token")
+	if token == "" || !tokenFormat.MatchString(token) {
+		return apperrors.NotFound("token_invalid", nil) // spec §2.6 (404, bukan 400)
+	}
+	r, err := h.uc.Repo().GetByToken(ctx, token) // 404 token_invalid / 403 token_expired — persis GetByToken
+	if err != nil {
+		return err
+	}
+	granted, err := h.consent.GetConsentValue(ctx, r.ParticipantID, r.SessionID, entity.ConsentPhoto)
+	if err != nil {
+		return err
+	}
+	if !granted {
+		return apperrors.Forbidden("consent_required", nil)
+	}
+	rec, err := resolveReportPhoto(ctx, h.photos, r.ParticipantID, r.SessionID, r.ProgramStageID)
+	if err != nil {
+		return err
+	}
+	if rec == nil {
+		return apperrors.NotFound("not_found", nil) // 404 — foto resolusi tidak ada
+	}
+	// Pola media_handler.Get + batasi gambar (R10).
+	dest := filepath.Join(h.cfg.UploadDir, filepath.FromSlash(rec.OriginalFileURL))
+	if !withinDir(h.cfg.UploadDir, dest) {
+		return apperrors.NotFound("not_found", nil)
+	}
+	ext := strings.ToLower(filepath.Ext(dest))
+	if strings.EqualFold(ext, ".html") {
+		return apperrors.Forbidden("file_type_blocked", nil)
+	}
+	blob, err := os.ReadFile(dest)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return apperrors.NotFound("not_found", err)
+		}
+		return apperrors.Internal("internal_error", err)
+	}
+	ct := safeContentType(ext)
+	if ct == "" || !strings.HasPrefix(ct, "image/") {
+		return apperrors.Forbidden("file_type_blocked", nil)
+	}
+	return (*c).Blob(http.StatusOK, ct, blob)
 }
 
 // Generate handles POST /api/reports/:id/generate.
