@@ -3,10 +3,12 @@ package handler
 import (
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	apputil "kidversa-edutourism-backend/internal/pkg/util"
@@ -56,13 +58,20 @@ func (h *PhotoHandler) Delete(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	if err := h.photos.DeletePhoto((*c).Request().Context(), id); err != nil {
+	ctx := (*c).Request().Context()
+	// Tenant check: only photos in the caller's tenant may be deleted.
+	if _, err := h.photos.GetPhotoByID(ctx, id, appmiddleware.GetTenantID(c)); err != nil {
+		return err
+	}
+	if err := h.photos.DeletePhoto(ctx, id); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
 }
 
 // Update handles PUT /api/photos/:id (partial map update, C2 zero-value safe).
+// is_report_photo is intentionally NOT part of this whitelist: the exclusive
+// is_report_photo default is set via POST /:id/set-report-photo.
 func (h *PhotoHandler) Update(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
@@ -76,7 +85,6 @@ func (h *PhotoHandler) Update(c *echo.Context) error {
 	if req.FramedFileURL != "" {
 		fields["framed_file_url"] = req.FramedFileURL
 	}
-	fields["is_report_photo"] = req.IsReportPhoto
 	if req.TakenBy != "" {
 		fields["taken_by"] = req.TakenBy
 	}
@@ -119,4 +127,64 @@ func (h *PhotoHandler) SetReportPhoto(c *echo.Context) error {
 		return err
 	}
 	return appresp.OK(c, dto.NewPhotoResponse(updated))
+}
+
+// SetReportPick upserts this participant's chosen report photo for one topic.
+func (h *PhotoHandler) SetReportPick(c *echo.Context) error {
+	var req dto.ReportPhotoPickRequest
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	ctx := (*c).Request().Context()
+	p, err := h.photos.GetPhotoByID(ctx, req.PhotoID, appmiddleware.GetTenantID(c))
+	if err != nil {
+		return err // cross-tenant / missing photo -> 404 not_found
+	}
+	if p.ParticipantID != req.ParticipantID || p.SessionID != req.SessionID {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
+	pick := &entity.ReportPhotoPick{
+		ParticipantID:  req.ParticipantID,
+		SessionID:      req.SessionID,
+		ProgramStageID: req.ProgramStageID,
+		PhotoID:        req.PhotoID,
+	}
+	if err := h.photos.UpsertReportPhotoPick(ctx, pick); err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewPhotoResponse(p))
+}
+
+// DeleteReportPick clears the pick for one topic (idempotent).
+func (h *PhotoHandler) DeleteReportPick(c *echo.Context) error {
+	participantID := (*c).QueryParam("participant_id")
+	sessionID := (*c).QueryParam("session_id")
+	programStageID := (*c).QueryParam("program_stage_id")
+	if participantID == "" || sessionID == "" || programStageID == "" ||
+		uuid.Validate(participantID) != nil || uuid.Validate(sessionID) != nil || uuid.Validate(programStageID) != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
+	if err := h.photos.DeleteReportPhotoPick((*c).Request().Context(), participantID, sessionID, programStageID); err != nil {
+		return err
+	}
+	return appresp.NoContent(c)
+}
+
+// ListReportPicks returns all topic picks for one participant+session.
+func (h *PhotoHandler) ListReportPicks(c *echo.Context) error {
+	participantID := (*c).QueryParam("participant_id")
+	sessionID := (*c).QueryParam("session_id")
+	if participantID == "" || sessionID == "" ||
+		uuid.Validate(participantID) != nil || uuid.Validate(sessionID) != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
+	picks, err := h.photos.ListReportPhotoPicks((*c).Request().Context(), participantID, sessionID)
+	if err != nil {
+		return err
+	}
+	resp := make([]dto.ReportPhotoPickResponse, 0, len(picks))
+	for _, pk := range picks {
+		resp = append(resp, dto.ReportPhotoPickResponse{ProgramStageID: pk.ProgramStageID, PhotoID: pk.PhotoID})
+	}
+	return appresp.OK(c, resp)
 }

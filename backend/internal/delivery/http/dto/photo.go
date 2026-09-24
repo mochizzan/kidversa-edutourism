@@ -35,6 +35,20 @@ type PhotoRequest struct {
 	FrameID       string `json:"frame_id,omitempty"`
 }
 
+// ReportPhotoPickRequest is the body for PUT /api/photos/report-pick.
+type ReportPhotoPickRequest struct {
+	ParticipantID  string `json:"participant_id" validate:"required,uuid"`
+	SessionID      string `json:"session_id" validate:"required,uuid"`
+	ProgramStageID string `json:"program_stage_id" validate:"required,uuid"`
+	PhotoID        string `json:"photo_id" validate:"required,uuid"`
+}
+
+// ReportPhotoPickResponse is one row returned by GET /api/photos/report-picks.
+type ReportPhotoPickResponse struct {
+	ProgramStageID string `json:"program_stage_id"`
+	PhotoID        string `json:"photo_id"`
+}
+
 // SetReportPhotoRequest is the body for POST /api/photos/:id/set-report-photo.
 // It currently carries no fields; the photo id in the path is the target.
 type SetReportPhotoRequest struct{}

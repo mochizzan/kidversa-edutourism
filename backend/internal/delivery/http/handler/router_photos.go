@@ -13,6 +13,10 @@ import (
 func RegisterPhotosRoutes(g *echo.Group, h *PhotoHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	scopeMW := appmiddleware.TenantScope()
+	// static paths precede /:id (echo priority; see router_reports.go:29)
+	g.GET("/report-picks", h.ListReportPicks, authMW, scopeMW)
+	g.PUT("/report-pick", h.SetReportPick, authMW, scopeMW)
+	g.DELETE("/report-pick", h.DeleteReportPick, authMW, scopeMW)
 	g.GET("/:id", h.GetByID, authMW, scopeMW)
 	g.GET("", h.List, authMW, scopeMW)
 	g.PUT("/:id", h.Update, authMW, scopeMW)
