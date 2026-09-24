@@ -112,6 +112,39 @@ func smartPhotoModelFromEntity(e *entity.SmartPhoto) *SmartPhotoModel {
 	return &SmartPhotoModel{SmartPhoto: *e}
 }
 
+// ReportPhotoPickModel is the GORM model for report_photo_picks (hard
+// table: no DeletedAt, the unique key is the contract).
+type ReportPhotoPickModel struct {
+	entity.ReportPhotoPick
+}
+
+// TableName pins the table name.
+func (ReportPhotoPickModel) TableName() string { return "report_photo_picks" }
+
+// BeforeCreate generates a UUID if missing and stamps audit fields.
+func (m *ReportPhotoPickModel) BeforeCreate(*gorm.DB) error {
+	if m.ID == "" {
+		m.ID = newUUID()
+	}
+	now := time.Now()
+	if m.CreatedAt.IsZero() {
+		m.CreatedAt = now
+	}
+	m.UpdatedAt = m.CreatedAt
+	return nil
+}
+
+// ToEntity maps the model back to the domain entity.
+func (m *ReportPhotoPickModel) ToEntity() *entity.ReportPhotoPick {
+	e := m.ReportPhotoPick
+	return &e
+}
+
+// reportPhotoPickModelFromEntity builds a model from a domain entity.
+func reportPhotoPickModelFromEntity(pe *entity.ReportPhotoPick) *ReportPhotoPickModel {
+	return &ReportPhotoPickModel{ReportPhotoPick: *pe}
+}
+
 // ConsentLogModel is the GORM persistence model for consent logs.
 type ConsentLogModel struct {
 	entity.ConsentLog

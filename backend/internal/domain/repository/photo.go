@@ -24,6 +24,17 @@ type PhotoRepository interface {
 	SetReportPhoto(ctx context.Context, participantID, sessionID, photoID string) error
 	// DeletePhoto removes the photo row.
 	DeletePhoto(ctx context.Context, id string) error
+
+	// Report-photo pick methods: one chosen photo per participant+session+topic
+	// (program stage), enforced by the uq_photo_pick unique key.
+	// UpsertReportPhotoPick inserts or replaces the pick for participant+session+topic.
+	UpsertReportPhotoPick(ctx context.Context, pick *entity.ReportPhotoPick) error
+	// GetReportPhotoPick returns the pick for participant+session+topic, or (nil, nil) when none exists.
+	GetReportPhotoPick(ctx context.Context, participantID, sessionID, programStageID string) (*entity.ReportPhotoPick, error)
+	// ListReportPhotoPicks returns every pick for participant+session, ordered by program_stage_id.
+	ListReportPhotoPicks(ctx context.Context, participantID, sessionID string) ([]entity.ReportPhotoPick, error)
+	// DeleteReportPhotoPick removes the pick for participant+session+topic; a missing row is not an error.
+	DeleteReportPhotoPick(ctx context.Context, participantID, sessionID, programStageID string) error
 }
 
 // PhotoFilter narrows a photo list query.

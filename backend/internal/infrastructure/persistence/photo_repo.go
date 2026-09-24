@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -89,6 +90,65 @@ func (r *GormPhotoRepository) SetReportPhoto(ctx context.Context, participantID,
 
 func (r *GormPhotoRepository) DeletePhoto(ctx context.Context, id string) error {
 	if err := r.db.WithContext(ctx).Delete(&SmartPhotoModel{}, "id = ?", id).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}
+
+// UpsertReportPhotoPick inserts or replaces the pick for one topic; the
+// uq_photo_pick conflict on (participant, session, stage) updates photo_id.
+func (r *GormPhotoRepository) UpsertReportPhotoPick(ctx context.Context, pick *entity.ReportPhotoPick) error {
+	m := reportPhotoPickModelFromEntity(pick)
+	if err := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "participant_id"}, {Name: "session_id"}, {Name: "program_stage_id"},
+			},
+			DoUpdates: clause.AssignmentColumns([]string{"photo_id", "updated_at"}),
+		}).
+		Create(m).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	*pick = *m.ToEntity()
+	return nil
+}
+
+// GetReportPhotoPick returns (nil, nil) when no pick exists for the topic.
+func (r *GormPhotoRepository) GetReportPhotoPick(ctx context.Context, participantID, sessionID, programStageID string) (*entity.ReportPhotoPick, error) {
+	var m ReportPhotoPickModel
+	err := r.db.WithContext(ctx).
+		Where("participant_id = ? AND session_id = ? AND program_stage_id = ?", participantID, sessionID, programStageID).
+		First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
+// ListReportPhotoPicks returns every pick for participant+session, ordered by program_stage_id.
+func (r *GormPhotoRepository) ListReportPhotoPicks(ctx context.Context, participantID, sessionID string) ([]entity.ReportPhotoPick, error) {
+	var models []ReportPhotoPickModel
+	if err := r.db.WithContext(ctx).
+		Where("participant_id = ? AND session_id = ?", participantID, sessionID).
+		Order("program_stage_id").
+		Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	picks := make([]entity.ReportPhotoPick, 0, len(models))
+	for i := range models {
+		picks = append(picks, models[i].ReportPhotoPick)
+	}
+	return picks, nil
+}
+
+// DeleteReportPhotoPick removes the pick for one topic; a missing row is a no-op.
+func (r *GormPhotoRepository) DeleteReportPhotoPick(ctx context.Context, participantID, sessionID, programStageID string) error {
+	if err := r.db.WithContext(ctx).
+		Where("participant_id = ? AND session_id = ? AND program_stage_id = ?", participantID, sessionID, programStageID).
+		Delete(&ReportPhotoPickModel{}).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil

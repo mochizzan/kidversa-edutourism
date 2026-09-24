@@ -31,6 +31,16 @@ type SmartPhoto struct {
 	SyncStatus      SyncStatus `json:"sync_status"`
 }
 
+// ReportPhotoPick is one participant's chosen report photo for one topic
+// (program stage) within one session. Unique on participant+session+stage.
+type ReportPhotoPick struct {
+	BaseModel
+	ParticipantID  string `json:"participant_id"`
+	SessionID      string `json:"session_id"`
+	ProgramStageID string `json:"program_stage_id"`
+	PhotoID        string `json:"photo_id"`
+}
+
 // Report is the generated narrative report for one participant in one session.
 type Report struct {
 	BaseModel
