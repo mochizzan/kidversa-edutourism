@@ -50,7 +50,7 @@ function GalleryView() {
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />
-                {photo.is_report_photo && (
+                {photo.report_photo && (
                   <div className="absolute top-1.5 left-1.5 bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
                     <Award className="w-3 h-3" /> {t('parent.gallery.reportPhoto')}
                   </div>

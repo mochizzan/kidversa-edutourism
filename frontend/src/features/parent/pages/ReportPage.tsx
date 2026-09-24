@@ -12,11 +12,12 @@ import type { PublicReport } from '../../../core/types'
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
 import { DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
+import { API_ROUTES } from '@/core/constants/apiRoutes'
 
 /* ── Inner report component ── */
 function ReportView() {
   const { t } = useTranslation()
-  const { report, loading: guardLoading, error: guardError } = useParentToken()
+  const { token, report, loading: guardLoading, error: guardError } = useParentToken()
 
   const [raportHtml, setRaportHtml] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -51,7 +52,9 @@ function ReportView() {
         childSchool: undefined,
         childGroup: pub.group_name,
         sessionDate: '',
-        photoUrl: undefined,
+        photoUrl: pub.photo_url
+          ? `${API_ROUTES.REPORTS.ACCESS_PHOTO}?token=${encodeURIComponent(token)}`
+          : undefined,
         stages: [],
         narrative,
         missions: [],

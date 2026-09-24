@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import QRCode from 'qrcode'
 import { reportService } from '../../../core/services/reports'
 import { openSSE } from '../../../core/services/backend-client'
@@ -37,6 +37,7 @@ import type {
   Session,
   Assessment,
   SmartPhoto,
+  ReportPhotoPick,
   ProgramStage,
   MissionBank,
   SessionSubstage,
@@ -63,6 +64,10 @@ export interface TopicTab {
 
 const MAX_MISSIONS = 4
 
+const logError = (scope: string, err: unknown) => {
+  console.error(`[${scope}]`, err)
+}
+
 export function useReportReview(sessionId: string | undefined, participantId: string | undefined) {
   const { user } = useAuth()
   const { tenantId } = useTenantScope()
@@ -73,7 +78,8 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [participant, setParticipant] = useState<Participant | null>(null)
-  const [photo, setPhoto] = useState<SmartPhoto | null>(null)
+  const [partPhotos, setPartPhotos] = useState<SmartPhoto[]>([])
+  const [partPicks, setPartPicks] = useState<ReportPhotoPick[] | null>(null)
   const [stageInfos, setStageInfos] = useState<StageInfo[]>([])
   const [missions, setMissions] = useState<MissionBank[]>([])
   const [assignedMissionIds, setAssignedMissionIds] = useState<string[]>([])
@@ -98,13 +104,25 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
   const report = activeTopicId ? reportsByTopic[activeTopicId] ?? null : null
 
+  // Foto rapor diturunkan dari topik aktif + picks (spec §4.1): pick menang →
+  // cari foto asli; pick menunjuk foto terhapus → null (tanpa fallback, §4.1);
+  // picks gagal dimuat → perilaku lama (R3).
+  const photo = useMemo<SmartPhoto | null>(() => {
+    const fallback =
+      partPhotos.find((p) => p.participant_id === participantId && p.is_report_photo) ?? null
+    if (!partPicks || !activeTopicId) return fallback
+    const pick = partPicks.find((p) => p.program_stage_id === activeTopicId)
+    if (!pick) return fallback
+    return partPhotos.find((p) => p.id === pick.photo_id) ?? null
+  }, [partPicks, partPhotos, activeTopicId, participantId])
+
   const loadData = useCallback(async () => {
     if (!sessionId || !participantId) return
     setLoading(true)
     setError(null)
 
     try {
-      const [sess, sessionReports, stageAssessments, sessStages, sessSubstages, partPhotos, sessGroups] =
+      const [sess, sessionReports, stageAssessments, sessStages, sessSubstages, partPhotos, sessGroups, picks] =
         await Promise.all([
           sessionService.getById(sessionId),
           reportService.getBySession(sessionId),
@@ -113,6 +131,10 @@ export function useReportReview(sessionId: string | undefined, participantId: st
           sessionService.getSubstages(sessionId),
           photoService.getBySession(sessionId),
           sessionService.getGroups(sessionId),
+          photoService.getReportPicks(participantId, sessionId).catch((err) => {
+            logError('useReportReview.getReportPicks', err)
+            return null
+          }),
         ])
 
       if (!sess) {
@@ -195,9 +217,8 @@ export function useReportReview(sessionId: string | undefined, participantId: st
         .every((k) => !k.assessment || k.assessment.star_rating < 1)
       setHasNoAssessment(hasNoAssessment)
 
-      const reportPhoto =
-        partPhotos.find((p) => p.participant_id === participantId && p.is_report_photo) || null
-      setPhoto(reportPhoto)
+      setPartPhotos(partPhotos)
+      setPartPicks(picks)
 
       const missionResult = await missionService.getAll({ limit: 50 })
       const programMissions = missionResult.data.filter((m) => m.program_id === sess.program_id)
