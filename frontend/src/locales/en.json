@@ -1264,7 +1264,12 @@
       "retake": "Retry",
       "deletePhoto": "Delete Photo",
       "deleteConfirm": "Are you sure you want to delete this photo? This action cannot be undone.",
-      "deleteError": "Failed to delete photo"
+      "deleteError": "Failed to delete photo",
+      "pickPhoto": "Select as report photo",
+      "unpickPhoto": "Deselect report photo",
+      "pickFooter": "Report photo for: {{topic}}",
+      "pickError": "Failed to select report photo",
+      "clearPickError": "Failed to deselect report photo"
     },
     "camera": {
       "accessing": "Accessing camera...",

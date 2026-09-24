@@ -1264,7 +1264,12 @@
       "retake": "Ulang",
       "deletePhoto": "Hapus Foto",
       "deleteConfirm": "Yakin ingin menghapus foto ini? Tindakan ini tidak dapat dibatalkan.",
-      "deleteError": "Gagal menghapus foto"
+      "deleteError": "Gagal menghapus foto",
+      "pickPhoto": "Select as report photo",
+      "unpickPhoto": "Deselect report photo",
+      "pickFooter": "Report photo for: {{topic}}",
+      "pickError": "Failed to select report photo",
+      "clearPickError": "Failed to deselect report photo"
     },
     "camera": {
       "accessing": "Mengakses kamera...",

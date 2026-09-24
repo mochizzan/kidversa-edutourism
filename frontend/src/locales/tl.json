@@ -1264,7 +1264,12 @@
       "retake": "Ulitin",
       "deletePhoto": "Burahin ang Larawan",
       "deleteConfirm": "Sigurado ka bang gusto mong burahin ang larawang ito? Hindi na ito maibabalik.",
-      "deleteError": "Nabigong burahin ang larawan"
+      "deleteError": "Nabigong burahin ang larawan",
+      "pickPhoto": "Select as report photo",
+      "unpickPhoto": "Deselect report photo",
+      "pickFooter": "Report photo for: {{topic}}",
+      "pickError": "Failed to select report photo",
+      "clearPickError": "Failed to deselect report photo"
     },
     "camera": {
       "accessing": "Ina-access ang camera...",

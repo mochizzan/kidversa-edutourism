@@ -1264,7 +1264,12 @@
       "retake": "やり直し",
       "deletePhoto": "写真を削除",
       "deleteConfirm": "この写真を削除しますか？この操作は取り消せません。",
-      "deleteError": "写真の削除に失敗しました"
+      "deleteError": "写真の削除に失敗しました",
+      "pickPhoto": "Select as report photo",
+      "unpickPhoto": "Deselect report photo",
+      "pickFooter": "Report photo for: {{topic}}",
+      "pickError": "Failed to select report photo",
+      "clearPickError": "Failed to deselect report photo"
     },
     "camera": {
       "accessing": "カメラにアクセス中...",

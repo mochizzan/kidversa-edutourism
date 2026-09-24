@@ -1,4 +1,4 @@
-import { Camera, Award, X, Trash2 } from 'lucide-react'
+import { Camera, Award, Check, X, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getMediaUrl } from '../../../core/utils/media'
 import type { SmartPhoto, Participant } from '../../../core/types'
@@ -7,10 +7,23 @@ interface PhotoGridProps {
   photos: SmartPhoto[]
   participant: Participant
   onPhotoClick: (photo: SmartPhoto) => void
+  activeStageId: string | null
+  pickPhotoId: string | null
+  onTogglePick: (photo: SmartPhoto) => void
+  onDelete: (photo: SmartPhoto) => void
 }
 
-export const PhotoGallery = ({ photos, participant, onPhotoClick }: PhotoGridProps) => {
+export const PhotoGallery = ({
+  photos,
+  participant,
+  onPhotoClick,
+  activeStageId,
+  pickPhotoId,
+  onTogglePick,
+  onDelete,
+}: PhotoGridProps) => {
   const { t } = useTranslation()
+  const canPick = !!participant?.consent_photo && !!activeStageId
   return (
     <div className="w-full h-full overflow-y-auto bg-white rounded-3xl p-4 md:p-6">
       {photos.length === 0 ? (
@@ -20,25 +33,73 @@ export const PhotoGallery = ({ photos, participant, onPhotoClick }: PhotoGridPro
         </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-          {photos.map((photo) => (
-            <button
-              key={photo.id}
-              onClick={() => onPhotoClick(photo)}
-              className="aspect-[3/4] overflow-hidden rounded-2xl bg-surface-container-low relative group border border-surface-container-highest shadow-sm"
-            >
-              <img
-                src={getMediaUrl('photo', photo.id)}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-              {photo.is_report_photo && (
-                <div className="absolute top-2 right-2 bg-accent text-white rounded-full p-1 shadow">
-                  <Award className="w-3.5 h-3.5" />
+          {photos.map((photo) => {
+            const selected = pickPhotoId === photo.id
+            return (
+              <div
+                key={photo.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onPhotoClick(photo)}
+                onKeyDown={(e) =>
+                  (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onPhotoClick(photo))
+                }
+                className={`group relative block aspect-[3/4] cursor-pointer overflow-hidden rounded-2xl bg-surface-container-low shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected
+                    ? 'border-2 border-primary ring-2 ring-primary/40'
+                    : 'border border-surface-container-highest'
+                  }`}
+              >
+                <img
+                  src={getMediaUrl('photo', photo.id)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+                {photo.is_report_photo && !selected && (
+                  <div className="absolute top-2 right-2 bg-accent text-white rounded-full p-1 shadow">
+                    <Award className="w-3.5 h-3.5" />
+                  </div>
+                )}
+                {selected && (
+                  <span className="absolute top-2 right-2 z-10 rounded-full bg-primary p-1 text-white shadow">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                )}
+                <div className="absolute bottom-2 left-2 z-10 flex gap-1.5">
+                  <button
+                    type="button"
+                    disabled={!canPick}
+                    title={
+                      selected ? t('fasilitator.photos.unpickPhoto') : t('fasilitator.photos.pickPhoto')
+                    }
+                    aria-label={
+                      selected ? t('fasilitator.photos.unpickPhoto') : t('fasilitator.photos.pickPhoto')
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onTogglePick(photo)
+                    }}
+                    className={`rounded-full p-1.5 shadow-md transition ${selected ? 'bg-primary text-white' : 'bg-black/50 text-white hover:bg-black/70'
+                      } disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    {selected ? <X className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    title={t('fasilitator.photos.deletePhoto')}
+                    aria-label={t('fasilitator.photos.deletePhoto')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDelete(photo)
+                    }}
+                    className="rounded-full bg-black/50 p-1.5 text-white shadow-md hover:bg-black/70"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-              )}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all rounded-2xl" />
-            </button>
-          ))}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all rounded-2xl" />
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

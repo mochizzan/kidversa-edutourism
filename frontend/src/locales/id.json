@@ -1249,7 +1249,12 @@
       "retake": "Ulang",
       "deletePhoto": "Hapus Foto",
       "deleteConfirm": "Yakin ingin menghapus foto ini? Tindakan ini tidak dapat dibatalkan.",
-      "deleteError": "Gagal menghapus foto"
+      "deleteError": "Gagal menghapus foto",
+      "pickPhoto": "Jadikan foto rapor",
+      "unpickPhoto": "Batalkan pilihan foto rapor",
+      "pickFooter": "Foto rapor untuk: {{topic}}",
+      "pickError": "Foto rapor gagal dipilih",
+      "clearPickError": "Pilihan foto rapor gagal dibatalkan"
     },
     "camera": {
       "accessing": "Mengakses kamera...",

@@ -1264,7 +1264,12 @@
       "retake": "重拍",
       "deletePhoto": "删除照片",
       "deleteConfirm": "确定要删除此照片吗？此操作无法撤销。",
-      "deleteError": "删除照片失败"
+      "deleteError": "删除照片失败",
+      "pickPhoto": "Select as report photo",
+      "unpickPhoto": "Deselect report photo",
+      "pickFooter": "Report photo for: {{topic}}",
+      "pickError": "Failed to select report photo",
+      "clearPickError": "Failed to deselect report photo"
     },
     "camera": {
       "accessing": "正在访问相机...",

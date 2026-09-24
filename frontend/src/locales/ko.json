@@ -1264,7 +1264,12 @@
       "retake": "다시 하기",
       "deletePhoto": "사진 삭제",
       "deleteConfirm": "이 사진을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
-      "deleteError": "사진 삭제 실패"
+      "deleteError": "사진 삭제 실패",
+      "pickPhoto": "Select as report photo",
+      "unpickPhoto": "Deselect report photo",
+      "pickFooter": "Report photo for: {{topic}}",
+      "pickError": "Failed to select report photo",
+      "clearPickError": "Failed to deselect report photo"
     },
     "camera": {
       "accessing": "카메라 접근 중...",

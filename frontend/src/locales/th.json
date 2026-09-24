@@ -1264,7 +1264,12 @@
       "retake": "ทำซ้ำ",
       "deletePhoto": "ลบรูปภาพ",
       "deleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพนี้? การดำเนินการนี้ไม่สามารถยกเลิกได้",
-      "deleteError": "ลบรูปภาพไม่สำเร็จ"
+      "deleteError": "ลบรูปภาพไม่สำเร็จ",
+      "pickPhoto": "Select as report photo",
+      "unpickPhoto": "Deselect report photo",
+      "pickFooter": "Report photo for: {{topic}}",
+      "pickError": "Failed to select report photo",
+      "clearPickError": "Failed to deselect report photo"
     },
     "camera": {
       "accessing": "กำลังเข้าถึงกล้อง...",

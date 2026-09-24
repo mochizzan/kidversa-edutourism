@@ -9,6 +9,7 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { frameService } from '../../../core/services/frames'
 import { sessionService } from '../../../core/services/sessions'
+import { programService } from '../../../core/services/programs'
 import { useAuthStore } from '../../../core/stores/authStore'
 import { useCamera } from '../hooks/useCamera'
 import { useSmartPhotos } from '../hooks/useSmartPhotos'
@@ -17,7 +18,7 @@ import { CameraViewport } from '../components/CameraViewport'
 import { PhotoEditor } from '../components/PhotoEditor'
 import { PhotoGallery, FullscreenPhoto } from '../components/PhotoGallery'
 import { FramePicker } from '../components/FramePicker'
-import type { SmartPhoto, PhotoFrame, Participant } from '../../../core/types'
+import type { SmartPhoto, PhotoFrame, Participant, SessionStage } from '../../../core/types'
 
 /**
  * Ref-stable snapshots of values that `handleSave` needs but that arrive
@@ -47,7 +48,7 @@ const SmartPhotoPage = () => {
  const navigate = useNavigate()
  const user = useAuthStore((s) => s.user)
  const { addToast } = useGlobalToast()
- const { isMine } = useGroupOwnership(childId)
+ const { isMine, group } = useGroupOwnership(childId)
 
  const captureCanvasRef = useRef<HTMLCanvasElement>(null)
  const editorCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -70,12 +71,16 @@ const SmartPhotoPage = () => {
  const [isSaving, setIsSaving] = useState(false)
 
  const [fullscreenPhoto, setFullscreenPhoto] = useState<SmartPhoto | null>(null)
- const [confirmDeletePhoto, setConfirmDeletePhoto] = useState(false)
+ const [confirmDeletePhoto, setConfirmDeletePhoto] = useState<SmartPhoto | null>(null)
  const [framePickerOpen, setFramePickerOpen] = useState(false)
 
  const [participant, setParticipant] = useState<Participant | null>(null)
  const [dataLoading, setDataLoading] = useState(true)
  const loadCancelledRef = useRef(false)
+
+ const [topics, setTopics] = useState<{ programStageId: string; name: string }[]>([])
+ const [sessStages, setSessStages] = useState<SessionStage[]>([])
+ const [activeStageId, setActiveStageId] = useState<string | null>(null)
 
  // Ref-stable snapshots for handleSave to avoid stale closure.
  const participantRef = useStableRef(participant)
@@ -93,20 +98,46 @@ const SmartPhotoPage = () => {
   restartCamera,
  } = useCamera({ enabled: phase === 'camera' && !!participant?.consent_photo })
 
- const { photos, loadPhotos, deletePhoto, uploadPhoto } = useSmartPhotos(childId)
+ const { photos, loadPhotos, deletePhoto, uploadPhoto, picks, loadPicks, setPick, clearPick } =
+  useSmartPhotos(childId, participant)
 
  const loadParticipant = useCallback(async () => {
   if (!childId) return
   loadCancelledRef.current = false
   try {
    const part = await sessionService.getParticipantById(childId)
-   if (!loadCancelledRef.current) setParticipant(part)
+   if (loadCancelledRef.current) return
+   setParticipant(part)
+   if (!part?.session_id) return
+   try {
+    const [detail, stages] = await Promise.all([
+     sessionService.getById(part.session_id),
+     sessionService.getStages(part.session_id),
+    ])
+    if (loadCancelledRef.current) return
+    const programStages = detail ? await programService.getStages(detail.program_id) : []
+    if (loadCancelledRef.current) return
+    const progById = new Map(programStages.map((s) => [s.id, s]))
+    setSessStages(stages)
+    setTopics(
+     stages.map((s) => ({
+      programStageId: s.program_stage_id,
+      name: progById.get(s.program_stage_id)?.name ?? t('fasilitator.topicFallback'),
+     })),
+    )
+   } catch {
+    // Topik gagal dimuat — galeri tetap jalan dengan nama fallback.
+    if (!loadCancelledRef.current) {
+     setSessStages([])
+     setTopics([])
+    }
+   }
   } catch {
    if (!loadCancelledRef.current) setParticipant(null)
   } finally {
    if (!loadCancelledRef.current) setDataLoading(false)
   }
- }, [childId])
+ }, [childId, t])
 
  useEffect(() => {
   if (!childId) {
@@ -131,15 +162,30 @@ const SmartPhotoPage = () => {
     setPageError(t('fasilitator.photos.frameLoadError'))
    })
   if (childId) {
-   loadPhotos().catch(() => {
+   Promise.all([loadPhotos(), loadPicks()]).catch(() => {
     setPageError(t('fasilitator.photos.photoLoadError'))
    })
   }
- }, [childId, loadPhotos])
+ }, [childId, loadPhotos, loadPicks])
 
  useEffect(() => {
   loadInitialData()
  }, [childId, loadInitialData])
+
+ // Muat picks begitu participant siap (loadInitialData berjalan saat participant
+ // masih null — guard di hook menahannya).
+ useEffect(() => {
+  if (participant) loadPicks()
+ }, [participant, loadPicks])
+
+ // Default topik = current_session_stage_id grup, fallback stage pertama;
+ // pilihan user (activeStageId) menang — pola useChildAssessment.
+ useEffect(() => {
+  if (!sessStages.length) return
+  const fallbackStage =
+   sessStages.find((s) => s.id === group?.current_session_stage_id) ?? sessStages[0]
+  setActiveStageId((prev) => prev ?? fallbackStage?.program_stage_id ?? null)
+ }, [sessStages, group])
 
  useEffect(() => {
   if (phase !== 'editor' || !capturedPhotoDataUrl || !editorCanvasRef.current) return
@@ -291,6 +337,17 @@ const SmartPhotoPage = () => {
   }
  }, [phase, galleryOpen, navigate, handleRetake])
 
+ const handleTogglePick = async (photo: SmartPhoto) => {
+  if (!activeStageId) return
+  if (photo.id === pickPhotoId) {
+   if (await clearPick(activeStageId)) return
+   addToast({ type: 'error', message: t('fasilitator.photos.clearPickError') })
+  } else {
+   if (await setPick(activeStageId, photo.id)) return
+   addToast({ type: 'error', message: t('fasilitator.photos.pickError') })
+  }
+ }
+
  const currentCameraLabel = (() => {
   if (window.innerWidth <= 1024) {
    return facingMode === 'environment' ? t('fasilitator.camera.back') : t('fasilitator.camera.front')
@@ -302,6 +359,9 @@ const SmartPhotoPage = () => {
 
  const photoCount = photos.length
  const isMaxPhotos = photoCount >= MAX_PHOTOS
+ const activeTopicName =
+  topics.find((tp) => tp.programStageId === activeStageId)?.name ?? t('fasilitator.topicFallback')
+ const pickPhotoId = picks.find((p) => p.program_stage_id === activeStageId)?.photo_id ?? null
 
  if (dataLoading) {
   return (
@@ -418,17 +478,39 @@ const SmartPhotoPage = () => {
      title={t('fasilitator.photos.galleryTitle', { name: participant.child_name })}
      size="lg"
      footer={
-      <div className="text-center">
-       <p className="text-xs text-on-surface-variant">
+      <div className="flex flex-col gap-0.5">
+       <p className="text-sm text-on-surface-variant">
+        {t('fasilitator.photos.pickFooter', { topic: activeTopicName })}
+       </p>
+       <p className="text-xs text-on-surface-variant/70">
         {t('fasilitator.photos.photoCount', { count: photos.length, max: MAX_PHOTOS })}
        </p>
       </div>
      }
     >
+     <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+      {topics.map((tp) => (
+       <button
+        key={tp.programStageId}
+        type="button"
+        onClick={() => setActiveStageId(tp.programStageId)}
+        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${tp.programStageId === activeStageId
+         ? 'bg-primary text-white'
+         : 'bg-surface-container-highest text-on-surface-variant hover:bg-primary/10'
+         }`}
+       >
+        {tp.name}
+       </button>
+      ))}
+     </div>
      <PhotoGallery
       photos={photos}
       participant={participant}
       onPhotoClick={setFullscreenPhoto}
+      activeStageId={activeStageId}
+      pickPhotoId={pickPhotoId}
+      onTogglePick={handleTogglePick}
+      onDelete={(photo) => setConfirmDeletePhoto(photo)}
      />
     </Modal>
 
@@ -467,26 +549,28 @@ const SmartPhotoPage = () => {
      <FullscreenPhoto
       photo={fullscreenPhoto}
       onClose={() => setFullscreenPhoto(null)}
-      onDelete={() => setConfirmDeletePhoto(true)}
+      onDelete={() => setConfirmDeletePhoto(fullscreenPhoto)}
      />
     )}
 
     <ConfirmDialog
-     open={confirmDeletePhoto}
+     open={confirmDeletePhoto !== null}
      title={t('fasilitator.photos.deletePhoto')}
      message={t('fasilitator.photos.deleteConfirm')}
      onConfirm={async () => {
-      if (!fullscreenPhoto) return
+      const photo = confirmDeletePhoto
+      if (!photo) return
       try {
-       await deletePhoto(fullscreenPhoto.id)
+       // reload bersama (spec §5.1): deletePhoto sudah memuat photos di dalamnya
+       await Promise.all([deletePhoto(photo.id), loadPicks()])
        setFullscreenPhoto(null)
       } catch {
        addToast({ type: 'error', message: t('fasilitator.photos.deleteError') })
       } finally {
-       setConfirmDeletePhoto(false)
+       setConfirmDeletePhoto(null)
       }
      }}
-     onClose={() => setConfirmDeletePhoto(false)}
+     onClose={() => setConfirmDeletePhoto(null)}
     />
    </div>
   </div>
