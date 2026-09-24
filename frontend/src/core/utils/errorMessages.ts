@@ -1,42 +1,15 @@
 import { ApiError } from '../services/backend-client'
-
-export const ERROR_MESSAGES: Record<string, string> = {
-  invalid_credentials: 'Email atau password salah. Periksa kembali data Anda.',
-  unauthorized: 'Sesi Anda telah berakhir. Silakan masuk kembali.',
-  forbidden: 'Anda tidak memiliki akses untuk melakukan ini.',
-  not_found: 'Data tidak ditemukan.',
-  conflict: 'Data sudah ada. Gunakan data yang berbeda.',
-  validation_error: 'Data tidak valid. Periksa kembali input Anda.',
-  token_expired: 'Tautan sudah kedaluwarsa. Silakan hubungi koordinator.',
-  token_invalid: 'Tautan tidak valid.',
-  token_consumed: 'Tautan ini sudah digunakan sebelumnya.',
-  tenant_required: 'Silakan pilih tenant terlebih dahulu.',
-  internal_error: 'Terjadi kesalahan pada server. Silakan coba lagi.',
-  kiosk_invalid: 'Sesi berakhir atau tautan tidak valid.',
-  kiosk_forbidden: 'Anda tidak memiliki akses ke sesi tersebut.',
-  kiosk_expired: 'Tautan kiosk telah kedaluwarsa. Minta fasilitator membuka ulang sesi.',
-  kiosk_cancelled: 'Sesi ini telah dibatalkan.',
-  group_required: 'Tautan kiosk tidak menyertakan kelompok. Minta admin membuka kiosk dari kartu kelompok.',
-  session_not_found: 'Sesi tidak ditemukan.',
-  session_not_deletable: 'Sesi ini tidak dapat dihapus.',
-  participant_not_deletable: 'Peserta ini tidak dapat dihapus.',
-  bad_request: 'Permintaan tidak dapat diproses.',
-  schema_drift: 'Terjadi kesalahan pada struktur database. Hubungi administrator.',
-  facilitator_required: 'Belum ada fasilitator yang ditugaskan.',
-  no_groups: 'Sesi harus memiliki minimal satu kelompok.',
-  no_participants: 'Setiap kelompok harus memiliki minimal satu peserta.',
-  network: 'Gagal terhubung ke server. Periksa koneksi internet Anda.',
-}
+import { i18n, tIfExists } from '../i18n'
 
 export function friendlyError(err: unknown): string {
   if (err instanceof ApiError) {
-    return ERROR_MESSAGES[err.code] || 'Terjadi kesalahan. Silakan coba lagi.'
+    return tIfExists('errors.' + err.code) ?? i18n.t('errors.default')
   }
   if (err instanceof Error) {
     // Network / fetch failures
     if (err.name === 'TypeError' || err.message.includes('fetch')) {
-      return 'Gagal terhubung ke server. Periksa koneksi internet Anda.'
+      return i18n.t('errors.network')
     }
   }
-  return 'Terjadi kesalahan. Silakan coba lagi.'
+  return i18n.t('errors.default')
 }

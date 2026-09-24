@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type ReactNode } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES, contentEditPath } from '../../../core/constants/app'
 import { Plus, Pencil, Trash2, Play, Image, Gamepad2, Loader2, Search } from 'lucide-react'
@@ -17,34 +17,39 @@ import { StageContentFileType } from '../../../core/types/enums'
 import { YOUTUBE_LABEL } from '../../../core/constants/labels'
 import { getContentThumbnailSrc } from '../../../core/utils/content'
 import { getActiveTenantId } from '../../../core/utils/tenant'
+import { useTranslation } from 'react-i18next'
+import { i18n } from '../../../core/i18n'
 
 // ── File type helpers ──
 
-const FILE_TYPE_META: Record<StageContentFileType, { icon: ReactNode; label: string; bg: string; fg: string; ring: string }> = {
-  VIDEO: { icon: <Play className="w-4 h-4" />, label: 'Video', bg: 'bg-blue-100', fg: 'text-blue-700', ring: 'ring-blue-200/50' },
-  IMAGE: { icon: <Image className="w-4 h-4" />, label: 'Gambar', bg: 'bg-emerald-100', fg: 'text-emerald-700', ring: 'ring-emerald-200/50' },
-  GAME_BUNDLE: { icon: <Gamepad2 className="w-4 h-4" />, label: 'Game', bg: 'bg-purple-100', fg: 'text-purple-700', ring: 'ring-purple-200/50' },
-}
+const FILE_TYPE_META = {
+  VIDEO: { icon: <Play className="w-4 h-4" />, labelKey: 'admin.contentType.video', bg: 'bg-blue-100', fg: 'text-blue-700', ring: 'ring-blue-200/50' },
+  IMAGE: { icon: <Image className="w-4 h-4" />, labelKey: 'admin.contentType.image', bg: 'bg-emerald-100', fg: 'text-emerald-700', ring: 'ring-emerald-200/50' },
+  GAME_BUNDLE: { icon: <Gamepad2 className="w-4 h-4" />, labelKey: 'admin.contentType.game', bg: 'bg-purple-100', fg: 'text-purple-700', ring: 'ring-purple-200/50' },
+} as const
 
 function formatDuration(seconds: number | undefined): string {
-  if (!seconds || seconds <= 0) return 'Langsung'
-  if (seconds < 60) return `${seconds} detik`
+  if (!seconds || seconds <= 0) return i18n.t('admin.content.duration.live')
+  if (seconds < 60) return i18n.t('admin.content.duration.seconds', { count: seconds })
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
-  return s > 0 ? `${m} menit ${s} detik` : `${m} menit`
+  return s > 0
+    ? i18n.t('admin.content.duration.minuteSeconds', { m, s })
+    : i18n.t('admin.content.duration.minutes', { count: m })
 }
 
 const FILE_TYPE_FILTER_OPTIONS = [
-  { value: '', label: 'Semua Tipe' },
-  { value: StageContentFileType.VIDEO, label: 'Video' },
-  { value: StageContentFileType.IMAGE, label: 'Gambar' },
-  { value: StageContentFileType.GAME_BUNDLE, label: 'Game' },
-]
+  { value: '', labelKey: 'admin.content.allTypes' },
+  { value: StageContentFileType.VIDEO, labelKey: 'admin.contentType.video' },
+  { value: StageContentFileType.IMAGE, labelKey: 'admin.contentType.image' },
+  { value: StageContentFileType.GAME_BUNDLE, labelKey: 'admin.contentType.game' },
+] as const
 
 // ── Component ──
 
 const ContentPage = () => {
   const { addToast } = useGlobalToast()
+  const { t } = useTranslation()
 
   const [loading, setLoading] = useState(true)
   const [contents, setContents] = useState<Content[]>([])
@@ -59,7 +64,7 @@ const ContentPage = () => {
   // (debounced) so the backend drives text search.
   useEffect(() => {
     let cancelled = false
-    const t = setTimeout(() => {
+    const timerId = setTimeout(() => {
       setLoading(true)
       contentService
         .getAll({ limit: 100, search: search || undefined })
@@ -67,7 +72,7 @@ const ContentPage = () => {
           if (!cancelled) setContents(res.data)
         })
         .catch(() => {
-          if (!cancelled) addToast({ type: 'error', message: 'Gagal memuat konten' })
+          if (!cancelled) addToast({ type: 'error', message: t('admin.content.loadError') })
         })
         .finally(() => {
           if (!cancelled) setLoading(false)
@@ -75,9 +80,9 @@ const ContentPage = () => {
     }, 300)
     return () => {
       cancelled = true
-      clearTimeout(t)
+      clearTimeout(timerId)
     }
-  }, [search, addToast])
+  }, [search, addToast, t])
 
   const filtered = useMemo(
     () =>
@@ -104,11 +109,11 @@ const ContentPage = () => {
     try {
       await contentService.remove(deleteTarget.id)
       setContents((prev) => prev.filter((c) => c.id !== deleteTarget.id))
-      addToast({ type: 'success', message: 'Konten dihapus' })
+      addToast({ type: 'success', message: t('admin.content.deletedToast') })
       setDeleteTarget(null)
       setUsage([])
     } catch {
-      addToast({ type: 'error', message: 'Gagal menghapus konten' })
+      addToast({ type: 'error', message: t('admin.content.deleteError') })
     } finally {
       setDeleting(false)
     }
@@ -119,12 +124,12 @@ const ContentPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Content Manager"
-        subtitle="Perpustakaan konten tenant: video, gambar, game."
+        title={t('admin.sidebar.content')}
+        subtitle={t('admin.content.subtitle')}
         actions={
           <Link to={ROUTES.ADMIN.CONTENT_NEW}>
             <Button icon={<Plus className="w-4 h-4" />}>
-              Tambah Konten
+              {t('admin.content.add')}
             </Button>
           </Link>
         }
@@ -136,20 +141,20 @@ const ContentPage = () => {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari konten..."
+            placeholder={t('admin.content.searchPlaceholder')}
             className="w-full rounded-xl border border-outline-variant bg-surface pl-9 pr-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
           />
         </div>
         <div className="w-full sm:w-48">
           <Select
-            label="Tipe"
-            options={FILE_TYPE_FILTER_OPTIONS}
+            label={t('admin.content.typeLabel')}
+            options={FILE_TYPE_FILTER_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
             value={fileTypeFilter}
             onChange={(e) => setFileTypeFilter(e.target.value)}
           />
         </div>
         <div className="text-sm text-on-surface-variant ml-auto">
-          {loading ? 'Memuat...' : `${filtered.length} konten ditemukan`}
+          {loading ? t('common.loading') : t('admin.content.foundCount', { count: filtered.length })}
         </div>
       </div>
 
@@ -160,11 +165,11 @@ const ContentPage = () => {
       ) : filtered.length === 0 ? (
         <ListEmptyState
           icon={<Image className="w-12 h-12" />}
-          title="Belum ada konten"
+          title={t('admin.content.emptyTitle')}
           description={
             contents.length === 0
-              ? 'Klik "Tambah Konten" di atas untuk membuat konten pertama.'
-              : 'Tidak ada konten yang cocok dengan filter.'
+              ? t('admin.content.emptyAll')
+              : t('admin.content.emptyFiltered')
           }
         />
       ) : (
@@ -196,7 +201,7 @@ const ContentPage = () => {
                   )}
                   <div className={cn('absolute top-2 left-2 flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium ring-1', meta.bg, meta.fg, meta.ring)}>
                     {meta.icon}
-                    {isYouTube ? YOUTUBE_LABEL : meta.label}
+                    {isYouTube ? YOUTUBE_LABEL : t(meta.labelKey)}
                   </div>
                 </div>
 
@@ -211,13 +216,13 @@ const ContentPage = () => {
                       <Button
                         variant="ghost" size="sm"
                         icon={<Pencil className="w-3.5 h-3.5" />}
-                        tooltip="Edit"
+                        tooltip={t('admin.common.edit')}
                       />
                     </Link>
                     <Button
                       variant="ghost" size="sm"
                       icon={<Trash2 className="w-3.5 h-3.5 text-error" />}
-                      tooltip="Hapus"
+                      tooltip={t('common.delete')}
                       onClick={() => openDelete(item)}
                     />
                   </div>
@@ -231,21 +236,21 @@ const ContentPage = () => {
       <Modal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Hapus Konten"
+        title={t('admin.content.deleteTitle')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>Batal</Button>
-            <Button variant="danger" loading={deleting} onClick={handleDelete}>Hapus</Button>
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>{t('common.cancel')}</Button>
+            <Button variant="danger" loading={deleting} onClick={handleDelete}>{t('common.delete')}</Button>
           </div>
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Apakah Anda yakin ingin menghapus konten &ldquo;{deleteTarget?.title}&rdquo;? Tindakan ini tidak dapat dibatalkan.
+          {t('admin.content.deleteMsg', { title: deleteTarget?.title ?? '' })}
         </p>
         {usage.length > 0 && (
           <div className="mt-4 rounded-xl bg-surface-container-low p-3">
             <p className="text-xs font-medium text-on-surface-variant mb-2">
-              Konten ini masih digunakan di {usage.length} topik:
+              {t('admin.content.usageCount', { count: usage.length })}
             </p>
             <ul className="space-y-1 text-xs text-on-surface">
               {usage.map((u) => (
@@ -257,7 +262,7 @@ const ContentPage = () => {
               ))}
             </ul>
             <p className="mt-2 text-xs text-on-surface-variant">
-              Menghapus konten akan melepasnya dari semua topik tersebut.
+              {t('admin.content.usageNote')}
             </p>
           </div>
         )}

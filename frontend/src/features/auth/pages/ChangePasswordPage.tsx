@@ -10,18 +10,20 @@ import { friendlyError } from '../../../core/utils/errorMessages'
 import { ROUTES } from '../../../core/constants/app'
 import { changePassword } from '../../../core/services/users'
 import { zPassword } from '../../../core/utils/validation'
+import { i18n } from '../../../core/i18n'
+import { useTranslation } from 'react-i18next'
 import { PasswordStrengthBar } from '../components/PasswordStrengthBar'
 import { Logo } from '../../../shared/components/ui/Logo'
 import { Button } from '../../../shared/components/ui/Button'
 
 export const changePasswordSchema = z
   .object({
-    old_password: z.string().min(8, 'Password lama minimal 8 karakter'),
+    old_password: z.string().min(8, { error: () => ({ message: i18n.t('validation.passwordOldMin') }) }),
     new_password: zPassword,
     confirm: z.string(),
   })
   .refine((data) => data.new_password === data.confirm, {
-    message: 'Konfirmasi password tidak sama',
+    error: () => ({ message: i18n.t('validation.confirmMismatchAlt') }),
     path: ['confirm'],
   })
 
@@ -38,6 +40,7 @@ const ChangePasswordPage = () => {
   const { isAuthenticated, user } = useAuth()
   const setUser = useAuthStore((s) => s.setUser)
   const returnUrl = searchParams.get('returnUrl') || ROUTES.ADMIN.DASHBOARD
+  const { t } = useTranslation()
 
   const {
     register,
@@ -86,10 +89,10 @@ const ChangePasswordPage = () => {
           <Logo alt="Kidversa" className="w-8 h-8 object-contain" />
         </div>
         <h2 className="text-xl font-bold text-on-surface tracking-tight text-center">
-          Ubah Password
+          {t('auth.changePassword.title')}
         </h2>
         <p className="text-sm text-on-surface-variant/60 mt-1.5 text-center max-w-[240px] leading-relaxed">
-          Demi keamanan, ubah password akun Anda sebelum melanjutkan.
+          {t('auth.changePassword.subtitle')}
         </p>
       </div>
 
@@ -106,7 +109,7 @@ const ChangePasswordPage = () => {
         {/* Old password */}
         <div>
           <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-            Password Lama
+            {t('auth.changePassword.oldLabel')}
           </label>
           <div className="relative">
             <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
@@ -114,7 +117,7 @@ const ChangePasswordPage = () => {
               type={showPassword ? 'text' : 'password'}
               {...register('old_password')}
               className="w-full pl-10 pr-11 py-2.5 rounded-xl border text-sm outline-none transition-all duration-200 bg-surface-container-low placeholder:text-on-surface-variant/35 focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15 text-on-surface"
-              placeholder="Masukkan password lama"
+              placeholder={t('auth.changePassword.oldPlaceholder')}
               disabled={isSubmitting}
               aria-invalid={!!errors.old_password}
             />
@@ -123,7 +126,7 @@ const ChangePasswordPage = () => {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface-variant transition-colors"
               tabIndex={-1}
-              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              aria-label={showPassword ? t('common.hidePassword') : t('common.showPassword')}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -136,7 +139,7 @@ const ChangePasswordPage = () => {
         {/* New password */}
         <div>
           <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-            Password Baru
+            {t('auth.changePassword.newLabel')}
           </label>
           <div className="relative">
             <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
@@ -144,7 +147,7 @@ const ChangePasswordPage = () => {
               type={showPassword ? 'text' : 'password'}
               {...register('new_password')}
               className="w-full pl-10 pr-11 py-2.5 rounded-xl border text-sm outline-none transition-all duration-200 bg-surface-container-low placeholder:text-on-surface-variant/35 focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15 text-on-surface"
-              placeholder="Masukkan password baru"
+              placeholder={t('auth.changePassword.newPlaceholder')}
               disabled={isSubmitting}
               aria-invalid={!!errors.new_password}
             />
@@ -153,7 +156,7 @@ const ChangePasswordPage = () => {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface-variant transition-colors"
               tabIndex={-1}
-              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              aria-label={showPassword ? t('common.hidePassword') : t('common.showPassword')}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -167,7 +170,7 @@ const ChangePasswordPage = () => {
         {/* Confirm password */}
         <div>
           <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-            Konfirmasi Password
+            {t('auth.field.confirmPassword')}
           </label>
           <div className="relative">
             <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
@@ -175,7 +178,7 @@ const ChangePasswordPage = () => {
               type={showPassword ? 'text' : 'password'}
               {...register('confirm')}
               className="w-full pl-10 pr-11 py-2.5 rounded-xl border text-sm outline-none transition-all duration-200 bg-surface-container-low placeholder:text-on-surface-variant/35 focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15 text-on-surface"
-              placeholder="Ulangi password baru"
+              placeholder={t('auth.changePassword.confirmPlaceholder')}
               disabled={isSubmitting}
               aria-invalid={!!errors.confirm}
             />
@@ -184,7 +187,7 @@ const ChangePasswordPage = () => {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface-variant transition-colors"
               tabIndex={-1}
-              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              aria-label={showPassword ? t('common.hidePassword') : t('common.showPassword')}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -199,7 +202,7 @@ const ChangePasswordPage = () => {
           loading={isSubmitting}
           className="w-full py-2.5 bg-gradient-to-r from-primary to-primary-dark text-on-primary hover:shadow-lg hover:shadow-primary/25 hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0"
         >
-          Ubah Password
+          {t('auth.changePassword.title')}
         </Button>
       </form>
     </div>

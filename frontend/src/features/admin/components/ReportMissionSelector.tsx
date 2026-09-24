@@ -4,6 +4,7 @@ import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { cn } from '../../../core/utils'
+import { useTranslation } from 'react-i18next'
 import type { MissionBank } from '../../../core/types'
 
 const MAX_MISSIONS = 4
@@ -23,40 +24,41 @@ export const ReportMissionSelector = ({
   onSuggestMissions,
   suggesting,
 }: ReportMissionSelectorProps) => {
+  const { t } = useTranslation()
   const [showLibrary, setShowLibrary] = useState(false)
   const atCapacity = assignedMissionIds.length >= MAX_MISSIONS
 
   return (
-    <Card title="Misi Lanjutan" subtitle="Pilih maksimal 4 misi untuk diberikan kepada orang tua">
+    <Card title={t('admin.review.missionLabel')} subtitle={t('admin.review.missionSubtitle')}>
       {/* Action bar */}
       <div className="flex flex-wrap items-center gap-2 no-print mb-4">
         <Button variant="secondary" size="sm" onClick={() => setShowLibrary(true)}>
-          <Library className="w-4 h-4 mr-1" /> Pilih dari library misi
+          <Library className="w-4 h-4 mr-1" /> {t('admin.review.pickFromLibrary')}
         </Button>
         <Button variant="secondary" size="sm" onClick={onSuggestMissions} disabled={suggesting}>
           {suggesting ? (
             <>
-              <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memuat...
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t('common.loading')}
             </>
           ) : (
             <>
-              <Sparkles className="w-4 h-4 mr-1" /> Sesuaikan Misi - AI
+              <Sparkles className="w-4 h-4 mr-1" /> {t('admin.review.aiSuggest')}
             </>
           )}
         </Button>
         <span className="text-xs text-on-surface-variant ml-auto">
-          {assignedMissionIds.length}/{MAX_MISSIONS} misi dipilih
+          {t('admin.review.missionCount', { count: assignedMissionIds.length, max: MAX_MISSIONS })}
         </span>
       </div>
 
       {/* Empty states */}
       {missions.length === 0 ? (
         <p className="text-sm text-on-surface-variant py-4">
-          Belum ada misi yang tersedia untuk topik ini.
+          {t('admin.review.missionsEmpty')}
         </p>
       ) : assignedMissionIds.length === 0 ? (
         <p className="text-sm text-on-surface-variant py-4">
-          Belum ada misi dipilih — pilih dari library atau gunakan saran AI.
+          {t('admin.review.missionsNone')}
         </p>
       ) : (
         <>
@@ -72,7 +74,7 @@ export const ReportMissionSelector = ({
                   {m?.title ?? id}
                   <button
                     type="button"
-                    aria-label={`Hapus ${m?.title ?? id}`}
+                    aria-label={t('admin.review.removeMission', { title: m?.title ?? id })}
                     onClick={() => onToggleMission(id)}
                     className="ml-0.5 text-on-surface-variant hover:text-on-surface"
                   >
@@ -100,18 +102,18 @@ export const ReportMissionSelector = ({
       <Modal
         open={showLibrary}
         onClose={() => setShowLibrary(false)}
-        title="Pilih dari Library Misi"
+        title={t('admin.review.pickTitle')}
         size="lg"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowLibrary(false)}>
-              Selesai
+              {t('common.done')}
             </Button>
           </div>
         }
       >
         {missions.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">Tidak ada misi untuk topik ini.</p>
+          <p className="text-sm text-on-surface-variant">{t('admin.review.missionsEmptyForTopic')}</p>
         ) : (
           <div className="space-y-3 max-h-[60vh] overflow-y-auto">
             {missions.map((mission) => {

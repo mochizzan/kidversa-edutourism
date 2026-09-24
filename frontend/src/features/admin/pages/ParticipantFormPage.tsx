@@ -15,6 +15,7 @@ import { sessionService } from '../../../core/services/sessions'
 import { ApiError } from '../../../core/services/backend-client'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { redirectToLogin } from '../../../core/stores/authStore'
+import { useTranslation, Trans } from 'react-i18next'
 
 type ParticipantFormState = {
   child_name: string
@@ -44,6 +45,7 @@ const emptyForm: ParticipantFormState = {
 }
 
 const ParticipantFormPage = () => {
+  const { t } = useTranslation()
   const { participantId } = useParams<{ participantId: string }>()
   const navigate = useNavigate()
   const { addToast } = useGlobalToast()
@@ -69,7 +71,7 @@ const ParticipantFormPage = () => {
         if (cancelled) return
 
         if (!found) {
-          addToast({ type: 'error', message: 'Peserta tidak ditemukan' })
+          addToast({ type: 'error', message: t('admin.participants.notFound') })
           navigate(ROUTES.ADMIN.PARTICIPANTS, { replace: true })
           return
         }
@@ -84,7 +86,7 @@ const ParticipantFormPage = () => {
         })
       } catch {
         if (!cancelled) {
-          addToast({ type: 'error', message: 'Gagal memuat data peserta' })
+          addToast({ type: 'error', message: t('admin.participants.loadError') })
           navigate(ROUTES.ADMIN.PARTICIPANTS, { replace: true })
         }
       } finally {
@@ -97,7 +99,7 @@ const ParticipantFormPage = () => {
     return () => {
       cancelled = true
     }
-  }, [isEdit, participantId, addToast, navigate])
+  }, [isEdit, participantId, addToast, navigate, t])
 
   const validate = (): boolean => {
     const errs = validateParticipantForm(form)
@@ -122,7 +124,7 @@ const ParticipantFormPage = () => {
       if (isEdit && participantId) {
         const existing = await participantService.getById(participantId)
         if (!existing?.session_id) {
-          addToast({ type: 'error', message: 'Peserta belum terikat sesi; edit melalui halaman sesi' })
+          addToast({ type: 'error', message: t('admin.participants.notLinked') })
           return
         }
         await sessionService.updateParticipant(existing.session_id, participantId, {
@@ -133,7 +135,7 @@ const ParticipantFormPage = () => {
           parent_phone: form.parent_phone.trim(),
           parent_email: trimmedEmail || undefined,
         })
-        addToast({ type: 'success', message: 'Peserta berhasil diperbarui' })
+        addToast({ type: 'success', message: t('admin.participants.updatedToast') })
       } else {
         await participantService.create({
           child_name: form.child_name.trim(),
@@ -143,7 +145,7 @@ const ParticipantFormPage = () => {
           parent_phone: form.parent_phone.trim(),
           parent_email: trimmedEmail || undefined,
         })
-        addToast({ type: 'success', message: 'Peserta berhasil ditambahkan' })
+        addToast({ type: 'success', message: t('admin.participants.createdToast') })
       }
 
       navigate(ROUTES.ADMIN.PARTICIPANTS)
@@ -155,7 +157,7 @@ const ParticipantFormPage = () => {
         }
         addToast({ type: 'error', message: friendlyError(err) })
       } else {
-        addToast({ type: 'error', message: 'Gagal menyimpan peserta' })
+        addToast({ type: 'error', message: t('admin.participants.saveError') })
       }
     } finally {
       setSaving(false)
@@ -188,11 +190,11 @@ const ParticipantFormPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isEdit ? 'Edit Peserta' : 'Tambah Peserta Baru'}
-        subtitle={isEdit ? 'Perbarui data peserta' : 'Buat data peserta baru tanpa penempatan sesi'}
+        title={isEdit ? t('admin.participants.editTitle') : t('admin.participants.newTitle')}
+        subtitle={isEdit ? t('admin.participants.editSubtitle') : t('admin.participants.newSubtitle')}
         breadcrumbs={[
-          { label: 'Peserta', href: ROUTES.ADMIN.PARTICIPANTS },
-          { label: isEdit ? 'Edit' : 'Tambah' },
+          { label: t('admin.sidebar.participants'), href: ROUTES.ADMIN.PARTICIPANTS },
+          { label: isEdit ? t('admin.common.edit') : t('admin.common.add') },
         ]}
       />
 
@@ -202,36 +204,36 @@ const ParticipantFormPage = () => {
             <span className="w-9 h-9 rounded-xl bg-primary-container flex items-center justify-center text-primary shrink-0">
               <Baby className="w-5 h-5" />
             </span>
-            <h2 className="text-lg font-semibold text-on-surface">Data Anak</h2>
+            <h2 className="text-lg font-semibold text-on-surface">{t('admin.participants.childDataTitle')}</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Nama Anak *"
+              label={t('admin.participants.childNameLabel')}
               required
               autoFocus
               value={form.child_name}
               onChange={(e) => handleChange('child_name', e.target.value)}
-              placeholder="Contoh: Budi Santoso"
+              placeholder={t('admin.participants.childNamePlaceholder')}
               error={errors.child_name}
             />
 
             <Input
-              label="Usia Anak *"
+              label={t('admin.participants.ageInputLabel')}
               type="number"
               required
               value={form.child_age}
               onChange={(e) => handleChange('child_age', e.target.value)}
-              placeholder="Contoh: 6"
-              hint="Masukkan usia anak dalam tahun"
+              placeholder={t('admin.participants.agePlaceholder')}
+              hint={t('admin.participants.ageHint')}
               error={errors.child_age}
             />
 
             <Input
-              label="Nama Sekolah"
+              label={t('admin.participants.schoolLabel')}
               value={form.school_name}
               onChange={(e) => handleChange('school_name', e.target.value)}
-              placeholder="Contoh: TK Harapan Bangsa (opsional)"
+              placeholder={t('admin.participants.schoolPlaceholder')}
             />
           </div>
         </Card>
@@ -241,37 +243,37 @@ const ParticipantFormPage = () => {
             <span className="w-9 h-9 rounded-xl bg-primary-container flex items-center justify-center text-primary shrink-0">
               <Users className="w-5 h-5" />
             </span>
-            <h2 className="text-lg font-semibold text-on-surface">Data Orang Tua / Wali</h2>
+            <h2 className="text-lg font-semibold text-on-surface">{t('admin.participants.parentDataTitle')}</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Nama Orang Tua *"
+              label={t('admin.participants.parentNameLabel')}
               required
               value={form.parent_name}
               onChange={(e) => handleChange('parent_name', e.target.value)}
-              placeholder="Contoh: Andi Santoso"
+              placeholder={t('admin.participants.parentNamePlaceholder')}
               error={errors.parent_name}
             />
 
             <Input
-              label="Email Orang Tua"
+              label={t('admin.participants.parentEmailLabel')}
               type="email"
               value={form.parent_email}
               onChange={(e) => handleChange('parent_email', e.target.value)}
-              placeholder="Contoh: andi@mail.com (opsional)"
+              placeholder={t('admin.participants.parentEmailPlaceholder')}
               error={errors.parent_email}
             />
 
             <div className="md:col-span-2">
               <PhoneInput
                 id="parent_phone"
-                label="No. HP Orang Tua"
+                label={t('admin.participants.parentPhoneLabel')}
                 required
                 value={form.parent_phone}
                 onChange={(v) => handleChange('parent_phone', v)}
                 error={errors.parent_phone}
-                hint="Tanpa 0 di depan — kode negara otomatis"
+                hint={t('admin.participants.phoneHint')}
                 placeholder="8123456789"
               />
             </div>
@@ -279,15 +281,15 @@ const ParticipantFormPage = () => {
         </Card>
 
         <p className="text-xs text-on-surface-variant">
-          Field bertanda <span className="text-error font-medium">*</span> wajib diisi.
+          <Trans i18nKey="admin.participants.requiredNote" components={{ span: <span className="text-error font-medium" /> }} />
         </p>
 
         <div className="flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.PARTICIPANTS)}>
-            Batal
+            {t('common.cancel')}
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>
-            {isEdit ? 'Simpan' : 'Tambah'}
+            {isEdit ? t('common.save') : t('admin.common.add')}
           </Button>
         </div>
       </form>
@@ -295,16 +297,16 @@ const ParticipantFormPage = () => {
       <Modal
         open={ageConfirmOpen}
         onClose={() => setAgeConfirmOpen(false)}
-        title="Konfirmasi Usia"
+        title={t('admin.participants.ageConfirmTitle')}
         size="md"
       >
         <div className="space-y-4">
           <p className="text-sm text-on-surface">
-            {`Usia ${n} tahun terlihat tidak biasa. Apakah benar usia anak ${form.child_name.trim()} ${n} tahun?`}
+            {t('admin.participants.ageConfirmMsg', { age: n, name: form.child_name.trim() })}
           </p>
           <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
             <Button variant="secondary" onClick={() => setAgeConfirmOpen(false)}>
-              Kembali
+              {t('common.back')}
             </Button>
             <Button
               onClick={() => {
@@ -312,7 +314,7 @@ const ParticipantFormPage = () => {
                 void doSubmit(n)
               }}
             >
-              Ya, lanjutkan
+              {t('admin.participants.continueYes')}
             </Button>
           </div>
         </div>

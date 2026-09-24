@@ -10,10 +10,11 @@ import { StageContentFileType as StageContentFileTypeEnum } from '../../../core/
 import { STAGE_CONTENT_FILE_TYPE_LABELS } from '../../../core/constants/labels'
 import { CONTENT_MAX_FILE_SIZES, CONTENT_FILE_ACCEPT } from '../../../core/constants/content'
 import { autoDetectFileType, getMediaDuration } from '../../../core/utils/content'
+import { useTranslation } from 'react-i18next'
 
 const fileTypes = Object.values(StageContentFileTypeEnum).map((value) => ({
   value,
-  label: STAGE_CONTENT_FILE_TYPE_LABELS[value as StageContentFileType],
+  labelKey: STAGE_CONTENT_FILE_TYPE_LABELS[value as StageContentFileType],
 }))
 
 export type StageContentSourceMode = 'upload' | 'youtube'
@@ -48,6 +49,7 @@ const EMPTY: StageContentFormValues = {
 }
 
 export function StageContentForm({ initial, showActive = true, onSubmit, onCancel }: StageContentFormProps) {
+  const { t } = useTranslation()
   const [form, setForm] = useState<StageContentFormValues>(
     initial
       ? {
@@ -90,7 +92,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
     const detectedType = autoDetectFileType(file)
 
     if (detectedType === StageContentFileTypeEnum.GAME_BUNDLE) {
-      setFileError('Tipe file tidak didukung. Gunakan URL untuk Game Bundle.')
+      setFileError(t('admin.content.typeUnsupported'))
       return
     }
 
@@ -99,8 +101,8 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
       const limitMB = Math.round(maxSize / (1024 * 1024))
       setFileError(
         detectedType === StageContentFileTypeEnum.IMAGE
-          ? 'Gambar melebihi batas 10 MB'
-          : `File melebihi batas ${limitMB} MB`
+          ? t('admin.content.imageTooLarge')
+          : t('admin.content.fileTooLarge', { limit: limitMB })
       )
       return
     }
@@ -110,7 +112,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
       file.type === 'image/gif' &&
       file.size > CONTENT_MAX_FILE_SIZES.IMAGE
     ) {
-      setFileError('GIF tidak dapat dikompresi otomatis')
+      setFileError(t('admin.content.gifNoCompress'))
       return
     }
 
@@ -148,11 +150,11 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
         set('duration_seconds', duration)
       }
     } catch {
-      setFileError('Gagal memproses file. Coba lagi.')
+      setFileError(t('admin.content.processError'))
     } finally {
       setCompressing(false)
     }
-  }, [revokePreview])
+  }, [revokePreview, t])
 
   const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -202,7 +204,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
     // VIDEO + YouTube: send the URL, no file.
     if (form.file_type === StageContentFileTypeEnum.VIDEO && form.source_mode === 'youtube') {
       if (!form.youtube_url.trim()) {
-        setFileError('URL YouTube wajib diisi')
+        setFileError(t('admin.content.youtubeUrlRequired'))
         return
       }
       onSubmit({ ...form, file_url: '' }, null)
@@ -211,7 +213,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
 
     // Everything else requires a file (or a Game Bundle URL).
     if (!form.file_url.trim()) {
-      setFileError(form.file_type === StageContentFileTypeEnum.GAME_BUNDLE ? 'URL wajib diisi' : 'File wajib diisi')
+      setFileError(form.file_type === StageContentFileTypeEnum.GAME_BUNDLE ? t('admin.content.urlRequired') : t('admin.content.fileRequired'))
       return
     }
     onSubmit(form, uploadFileRef.current)
@@ -222,15 +224,15 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
   return (
     <form className="p-4 bg-surface-container-low rounded-xl space-y-3" onSubmit={handleSubmit}>
       <Input
-        label="Judul"
+        label={t('admin.content.titleLabel')}
         value={form.title}
         onChange={(e) => set('title', e.target.value)}
-        placeholder="Judul konten"
+        placeholder={t('admin.content.titlePlaceholder')}
         required
       />
 
       <Select
-        label="Tipe File"
+        label={t('admin.content.fileTypeLabel')}
         value={form.file_type}
         onChange={(e) => {
           const nextType = e.target.value as StageContentFileType
@@ -241,13 +243,13 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
           set('source_mode', nextType === StageContentFileTypeEnum.VIDEO ? form.source_mode : 'upload')
           setFileError(null)
         }}
-        options={fileTypes}
-        hint="Format media dari satu konten; boleh berbeda dari Tipe Aktivitas topik."
+        options={fileTypes.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+        hint={t('admin.content.fileTypeHint')}
       />
 
       {form.file_type === StageContentFileTypeEnum.VIDEO && (
         <div className="flex flex-wrap items-center gap-3 p-3 bg-surface rounded-lg border border-outline-variant">
-          <span className="text-sm text-on-surface-variant">Sumber Video:</span>
+          <span className="text-sm text-on-surface-variant">{t('admin.content.videoSourceLabel')}</span>
           <button
             type="button"
             onClick={() => set('source_mode', 'upload')}
@@ -258,7 +260,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
                 : 'bg-surface-variant text-on-surface-variant hover:bg-outline-variant'
             )}
           >
-            Upload Manual
+            {t('admin.content.uploadManual')}
           </button>
           <button
             type="button"
@@ -283,7 +285,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
 
       {isGameBundle ? (
         <Input
-          label="URL File"
+          label={t('admin.content.urlFileLabel')}
           value={form.file_url}
           onChange={(e) => set('file_url', e.target.value)}
           placeholder="https://..."
@@ -291,16 +293,16 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
         />
       ) : form.file_type === StageContentFileTypeEnum.VIDEO && form.source_mode === 'youtube' ? (
         <Input
-          label="URL YouTube"
+          label={t('admin.content.youtubeUrlLabel')}
           value={form.youtube_url}
           onChange={(e) => set('youtube_url', e.target.value)}
           placeholder="https://youtube.com/watch?v=..."
           required
-          hint="Tempel tautan YouTube (watch / youtu.be / embed). Kiosk akan menampilkan via embed."
+          hint={t('admin.content.youtubeHint')}
         />
       ) : (
         <div className="relative space-y-2">
-          <span className="block text-sm font-medium text-on-surface mb-1">File</span>
+          <span className="block text-sm font-medium text-on-surface mb-1">{t('admin.content.fileLabel')}</span>
           {form.file_url ? (
             <div className="flex items-center justify-between p-3 bg-surface rounded-lg border border-outline-variant">
               <span className="text-sm text-on-surface truncate">{form.file_url.split('/').pop()}</span>
@@ -308,7 +310,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
                 type="button"
                 onClick={clearFile}
                 className="text-on-surface-variant hover:text-error ml-2 shrink-0"
-                aria-label="Hapus file"
+                aria-label={t('admin.content.removeFileAria')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -338,7 +340,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
             >
               <Upload className="w-6 h-6" />
               <span className="text-sm text-center">
-                {compressing ? 'Memproses...' : 'Seret file ke sini atau klik untuk pilih'}
+                {compressing ? t('common.processing') : t('admin.content.dropzoneText')}
               </span>
             </div>
           )}
@@ -353,7 +355,7 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
 
           {form.file_type === StageContentFileTypeEnum.VIDEO && form.duration_seconds > 0 && (
             <p className="text-sm text-on-surface-variant">
-              Total Durasi Video: {form.duration_seconds}(detik)
+              {t('admin.content.durationLine', { duration: form.duration_seconds })}
             </p>
           )}
         </div>
@@ -367,16 +369,16 @@ export function StageContentForm({ initial, showActive = true, onSubmit, onCance
             onChange={(e) => set('is_active', e.target.checked)}
             className="rounded"
           />
-          Aktif
+          {t('admin.content.activeLabel')}
         </label>
       )}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={compressing}>
-          {initial ? 'Simpan' : 'Tambah'}
+          {initial ? t('common.save') : t('admin.common.add')}
         </Button>
         {initial && (
           <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-            Batal
+            {t('common.cancel')}
           </Button>
         )}
       </div>

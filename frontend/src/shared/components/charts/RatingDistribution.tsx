@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 interface RatingDistributionProps {
@@ -12,13 +13,14 @@ interface RatingTooltipProps {
 }
 
 function RatingTooltip({ active, payload }: RatingTooltipProps) {
+ const { t } = useTranslation()
  const row = payload?.[0]?.payload
  if (!active || !row) return null
  return (
   <div className="rounded-xl bg-surface px-3 py-2 shadow-lg border border-outline-variant/50">
    <p className="text-xs font-semibold text-on-surface">{row.name}</p>
    <p className="text-xs text-on-surface-variant">
-    {row.count} penilaian · {row.pct?.toFixed(1)}% dari total
+    {t('common.chart.ratingTooltip', { count: row.count, pct: row.pct?.toFixed(1) })}
    </p>
   </div>
  )
@@ -30,9 +32,10 @@ function RatingTooltip({ active, payload }: RatingTooltipProps) {
  */
 export function RatingDistribution({
  data,
- title = 'Distribusi Penilaian',
- subtitle = 'Sebaran bintang 1–5 dari sesi terfilter — arahkan kursor untuk detail',
+ title,
+ subtitle,
 }: RatingDistributionProps) {
+ const { t } = useTranslation()
  const total = data.reduce((sum, d) => sum + d.count, 0)
  const rows = data.map((d) => ({
   name: `${d.rating} ★`,
@@ -42,10 +45,10 @@ export function RatingDistribution({
 
  return (
   <div className="bg-surface rounded-3xl p-6 shadow-sm">
-   <h2 className="text-lg font-bold text-on-surface mb-1">{title}</h2>
-   <p className="text-xs text-on-surface-variant mb-4">{subtitle}</p>
+   <h2 className="text-lg font-bold text-on-surface mb-1">{title ?? t('common.chart.ratingTitle')}</h2>
+   <p className="text-xs text-on-surface-variant mb-4">{subtitle ?? t('common.chart.ratingSubtitle')}</p>
    {total === 0 ? (
-    <p className="text-sm text-on-surface-variant py-4">Belum ada penilaian pada filter ini.</p>
+    <p className="text-sm text-on-surface-variant py-4">{t('common.chart.ratingEmpty')}</p>
    ) : (
     <>
      <div className="h-56">
@@ -68,12 +71,12 @@ export function RatingDistribution({
          axisLine={false}
         />
         <Tooltip content={<RatingTooltip />} cursor={{ fill: 'var(--color-surface-container-low)' }} />
-        <Bar dataKey="count" name="Penilaian" fill="var(--color-primary)" radius={[0, 8, 8, 0]} barSize={18} />
+        <Bar dataKey="count" name={t('common.chart.assessments')} fill="var(--color-primary)" radius={[0, 8, 8, 0]} barSize={18} />
        </BarChart>
       </ResponsiveContainer>
      </div>
      <div className="flex items-center justify-between pt-3 mt-2 border-t border-outline-variant/50">
-      <span className="text-xs text-on-surface-variant">Total Penilaian</span>
+      <span className="text-xs text-on-surface-variant">{t('common.chart.totalRating')}</span>
       <span className="text-sm font-bold text-on-surface">{total}</span>
      </div>
     </>

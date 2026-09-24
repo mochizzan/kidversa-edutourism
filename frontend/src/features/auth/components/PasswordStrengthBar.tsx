@@ -1,10 +1,17 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 
 interface PasswordStrengthBarProps {
   password: string
 }
 
-const STRENGTH_LABELS = ['Sangat Lemah', 'Lemah', 'Sedang', 'Kuat', 'Sangat Kuat']
+const STRENGTH_LABEL_KEYS = [
+  'auth.password.veryWeak',
+  'auth.password.weak',
+  'auth.password.fair',
+  'auth.password.strong',
+  'auth.password.veryStrong',
+] as const
 const STRENGTH_COLORS = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-green-600']
 const STRENGTH_TEXT_COLORS = ['text-red-600', 'text-orange-600', 'text-yellow-600', 'text-green-600', 'text-green-700']
 
@@ -19,6 +26,7 @@ function getStrength(pw: string): number {
 }
 
 export function PasswordStrengthBar({ password }: PasswordStrengthBarProps) {
+  const { t } = useTranslation()
   if (!password) return null
   const strength = getStrength(password)
 
@@ -36,7 +44,7 @@ export function PasswordStrengthBar({ password }: PasswordStrengthBarProps) {
         ))}
       </div>
       <p className={cn('text-[11px] mt-1 font-medium', STRENGTH_TEXT_COLORS[strength])}>
-        Kekuatan: {STRENGTH_LABELS[strength]}
+        {t('auth.password.strengthPrefix')} {t(STRENGTH_LABEL_KEYS[strength])}
       </p>
     </div>
   )

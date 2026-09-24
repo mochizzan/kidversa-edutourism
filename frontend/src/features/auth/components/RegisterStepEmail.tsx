@@ -1,5 +1,6 @@
 import { Mail } from 'lucide-react'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 
 interface RegisterStepEmailProps {
@@ -9,10 +10,11 @@ interface RegisterStepEmailProps {
 }
 
 export function RegisterStepEmail({ register, errors, disabled }: RegisterStepEmailProps) {
+  const { t } = useTranslation()
   return (
     <div>
       <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-        Email
+        {t('auth.field.email')}
       </label>
       <div className="relative">
         <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />

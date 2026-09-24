@@ -9,9 +9,11 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
 import { useAuthStore } from '../../../core/stores/authStore'
 import type { User } from '../../../core/types'
+import { i18n } from '../../../core/i18n'
+import { useTranslation } from 'react-i18next'
 
 const editEmailSchema = z.object({
-  email: z.string().trim().email('Format email tidak valid'),
+  email: z.string().trim().email({ error: () => ({ message: i18n.t('validation.emailInvalid') }) }),
 })
 
 type EditEmailFormData = z.infer<typeof editEmailSchema>
@@ -23,12 +25,13 @@ interface EditEmailModalProps {
   onSaved?: (updated: User) => void
 }
 
-const ERROR_MAP: Record<string, string> = {
-  EMAIL_EXISTS: 'Email sudah digunakan oleh akun lain',
-  'User not found': 'Data pengguna tidak ditemukan. Silakan login ulang.',
+const ERROR_MAP: Record<string, () => string> = {
+  EMAIL_EXISTS: () => i18n.t('fasilitator.edit.emailExists'),
+  'User not found': () => i18n.t('fasilitator.edit.userNotFound'),
 }
 
 const EditEmailModal = ({ open, onClose, user, onSaved }: EditEmailModalProps) => {
+  const { t } = useTranslation()
   const { addToast } = useGlobalToast()
   const setUser = useAuthStore((s) => s.setUser)
 
@@ -57,7 +60,7 @@ const EditEmailModal = ({ open, onClose, user, onSaved }: EditEmailModalProps) =
           (u) => u.id !== user.id && u.email.toLowerCase() === trimmedEmail
         )
         if (duplicate) {
-          addToast({ type: 'error', message: 'Email sudah digunakan oleh akun lain' })
+          addToast({ type: 'error', message: t('fasilitator.edit.emailExists') })
           return
         }
       }
@@ -66,11 +69,11 @@ const EditEmailModal = ({ open, onClose, user, onSaved }: EditEmailModalProps) =
       const { password_hash: _, ...cleanUser } = updated
       setUser(cleanUser as User)
       onSaved?.(cleanUser as User)
-      addToast({ type: 'success', message: 'Email berhasil diperbarui' })
+      addToast({ type: 'success', message: t('fasilitator.edit.emailSaved') })
       onClose()
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
-      addToast({ type: 'error', message: ERROR_MAP[msg] ?? 'Gagal memperbarui data. Silakan coba lagi.' })
+      addToast({ type: 'error', message: ERROR_MAP[msg]?.() ?? t('fasilitator.edit.saveFailed') })
     }
   }
 
@@ -78,26 +81,26 @@ const EditEmailModal = ({ open, onClose, user, onSaved }: EditEmailModalProps) =
     <Modal
       open={open}
       onClose={onClose}
-      title="Edit Email"
+      title={t('fasilitator.edit.emailTitle')}
       size="sm"
       footer={
         <div className="flex items-center justify-end gap-3">
           <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
-            Batal
+            {t('common.cancel')}
           </Button>
           <Button
             variant="primary"
             loading={isSubmitting}
             onClick={handleSubmit(onSubmit)}
           >
-            Simpan
+            {t('common.save')}
           </Button>
         </div>
       }
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
-          label="Email"
+          label={t('fasilitator.edit.emailLabel')}
           type="email"
           placeholder="nama@contoh.com"
           error={errors.email?.message}

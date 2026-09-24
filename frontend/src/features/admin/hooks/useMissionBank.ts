@@ -4,6 +4,7 @@ import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientLi
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { missionService } from '../../../core/services/missions'
 import { programService } from '../../../core/services/programs'
+import { i18n } from '../../../core/i18n'
 import type { MissionBank, Program, ProgramStage } from '../../../core/types'
 
 export function useMissionBank() {
@@ -104,11 +105,11 @@ export function useMissionBank() {
       await missionService.toggleActive(deactivateTarget.id)
       addToast({
         type: 'success',
-        message: deactivateTarget.is_active ? 'Misi dinonaktifkan' : 'Misi diaktifkan',
+        message: deactivateTarget.is_active ? i18n.t('admin.missions.toggleOffToast') : i18n.t('admin.missions.toggleOnToast'),
       })
       refresh()
     } catch {
-      addToast({ type: 'error', message: 'Gagal mengubah status misi' })
+      addToast({ type: 'error', message: i18n.t('admin.missions.toggleError') })
     } finally {
       setDeactivating(false)
       setDeactivateTarget(null)
@@ -127,10 +128,10 @@ export function useMissionBank() {
     setDeleting(true)
     try {
       await missionService.delete(deleteTarget.id)
-      addToast({ type: 'success', message: 'Misi berhasil dihapus' })
+      addToast({ type: 'success', message: i18n.t('admin.missions.deletedToast') })
       refresh()
     } catch {
-      addToast({ type: 'error', message: 'Gagal menghapus misi' })
+      addToast({ type: 'error', message: i18n.t('admin.missions.deleteError') })
     } finally {
       setDeleting(false)
       setDeleteTarget(null)

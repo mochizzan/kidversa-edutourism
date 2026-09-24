@@ -25,6 +25,7 @@ import { topicNewPath, topicDetailPath, topicEditPath } from '../../../core/cons
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { ProgramStage, ProgramSubstage } from '../../../core/types'
+import { useTranslation } from 'react-i18next'
 
 interface TopicRow extends ProgramStage {
   programId: string
@@ -59,6 +60,7 @@ function CountCell({ stageId }: { stageId: string }) {
 }
 
 function ActivityPreview({ stageId }: { stageId: string }) {
+  const { t } = useTranslation()
   const [items, setItems] = useState<ProgramSubstage[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -81,9 +83,9 @@ function ActivityPreview({ stageId }: { stageId: string }) {
     }
   }, [stageId])
 
-  if (loading) return <p className="text-xs text-on-surface-variant py-2">Memuat kegiatan…</p>
+  if (loading) return <p className="text-xs text-on-surface-variant py-2">{t('admin.topic.loadingActivities')}</p>
   if (items.length === 0)
-    return <p className="text-xs text-on-surface-variant py-2">Belum ada kegiatan.</p>
+    return <p className="text-xs text-on-surface-variant py-2">{t('admin.topic.activityPreviewEmpty')}</p>
 
   return (
     <ul className="space-y-1 py-2">
@@ -97,6 +99,7 @@ function ActivityPreview({ stageId }: { stageId: string }) {
 }
 
 const TopicsPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { tenantId } = useTenantScope()
   const { addToast } = useGlobalToast()
@@ -158,7 +161,7 @@ const TopicsPage = () => {
   const columns: Column<TopicRow>[] = [
     {
       key: 'programName',
-      header: 'Program',
+      header: t('admin.col.program'),
       sortable: true,
       render: (item) => (
         <div>
@@ -168,7 +171,7 @@ const TopicsPage = () => {
     },
     {
       key: 'name',
-      header: 'Nama Topik',
+      header: t('admin.topic.nameLabel'),
       sortable: true,
       render: (item) => (
         <div>
@@ -181,7 +184,7 @@ const TopicsPage = () => {
     },
     {
       key: 'badge',
-      header: 'Badge',
+      header: t('admin.topic.colBadge'),
       render: (item) =>
         item.badge_name ? (
           <Badge variant="accent">{item.badge_name}</Badge>
@@ -191,12 +194,12 @@ const TopicsPage = () => {
     },
     {
       key: 'kegiatan_count',
-      header: 'Jumlah Kegiatan',
+      header: t('admin.topic.colCount'),
       render: (item) => <CountCell stageId={item.id} />,
     },
     {
       key: 'actions',
-      header: 'Aksi',
+      header: t('admin.col.action'),
       align: 'right',
       render: (item) => (
         <div className="flex items-center justify-end gap-2">
@@ -204,21 +207,21 @@ const TopicsPage = () => {
             variant="ghost"
             size="sm"
             icon={<Info className="w-4 h-4" />}
-            tooltip="Info"
+            tooltip={t('admin.common.info')}
             onClick={() => navigate(topicDetailPath(item.id))}
           />
           <Button
             variant="ghost"
             size="sm"
             icon={<Pencil className="w-4 h-4" />}
-            tooltip="Edit"
+            tooltip={t('admin.common.edit')}
             onClick={() => navigate(topicEditPath(item.id))}
           />
           <Button
             variant="ghost"
             size="sm"
             icon={<Trash2 className="w-4 h-4 text-error" />}
-            tooltip="Hapus"
+            tooltip={t('common.delete')}
             onClick={() => setDeleteTarget(item)}
           />
         </div>
@@ -231,7 +234,7 @@ const TopicsPage = () => {
     setDeleting(true)
     try {
       await programService.deleteStage(deleteTarget.programId, deleteTarget.id)
-      addToast({ type: 'success', message: 'Topik dihapus' })
+      addToast({ type: 'success', message: t('admin.topic.deletedToast') })
       setDeleteTarget(null)
       refresh()
     } catch (err) {
@@ -244,14 +247,14 @@ const TopicsPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Topik"
-        subtitle="Kelola topik (subtopik) dan kegiatan di dalam program."
+        title={t('admin.topic.pageTitle')}
+        subtitle={t('admin.topic.subtitle')}
         actions={
           <Button
             icon={<Plus className="w-4 h-4" />}
             onClick={() => navigate(topicNewPath({ programId: programFilter || undefined }))}
           >
-            Tambah Topik
+            {t('admin.topic.add')}
           </Button>
         }
       />
@@ -263,7 +266,7 @@ const TopicsPage = () => {
             {error}
           </span>
           <Button variant="secondary" size="sm" onClick={refresh}>
-            Coba Lagi
+            {t('common.error.retry')}
           </Button>
         </div>
       )}
@@ -285,10 +288,10 @@ const TopicsPage = () => {
         )}
         actions={
           <Select
-            label="Program"
-            placeholder="Semua Program"
+            label={t('admin.col.program')}
+            placeholder={t('admin.common.allPrograms')}
             value={programFilter}
-            options={[{ value: '', label: 'Semua Program' }, ...programs]}
+            options={[{ value: '', label: t('admin.common.allPrograms') }, ...programs]}
             onChange={(e) => {
               const value = e.target.value
               setSearchParams((prev) => {
@@ -304,17 +307,17 @@ const TopicsPage = () => {
         emptyState={
           <ListEmptyState
             icon={<FolderOpen className="w-12 h-12" />}
-            title="Belum ada topik"
-            description="Buat topik pertama untuk program yang dipilih."
+            title={t('admin.topic.emptyTitle')}
+            description={t('admin.topic.emptyDesc')}
           />
         }
       />
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Hapus Topik"
-        message={`Yakin ingin menghapus topik "${deleteTarget?.name || ''}"? Seluruh kegiatan di dalamnya juga akan dihapus. Tindakan ini tidak dapat dibatalkan.`}
-        confirmLabel="Hapus Topik"
+        title={t('admin.topic.deleteTitle')}
+        message={t('admin.topic.deleteMsgConfirm', { name: deleteTarget?.name || '' })}
+        confirmLabel={t('admin.topic.deleteTitle')}
         loading={deleting}
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}

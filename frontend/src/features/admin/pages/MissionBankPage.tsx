@@ -13,8 +13,10 @@ import type { Column } from '../../../shared/components/data/DataTable'
 import { useMissionBank } from '../hooks/useMissionBank'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { MissionBank } from '../../../core/types'
+import { useTranslation } from 'react-i18next'
 
 const MissionBankPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   const {
@@ -47,12 +49,12 @@ const MissionBankPage = () => {
     [programs],
   )
 
-  const currentAction = deactivateTarget?.is_active ? 'Nonaktifkan' : 'Aktifkan'
+  const currentAction = deactivateTarget?.is_active ? t('admin.common.deactivate') : t('admin.common.activate')
 
   const columns: Column<MissionBank>[] = [
     {
       key: 'title',
-      header: 'Judul Misi',
+      header: t('admin.missions.title'),
       sortable: true,
       render: (item) => (
         <span className="font-medium text-on-surface">{item.title}</span>
@@ -60,7 +62,7 @@ const MissionBankPage = () => {
     },
     {
       key: 'program_id',
-      header: 'Program',
+      header: t('admin.col.program'),
       render: (item) => (
         <span className="text-sm text-on-surface-variant">
           {programMap.get(item.program_id) || '-'}
@@ -69,7 +71,7 @@ const MissionBankPage = () => {
     },
     {
       key: 'related_stage_ids',
-      header: 'Topik Terkait',
+      header: t('admin.missions.relatedStages'),
       render: (item) => {
         const ids = item.related_stage_ids
         if (!ids || ids.length === 0) {
@@ -91,16 +93,16 @@ const MissionBankPage = () => {
     },
     {
       key: 'is_active',
-      header: 'Status',
+      header: t('admin.col.status'),
       render: (item) => (
         <Badge variant={item.is_active ? 'success' : 'neutral'}>
-          {item.is_active ? 'Aktif' : 'Nonaktif'}
+          {item.is_active ? t('admin.status.active') : t('admin.status.inactive')}
         </Badge>
       ),
     },
     {
       key: 'actions',
-      header: 'Aksi',
+      header: t('admin.col.action'),
       align: 'right',
       render: (item) => (
         <div className="flex items-center justify-end gap-1">
@@ -109,7 +111,7 @@ const MissionBankPage = () => {
               variant="ghost"
               size="sm"
               icon={<Pencil className="w-4 h-4" />}
-              tooltip="Edit"
+              tooltip={t('admin.common.edit')}
             />
           </Link>
           {item.is_active ? (
@@ -117,7 +119,7 @@ const MissionBankPage = () => {
               variant="ghost"
               size="sm"
               icon={<PowerOff className="w-4 h-4 text-warning" />}
-              tooltip="Nonaktifkan"
+              tooltip={t('admin.common.deactivate')}
               onClick={() => handleToggleActive(item)}
             />
           ) : (
@@ -125,7 +127,7 @@ const MissionBankPage = () => {
               variant="ghost"
               size="sm"
               icon={<Power className="w-4 h-4 text-green-600" />}
-              tooltip="Aktifkan"
+              tooltip={t('admin.common.activate')}
               onClick={() => setDeactivateTarget(item)}
             />
           )}
@@ -133,7 +135,7 @@ const MissionBankPage = () => {
             variant="ghost"
             size="sm"
             icon={<Trash2 className="w-4 h-4 text-error" />}
-            tooltip="Hapus"
+            tooltip={t('common.delete')}
             onClick={() => handleDelete(item)}
           />
         </div>
@@ -144,14 +146,14 @@ const MissionBankPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Bank Misi"
-        subtitle="Kelola bank misi untuk program edutourism."
+        title={t('admin.missions.bankTitle')}
+        subtitle={t('admin.missions.bankSubtitle')}
         actions={
           <Button
             icon={<Plus className="w-4 h-4" />}
             onClick={() => navigate(ROUTES.ADMIN.MISSION_NEW)}
           >
-            Tambah Misi Baru
+            {t('admin.missions.new')}
           </Button>
         }
       />
@@ -160,7 +162,7 @@ const MissionBankPage = () => {
         <div className="bg-error-container/30 rounded-2xl p-6 text-center">
           <p className="text-sm font-medium text-on-error-container mb-2">{error}</p>
           <Button variant="secondary" size="sm" onClick={loadMissions}>
-            Coba Lagi
+            {t('common.error.retry')}
           </Button>
         </div>
       )}
@@ -180,12 +182,12 @@ const MissionBankPage = () => {
             <div className="w-56">
               <Select
                 options={[
-                  { value: '', label: 'Semua Program' },
+                  { value: '', label: t('admin.common.allPrograms') },
                   ...programs.map((p) => ({ value: p.id, label: p.name })),
                 ]}
                 value={selectedProgram}
                 onChange={(e) => setSelectedProgram(e.target.value)}
-                placeholder="Semua Program"
+                placeholder={t('admin.common.allPrograms')}
               />
             </div>
           </div>
@@ -193,11 +195,11 @@ const MissionBankPage = () => {
         emptyState={
           <ListEmptyState
             icon={<FileText className="w-12 h-12" />}
-            title="Belum ada misi"
+            title={t('admin.missions.emptyTitle')}
             description={
               selectedProgram
-                ? 'Belum ada misi untuk program ini. Klik "Tambah Misi Baru" di atas untuk membuat misi pertama.'
-                : 'Pilih program, lalu klik "Tambah Misi Baru" di atas untuk membuat misi pertama.'
+                ? t('admin.missions.emptyFiltered')
+                : t('admin.missions.emptyAll')
             }
           />
         }
@@ -206,12 +208,12 @@ const MissionBankPage = () => {
       <Modal
         open={!!deactivateTarget}
         onClose={() => setDeactivateTarget(null)}
-        title={`${currentAction} Misi`}
+        title={t('admin.missions.toggleTitle', { action: currentAction })}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setDeactivateTarget(null)}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button
               variant={deactivateTarget?.is_active ? 'danger' : 'primary'}
@@ -224,32 +226,32 @@ const MissionBankPage = () => {
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Apakah Anda yakin ingin {currentAction.toLowerCase()} misi &ldquo;{deactivateTarget?.title}&rdquo;?
+          {t('admin.missions.toggleMsg', { action: currentAction.toLowerCase(), title: deactivateTarget?.title ?? '' })}
         </p>
       </Modal>
 
       <Modal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Hapus Misi"
+        title={t('admin.missions.deleteTitle')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
               onClick={confirmDelete}
               loading={deleting}
             >
-              Hapus
+              {t('common.delete')}
             </Button>
           </div>
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Apakah Anda yakin ingin menghapus misi &ldquo;{deleteTarget?.title}&rdquo;? Misi yang dihapus tidak dapat dikembalikan.
+          {t('admin.missions.deleteMsg', { title: deleteTarget?.title ?? '' })}
         </p>
       </Modal>
     </div>

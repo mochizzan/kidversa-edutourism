@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { i18n } from '../../core/i18n'
 import type { ListParams, PaginatedResponse } from '../../core/types'
 import { ApiError } from '../../core/services/backend-client'
 import { PAGE_SIZE } from '../../core/constants/api'
@@ -117,13 +118,13 @@ export function useCrudList<T extends { id: string }>(
     } catch (err) {
       // A 401 is handled globally (redirect to login); don't toast it here.
       if (err instanceof ApiError && err.status === 401) {
-        setError('Sesi berakhir. Silakan masuk kembali.')
+        setError(i18n.t('common.sessionExpired'))
       } else if (err instanceof Error && 'status' in err) {
         // Network/connection failure surfaced by backendClient as a generic Error.
-        setError('Backend tidak tersedia. Periksa koneksi lalu coba lagi.')
-        addToast({ type: 'error', message: 'Backend tidak tersedia. Coba lagi.' })
+        setError(i18n.t('common.backend.unavailable'))
+        addToast({ type: 'error', message: i18n.t('common.backend.unavailableToast') })
       } else {
-        setError('Gagal memuat data. Coba lagi.')
+        setError(i18n.t('common.loadFailed'))
       }
     } finally {
       setLoading(false)

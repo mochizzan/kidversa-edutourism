@@ -19,6 +19,7 @@ import { formatDate } from '../../../shared/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Program, ProgramStage, ProgramSubstage } from '../../../core/types'
+import { useTranslation } from 'react-i18next'
 
 interface ActivityRow extends ProgramSubstage {
   programId: string
@@ -27,6 +28,7 @@ interface ActivityRow extends ProgramSubstage {
 }
 
 const ActivitiesPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { tenantId } = useTenantScope()
   const { addToast } = useGlobalToast()
@@ -155,7 +157,7 @@ const ActivitiesPage = () => {
     setDeleting(true)
     try {
       await programSubstageService.remove(deleteTarget.id)
-      addToast({ type: 'success', message: 'Kegiatan dihapus' })
+      addToast({ type: 'success', message: t('admin.activities.deletedToast') })
       setDeleteTarget(null)
       adjustPageOnDelete()
     } catch (err) {
@@ -168,19 +170,19 @@ const ActivitiesPage = () => {
   const columns: Column<ActivityRow>[] = [
     {
       key: 'programName',
-      header: 'Program',
+      header: t('admin.col.program'),
       sortable: true,
       render: (item) => <span className="text-sm text-on-surface">{item.programName}</span>,
     },
     {
       key: 'stageName',
-      header: 'Topik',
+      header: t('admin.topic.pageTitle'),
       sortable: true,
       render: (item) => <span className="text-sm text-on-surface">{item.stageName}</span>,
     },
     {
       key: 'name',
-      header: 'Nama Kegiatan',
+      header: t('admin.activities.nameLabel'),
       sortable: true,
       render: (item) => (
         <div>
@@ -191,12 +193,12 @@ const ActivitiesPage = () => {
     },
     {
       key: 'created_at',
-      header: 'Dibuat',
+      header: t('admin.col.created'),
       render: (item) => <span className="text-sm text-on-surface-variant">{formatDate(item.created_at)}</span>,
     },
     {
       key: 'actions',
-      header: 'Aksi',
+      header: t('admin.col.action'),
       align: 'right',
       render: (item) => (
         <div className="flex items-center justify-end gap-2">
@@ -204,21 +206,21 @@ const ActivitiesPage = () => {
             variant="ghost"
             size="sm"
             icon={<Info className="w-4 h-4" />}
-            tooltip="Detail"
+            tooltip={t('admin.activities.tipDetail')}
             onClick={() => navigate(activityDetailPath(item.id))}
           />
           <Button
             variant="ghost"
             size="sm"
             icon={<Pencil className="w-4 h-4" />}
-            tooltip="Edit"
+            tooltip={t('admin.common.edit')}
             onClick={() => navigate(activityEditPath(item.id))}
           />
           <Button
             variant="ghost"
             size="sm"
             icon={<Trash2 className="w-4 h-4 text-error" />}
-            tooltip="Hapus"
+            tooltip={t('common.delete')}
             onClick={() => setDeleteTarget(item)}
           />
         </div>
@@ -231,8 +233,8 @@ const ActivitiesPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Kegiatan"
-        subtitle="Kelola kegiatan (program substages) di dalam setiap topik."
+        title={t('admin.activities.title')}
+        subtitle={t('admin.activities.subtitle')}
         actions={
           <Button
             icon={<Plus className="w-4 h-4" />}
@@ -240,7 +242,7 @@ const ActivitiesPage = () => {
               navigate(activityNewPath({ programId: programFilter || undefined, stageId: stageFilter || undefined }))
             }
           >
-            Tambah Kegiatan
+            {t('admin.activities.add')}
           </Button>
         }
       />
@@ -252,7 +254,7 @@ const ActivitiesPage = () => {
             {error}
           </span>
           <Button variant="secondary" size="sm" onClick={refresh}>
-            Coba Lagi
+            {t('common.error.retry')}
           </Button>
         </div>
       )}
@@ -270,18 +272,18 @@ const ActivitiesPage = () => {
         actions={
           <div className="flex items-center gap-2">
             <Select
-              label="Program"
-              placeholder="Semua Program"
+              label={t('admin.col.program')}
+              placeholder={t('admin.common.allPrograms')}
               value={programFilter}
-              options={[{ value: '', label: 'Semua Program' }, ...programOptions]}
+              options={[{ value: '', label: t('admin.common.allPrograms') }, ...programOptions]}
               onChange={(e) => handleProgramChange(e.target.value)}
               className="w-56"
             />
             <Select
-              label="Topik"
-              placeholder={programFilter ? 'Semua Topik' : 'Pilih Program Dulu'}
+              label={t('admin.topic.pageTitle')}
+              placeholder={programFilter ? t('admin.activities.allTopics') : t('admin.activities.pickProgramDulu')}
               value={stageFilter}
-              options={[{ value: '', label: 'Semua Topik' }, ...stageOptions]}
+              options={[{ value: '', label: t('admin.activities.allTopics') }, ...stageOptions]}
               onChange={(e) => handleStageChange(e.target.value)}
               disabled={!programFilter || stagesLoading}
               className="w-56"
@@ -291,17 +293,17 @@ const ActivitiesPage = () => {
         emptyState={
           <ListEmptyState
             icon={<FolderOpen className="w-12 h-12" />}
-            title="Belum ada kegiatan"
-            description="Buat kegiatan pertama untuk program dan topik yang dipilih."
+            title={t('admin.activities.emptyTitle')}
+            description={t('admin.activities.emptyDesc')}
           />
         }
       />
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Hapus Kegiatan"
-        message={`Yakin ingin menghapus kegiatan "${deleteTarget?.name || ''}"? Konten yang ditugaskan ke kegiatan ini akan dilepas. Tindakan ini tidak dapat dibatalkan.`}
-        confirmLabel="Hapus"
+        title={t('admin.activities.deleteTitle')}
+        message={t('admin.activities.deleteMsgList', { name: deleteTarget?.name || '' })}
+        confirmLabel={t('common.delete')}
         loading={deleting}
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}

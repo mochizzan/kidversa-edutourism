@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Upload, ArrowRight } from 'lucide-react'
 import { Modal } from './Modal'
 import { Button } from './Button'
@@ -15,6 +16,7 @@ interface AvatarUploadModalProps {
 }
 
 export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile = null, onUpload }: AvatarUploadModalProps) {
+  const { t } = useTranslation()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -91,7 +93,7 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
     if (!uploading) onClose()
   }, [uploading, onClose])
 
-  const title = currentAvatarUrl ? 'Ubah Foto Profil' : 'Tambahkan Foto Profil'
+  const title = currentAvatarUrl ? t('common.avatar.changeTitle') : t('common.avatar.addTitle')
 
   return (
     <Modal
@@ -102,8 +104,8 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
       closeOnOverlay={!uploading}
       footer={selectedFile ? (
         <div className="flex justify-end gap-3">
-          <Button variant="ghost" disabled={uploading} onClick={onClose}>Batal</Button>
-          <Button loading={uploading} onClick={handleSave}>Simpan</Button>
+          <Button variant="ghost" disabled={uploading} onClick={onClose}>{t('common.cancel')}</Button>
+          <Button loading={uploading} onClick={handleSave}>{t('common.save')}</Button>
         </div>
       ) : undefined}
     >
@@ -111,7 +113,7 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
         <div
           tabIndex={0}
           role="button"
-          aria-label="Pilih file gambar untuk foto profil"
+          aria-label={t('common.avatar.pickAria')}
           onClick={() => fileInputRef.current?.click()}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click() } }}
           onDragEnter={handleDragEnter}
@@ -126,9 +128,9 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
         >
           <Upload className="w-12 h-12 mx-auto mb-3 text-outline" />
           <p className="text-sm font-medium text-on-surface mb-1">
-            Seret & lepas gambar di sini, atau klik untuk memilih
+            {t('common.avatar.dropHint')}
           </p>
-          <p className="text-xs text-on-surface-variant">JPEG atau PNG, maksimal 5MB</p>
+          <p className="text-xs text-on-surface-variant">{t('common.avatar.limits')}</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -143,9 +145,9 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
             {currentAvatarUrl && (
               <div className="text-center">
                 <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-outline-variant mx-auto">
-                  <img src={currentAvatarUrl} alt="Saat ini" className="w-full h-full object-cover" />
+                  <img src={currentAvatarUrl} alt={t('common.avatar.current')} className="w-full h-full object-cover" />
                 </div>
-                <p className="text-xs font-semibold text-on-surface-variant mt-2">Saat ini</p>
+                <p className="text-xs font-semibold text-on-surface-variant mt-2">{t('common.avatar.current')}</p>
               </div>
             )}
             {currentAvatarUrl && (
@@ -153,9 +155,9 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
             )}
             <div className="text-center">
               <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-primary mx-auto">
-                <img src={previewUrl!} alt="Pratinjau foto profil" className="w-full h-full object-cover" />
+                <img src={previewUrl!} alt={t('common.avatar.previewAlt')} className="w-full h-full object-cover" />
               </div>
-              <p className="text-xs font-semibold text-primary mt-2">Baru</p>
+              <p className="text-xs font-semibold text-primary mt-2">{t('common.avatar.new')}</p>
             </div>
           </div>
 
@@ -173,7 +175,7 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
             onClick={() => { setSelectedFile(null); setPreviewUrl(null) }}
             className="text-primary text-sm font-semibold hover:underline cursor-pointer"
           >
-            Ganti file
+            {t('common.avatar.changeFile')}
           </button>
         </div>
       )}

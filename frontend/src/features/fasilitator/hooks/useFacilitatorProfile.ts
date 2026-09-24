@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { i18n } from '../../../core/i18n'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { ROUTES } from '../../../core/constants/app'
@@ -25,9 +26,9 @@ export function useFacilitatorProfile() {
         const updated = await userService.uploadAvatar(user.id, file)
         const { password_hash: _password, ...cleanUser } = updated
         setUser(cleanUser as UserType)
-        addToast({ type: 'success', message: 'Foto profil berhasil diperbarui' })
+        addToast({ type: 'success', message: i18n.t('fasilitator.profile.avatarUpdated') })
       } catch (err) {
-        addToast({ type: 'error', message: 'Gagal memperbarui foto profil' })
+        addToast({ type: 'error', message: i18n.t('fasilitator.profile.avatarError') })
         throw err
       }
     },

@@ -7,6 +7,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Select } from '../../../shared/components/ui/Select'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
+import { Trans, useTranslation } from 'react-i18next'
 import { sessionService } from '../../../core/services/sessions'
 import { participantService } from '../../../core/services/participants'
 import { GroupFormModal } from './GroupFormModal'
@@ -31,14 +32,15 @@ const groupStatusVariant: Record<string, 'neutral' | 'warning' | 'success'> = {
   COMPLETED: 'success',
 }
 
-const groupStatusLabel: Record<string, string> = {
-  WAITING: 'Menunggu',
-  IN_PROGRESS: 'Berlangsung',
-  COMPLETED: 'Selesai',
-}
+const groupStatusKeys = {
+  WAITING: 'admin.status.waiting',
+  IN_PROGRESS: 'admin.sessions.stageInProgress',
+  COMPLETED: 'common.done',
+} as const satisfies Record<string, string>
 
 export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitators, onRefresh }: SessionGroupsTabProps) {
   const { addToast } = useGlobalToast()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const isDraft = sessionStatus === 'DRAFT'
   const canModifyParticipants = sessionStatus === 'DRAFT' || sessionStatus === 'ACTIVE'
@@ -81,8 +83,8 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
 
   const linkedParticipantIds = groups.flatMap((g) => g.participants.map((p) => p.id))
   const facilitatorOptions = useMemo(
-    () => [{ value: '', label: 'Pilih Fasilitator' }, ...facilitators.map((f) => ({ value: f.id, label: f.name }))],
-    [facilitators]
+    () => [{ value: '', label: t('admin.sessions.pickFacilitator') }, ...facilitators.map((f) => ({ value: f.id, label: f.name }))],
+    [facilitators, t]
   )
 
   const loadAvailableParticipants = async () => {
@@ -116,7 +118,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
   const handleCreateGroup = async (name: string) => {
     try {
       await sessionService.createGroup(sessionId, name)
-      addToast({ type: 'success', message: 'Kelompok berhasil ditambahkan' })
+      addToast({ type: 'success', message: t('admin.sessions.groupAdded') })
       onRefresh()
       setRefreshKey((k) => k + 1)
     } catch (err) {
@@ -128,7 +130,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
     if (!editingGroup) return
     try {
       await sessionService.updateGroup(sessionId, editingGroup.id, { name, facilitatorId: editingGroup.facilitator_id ?? null })
-      addToast({ type: 'success', message: 'Kelompok berhasil diperbarui' })
+      addToast({ type: 'success', message: t('admin.sessions.groupUpdated') })
       onRefresh()
       setRefreshKey((k) => k + 1)
     } catch (err) {
@@ -157,7 +159,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
 
   const handleDeleteGroup = (group: SessionGroup & { participants: Participant[] }) => {
     if (group.participants.length > 0) {
-      addToast({ type: 'error', message: 'Tidak dapat menghapus kelompok yang memiliki peserta' })
+      addToast({ type: 'error', message: t('admin.sessions.groupHasParticipants') })
       return
     }
     setConfirmGroup(group)
@@ -167,7 +169,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
     if (!confirmGroup) return
     try {
       await sessionService.deleteGroup(sessionId, confirmGroup.id)
-      addToast({ type: 'success', message: 'Kelompok berhasil dihapus' })
+      addToast({ type: 'success', message: t('admin.sessions.groupDeleted') })
       onRefresh()
       setRefreshKey((k) => k + 1)
     } catch (err) {
@@ -181,9 +183,9 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
     if (!selectedGroupId) return
     const result = await sessionService.linkParticipant(sessionId, selectedGroupId, participantId)
     if (result.previous_session_name) {
-      addToast({ type: 'success', message: `Peserta dipindahkan dari sesi "${result.previous_session_name}"` })
+      addToast({ type: 'success', message: t('admin.sessions.participantMoved', { name: result.previous_session_name }) })
     } else {
-      addToast({ type: 'success', message: 'Peserta berhasil ditambahkan ke kelompok' })
+      addToast({ type: 'success', message: t('admin.sessions.participantLinked') })
     }
     onRefresh()
     setRefreshKey((k) => k + 1)
@@ -197,7 +199,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
     if (!confirmParticipant) return
     try {
       await sessionService.removeParticipant(sessionId, confirmParticipant.id)
-      addToast({ type: 'success', message: 'Peserta berhasil dilepas dari kelompok' })
+      addToast({ type: 'success', message: t('admin.sessions.participantUnlinked') })
       onRefresh()
       setRefreshKey((k) => k + 1)
     } catch (err) {
@@ -237,14 +239,14 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
       if (skippedCount > 0) {
         addToast({
           type: 'warning',
-          message: `${createdCount} peserta ditambahkan, ${skippedCount} dilewati (duplikat)`,
+          message: t('admin.sessions.importPartial', { created: createdCount, skipped: skippedCount }),
         })
       } else {
-        addToast({ type: 'success', message: `${createdCount} peserta berhasil diimport` })
+        addToast({ type: 'success', message: t('admin.sessions.importDone', { count: createdCount }) })
       }
     } catch (err) {
       for (const g of newGroups) {
-        await sessionService.deleteGroup(g.sessionId, g.groupId).catch(() => {})
+        await sessionService.deleteGroup(g.sessionId, g.groupId).catch(() => { })
       }
       throw err
     }
@@ -279,17 +281,17 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
       <Card padding="sm">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
           <span className="text-on-surface-variant">
-            Kelompok: <span className="font-semibold text-on-surface">{groups.length}</span>
+            <Trans i18nKey="admin.sessions.statGroups" values={{ count: groups.length }} components={{ v: <span className="font-semibold text-on-surface" /> }} />
           </span>
           <span className="text-on-surface-variant">
-            Peserta: <span className="font-semibold text-on-surface">{totalParticipants}</span>
+            <Trans i18nKey="admin.sessions.statParticipants" values={{ count: totalParticipants }} components={{ v: <span className="font-semibold text-on-surface" /> }} />
           </span>
           <span className="text-on-surface-variant">
-            Kelompok berfasilitator: <span className="font-semibold text-on-surface">{assignedGroups}</span> / {groups.length}
+            <Trans i18nKey="admin.sessions.statFacilitated" values={{ assigned: assignedGroups, total: groups.length }} components={{ v: <span className="font-semibold text-on-surface" /> }} />
           </span>
           {!isDraft && (
             <span className="text-on-surface-variant">
-              Fasilitator terpakai: <span className="font-semibold text-on-surface">{usedFacilitators}</span> / {facilitators.length}
+              <Trans i18nKey="admin.sessions.statUsedFacilitators" values={{ used: usedFacilitators, total: facilitators.length }} components={{ v: <span className="font-semibold text-on-surface" /> }} />
             </span>
           )}
         </div>
@@ -298,10 +300,10 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
       {isDraft && (
         <div className="flex gap-2">
           <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openAddGroupModal}>
-            Tambah Kelompok
+            {t('admin.sessions.groupAdd')}
           </Button>
           <Button variant="secondary" icon={<Upload className="w-4 h-4" />} onClick={() => setCsvImportOpen(true)}>
-            Import CSV
+            {t('admin.sessions.importCsvBtn')}
           </Button>
         </div>
       )}
@@ -309,7 +311,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
       {groups.length === 0 ? (
         <Card>
           <div className="text-center py-8 text-on-surface-variant">
-            <p>Belum ada kelompok. {isDraft && 'Tambahkan kelompok atau import CSV untuk memulai.'}</p>
+            <p>{t('admin.sessions.emptyGroups')}{isDraft ? ` ${t('admin.sessions.emptyGroupsDraft')}` : ''}</p>
           </div>
         </Card>
       ) : (
@@ -330,16 +332,16 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                         onClick={() => toggle(group.id)}
                         className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-on-surface-variant hover:bg-primary-50 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                         aria-expanded={isOpen}
-                        aria-label={isOpen ? `Tutup kelompok ${group.name}` : `Buka kelompok ${group.name}`}
+                        aria-label={isOpen ? t('admin.sessions.closeGroupAria', { name: group.name }) : t('admin.sessions.openGroupAria', { name: group.name })}
                       >
                         {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </button>
                       <Users className="w-4 h-4 text-primary shrink-0" />
                       <span className="font-semibold text-on-surface">{group.name}</span>
                       <Badge variant={groupStatusVariant[group.status] || 'neutral'}>
-                        {groupStatusLabel[group.status] || group.status}
+                        {t(groupStatusKeys[group.status as keyof typeof groupStatusKeys] || group.status)}
                       </Badge>
-                      <Badge variant="accent">{group.participants.length} anak</Badge>
+                      <Badge variant="accent">{t('admin.sessions.childCount', { count: group.participants.length })}</Badge>
                     </div>
 
                     {isDraft && (
@@ -349,14 +351,14 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                           size="sm"
                           icon={<Pencil className="w-4 h-4" />}
                           onClick={() => openEditGroupModal(group)}
-                          tooltip="Edit kelompok"
+                          tooltip={t('admin.sessions.editGroupTooltip')}
                         />
                         <Button
                           variant="ghost"
                           size="sm"
                           icon={<Trash2 className="w-4 h-4" />}
                           onClick={() => handleDeleteGroup(group)}
-                          tooltip={group.participants.length > 0 ? 'Tidak dapat menghapus kelompok yang memiliki peserta' : 'Hapus kelompok'}
+                          tooltip={group.participants.length > 0 ? t('admin.sessions.groupHasParticipants') : t('admin.sessions.deleteGroupTooltip')}
                           disabled={group.participants.length > 0}
                         />
                       </div>
@@ -370,7 +372,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                       <div className="relative flex items-center gap-2">
                         <span aria-hidden className="pointer-events-none absolute -left-4 top-1/2 h-px w-4 -translate-y-1/2 bg-primary-200" />
                         <UserIcon className="w-4 h-4 shrink-0 text-primary-400" />
-                        <span className="text-sm font-medium text-on-surface-variant">Fasilitator</span>
+                        <span className="text-sm font-medium text-on-surface-variant">{t('admin.sessions.fasilitatorLabel')}</span>
                         {isDraft ? (
                           <div className="w-auto min-w-[180px] max-w-[240px] flex-1">
                             <Select
@@ -378,12 +380,12 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                               options={facilitatorOptions}
                               disabled={pendingFacilitator[group.id]}
                               onChange={(e) => handleAssignFacilitator(group, e.target.value)}
-                              aria-label={`Fasilitator kelompok ${group.name}`}
+                              aria-label={t('admin.sessions.facilitatorSelectAria', { name: group.name })}
                             />
                           </div>
                         ) : (
                           <span className="text-sm font-semibold text-on-surface truncate">
-                            {facilitator?.name || 'Belum ada fasilitator'}
+                            {facilitator?.name || t('admin.sessions.noFacilitator')}
                           </span>
                         )}
                       </div>
@@ -394,7 +396,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                           <div className="relative flex items-center">
                             <span aria-hidden className="pointer-events-none absolute -left-4 top-1/2 h-px w-4 -translate-y-1/2 bg-primary-200" />
                             <p className="py-0.5 text-sm text-on-surface-variant italic">
-                              Belum ada peserta di kelompok ini.
+                              {t('admin.sessions.noParticipants')}
                             </p>
                           </div>
                         ) : (
@@ -408,13 +410,13 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                               <div className="min-w-0 flex-1">
                                 <p className="font-medium text-on-surface">{participant.child_name}</p>
                                 <p className="mt-0.5 text-xs text-on-surface-variant">
-                                  Umur {participant.child_age} · {participant.parent_name}
+                                  {t('admin.sessions.ageParentLine', { age: participant.child_age, parent: participant.parent_name })}
                                   {participant.school_name ? ` · ${participant.school_name}` : ''}
                                 </p>
                               </div>
 
                               <div className="flex shrink-0 items-center gap-1.5">
-                                <Badge variant={participant.consent_photo ? 'success' : 'danger'}>Foto</Badge>
+                                <Badge variant={participant.consent_photo ? 'success' : 'danger'}>{t('admin.sessions.photoBadge')}</Badge>
                               </div>
 
                               {canModifyParticipants && (
@@ -424,14 +426,14 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                                     size="sm"
                                     icon={<Pencil className="w-4 h-4" />}
                                     onClick={() => navigate(`${ROUTES.ADMIN.PARTICIPANTS}/${participant.id}/edit`)}
-                                    tooltip="Edit peserta"
+                                    tooltip={t('admin.sessions.editParticipantTooltip')}
                                   />
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     icon={<Trash2 className="w-4 h-4" />}
                                     onClick={() => handleDeleteParticipant(participant)}
-                                    tooltip="Lepas peserta"
+                                    tooltip={t('admin.sessions.unlinkParticipantTooltip')}
                                   />
                                 </div>
                               )}
@@ -447,7 +449,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                               icon={<UserPlus className="w-4 h-4" />}
                               onClick={() => openAddParticipantModal(group.id)}
                             >
-                              Tambah Peserta
+                              {t('admin.sessions.addParticipantBtn')}
                             </Button>
                           </div>
                         )}
@@ -486,17 +488,17 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
 
       <ConfirmDialog
         open={!!confirmGroup}
-        title="Hapus Kelompok"
-        message={`Yakin ingin menghapus kelompok "${confirmGroup?.name || ''}"? Tindakan ini tidak dapat dibatalkan.`}
+        title={t('admin.sessions.groupDeleteTitle')}
+        message={t('admin.sessions.groupDeleteMsg', { name: confirmGroup?.name || '' })}
         onConfirm={confirmDeleteGroup}
         onClose={() => setConfirmGroup(null)}
       />
 
       <ConfirmDialog
         open={!!confirmParticipant}
-        title="Lepas Peserta"
-        message={`Yakin ingin melepaskan peserta "${confirmParticipant?.child_name || ''}" dari kelompok ini? Peserta masih bisa ditambahkan kembali.`}
-        confirmLabel="Lepas"
+        title={t('admin.sessions.unlinkTitle')}
+        message={t('admin.sessions.unlinkMsg', { name: confirmParticipant?.child_name || '' })}
+        confirmLabel={t('admin.sessions.unlinkBtn')}
         onConfirm={confirmDeleteParticipant}
         onClose={() => setConfirmParticipant(null)}
       />

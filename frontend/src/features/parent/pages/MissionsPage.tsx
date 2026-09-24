@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   ArrowLeft,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../../shared/components/ui/Button'
 import { Card } from '../../../shared/components/ui/Card'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
@@ -19,10 +20,12 @@ import { missionService } from '../../../core/services/missions'
 import { participantMissionService } from '../../../core/services/missions'
 import type { MissionBank, ParticipantMission } from '../../../core/types'
 import { cn } from '../../../core/utils/cn'
+import { i18n } from '../../../core/i18n'
 import { BadgeList } from '../../../shared/components/data/BadgeList'
 
 /* ── Inner component ── */
 function MissionsView() {
+  const { t } = useTranslation()
   const { report, loading: guardLoading, error: guardError } = useParentToken()
   const [searchParams] = useSearchParams()
   const reportIdParam = searchParams.get('reportId') || report?.id || ''
@@ -61,7 +64,7 @@ function MissionsView() {
       }
       setMissionBank(bankMap)
     } catch {
-      setError('Gagal memuat misi. Silakan coba lagi.')
+      setError(t('parent.missions.loadError'))
     } finally {
       setLoading(false)
     }
@@ -77,7 +80,7 @@ function MissionsView() {
       await participantMissionService.toggleComplete(pmId)
       await loadData()
     } catch {
-      setError('Gagal memperbarui status misi.')
+      setError(t('parent.missions.updateError'))
     } finally {
       setTogglingId(null)
     }
@@ -125,7 +128,7 @@ function MissionsView() {
       <div className="flex items-center justify-center py-16">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mx-auto" />
-          <p className="mt-4 text-sm text-on-surface-variant">Memuat misi...</p>
+          <p className="mt-4 text-sm text-on-surface-variant">{t('parent.missions.loading')}</p>
         </div>
       </div>
     )
@@ -136,8 +139,8 @@ function MissionsView() {
     return (
       <EmptyState
         icon={<Target className="w-12 h-12" />}
-        title="Tidak dapat mengakses"
-        description="Tautan tidak valid atau sudah kedaluwarsa."
+        title={t('parent.missions.invalidTitle')}
+        description={t('parent.missions.invalidDesc')}
       />
     )
   }
@@ -147,8 +150,8 @@ function MissionsView() {
     return (
       <div className="space-y-4">
         <div className="text-center">
-          <h1 className="text-xl font-bold text-on-surface">Misi Lanjutan</h1>
-          <p className="text-sm text-on-surface-variant mt-1">Ananda</p>
+          <h1 className="text-xl font-bold text-on-surface">{t('parent.missions.title')}</h1>
+          <p className="text-sm text-on-surface-variant mt-1">{t('parent.missions.loadingChild')}</p>
         </div>
         {[1, 2, 3].map((i) => (
           <div key={i} className="bg-surface rounded-2xl p-4 animate-pulse">
@@ -168,7 +171,7 @@ function MissionsView() {
         <AlertTriangle className="w-8 h-8 text-error mx-auto mb-3" />
         <p className="text-sm text-on-surface-variant mb-4">{error}</p>
         <Button variant="secondary" size="sm" onClick={loadData}>
-          Coba Lagi
+          {t('common.error.retry')}
         </Button>
       </div>
     )
@@ -179,13 +182,13 @@ function MissionsView() {
     return (
       <div className="space-y-6">
         <div className="text-center">
-          <h1 className="text-xl font-bold text-on-surface">Misi Lanjutan</h1>
-          <p className="text-sm text-on-surface-variant mt-1">Ananda</p>
+          <h1 className="text-xl font-bold text-on-surface">{t('parent.missions.title')}</h1>
+          <p className="text-sm text-on-surface-variant mt-1">{t('parent.missions.loadingChild')}</p>
         </div>
         <EmptyState
           icon={<Target className="w-12 h-12" />}
-          title="Belum ada misi"
-          description="Misi lanjutan akan muncul setelah laporan tersedia."
+          title={t('parent.missions.emptyTitle')}
+          description={t('parent.missions.emptyDesc')}
         />
       </div>
     )
@@ -196,9 +199,9 @@ function MissionsView() {
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-xl font-bold text-on-surface">Misi Lanjutan</h1>
+        <h1 className="text-xl font-bold text-on-surface">{t('parent.missions.title')}</h1>
         <p className="text-sm text-on-surface-variant mt-1">
-          Untuk: Ananda
+          {t('parent.missions.forChild')}
         </p>
       </div>
 
@@ -213,7 +216,7 @@ function MissionsView() {
           </div>
           <div className="flex-1">
             <p className="font-semibold text-on-surface">
-              {completedCount}/{totalCount} misi selesai
+              {t('parent.missions.progress', { done: completedCount, total: totalCount })}
             </p>
             <div className="mt-2 w-full bg-surface-variant rounded-full h-2">
               <div
@@ -232,7 +235,7 @@ function MissionsView() {
         return (
           <div key={group.key}>
             <div className="flex items-center gap-2 mb-3">
-              <h2 className="font-semibold text-on-surface">SubTopik {group.index}</h2>
+              <h2 className="font-semibold text-on-surface">{t('parent.missions.subtopik', { n: group.index })}</h2>
               <span className="text-xs text-on-surface-variant ml-auto">
                 {group.missions.filter((m) => m.pm.is_completed).length}/{group.missions.length}
               </span>
@@ -254,7 +257,7 @@ function MissionsView() {
                       onClick={() => handleToggle(pm.id)}
                       disabled={togglingId === pm.id}
                       className="mt-0.5 shrink-0"
-                      aria-label={pm.is_completed ? 'Tandai belum selesai' : 'Tandai selesai'}
+                      aria-label={pm.is_completed ? t('parent.missions.markIncomplete') : t('parent.missions.markComplete')}
                     >
                       {togglingId === pm.id ? (
                         <Loader2 className="w-5 h-5 text-primary animate-spin" />
@@ -274,12 +277,12 @@ function MissionsView() {
                             : 'text-on-surface'
                         )}
                       >
-                        {bank?.title || 'Misi'}
+                        {bank?.title || t('parent.missions.fallbackTitle')}
                       </p>
                       {pm.completed_at && (
                         <p className="text-[11px] text-green-500 mt-1">
-                          Selesai{' '}
-                          {new Date(pm.completed_at).toLocaleDateString('id-ID', {
+                          {t('parent.missions.completedOn')}{' '}
+                          {new Date(pm.completed_at).toLocaleDateString(i18n.resolvedLanguage ?? 'id', {
                             day: 'numeric',
                             month: 'short',
                             timeZone: 'Asia/Jakarta',
@@ -301,7 +304,7 @@ function MissionsView() {
           to={`/parent/report?${searchParams.toString()}`}
           className="flex items-center justify-center gap-2 text-sm text-primary font-medium hover:underline"
         >
-          <ArrowLeft className="w-4 h-4" /> Kembali ke Laporan
+          <ArrowLeft className="w-4 h-4" /> {t('parent.missions.backToReport')}
         </Link>
       )}
     </div>

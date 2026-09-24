@@ -1,5 +1,6 @@
 import { User } from 'lucide-react'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 
 interface RegisterStepNameProps {
@@ -9,10 +10,11 @@ interface RegisterStepNameProps {
 }
 
 export function RegisterStepName({ register, errors, disabled }: RegisterStepNameProps) {
+  const { t } = useTranslation()
   return (
     <div>
       <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-        Nama Lengkap
+        {t('auth.register.nameLabel')}
       </label>
       <div className="relative">
         <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
@@ -25,7 +27,7 @@ export function RegisterStepName({ register, errors, disabled }: RegisterStepNam
             'focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15',
             errors.name ? 'border-error' : 'border-outline-variant/60',
           )}
-          placeholder="Nama Lengkap"
+          placeholder={t('auth.register.nameLabel')}
           disabled={disabled}
         />
       </div>

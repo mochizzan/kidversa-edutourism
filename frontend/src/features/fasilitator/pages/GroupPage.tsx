@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Users, Target, Monitor, User } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
 import { SessionStatus } from '../../../core/types/enums'
@@ -79,6 +80,7 @@ function SkeletonList() {
 }
 
 const GroupPage = () => {
+  const { t } = useTranslation()
   const { groupId } = useParams<{ groupId: string }>()
   const navigate = useNavigate()
   const confirm = useConfirmDialog()
@@ -106,14 +108,14 @@ const GroupPage = () => {
       const detail = await findGroupInSessions(res.data, groupId)
 
       if (!detail) {
-        setError('Kelompok tidak ditemukan')
+        setError(t('fasilitator.group.notFound'))
         return
       }
 
       // Get the matching group
       const group = detail.groups.find((g) => g.id === groupId)
       if (!group) {
-        setError('Kelompok tidak ditemukan')
+        setError(t('fasilitator.group.notFound'))
         return
       }
 
@@ -121,7 +123,7 @@ const GroupPage = () => {
       const isGroupMine = !user || user.role !== 'FASILITATOR' || group.facilitator_id === user.id
       if (!isGroupMine) {
         navigate(ROUTES.FASILITATOR.DASHBOARD, { replace: true })
-        addToast({ type: 'error', message: 'Anda tidak memiliki akses ke kelompok ini.' })
+        addToast({ type: 'error', message: t('fasilitator.group.noAccess') })
         return
       }
 
@@ -242,7 +244,7 @@ const GroupPage = () => {
   const confirmComplete = async () => {
     if (!groupDetail || !groupId || !groupDetail.sessionStage) return
     if (activeLeaves.length === 0) {
-      addToast({ type: 'error', message: 'Kelompok belum memiliki kegiatan untuk diselesaikan.' })
+      addToast({ type: 'error', message: t('fasilitator.group.noActivities') })
       return
     }
     setCompleting(true)
@@ -260,10 +262,10 @@ const GroupPage = () => {
         user?.id,
       )
       confirm.dismiss()
-      addToast({ type: 'success', message: 'Kelompok berhasil diselesaikan' })
+      addToast({ type: 'success', message: t('fasilitator.group.completeSuccess') })
       navigate(ROUTES.FASILITATOR.DASHBOARD)
     } catch {
-      addToast({ type: 'error', message: 'Gagal menyelesaikan kelompok' })
+      addToast({ type: 'error', message: t('fasilitator.group.completeError') })
     } finally {
       setCompleting(false)
     }
@@ -280,13 +282,13 @@ const GroupPage = () => {
     const sessionId = groupDetail.session.id
     const stageId = openableStageId ?? groupDetail.group.current_session_stage_id
     if (!stageId) {
-      addToast({ type: 'error', message: 'Kelompok belum memiliki stage aktif untuk dibuka di kiosk.' })
+      addToast({ type: 'error', message: t('fasilitator.group.noActiveStage') })
       return
     }
     // Edge case: kiosk token single-use. Jika sesi belum ACTIVE, konten mungkin
     // kosong — beri peringatan, tapi tetap izinkan (backend tidak memblokir).
     if (groupDetail.session.status !== 'ACTIVE') {
-      addToast({ type: 'info', message: 'Sesi belum aktif — kiosk mungkin menampilkan konten kosong.' })
+      addToast({ type: 'info', message: t('fasilitator.group.sessionInactiveKiosk') })
     }
     setKioskLoading(true)
     // Buka jendela SEBELUM await agar tidak terblokir popup blocker
@@ -334,7 +336,7 @@ const GroupPage = () => {
     } catch {
       // Revert on error
       setAttendanceMap(prev => new Map(prev).set(participantId, current))
-      addToast({ type: 'error', message: 'Gagal mengubah kehadiran' })
+      addToast({ type: 'error', message: t('fasilitator.group.attendanceError') })
     } finally {
       setAttendanceLoading(prev => {
         const next = new Set(prev)
@@ -359,7 +361,7 @@ const GroupPage = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Kelompok" breadcrumbs={[{ label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD }, { label: 'Error' }]} />
+        <PageHeader title={t('fasilitator.group.pageTitle')} breadcrumbs={[{ label: t('common.dashboard'), href: ROUTES.FASILITATOR.DASHBOARD }, { label: t('fasilitator.group.crumbError') }]} />
         <ErrorState message={error} onRetry={fetchData} />
       </div>
     )
@@ -369,11 +371,11 @@ const GroupPage = () => {
   if (!groupDetail) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Kelompok" />
+        <PageHeader title={t('fasilitator.group.pageTitle')} />
         <EmptyState
           icon={<Users className="w-12 h-12" />}
-          title="Belum ada peserta"
-          description="Belum ada peserta yang terdaftar di kelompok ini."
+          title={t('fasilitator.group.emptyTitle')}
+          description={t('fasilitator.group.emptyDesc')}
         />
       </div>
     )
@@ -396,16 +398,16 @@ const GroupPage = () => {
     <div className="space-y-6">
       <PageHeader
         title={group.name}
-        subtitle={programStageName ?? 'Topik'}
+        subtitle={programStageName ?? t('fasilitator.topicFallback')}
         breadcrumbs={[
-          { label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD },
+          { label: t('common.dashboard'), href: ROUTES.FASILITATOR.DASHBOARD },
           { label: group.name },
         ]}
         actions={
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 text-sm text-on-surface-variant">
               <Target className="w-4 h-4" />
-              <span>{programStageName ?? 'Topik'}</span>
+              <span>{programStageName ?? t('fasilitator.topicFallback')}</span>
             </div>
             <Button
               variant="primary"
@@ -415,7 +417,7 @@ const GroupPage = () => {
               disabled={!openableStageId || !isMine}
               icon={<Monitor className="w-4 h-4" />}
             >
-              Buka Kiosk
+              {t('fasilitator.group.openKiosk')}
             </Button>
           </div>
         }
@@ -423,7 +425,7 @@ const GroupPage = () => {
 
       {!isSessionActive && (
         <div className="flex items-center gap-2 rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-700">
-          Sesi belum dimulai. Penilaian akan tersedia setelah sesi aktif.
+          {t('fasilitator.group.sessionNotStarted')}
         </div>
       )}
 
@@ -431,14 +433,14 @@ const GroupPage = () => {
         <div className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
           <User className="w-4 h-4 shrink-0" />
           {facilitatorName
-            ? `Bukan kelompok Anda (PIC: ${facilitatorName}) — mode baca saja.`
-            : 'Bukan kelompok Anda — mode baca saja.'}
+            ? t('fasilitator.group.readOnlyPic', { name: facilitatorName })
+            : t('fasilitator.group.readOnly')}
         </div>
       ) : (
         facilitatorName && (
           <div className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
             <User className="w-4 h-4 shrink-0" />
-            Fasilitator: {facilitatorName}
+            {t('fasilitator.group.facilitatorLine', { name: facilitatorName })}
           </div>
         )
       )}
@@ -447,8 +449,8 @@ const GroupPage = () => {
       {participants.length === 0 ? (
         <EmptyState
           icon={<Users className="w-12 h-12" />}
-          title="Belum ada peserta"
-          description="Belum ada peserta yang terdaftar di kelompok ini."
+          title={t('fasilitator.group.emptyTitle')}
+          description={t('fasilitator.group.emptyDesc')}
         />
       ) : (
         <div className="space-y-4">
@@ -484,22 +486,21 @@ const GroupPage = () => {
       <Modal
         open={confirm.open}
         onClose={confirm.dismiss}
-        title="Selesaikan Kelompok"
+        title={t('fasilitator.group.completeModalTitle')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={confirm.dismiss}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button variant="primary" onClick={confirmComplete} loading={completing}>
-              Ya, Selesaikan
+              {t('fasilitator.group.confirmComplete')}
             </Button>
           </div>
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Apakah Anda yakin ingin menyelesaikan kelompok ini? Semua penilaian akan disimpan dan
-          kelompok akan melanjutkan ke Topik berikutnya.
+          {t('fasilitator.group.completeConfirmMsg')}
         </p>
       </Modal>
     </div>

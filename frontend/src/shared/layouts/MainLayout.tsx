@@ -1,9 +1,11 @@
 import { Outlet, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ROUTES } from '../../core/constants/app'
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary'
 import { Logo } from '../components/ui/Logo'
 
 const MainLayout = () => {
+  const { t } = useTranslation()
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-dark via-primary to-primary-light">
       {/* Navigation */}
@@ -18,13 +20,13 @@ const MainLayout = () => {
               to={ROUTES.AUTH.BASE}
               className="text-white hover:text-accent transition-colors"
             >
-              Masuk
+              {t('common.signIn')}
             </Link>
             <Link
               to={`${ROUTES.AUTH.BASE}?mode=register`}
               className="bg-accent text-primary-dark px-4 py-2 rounded-lg font-semibold hover:bg-accent-light transition-colors"
             >
-              Daftar
+              {t('common.signUp')}
             </Link>
           </div>
         </div>

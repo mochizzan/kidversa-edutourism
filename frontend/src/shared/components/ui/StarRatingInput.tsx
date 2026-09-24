@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Star } from 'lucide-react'
 import { cn } from '../../../core/utils'
 
@@ -31,6 +32,7 @@ export function StarRatingInput({
   size = 'md',
   className,
 }: StarRatingInputProps) {
+  const { t } = useTranslation()
   const [hovered, setHovered] = useState(0)
   const isInteractive = !disabled && !readonly
   const displayValue = hovered || value
@@ -48,7 +50,7 @@ export function StarRatingInput({
         className
       )}
       role="radiogroup"
-      aria-label="Rating"
+      aria-label={t('common.starRating.aria')}
     >
       {[1, 2, 3, 4, 5].map((star) => {
         const isFilled = star <= displayValue
@@ -74,7 +76,7 @@ export function StarRatingInput({
             )}
             role="radio"
             aria-checked={value === star}
-            aria-label={`${star} dari 5 bintang`}
+            aria-label={t('common.starRating.starOf', { star })}
           >
             <Star
               className={cn(

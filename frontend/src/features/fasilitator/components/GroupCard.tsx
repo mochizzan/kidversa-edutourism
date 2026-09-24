@@ -1,4 +1,5 @@
 import { Users, ChevronRight, CheckCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 import { Badge } from '../../../shared/components/ui/Badge'
 
@@ -14,11 +15,11 @@ interface GroupCardProps {
   className?: string
 }
 
-const statusConfig: Record<string, { label: string; variant: 'warning' | 'accent' | 'success' }> = {
-  WAITING: { label: 'Menunggu', variant: 'warning' },
-  IN_PROGRESS: { label: 'Sedang Berlangsung', variant: 'accent' },
-  COMPLETED: { label: 'Selesai', variant: 'success' },
-}
+const statusConfig = {
+  WAITING: { labelKey: 'fasilitator.status.waiting', variant: 'warning' },
+  IN_PROGRESS: { labelKey: 'fasilitator.status.inProgress', variant: 'accent' },
+  COMPLETED: { labelKey: 'fasilitator.status.completed', variant: 'success' },
+} as const
 
 export function GroupCard({
   name,
@@ -30,7 +31,8 @@ export function GroupCard({
   onClick,
   className,
 }: GroupCardProps) {
-  const config = statusConfig[status] ?? { label: status, variant: 'neutral' as const }
+  const { t } = useTranslation()
+  const config = statusConfig[status]
   const isMine = !!currentUserId && facilitatorId === currentUserId
 
   const handleClick = () => {
@@ -62,11 +64,11 @@ export function GroupCard({
             {isMine ? (
               <Badge variant="accent" size="sm" className="shrink-0">
                 <CheckCircle className="w-3 h-3 mr-1" />
-                Tugas Saya
+                {t('fasilitator.myTask')}
               </Badge>
             ) : (
               <Badge variant="neutral" size="sm" className="shrink-0">
-                Bukan kelompok Anda
+                {t('fasilitator.notMyGroup')}
               </Badge>
             )}
           </div>
@@ -76,17 +78,17 @@ export function GroupCard({
             </p>
           )}
         </div>
-        <Badge variant={config.variant}>{config.label}</Badge>
+        <Badge variant={config.variant}>{t(config.labelKey)}</Badge>
       </div>
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-sm text-on-surface-variant">
           <Users className="w-4 h-4 shrink-0" />
-          <span>{childCount} peserta</span>
+          <span>{t('fasilitator.group.participantCount', { count: childCount })}</span>
         </div>
         {isMine && (
           <div className="flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-            <span>Buka</span>
+            <span>{t('fasilitator.group.open')}</span>
             <ChevronRight className="w-4 h-4" />
           </div>
         )}

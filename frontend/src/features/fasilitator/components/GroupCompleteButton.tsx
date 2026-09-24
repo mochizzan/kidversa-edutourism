@@ -1,4 +1,5 @@
 import { CheckCircle, AlertTriangle, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 
 interface GroupCompleteButtonProps {
@@ -18,6 +19,7 @@ export function GroupCompleteButton({
   disabled = false,
   className,
 }: GroupCompleteButtonProps) {
+  const { t } = useTranslation()
   const allAssessed = totalChildren > 0 && assessedCount >= totalChildren
   const remaining = totalChildren - assessedCount
 
@@ -29,17 +31,17 @@ export function GroupCompleteButton({
           {allAssessed ? (
             <span className="flex items-center gap-1.5 text-green-600 font-medium">
               <CheckCircle className="w-4 h-4" />
-              Semua sudah dinilai
+              {t('fasilitator.group.allAssessed')}
             </span>
           ) : (
             <span className="flex items-center gap-1.5 text-yellow-600">
               <AlertTriangle className="w-4 h-4" />
-              {assessedCount}/{totalChildren} sudah dinilai
+              {t('fasilitator.group.assessedProgress', { assessed: assessedCount, total: totalChildren })}
             </span>
           )}
         </span>
         <span className="text-xs text-on-surface-variant/60">
-          {remaining > 0 ? `${remaining} tersisa` : ''}
+          {remaining > 0 ? t('fasilitator.group.remainingCount', { count: remaining }) : ''}
         </span>
       </div>
 
@@ -59,19 +61,19 @@ export function GroupCompleteButton({
         {loading ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            Memproses...
+            {t('common.processing')}
           </>
         ) : (
           <>
             <CheckCircle className="w-5 h-5" />
-            {allAssessed ? 'Selesaikan Kelompok' : 'Nilai Semua Peserta Terlebih Dahulu'}
+            {allAssessed ? t('fasilitator.group.complete') : t('fasilitator.group.rateAllFirst')}
           </>
         )}
       </button>
 
       {!allAssessed && remaining > 0 && (
         <p className="text-xs text-center text-yellow-600">
-          Semua peserta harus dinilai sebelum kelompok dapat diselesaikan
+          {t('fasilitator.group.completeHint')}
         </p>
       )}
     </div>

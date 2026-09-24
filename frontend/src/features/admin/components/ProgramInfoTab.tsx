@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
@@ -13,6 +14,7 @@ interface ProgramInfoTabProps {
 }
 
 export function ProgramInfoTab({ program, onSaved }: ProgramInfoTabProps) {
+  const { t } = useTranslation()
   const { addToast } = useGlobalToast()
   const [name, setName] = useState(program.name)
   const [description, setDescription] = useState(program.description ?? '')
@@ -32,7 +34,7 @@ export function ProgramInfoTab({ program, onSaved }: ProgramInfoTabProps) {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      addToast({ type: 'error', message: 'Nama program tidak boleh kosong' })
+      addToast({ type: 'error', message: t('admin.programs.nameRequired') })
       return
     }
     setSaving(true)
@@ -44,7 +46,7 @@ export function ProgramInfoTab({ program, onSaved }: ProgramInfoTabProps) {
         final_badge_name: finalBadgeName,
         final_badge_image_url: finalBadgeImageUrl,
       })
-      addToast({ type: 'success', message: 'Perubahan berhasil disimpan' })
+      addToast({ type: 'success', message: t('admin.programs.savedToast') })
       onSaved?.(updated)
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
@@ -55,9 +57,9 @@ export function ProgramInfoTab({ program, onSaved }: ProgramInfoTabProps) {
 
   return (
     <form className="space-y-4 max-w-2xl" onSubmit={onSubmit}>
-      <Input label="Nama Program" value={name} onChange={(e) => setName(e.target.value)} />
+      <Input label={t('admin.col.programName')} value={name} onChange={(e) => setName(e.target.value)} />
       <div>
-        <label className="block text-sm font-medium text-on-surface mb-1">Deskripsi</label>
+        <label className="block text-sm font-medium text-on-surface mb-1">{t('admin.programs.descLabel')}</label>
         <textarea value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
@@ -65,21 +67,21 @@ export function ProgramInfoTab({ program, onSaved }: ProgramInfoTabProps) {
       </div>
       <div className="flex items-center gap-2">
         <input type="checkbox" id="active" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary" />
-        <label htmlFor="active" className="text-sm text-on-surface">Program Aktif</label>
+        <label htmlFor="active" className="text-sm text-on-surface">{t('admin.programs.activeLabel')}</label>
       </div>
 
       <BadgeEditor
-        title="Badge Final Program"
+        title={t('admin.programs.finalBadgeTitle')}
         variant="final"
         name={finalBadgeName}
         imageUrl={finalBadgeImageUrl}
-        helperText="Diberikan otomatis ke anak setelah semua topik dalam program ini selesai."
+        helperText={t('admin.programs.finalBadgeHelp')}
         onNameChange={setFinalBadgeName}
         onImageChange={setFinalBadgeImageUrl}
       />
 
       <div className="flex justify-end">
-        <Button type="submit" loading={saving}>Simpan Perubahan</Button>
+        <Button type="submit" loading={saving}>{t('admin.programs.saveChanges')}</Button>
       </div>
     </form>
   )

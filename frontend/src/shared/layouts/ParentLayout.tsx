@@ -1,9 +1,11 @@
 import { Outlet, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary'
 import { ROUTES } from '../../core/constants/app'
 import { Logo } from '../components/ui/Logo'
 
 const ParentLayout = () => {
+  const { t } = useTranslation()
   return (
     <div className="min-h-screen bg-surface-container-low">
       {/* Header */}
@@ -13,7 +15,7 @@ const ParentLayout = () => {
             <Logo className="w-8 h-8 rounded-lg object-contain" />
             <div>
               <h1 className="text-base font-bold text-on-surface leading-tight">Kidversa</h1>
-              <p className="text-[10px] text-on-surface-variant leading-tight">Orang Tua</p>
+              <p className="text-[10px] text-on-surface-variant leading-tight">{t('parent.layout.role')}</p>
             </div>
           </Link>
         </div>

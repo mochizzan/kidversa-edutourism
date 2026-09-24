@@ -18,6 +18,8 @@ import type { Assessment, Participant, Session } from '../../../core/types'
 import { SessionStatus } from '../../../core/types'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { ROUTES } from '../../../core/constants/app'
+import { i18n } from '../../../core/i18n'
+import { useTranslation } from 'react-i18next'
 
 interface ParticipantRow extends Participant {
   sessionName: string
@@ -26,14 +28,15 @@ interface ParticipantRow extends Participant {
 }
 
 const getSessionStatusLabel = (session?: Session | null) => {
-  if (!session) return 'Sesi tidak ditemukan'
-  if (session.status === SessionStatus.DRAFT) return 'Menunggu sesi'
-  if (session.status === SessionStatus.ACTIVE) return 'Dalam sesi'
-  if (session.status === SessionStatus.COMPLETED) return 'Sesi selesai'
-  return 'Belum masuk sesi'
+  if (!session) return i18n.t('admin.participants.sessionMissing')
+  if (session.status === SessionStatus.DRAFT) return i18n.t('admin.participants.waitingSession')
+  if (session.status === SessionStatus.ACTIVE) return i18n.t('admin.participants.inSession')
+  if (session.status === SessionStatus.COMPLETED) return i18n.t('admin.participants.sessionDone')
+  return i18n.t('admin.participants.notInSession')
 }
 
 const ParticipantsPage = () => {
+  const { t } = useTranslation()
   const { addToast } = useGlobalToast()
   const { tenantId } = useTenantScope()
   const {
@@ -113,19 +116,19 @@ const ParticipantsPage = () => {
       const session = participant.session_id ? sessionsById[participant.session_id] : undefined
       const participantAssessments = assessmentsByParticipant[participant.id] ?? []
 
-      let statusLabel = 'Belum masuk sesi'
+      let statusLabel = t('admin.participants.notInSession')
       if (participant.session_id) {
         statusLabel = getSessionStatusLabel(session)
       }
 
       return {
         ...participant,
-        sessionName: session?.name ?? 'Belum masuk sesi',
+        sessionName: session?.name ?? t('admin.participants.notInSession'),
         statusLabel,
         assessedCount: participantAssessments.length,
       }
     })
-  }, [participants, sessionsById, assessmentsByParticipant])
+  }, [participants, sessionsById, assessmentsByParticipant, t])
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -135,12 +138,12 @@ const ParticipantsPage = () => {
       // participant must be removed from its session instead.
       const target = participants.find((p) => p.id === deleteId)
       if (!target?.session_id) {
-        addToast({ type: 'error', message: 'Peserta tanpa sesi tidak dapat dihapus dari sini' })
+        addToast({ type: 'error', message: t('admin.participants.noSessionDelete') })
         setDeleteId(null)
         return
       }
       await sessionService.removeParticipant(target.session_id, deleteId)
-      addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
+      addToast({ type: 'success', message: t('admin.participants.deletedToast') })
       setDeleteId(null)
       adjustPageOnDelete()
     } catch (err) {
@@ -151,17 +154,17 @@ const ParticipantsPage = () => {
   const columns: Column<ParticipantRow>[] = [
     {
       key: 'child_name',
-      header: 'Nama Peserta',
+      header: t('admin.col.participantName'),
       render: (item) => (
         <div>
           <p className="font-medium text-on-surface">{item.child_name}</p>
-          <p className="text-xs text-on-surface-variant">Usia {item.child_age} tahun{item.school_name ? ` · ${item.school_name}` : ''}</p>
+          <p className="text-xs text-on-surface-variant">{t('admin.participants.ageLine', { age: item.child_age })}{item.school_name ? ` · ${item.school_name}` : ''}</p>
         </div>
       ),
     },
     {
       key: 'parent_name',
-      header: 'Orang Tua',
+      header: t('admin.participants.parentCol'),
       render: (item) => (
         <div>
           <p className="font-medium text-on-surface">{item.parent_name}</p>
@@ -171,40 +174,40 @@ const ParticipantsPage = () => {
     },
     {
       key: 'sessionName',
-      header: 'Sesi',
+      header: t('admin.col.session'),
       render: (item) => <span>{item.sessionName}</span>,
     },
     {
       key: 'statusLabel',
-      header: 'Status',
+      header: t('admin.col.status'),
       render: (item) => <Badge variant={item.session_id ? 'primary' : 'neutral'}>{item.statusLabel}</Badge>,
     },
     {
       key: 'assessedCount',
-      header: 'Penilaian',
+      header: t('admin.col.assessed'),
       render: (item) => {
         if (!item.session_id) {
-          return <Badge variant="neutral">Belum masuk sesi</Badge>
+          return <Badge variant="neutral">{t('admin.participants.notInSession')}</Badge>
         }
         if (item.assessedCount > 0) {
-          return <Badge variant="success">{item.assessedCount} topik dinilai</Badge>
+          return <Badge variant="success">{t('admin.participants.assessedCount', { count: item.assessedCount })}</Badge>
         }
-        return <Badge variant="warning">Belum dinilai</Badge>
+        return <Badge variant="warning">{t('admin.participants.notAssessed')}</Badge>
       },
     },
     {
       key: 'actions',
-      header: 'Aksi',
+      header: t('admin.col.action'),
       align: 'right',
       render: (item) => (
         <div className="flex items-center justify-end gap-2">
           <Link to={`${ROUTES.ADMIN.PARTICIPANTS}/${item.id}`}>
-            <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip="Lihat detail" />
+            <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip={t('admin.participants.viewDetail')} />
           </Link>
           <Link to={`${ROUTES.ADMIN.PARTICIPANTS}/${item.id}/edit`}>
-            <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit peserta" />
+            <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip={t('admin.participants.edit')} />
           </Link>
-          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Hapus peserta" onClick={() => setDeleteId(item.id)} />
+          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip={t('admin.participants.deleteBtn')} onClick={() => setDeleteId(item.id)} />
         </div>
       ),
     },
@@ -213,11 +216,11 @@ const ParticipantsPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Peserta"
-        subtitle="Kelola data peserta dan pantau progres sesi mereka."
+        title={t('admin.sidebar.participants')}
+        subtitle={t('admin.participants.subtitle')}
         actions={
           <Link to={`${ROUTES.ADMIN.PARTICIPANTS}/new`}>
-            <Button icon={<Plus className="w-4 h-4" />}>Tambah Peserta</Button>
+            <Button icon={<Plus className="w-4 h-4" />}>{t('admin.participants.add')}</Button>
           </Link>
         }
       />
@@ -225,7 +228,7 @@ const ParticipantsPage = () => {
       {error && (
         <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
           <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
-          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+          <Button variant="secondary" size="sm" onClick={refresh}>{t('common.error.retry')}</Button>
         </div>
       )}
 
@@ -239,27 +242,27 @@ const ParticipantsPage = () => {
         onPageChange={setPage}
         onSearch={setSearch}
         getRowId={(item) => item.id}
-        ariaLabel="Daftar peserta"
-        emptyState={<ListEmptyState title="Belum ada peserta" description="Klik 'Tambah Peserta' di atas untuk menambahkan peserta pertama." />}
+        ariaLabel={t('admin.participants.listAria')}
+        emptyState={<ListEmptyState title={t('admin.participants.emptyTitle')} description={t('admin.participants.emptyDesc')} />}
       />
 
       <Modal
         open={Boolean(deleteId)}
         onClose={() => setDeleteId(null)}
-        title="Hapus Peserta"
+        title={t('admin.participants.deleteTitle')}
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setDeleteId(null)}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" onClick={handleDelete}>
-              Hapus
+              {t('common.delete')}
             </Button>
           </div>
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Peserta yang sudah terhubung ke sesi atau memiliki aktivitas tidak dapat dihapus.
+          {t('admin.participants.deleteMsg')}
         </p>
       </Modal>
     </div>

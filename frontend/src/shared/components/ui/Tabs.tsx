@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 
 interface TabsProps {
@@ -9,9 +10,10 @@ interface TabsProps {
 }
 
 export function Tabs({ tabs, activeKey, onChange, className }: TabsProps) {
+  const { t } = useTranslation()
   return (
     <div className={cn('border-b border-outline-variant', className)}>
-      <nav className="flex gap-1" aria-label="Tabs">
+      <nav className="flex gap-1" aria-label={t('common.tabsAria')}>
         {tabs.map((tab) => (
           <button
             key={tab.key}

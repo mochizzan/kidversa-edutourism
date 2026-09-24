@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileText, Printer, Camera } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
@@ -14,6 +15,7 @@ import { DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constant
 
 /* ── Inner report component ── */
 function ReportView() {
+  const { t } = useTranslation()
   const { report, loading: guardLoading, error: guardError } = useParentToken()
 
   const [raportHtml, setRaportHtml] = useState<string | null>(null)
@@ -62,7 +64,7 @@ function ReportView() {
     try {
       setRaportHtml(buildHtml())
     } catch {
-      setError('Gagal memuat laporan.')
+      setError(t('parent.report.loadError'))
     } finally {
       setLoading(false)
     }
@@ -80,7 +82,7 @@ function ReportView() {
     try {
       await captureRaportAsPdf(raportHtml, 'raport.pdf')
     } catch {
-      setDownloadError('Gagal menghasilkan file PDF.')
+      setDownloadError(t('parent.report.pdfError'))
     } finally {
       setActionLoading(null)
     }
@@ -94,7 +96,7 @@ function ReportView() {
       const blob = await captureRaportAsBlob(raportHtml)
       downloadBlob(blob, 'raport.png')
     } catch {
-      setDownloadError('Gagal menghasilkan gambar raport.')
+      setDownloadError(t('parent.report.pngError'))
     } finally {
       setActionLoading(null)
     }
@@ -122,7 +124,7 @@ function ReportView() {
       <div className="flex items-center justify-center min-h-screen bg-gray-200">
         <div className="text-center">
           <Loader2 className="h-10 w-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="mt-4 text-sm text-on-surface-variant">Memuat laporan...</p>
+          <p className="mt-4 text-sm text-on-surface-variant">{t('parent.report.loading')}</p>
         </div>
       </div>
     )
@@ -134,13 +136,13 @@ function ReportView() {
       <div className="min-h-screen bg-gray-200 py-8">
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
-          title="Laporan tidak tersedia"
+          title={t('parent.report.unavailableTitle')}
           description={
             guardError === 'INVALID'
-              ? 'Tautan tidak valid.'
+              ? t('parent.report.invalidLink')
               : guardError === 'EXPIRED'
-              ? 'Laporan sudah tidak tersedia.'
-              : error || 'Terjadi kesalahan saat memuat laporan.'
+                ? t('parent.report.expiredMsg')
+                : error || t('parent.report.loadFailedMsg')
           }
         />
       </div>
@@ -155,7 +157,7 @@ function ReportView() {
           <iframe
             ref={iframeRef}
             srcDoc={raportHtml}
-            title="Mini Raport"
+            title={t('parent.report.iframeTitle')}
             onLoad={handleIframeLoad}
             className="border-0 block"
             style={{ width: A4_SHEET_WIDTH, border: 'none' }}
@@ -171,20 +173,20 @@ function ReportView() {
 
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-surface rounded-2xl p-3 border border-outline-variant shadow-lg no-print">
         <Button variant="secondary" size="sm" onClick={handleCetak}>
-          <Printer className="w-4 h-4 mr-1" /> Cetak
+          <Printer className="w-4 h-4 mr-1" /> {t('parent.report.print')}
         </Button>
         <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={!!actionLoading}>
           {actionLoading === 'pdf' ? (
-            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...</>
+            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t('common.processing')}</>
           ) : (
-            <><FileText className="w-4 h-4 mr-1" /> Unduh PDF</>
+            <><FileText className="w-4 h-4 mr-1" /> {t('parent.report.downloadPdf')}</>
           )}
         </Button>
         <Button variant="secondary" size="sm" onClick={handleDownloadPng} disabled={!!actionLoading}>
           {actionLoading === 'png' ? (
-            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...</>
+            <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t('common.processing')}</>
           ) : (
-            <><Camera className="w-4 h-4 mr-1" /> Unduh PNG</>
+            <><Camera className="w-4 h-4 mr-1" /> {t('parent.report.downloadPng')}</>
           )}
         </Button>
       </div>

@@ -1,4 +1,5 @@
 import { Shield, Loader2, AlertCircle, Search, Send } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '../../../shared/components/ui/Button'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
@@ -6,15 +7,16 @@ import { Input } from '../../../shared/components/ui/Input'
 import { useConsentMonitor, type ConsentStatus } from '../hooks/useConsentMonitor'
 import { ConsentTable } from '../components/ConsentTable'
 
-const STATUS_OPTIONS: Array<{ value: ConsentStatus | 'all'; label: string }> = [
-  { value: 'all', label: 'Semua Status' },
-  { value: 'not_sent', label: 'Belum Dikirim' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'granted', label: 'Setuju' },
-  { value: 'denied', label: 'Tolak' },
-]
+const STATUS_OPTIONS = [
+  { value: 'all' as const, labelKey: 'admin.consent.allStatuses' },
+  { value: 'not_sent' as const, labelKey: 'admin.consent.notSent' },
+  { value: 'pending' as const, labelKey: 'admin.consent.pending' },
+  { value: 'granted' as const, labelKey: 'admin.consent.granted' },
+  { value: 'denied' as const, labelKey: 'admin.consent.denied' },
+] as const
 
 const ConsentMonitorPage = () => {
+  const { t } = useTranslation()
   const {
     items,
     paged,
@@ -44,15 +46,15 @@ const ConsentMonitorPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Monitor Consent"
-        subtitle="Pantau status persetujuan orang tua untuk setiap sesi."
+        title={t('admin.consent.title')}
+        subtitle={t('admin.consent.subtitle')}
       />
 
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <span className="ml-3 text-sm text-on-surface-variant">Memuat data consent...</span>
+          <span className="ml-3 text-sm text-on-surface-variant">{t('admin.consent.loading')}</span>
         </div>
       )}
 
@@ -62,7 +64,7 @@ const ConsentMonitorPage = () => {
           <AlertCircle className="w-10 h-10 mx-auto mb-3 text-on-error-container" />
           <p className="text-sm font-medium text-on-error-container mb-2">{error}</p>
           <Button variant="secondary" size="sm" onClick={refresh}>
-            Coba Lagi
+            {t('common.error.retry')}
           </Button>
         </div>
       )}
@@ -71,8 +73,8 @@ const ConsentMonitorPage = () => {
       {!loading && !error && items.length === 0 && (
         <EmptyState
           icon={<Shield className="w-12 h-12" />}
-          title="Belum ada data consent"
-          description="Belum ada peserta yang terdaftar di sesi manapun."
+          title={t('admin.consent.emptyTitle')}
+          description={t('admin.consent.emptyDesc')}
         />
       )}
 
@@ -82,19 +84,19 @@ const ConsentMonitorPage = () => {
           {/* Summary stats */}
           <div className="flex flex-wrap gap-3 text-sm">
             <span className="px-3 py-1 rounded-full bg-surface-container text-on-surface">
-              Semua: {items.length}
+              {t('admin.consent.countAll', { count: items.length })}
             </span>
             <span className="px-3 py-1 rounded-full bg-surface-container text-on-surface-variant">
-              Belum Dikirim: {countNotSent}
+              {t('admin.consent.countNotSent', { count: countNotSent })}
             </span>
             <span className="px-3 py-1 rounded-full bg-yellow-50 text-yellow-700">
-              Pending: {countPending}
+              {t('admin.consent.countPending', { count: countPending })}
             </span>
             <span className="px-3 py-1 rounded-full bg-green-50 text-green-700">
-              Setuju: {countGranted}
+              {t('admin.consent.countGranted', { count: countGranted })}
             </span>
             <span className="px-3 py-1 rounded-full bg-red-50 text-red-600">
-              Tolak: {countDenied}
+              {t('admin.consent.countDenied', { count: countDenied })}
             </span>
           </div>
 
@@ -102,7 +104,7 @@ const ConsentMonitorPage = () => {
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
               <Input
-                placeholder="Cari nama anak..."
+                placeholder={t('admin.consent.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 leftIcon={<Search className="w-4 h-4" />}
@@ -115,7 +117,7 @@ const ConsentMonitorPage = () => {
             >
               {STATUS_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {t(opt.labelKey)}
                 </option>
               ))}
             </select>
@@ -126,7 +128,7 @@ const ConsentMonitorPage = () => {
               onClick={sendAll}
               loading={batchSending}
             >
-              Kirim Semua
+              {t('admin.consent.sendAll')}
             </Button>
           </div>
 
@@ -146,8 +148,8 @@ const ConsentMonitorPage = () => {
           {paged.length === 0 && totalItems === 0 && (
             <EmptyState
               icon={<Search className="w-12 h-12" />}
-              title="Tidak ada hasil"
-              description="Coba ubah filter atau kata kunci pencarian."
+              title={t('admin.consent.noResultsTitle')}
+              description={t('admin.consent.noResultsDesc')}
             />
           )}
         </>

@@ -1,4 +1,5 @@
 import { Building2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { isSuperAdmin } from '../../../core/utils/permissions'
@@ -9,6 +10,7 @@ interface TenantGuardProps {
 }
 
 export function TenantGuard({ children }: TenantGuardProps) {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const { requiresSelection } = useTenantScope()
 
@@ -16,8 +18,8 @@ export function TenantGuard({ children }: TenantGuardProps) {
     return (
       <EmptyState
         icon={<Building2 className="w-12 h-12" />}
-        title="Pilih Tenant Terlebih Dahulu"
-        description="Gunakan pemilih tenant di sidebar untuk memilih tenant sebelum mengakses halaman operasional."
+        title={t('admin.tenantGuard.title')}
+        description={t('admin.tenantGuard.description')}
       />
     )
   }

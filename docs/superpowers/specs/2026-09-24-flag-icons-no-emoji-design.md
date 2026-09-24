@@ -47,7 +47,7 @@ Tidak ada situs lain (inventaris menyeluruh: locale JSON, index.html, public ass
 **Komponen baru — `frontend/src/shared/components/ui/FlagIcon.tsx`**
 
 ```tsx
-type FlagIconProps = { iso: string; className?: string; title?: string }
+type FlagIconProps = { iso?: string; title?: string } & React.SVGProps<SVGSVGElement> // spread svg/aria props (className, aria-hidden, …)
 // render <svg> dari country-flag-icons/react/3x2
 // dekoratif default: aria-hidden; jika title diberikan → role="img" + <title>
 ```
@@ -132,7 +132,7 @@ Field `flag` (emoji) **dihapus**; peta representasi negara tetap eksplisit per b
 | Risiko | Mitigasi |
 |---|---|
 | `react` tak dideklarasikan sebagai peer dependency | Smoke-check resolusi sekali saat install; fallback `pnpm.overrides/packageExtensions` |
-| Coverage libphonenumber vs 265 flag tak diverifikasi ekshaustif | Fallback teks-only per-ISO, tanpa crash |
+| Coverage libphonenumber vs 265 flag tak diverifikasi eksaustif | Fallback teks-only per-ISO, tanpa crash |
 | Bundle awal membengkak | Statis hanya 9 flag; 265 di lazy chunk |
 | Test lama mem-pin emoji | Dua test diubah kontraknya secara eksplisit (Bagian 7) |
 | Spec lama `2026-09-23` menyebut "emoji bendera" | Supersedes deklarasi di header dokumen ini |

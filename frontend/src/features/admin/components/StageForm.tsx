@@ -3,6 +3,7 @@ import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
 import type { ProgramStage } from '../../../core/types'
 import { BadgeEditor } from './BadgeEditor'
+import { useTranslation } from 'react-i18next'
 
 interface StageFormProps {
   editingStage: ProgramStage | null
@@ -18,6 +19,7 @@ interface StageFormProps {
 }
 
 export function StageForm({ editingStage, onSubmit, onCancel, submitting = false }: StageFormProps) {
+  const { t } = useTranslation()
   const [name, setName] = useState(editingStage?.name ?? '')
   const [description, setDescription] = useState(editingStage?.description ?? '')
   const [isPhotoStage, setIsPhotoStage] = useState<boolean>(
@@ -40,17 +42,17 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
       <Input
-        label="Nama Topik"
+        label={t('admin.topic.nameLabel')}
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
-        placeholder="Nama topik"
+        placeholder={t('admin.topic.namePlaceholder')}
       />
       <Input
-        label="Deskripsi"
+        label={t('admin.topic.descLabel')}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="Deskripsi topik"
+        placeholder={t('admin.topic.stageDescPlaceholder')}
       />
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-sm text-on-surface">
@@ -60,25 +62,25 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
             onChange={(e) => setIsPhotoStage(e.target.checked)}
             className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
           />
-          Foto
+          {t('admin.topic.photoToggle')}
         </label>
       </div>
 
       <BadgeEditor
-        title="Badge Topik"
+        title={t('admin.topic.badgeTitle')}
         variant="subtopik"
         name={badgeName}
         imageUrl={badgeImageUrl}
-        helperText="Diberikan otomatis ke anak saat semua kegiatan dalam topik ini sudah dinilai (bintang ≥ 1)."
+        helperText={t('admin.topic.badgeHelpStars')}
         onNameChange={setBadgeName}
         onImageChange={setBadgeImageUrl}
       />
 
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="secondary" type="button" onClick={onCancel}>
-          Batal
+          {t('common.cancel')}
         </Button>
-        <Button type="submit" loading={submitting}>Simpan</Button>
+        <Button type="submit" loading={submitting}>{t('common.save')}</Button>
       </div>
     </form>
   )

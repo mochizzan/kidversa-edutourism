@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { i18n } from '../../../core/i18n'
+import { useTranslation } from 'react-i18next'
 import { useRateLimit } from '../hooks/useRateLimit'
 import { ROUTES } from '../../../core/constants/app'
 import { LoginForm } from '../components/LoginForm'
@@ -13,8 +15,8 @@ import { DemoHint } from '../components/DemoHint'
 import { Logo } from '../../../shared/components/ui/Logo'
 
 const loginSchema = z.object({
-  email: z.string().email('Format email tidak valid'),
-  password: z.string().min(8, 'Password minimal 8 karakter'),
+  email: z.string().email({ error: () => ({ message: i18n.t('validation.emailInvalid') }) }),
+  password: z.string().min(8, { error: () => ({ message: i18n.t('validation.passwordMin') }) }),
   honeypot: z.string().max(0).optional().or(z.literal('')),
 })
 
@@ -29,6 +31,7 @@ const LoginPage = () => {
   const { login, isAuthenticated, getRedirectPath } = useAuth()
   const returnUrl = searchParams.get('returnUrl') || getRedirectPath()
   const { isLocked, lockoutTimeLeft, recordFailedAttempt, clearRateLimit } = useRateLimit()
+  const { t } = useTranslation()
 
   const {
     register,
@@ -61,7 +64,7 @@ const LoginPage = () => {
     } catch (err) {
       const isLockedNow = recordFailedAttempt()
       if (isLockedNow) {
-        setGeneralError('Terlalu banyak percobaan. Coba lagi dalam 5 menit.')
+        setGeneralError(t('auth.login.tooManyAttempts'))
       } else {
         setGeneralError(friendlyError(err))
       }
@@ -78,10 +81,10 @@ const LoginPage = () => {
           <Logo alt="Kidversa" className="w-8 h-8 object-contain" />
         </div>
         <h2 className="text-xl font-bold text-on-surface tracking-tight text-center">
-          Selamat datang kembali
+          {t('auth.login.title')}
         </h2>
         <p className="text-sm text-on-surface-variant/60 mt-1.5 text-center max-w-[220px] leading-relaxed">
-          Masuk ke akun Kidversa Anda
+          {t('auth.login.subtitle')}
         </p>
       </div>
 
@@ -96,10 +99,9 @@ const LoginPage = () => {
       {/* ── Lockout ── */}
       {isLocked && lockoutTimeLeft > 0 && (
         <div className="mb-4 p-3.5 bg-accent-50 border border-accent-200 rounded-xl text-accent-800 text-sm text-center">
-          <p className="font-medium">Akun terkunci sementara</p>
+          <p className="font-medium">{t('auth.login.lockedTitle')}</p>
           <p className="text-sm mt-0.5">
-            Coba lagi dalam {Math.ceil(lockoutTimeLeft / 60)} menit{' '}
-            {lockoutTimeLeft % 60} detik
+            {t('auth.login.lockedRetry', { minutes: Math.ceil(lockoutTimeLeft / 60), seconds: lockoutTimeLeft % 60 })}
           </p>
         </div>
       )}
@@ -121,7 +123,7 @@ const LoginPage = () => {
           {/* ── Divider ── */}
           <div className="flex items-center gap-3 my-5">
             <span className="flex-1 h-px bg-outline-variant/40" />
-            <span className="text-[11px] text-on-surface-variant/40 font-medium tracking-wider uppercase">Info Demo</span>
+            <span className="text-[11px] text-on-surface-variant/40 font-medium tracking-wider uppercase">{t('auth.login.demoInfo')}</span>
             <span className="flex-1 h-px bg-outline-variant/40" />
           </div>
 
@@ -131,9 +133,9 @@ const LoginPage = () => {
 
       {/* ── Register link ── */}
       <p className="mt-6 text-center text-sm text-on-surface-variant/50">
-        Belum punya akun?{' '}
+        {t('auth.login.noAccount')}{' '}
         <Link to={ROUTES.AUTH.REGISTER} className="text-primary font-semibold hover:text-primary-dark transition-colors">
-          Daftar sekarang
+          {t('auth.login.registerNow')}
         </Link>
       </p>
     </>

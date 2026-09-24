@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CheckCircle2,
   XCircle,
@@ -31,6 +32,7 @@ interface ChoiceProps {
 }
 
 function YaTidakChoice({ label, value, onChange }: ChoiceProps) {
+  const { t } = useTranslation()
   return (
     <div
       role="radiogroup"
@@ -56,7 +58,7 @@ function YaTidakChoice({ label, value, onChange }: ChoiceProps) {
             value === true ? 'text-green-600' : 'text-on-surface-variant/60',
           )}
         />
-        Ya, Setuju
+        {t('parent.consent.yes')}
       </button>
       <button
         type="button"
@@ -77,7 +79,7 @@ function YaTidakChoice({ label, value, onChange }: ChoiceProps) {
             value === false ? 'text-error' : 'text-on-surface-variant/60',
           )}
         />
-        Tidak
+        {t('parent.consent.no')}
       </button>
     </div>
   )
@@ -118,6 +120,7 @@ function StatePanel({
 
 /* ── Inner form component (inside guard) ── */
 function ConsentForm() {
+  const { t } = useTranslation()
   const { token } = useParentToken()
   const { addToast } = useGlobalToast()
 
@@ -144,15 +147,11 @@ function ConsentForm() {
           return
         }
         if (res.status === 'invalid') {
-          setLockedError(
-            'Tautan persetujuan tidak valid atau sudah digunakan. Silakan hubungi koordinator untuk tautan baru.',
-          )
+          setLockedError(t('parent.consent.invalidMsg'))
           return
         }
         if (res.status === 'expired') {
-          setLockedError(
-            'Tautan persetujuan sudah kedaluwarsa. Silakan hubungi koordinator untuk tautan baru.',
-          )
+          setLockedError(t('parent.consent.expiredMsgNew'))
           return
         }
         setInfo(res)
@@ -167,11 +166,11 @@ function ConsentForm() {
   const handleSubmit = async () => {
     if (lockedError) return
     if (!parentName.trim()) {
-      addToast({ type: 'error', message: 'Silakan masukkan nama Anda.' })
+      addToast({ type: 'error', message: t('parent.consent.nameToast') })
       return
     }
     if (photoConsent === null) {
-      addToast({ type: 'error', message: 'Silakan pilih Ya/Tidak untuk izin foto.' })
+      addToast({ type: 'error', message: t('parent.consent.chooseToast') })
       return
     }
 
@@ -187,12 +186,12 @@ function ConsentForm() {
         return
       }
       if (code === 'token_expired') {
-        setLockedError('Tautan persetujuan sudah kedaluwarsa. Silakan hubungi koordinator.')
+        setLockedError(t('parent.consent.expiredMsg'))
         return
       }
       addToast({
         type: 'error',
-        message: 'Gagal mengirim persetujuan. Silakan coba lagi.',
+        message: t('parent.consent.submitError'),
       })
     } finally {
       setSubmitting(false)
@@ -205,7 +204,7 @@ function ConsentForm() {
       <StatePanel
         tone="warn"
         icon={<AlertTriangle className="w-8 h-8 text-yellow-600" />}
-        title="Tautan Tidak Berlaku"
+        title={t('parent.consent.lockedTitle')}
       >
         {lockedError}
       </StatePanel>
@@ -218,10 +217,11 @@ function ConsentForm() {
       <StatePanel
         tone="success"
         icon={<Check className="w-8 h-8 text-green-600" />}
-        title="Persetujuan Sudah Dikirim"
+        title={t('parent.consent.alreadyTitle')}
       >
-        Persetujuan dari tautan ini sudah diterima sebelumnya. Terima kasih telah
-        mengonfirmasi izin untuk {info?.child_name || 'buah hati Anda'}.
+        {t('parent.consent.alreadyDesc', {
+          name: info?.child_name || t('parent.consent.childFallback'),
+        })}
       </StatePanel>
     )
   }
@@ -232,11 +232,13 @@ function ConsentForm() {
       <StatePanel
         tone="success"
         icon={<CheckCircle2 className="w-8 h-8 text-green-600" />}
-        title="Terima Kasih!"
+        title={t('parent.consent.thanksTitle')}
       >
-        <p className="mb-1">Persetujuan Anda berhasil dikirim.</p>
+        <p className="mb-1">{t('parent.consent.successMsg')}</p>
         <p className="text-xs">
-          Koordinator akan memproses data partisipasi {info?.child_name || 'buah hati Anda'}.
+          {t('parent.consent.successProcess', {
+            name: info?.child_name || t('parent.consent.childFallback'),
+          })}
         </p>
       </StatePanel>
     )
@@ -253,18 +255,18 @@ function ConsentForm() {
           </div>
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-on-surface-variant">
-              Formulir Persetujuan
+              {t('parent.consent.formTitle')}
             </p>
             {infoLoading ? (
               <div className="h-6 w-32 mt-0.5 rounded bg-surface-variant animate-pulse" />
             ) : (
               <h2 className="text-lg font-bold text-on-surface truncate">
-                {info?.child_name || 'Peserta Edutourism'}
+                {info?.child_name || t('parent.consent.participantFallback')}
               </h2>
             )}
             {!infoLoading && info?.parent_name && (
               <p className="text-sm text-on-surface-variant truncate">
-                Orang tua / wali: {info.parent_name}
+                {t('parent.consent.parentLabel', { name: info.parent_name })}
               </p>
             )}
           </div>
@@ -276,7 +278,7 @@ function ConsentForm() {
               <div className="flex items-start gap-2 min-w-0">
                 <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="text-xs text-on-surface-variant">Sesi</p>
+                  <p className="text-xs text-on-surface-variant">{t('parent.consent.sessionLabel')}</p>
                   <p className="font-medium text-on-surface truncate">{info.session_name}</p>
                 </div>
               </div>
@@ -285,7 +287,7 @@ function ConsentForm() {
               <div className="flex items-start gap-2">
                 <CalendarDays className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs text-on-surface-variant">Tanggal</p>
+                  <p className="text-xs text-on-surface-variant">{t('parent.consent.dateLabel')}</p>
                   <p className="font-medium text-on-surface">{formatDate(info.session_date)}</p>
                 </div>
               </div>
@@ -294,7 +296,7 @@ function ConsentForm() {
               <div className="flex items-start gap-2 min-w-0 sm:col-span-1">
                 <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="text-xs text-on-surface-variant">Lokasi</p>
+                  <p className="text-xs text-on-surface-variant">{t('parent.consent.locationLabel')}</p>
                   <p className="font-medium text-on-surface truncate">{info.location}</p>
                 </div>
               </div>
@@ -307,9 +309,8 @@ function ConsentForm() {
       <div className="bg-primary-container/60 rounded-2xl p-4 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <p className="text-sm text-on-surface-variant">
-          Kami meminta izin Anda untuk memotret selama kegiatan edutourism. Data
-          hanya digunakan untuk laporan perkembangan anak dan{' '}
-          <span className="font-medium text-on-surface">tidak disebarluaskan</span>.
+          {t('parent.consent.privacyPrefix')}{' '}
+          <span className="font-medium text-on-surface">{t('parent.consent.privacyEmphasis')}</span>.
         </p>
       </div>
 
@@ -320,15 +321,15 @@ function ConsentForm() {
             <Camera className="w-5 h-5" />
           </span>
           <div>
-            <h3 className="text-base font-semibold text-on-surface">Izin Foto</h3>
-            <p className="text-xs text-on-surface-variant">Pengambilan foto selama kegiatan</p>
+            <h3 className="text-base font-semibold text-on-surface">{t('parent.consent.photoTitle')}</h3>
+            <p className="text-xs text-on-surface-variant">{t('parent.consent.photoSubtitle')}</p>
           </div>
         </div>
         <p className="text-sm text-on-surface-variant mt-3 mb-4">
-          Foto digunakan untuk dokumentasi kegiatan dan disertakan dalam laporan perkembangan anak.
+          {t('parent.consent.photoDesc')}
         </p>
         <YaTidakChoice
-          label="Izin foto"
+          label={t('parent.consent.photoAria')}
           value={photoConsent}
           onChange={setPhotoConsent}
         />
@@ -336,11 +337,11 @@ function ConsentForm() {
 
       {/* Parent name */}
       <Input
-        label="Nama Lengkap Anda"
-        placeholder="Masukkan nama Anda sebagai orang tua/wali"
+        label={t('parent.consent.nameLabel')}
+        placeholder={t('parent.consent.namePlaceholder')}
         value={parentName}
         onChange={(e) => setParentName(e.target.value)}
-        error={!parentName.trim() ? 'Nama wajib diisi' : undefined}
+        error={!parentName.trim() ? t('parent.consent.nameRequired') : undefined}
         leftIcon={<User className="w-4 h-4" />}
       />
 
@@ -352,7 +353,7 @@ function ConsentForm() {
         disabled={submitting}
         loading={submitting}
       >
-        {!submitting && 'Kirim Persetujuan'}
+        {!submitting && t('parent.consent.submit')}
       </Button>
     </div>
   )

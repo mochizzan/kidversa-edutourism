@@ -22,8 +22,10 @@ import { SessionCreateForm } from '../components/SessionCreateForm'
 import { SessionInfoTab } from '../components/SessionInfoTab'
 import { SessionStagesTab } from '../components/SessionStagesTab'
 import { SessionGroupsTab } from '../components/SessionGroupsTab'
+import { useTranslation } from 'react-i18next'
 
 const SessionDetailPage = () => {
+  const { t } = useTranslation()
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const { addToast } = useGlobalToast()
@@ -77,7 +79,7 @@ const SessionDetailPage = () => {
         setPrograms(res.data)
         if (isNew && res.data.length > 0) setNewProgramId(res.data[0].id)
       }).catch(() => {
-        setProgramsError('Gagal memuat daftar program.')
+        setProgramsError(t('admin.sessions.loadProgramsError'))
       }).finally(() => {
         setProgramsLoading(false)
       })
@@ -119,8 +121,8 @@ const SessionDetailPage = () => {
   if (isNew) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Buat Sesi Baru" subtitle="Tambahkan sesi edutourism baru."
-          breadcrumbs={[{ label: 'Sessions', href: ROUTES.ADMIN.SESSIONS }, { label: 'Buat Baru' }]} />
+        <PageHeader title={t('admin.sessions.newTitle')} subtitle={t('admin.sessions.newSubtitle')}
+          breadcrumbs={[{ label: t('admin.sidebar.sessions'), href: ROUTES.ADMIN.SESSIONS }, { label: t('admin.common.createNew') }]} />
         <Card>
           {programsLoading ? (
             <div className="flex items-center justify-center py-16">
@@ -138,20 +140,20 @@ const SessionDetailPage = () => {
                   setPrograms(res.data)
                   if (res.data.length > 0) setNewProgramId(res.data[0].id)
                 }).catch(() => {
-                  setProgramsError('Gagal memuat daftar program.')
+                  setProgramsError(t('admin.sessions.loadProgramsError'))
                 }).finally(() => {
                   setProgramsLoading(false)
                 })
               }}>
-                Coba Lagi
+                {t('common.error.retry')}
               </Button>
             </div>
           ) : programs.length === 0 ? (
             <EmptyState
               icon={<AlertCircle className="w-12 h-12" />}
-              title="Belum ada program"
-              description="Buat program terlebih dahulu sebelum membuat sesi baru."
-              action={{ label: 'Ke Halaman Program', onClick: () => navigate(ROUTES.ADMIN.PROGRAMS) }}
+              title={t('admin.programs.emptyTitle')}
+              description={t('admin.sessions.noProgramDesc')}
+              action={{ label: t('admin.sessions.toPrograms'), onClick: () => navigate(ROUTES.ADMIN.PROGRAMS) }}
             />
           ) : (
             <SessionCreateForm
@@ -171,16 +173,16 @@ const SessionDetailPage = () => {
   }
 
   if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>
-  if (!session) return <div className="text-center text-on-surface-variant">Session not found</div>
+  if (!session) return <div className="text-center text-on-surface-variant">{t('admin.sessions.notFound')}</div>
 
   return (
     <div className="space-y-6">
       <PageHeader title={session.name} subtitle={`${session.location} · ${formatDate(session.session_date)}`}
-        breadcrumbs={[{ label: 'Sessions', href: ROUTES.ADMIN.SESSIONS }, { label: session.name }]}
+        breadcrumbs={[{ label: t('admin.sidebar.sessions'), href: ROUTES.ADMIN.SESSIONS }, { label: session.name }]}
         actions={<Badge variant={session.status === 'ACTIVE' ? 'success' : session.status === 'COMPLETED' ? 'primary' : 'neutral'}>{session.status}</Badge>}
       />
 
-      <Tabs tabs={[{ key: 'info', label: 'Info' }, { key: 'stages', label: 'Topik' }, { key: 'groups', label: 'Groups' }]}
+      <Tabs tabs={[{ key: 'info', label: t('admin.common.info') }, { key: 'stages', label: t('admin.topic.pageTitle') }, { key: 'groups', label: t('admin.sessions.groupsTab') }]}
         activeKey={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'info' && <SessionInfoTab session={session} programName={programMap.get(session.program_id) || session.program_id} />}

@@ -6,6 +6,7 @@ import { getMediaUrl } from '../../../core/utils/media'
 import { uploadBadgeImage } from '../../../core/utils/badgeImage'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { useTranslation } from 'react-i18next'
 
 type BadgeEditorVariant = 'subtopik' | 'final'
 
@@ -40,6 +41,7 @@ export function BadgeEditor({
   onNameChange,
   onImageChange,
 }: BadgeEditorProps) {
+  const { t } = useTranslation()
   const { addToast } = useGlobalToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -76,14 +78,14 @@ export function BadgeEditor({
       <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_11rem] sm:items-center">
         <div>
           <Input
-            label="Nama Badge"
+            label={t('admin.badge.nameLabel')}
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
-            placeholder="Contoh: Penjelajah Berani"
+            placeholder={t('admin.badge.namePlaceholder')}
           />
         </div>
         <div className="relative w-full shrink-0">
-          <span className="mb-1 block text-xs font-medium text-on-surface-variant">Gambar</span>
+          <span className="mb-1 block text-xs font-medium text-on-surface-variant">{t('admin.badge.imageLabel')}</span>
           <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm ring-1 ring-inset ring-black/5">
             {imageUrl ? (
               <img
@@ -104,7 +106,7 @@ export function BadgeEditor({
                 type="button"
                 onClick={() => onImageChange('')}
                 className="absolute right-1 top-1 rounded-full bg-surface/80 p-1 text-on-surface hover:bg-surface"
-                aria-label="Hapus gambar badge"
+                aria-label={t('admin.badge.removeImageAria')}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -126,7 +128,7 @@ export function BadgeEditor({
             disabled={uploading}
             icon={uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
           >
-            {uploading ? 'Mengunggah…' : 'Unggah Gambar'}
+            {uploading ? t('admin.badge.uploading') : t('admin.badge.uploadBtn')}
           </Button>
         </div>
       </div>

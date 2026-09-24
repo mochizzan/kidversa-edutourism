@@ -9,6 +9,8 @@ import {
  XAxis,
  YAxis,
 } from 'recharts'
+import { useTranslation } from 'react-i18next'
+import { i18n } from '../../../core/i18n'
 
 export interface TrendPoint {
  /** Date key YYYY-MM-DD (WIB). */
@@ -26,16 +28,16 @@ interface AnalyticsTrendChartProps {
  subtitle?: string
 }
 
-const seriesLabel: Record<string, string> = {
- sessions: 'Sesi',
- registrations: 'Pendaftar',
- assessments: 'Penilaian',
- avgRating: 'Rata-rata ★',
+const seriesLabel: Record<string, () => string> = {
+ sessions: () => i18n.t('common.chart.sessions'),
+ registrations: () => i18n.t('common.chart.registrations'),
+ assessments: () => i18n.t('common.chart.assessments'),
+ avgRating: () => i18n.t('common.chart.avgRating'),
 }
 
 function formatDay(date: string): string {
  const [y, m, d] = date.split('-').map(Number)
- return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('id-ID', {
+ return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(i18n.resolvedLanguage ?? 'id', {
   weekday: 'short',
   day: 'numeric',
   month: 'short',
@@ -70,15 +72,15 @@ function TrendTooltip({ active, label, payload }: TrendTooltipProps) {
     const value =
      key === 'avgRating'
       ? raw === null || raw === undefined
-       ? 'Tidak ada penilaian'
+       ? i18n.t('common.chart.noAssessment')
        : `${Number(raw).toFixed(1)} ★`
       : `${Number(raw ?? 0)}`
-    const unit = key === 'sessions' ? ' sesi' : key === 'registrations' ? ' pendaftar' : key === 'assessments' ? ' penilaian' : ''
+    const unit = key === 'sessions' ? i18n.t('common.chart.unitSessions') : key === 'registrations' ? i18n.t('common.chart.unitRegistrations') : key === 'assessments' ? i18n.t('common.chart.unitAssessments') : ''
     return (
      <p key={key} className="text-xs text-on-surface-variant flex items-center gap-2">
       <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: row.color }} />
       <span>
-       {seriesLabel[key] ?? key}: <span className="font-medium text-on-surface">{value}</span>
+       {seriesLabel[key]?.() ?? key}: <span className="font-medium text-on-surface">{value}</span>
        {unit}
       </span>
      </p>
@@ -94,13 +96,14 @@ function TrendTooltip({ active, label, payload }: TrendTooltipProps) {
  */
 export function AnalyticsTrendChart({
  data,
- title = 'Tren Analitik Harian',
- subtitle = 'Sesi, pendaftar baru, dan penilaian per tanggal (WIB) — arahkan kursor untuk detail',
+ title,
+ subtitle,
 }: AnalyticsTrendChartProps) {
+ const { t } = useTranslation()
  return (
   <div className="bg-surface rounded-3xl p-6 shadow-sm">
-   <h2 className="text-lg font-bold text-on-surface mb-1">{title}</h2>
-   <p className="text-xs text-on-surface-variant mb-4">{subtitle}</p>
+   <h2 className="text-lg font-bold text-on-surface mb-1">{title ?? t('common.chart.trendTitle')}</h2>
+   <p className="text-xs text-on-surface-variant mb-4">{subtitle ?? t('common.chart.trendSubtitle')}</p>
    <div className="h-72">
     <ResponsiveContainer width="100%" height="100%">
      <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
@@ -135,16 +138,16 @@ export function AnalyticsTrendChart({
       />
       <Tooltip content={<TrendTooltip />} cursor={{ fill: 'var(--color-surface-container-low)' }} />
       <Legend
-       formatter={(value) => seriesLabel[String(value)] ?? String(value)}
+       formatter={(value) => seriesLabel[String(value)]?.() ?? String(value)}
        iconType="circle"
        iconSize={8}
       />
-      <Bar yAxisId="left" dataKey="sessions" name="Sesi" fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={24} />
-      <Bar yAxisId="left" dataKey="registrations" name="Pendaftar" fill="var(--color-accent)" radius={[4, 4, 0, 0]} maxBarSize={24} />
+      <Bar yAxisId="left" dataKey="sessions" name={t('common.chart.sessions')} fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={24} />
+      <Bar yAxisId="left" dataKey="registrations" name={t('common.chart.registrations')} fill="var(--color-accent)" radius={[4, 4, 0, 0]} maxBarSize={24} />
       <Line
        yAxisId="left"
        dataKey="assessments"
-       name="Penilaian"
+       name={t('common.chart.assessments')}
        type="monotone"
        stroke="var(--color-tertiary)"
        strokeWidth={2}
@@ -154,7 +157,7 @@ export function AnalyticsTrendChart({
       <Line
        yAxisId="right"
        dataKey="avgRating"
-       name="Rata-rata ★"
+       name={t('common.chart.avgRating')}
        type="monotone"
        stroke="var(--color-secondary)"
        strokeWidth={2}

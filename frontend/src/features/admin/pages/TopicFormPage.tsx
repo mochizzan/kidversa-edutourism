@@ -17,8 +17,10 @@ import {
 import { ContentType } from '../../../core/types/enums'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Program, ProgramStage } from '../../../core/types'
+import { useTranslation } from 'react-i18next'
 
 const TopicFormPage = () => {
+  const { t } = useTranslation()
   const { topicId } = useParams<{ topicId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -106,11 +108,11 @@ const TopicFormPage = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!programId) {
-      addToast({ type: 'error', message: 'Program wajib dipilih' })
+      addToast({ type: 'error', message: t('admin.topic.programRequired') })
       return
     }
     if (!name.trim()) {
-      addToast({ type: 'error', message: 'Nama topik wajib diisi' })
+      addToast({ type: 'error', message: t('admin.topic.nameRequired') })
       return
     }
 
@@ -131,7 +133,7 @@ const TopicFormPage = () => {
             badge_image_url: badgeImageUrl.trim() || undefined,
           })
         }
-        addToast({ type: 'success', message: 'Topik berhasil dibuat' })
+        addToast({ type: 'success', message: t('admin.topic.createdToast') })
         navigate(topicDetailPath(created.id), { state: { showAddActivityCta: true } })
       } else if (topicId) {
         await programService.updateStage(programId, topicId, {
@@ -142,7 +144,7 @@ const TopicFormPage = () => {
           badge_name: badgeName.trim() || undefined,
           badge_image_url: badgeImageUrl.trim() || undefined,
         })
-        addToast({ type: 'success', message: 'Topik berhasil diperbarui' })
+        addToast({ type: 'success', message: t('admin.topic.updatedToast') })
         navigate(topicDetailPath(topicId))
       }
     } catch (err) {
@@ -157,7 +159,7 @@ const TopicFormPage = () => {
     setDeleting(true)
     try {
       await programService.deleteStage(programId, deleteTarget.id)
-      addToast({ type: 'success', message: 'Topik dihapus' })
+      addToast({ type: 'success', message: t('admin.topic.deletedToast') })
       navigate(topicListPath())
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
@@ -174,10 +176,10 @@ const TopicFormPage = () => {
   if (!isNew && !stage) {
     return (
       <div className="text-center text-on-surface-variant py-12">
-        Topik tidak ditemukan
+        {t('admin.topic.notFound')}
         <div className="mt-4">
           <Button variant="secondary" onClick={() => navigate(topicListPath())}>
-            Kembali
+            {t('common.back')}
           </Button>
         </div>
       </div>
@@ -187,16 +189,16 @@ const TopicFormPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isNew ? 'Buat Topik Baru' : `Edit Topik: ${stage?.name ?? ''}`}
-        subtitle={selectedProgram ? `Program: ${selectedProgram.name}` : 'Pilih program terlebih dahulu'}
+        title={isNew ? t('admin.topic.newTitle') : t('admin.topic.editTitle', { name: stage?.name ?? '' })}
+        subtitle={selectedProgram ? `Program: ${selectedProgram.name}` : t('admin.topic.selectProgramFirst')}
         breadcrumbs={[
-          { label: 'Topik', href: topicListPath() },
-          { label: isNew ? 'Buat Baru' : stage?.name || 'Edit' },
+          { label: t('admin.topic.pageTitle'), href: topicListPath() },
+          { label: isNew ? t('admin.common.createNew') : stage?.name || t('admin.common.edit') },
         ]}
         actions={
           !isNew && stage ? (
             <Button variant="danger" onClick={() => setDeleteTarget(stage)}>
-              Hapus Topik
+              {t('admin.topic.deleteTitle')}
             </Button>
           ) : undefined
         }
@@ -205,8 +207,8 @@ const TopicFormPage = () => {
       <Card>
         <form className="space-y-5" onSubmit={handleSubmit}>
           <Select
-            label="Program"
-            placeholder="Pilih Program"
+            label={t('admin.col.program')}
+            placeholder={t('admin.topic.pickProgram')}
             value={programId}
             options={programOptions}
             onChange={(e) => setProgramId(e.target.value)}
@@ -215,18 +217,18 @@ const TopicFormPage = () => {
           />
 
           <Input
-            label="Nama Topik"
+            label={t('admin.topic.nameLabel')}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Nama topik"
+            placeholder={t('admin.topic.namePlaceholder')}
             required
           />
 
           <Input
-            label="Deskripsi"
+            label={t('admin.topic.descLabel')}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Deskripsi singkat topik"
+            placeholder={t('admin.topic.descPlaceholder')}
           />
 
           <div className="flex items-center gap-3">
@@ -238,16 +240,16 @@ const TopicFormPage = () => {
               className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
             />
             <label htmlFor="isPhotoStage" className="text-sm text-on-surface">
-              Foto Stage badge
+              {t('admin.topic.photoStageLabel')}
             </label>
           </div>
 
           <BadgeEditor
-            title="Badge Topik"
+            title={t('admin.topic.badgeTitle')}
             variant="subtopik"
             name={badgeName}
             imageUrl={badgeImageUrl}
-            helperText="Diberikan otomatis ke anak saat semua kegiatan dalam topik ini sudah dinilai."
+            helperText={t('admin.topic.badgeHelp')}
             onNameChange={setBadgeName}
             onImageChange={setBadgeImageUrl}
           />
@@ -262,10 +264,10 @@ const TopicFormPage = () => {
                   : navigate(topicListPath())
               }
             >
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={saving}>
-              Simpan
+              {t('common.save')}
             </Button>
           </div>
         </form>
@@ -273,9 +275,9 @@ const TopicFormPage = () => {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Hapus Topik"
-        message={`Yakin ingin menghapus topik "${deleteTarget?.name || ''}"? Seluruh kegiatan di dalamnya juga akan dihapus. Tindakan ini tidak dapat dibatalkan.`}
-        confirmLabel="Hapus Topik"
+        title={t('admin.topic.deleteTitle')}
+        message={t('admin.topic.deleteMsgConfirm', { name: deleteTarget?.name || '' })}
+        confirmLabel={t('admin.topic.deleteTitle')}
         loading={deleting}
         onConfirm={handleDelete}
         onClose={() => setDeleteTarget(null)}

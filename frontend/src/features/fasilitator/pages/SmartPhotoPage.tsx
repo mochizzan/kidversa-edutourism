@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ChevronLeft, Lock } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -41,6 +42,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 const SmartPhotoPage = () => {
+ const { t } = useTranslation()
  const { childId } = useParams<{ groupId: string; childId: string }>()
  const navigate = useNavigate()
  const user = useAuthStore((s) => s.user)
@@ -126,11 +128,11 @@ const SmartPhotoPage = () => {
     setActiveFrames(res.data.filter((f) => f.is_active))
    })
    .catch(() => {
-    setPageError('Gagal memuat data frame. Periksa koneksi lalu coba lagi.')
+    setPageError(t('fasilitator.photos.frameLoadError'))
    })
   if (childId) {
    loadPhotos().catch(() => {
-    setPageError('Gagal memuat data foto. Periksa koneksi lalu coba lagi.')
+    setPageError(t('fasilitator.photos.photoLoadError'))
    })
   }
  }, [childId, loadPhotos])
@@ -161,7 +163,7 @@ const SmartPhotoPage = () => {
       if (!cancelled) ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height)
      } catch {
       if (!cancelled) {
-       addToast({ type: 'warning', message: 'Gagal memuat frame. Foto ditampilkan tanpa frame.' })
+       addToast({ type: 'warning', message: t('fasilitator.photos.frameFallbackToast') })
       }
      }
     }
@@ -239,7 +241,7 @@ const SmartPhotoPage = () => {
   const currentIsMine = isMineRef.current
   if (!editorCanvasRef.current || !childId || !currentParticipant || !user || !currentIsMine) return
   if (!currentParticipant.session_id) {
-   addToast({ type: 'error', message: 'Peserta belum masuk sesi' })
+   addToast({ type: 'error', message: t('fasilitator.photos.notInSession') })
    return
   }
   setIsSaving(true)
@@ -267,12 +269,12 @@ const SmartPhotoPage = () => {
   } catch (err: unknown) {
    const e = err as Error & { code?: string }
    if (e.message === 'MAX_PHOTOS_REACHED') {
-    addToast({ type: 'error', message: 'Maksimal 10 foto per anak' })
+    addToast({ type: 'error', message: t('fasilitator.photos.maxPhotos', { max: MAX_PHOTOS }) })
    } else if (e.code === 'consent_required') {
-    addToast({ type: 'error', message: 'Izin foto belum diberikan' })
+    addToast({ type: 'error', message: t('fasilitator.photos.consentRequired') })
     navigate(-1)
    } else {
-    addToast({ type: 'error', message: 'Gagal menyimpan foto' })
+    addToast({ type: 'error', message: t('fasilitator.photos.saveError') })
    }
   } finally {
    setIsSaving(false)
@@ -291,11 +293,11 @@ const SmartPhotoPage = () => {
 
  const currentCameraLabel = (() => {
   if (window.innerWidth <= 1024) {
-   return facingMode === 'environment' ? 'Kamera Belakang' : 'Kamera Depan'
+   return facingMode === 'environment' ? t('fasilitator.camera.back') : t('fasilitator.camera.front')
   }
-  if (!selectedDeviceId) return 'Otomatis'
+  if (!selectedDeviceId) return t('fasilitator.camera.auto')
   const device = devices.find((d) => d.deviceId === selectedDeviceId)
-  return device?.label || 'Kamera'
+  return device?.label || t('fasilitator.camera.deviceFallback')
  })()
 
  const photoCount = photos.length
@@ -305,7 +307,7 @@ const SmartPhotoPage = () => {
   return (
    <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-surface-container-low text-on-surface">
     <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
-    <p className="text-sm text-on-surface-variant">Memuat data peserta...</p>
+    <p className="text-sm text-on-surface-variant">{t('fasilitator.photos.loadingParticipant')}</p>
    </div>
   )
  }
@@ -314,9 +316,9 @@ const SmartPhotoPage = () => {
   return (
    <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-surface-container-low text-on-surface">
     <AlertTriangle className="w-16 h-16 text-error" />
-    <h2 className="text-xl font-bold">Anak Tidak Ditemukan</h2>
-    <p className="text-on-surface-variant">Data anak tidak tersedia atau telah dihapus.</p>
-    <Button onClick={() => navigate(-1)}>Kembali</Button>
+    <h2 className="text-xl font-bold">{t('fasilitator.photos.childMissingTitle')}</h2>
+    <p className="text-on-surface-variant">{t('fasilitator.photos.childMissingDesc')}</p>
+    <Button onClick={() => navigate(-1)}>{t('common.back')}</Button>
    </div>
   )
  }
@@ -325,11 +327,11 @@ const SmartPhotoPage = () => {
   return (
    <div className="h-dvh flex flex-col items-center justify-center gap-4 p-8 text-center bg-surface-container-low text-on-surface">
     <Lock className="w-16 h-16 text-error" />
-    <h2 className="text-xl font-bold">Akses Foto Diblokir</h2>
-    <p className="text-on-surface-variant">Izin foto untuk anak ini belum diberikan oleh orang tua.</p>
+    <h2 className="text-xl font-bold">{t('fasilitator.photos.blockedTitle')}</h2>
+    <p className="text-on-surface-variant">{t('fasilitator.photos.blockedDesc')}</p>
     <div className="flex gap-3">
-     <Button onClick={() => navigate(-1)}>Kembali</Button>
-     <Button variant="secondary" onClick={loadParticipant}>Coba lagi</Button>
+     <Button onClick={() => navigate(-1)}>{t('common.back')}</Button>
+     <Button variant="secondary" onClick={loadParticipant}>{t('fasilitator.photos.retry')}</Button>
     </div>
    </div>
   )
@@ -341,7 +343,7 @@ const SmartPhotoPage = () => {
     {!isMine && (
      <div className="flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
       <Lock className="w-4 h-4 shrink-0" />
-      Bukan kelompok Anda — foto hanya dapat dilihat (mode baca saja).
+      {t('fasilitator.photos.readOnlyPhoto')}
      </div>
     )}
     <div className="flex items-center gap-4 md:gap-6">
@@ -353,10 +355,10 @@ const SmartPhotoPage = () => {
      </button>
      <div>
       <h2 className="text-2xl md:text-3xl font-extrabold text-on-surface leading-tight">
-       Ambil Foto
+       {t('fasilitator.takePhoto')}
       </h2>
       <p className="text-xs md:text-sm text-on-surface-variant font-medium">
-       Pastikan objek terlihat jelas dalam frame
+       {t('fasilitator.photos.subtitle')}
       </p>
      </div>
     </div>
@@ -400,7 +402,7 @@ const SmartPhotoPage = () => {
         <canvas ref={editorCanvasRef} className="max-w-full max-h-full object-contain rounded-3xl" />
        ) : (
         <div className="flex items-center justify-center text-white/50 text-sm">
-         Memproses gambar...
+         {t('fasilitator.photos.processingImage')}
         </div>
        )}
       </div>
@@ -413,12 +415,12 @@ const SmartPhotoPage = () => {
     <Modal
      open={galleryOpen}
      onClose={() => setGalleryOpen(false)}
-     title={`Galeri Foto — ${participant.child_name}`}
+     title={t('fasilitator.photos.galleryTitle', { name: participant.child_name })}
      size="lg"
      footer={
       <div className="text-center">
        <p className="text-xs text-on-surface-variant">
-        {photos.length}/{MAX_PHOTOS} foto
+        {t('fasilitator.photos.photoCount', { count: photos.length, max: MAX_PHOTOS })}
        </p>
       </div>
      }
@@ -448,7 +450,7 @@ const SmartPhotoPage = () => {
     <Modal
      open={framePickerOpen}
      onClose={() => setFramePickerOpen(false)}
-     title="Pilih Frame"
+     title={t('fasilitator.photos.chooseFrame')}
      size="md"
     >
      <FramePicker
@@ -471,15 +473,15 @@ const SmartPhotoPage = () => {
 
     <ConfirmDialog
      open={confirmDeletePhoto}
-     title="Hapus Foto"
-     message="Yakin ingin menghapus foto ini? Tindakan ini tidak dapat dibatalkan."
+     title={t('fasilitator.photos.deletePhoto')}
+     message={t('fasilitator.photos.deleteConfirm')}
      onConfirm={async () => {
       if (!fullscreenPhoto) return
       try {
        await deletePhoto(fullscreenPhoto.id)
        setFullscreenPhoto(null)
       } catch {
-       addToast({ type: 'error', message: 'Gagal menghapus foto' })
+       addToast({ type: 'error', message: t('fasilitator.photos.deleteError') })
       } finally {
        setConfirmDeletePhoto(false)
       }

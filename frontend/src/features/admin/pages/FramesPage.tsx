@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ROUTES, IMAGE_FALLBACK_SRC } from '../../../core/constants/app'
+import { ROUTES, imageFallbackSrc } from '../../../core/constants/app'
 import { Upload, Image, Pencil, Trash2, ToggleLeft, ToggleRight, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -22,16 +22,18 @@ import { formatDate } from '../../../shared/utils'
 import { FramePreviewOverlay } from '../components/FramePreviewOverlay'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { PhotoFrame, Program } from '../../../core/types'
+import { useTranslation } from 'react-i18next'
 
 const frameTextFilter = makeTextFilter<PhotoFrame>(['name'])
 
-const STATUS_FILTERS: { key: 'all' | 'active' | 'inactive'; label: string }[] = [
-  { key: 'all', label: 'Semua' },
-  { key: 'active', label: 'Aktif' },
-  { key: 'inactive', label: 'Nonaktif' },
-]
+const STATUS_FILTERS = [
+  { key: 'all', labelKey: 'admin.common.all' },
+  { key: 'active', labelKey: 'admin.status.active' },
+  { key: 'inactive', labelKey: 'admin.status.inactive' },
+] as const
 
 const FramesPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { tenantId } = useTenantScope()
   const { addToast } = useGlobalToast()
@@ -80,7 +82,7 @@ const FramesPage = () => {
     programService
       .getAll({ limit: 100 })
       .then((res) => setPrograms(res.data))
-      .catch(() => setProgramError('Gagal memuat daftar program. Nama program mungkin tidak lengkap.'))
+      .catch(() => setProgramError(t('admin.frames.programLoadError')))
   }, [])
 
   const handleToggle = async (frame: PhotoFrame) => {
@@ -108,11 +110,11 @@ const FramesPage = () => {
   const columns: Column<PhotoFrame>[] = [
     {
       key: 'thumbnail',
-      header: 'Thumbnail',
+      header: t('admin.frames.colThumbnail'),
       render: (item: PhotoFrame) => (
         <button
           type="button"
-          aria-label={'Pratinjau ' + item.name}
+          aria-label={t('admin.frames.previewAria', { name: item.name })}
           className="cursor-zoom-in"
           onClick={() => setPreview(item)}
         >
@@ -120,7 +122,7 @@ const FramesPage = () => {
             src={getMediaUrl('frame', item.id)}
             alt={item.name}
             onError={(e) => {
-              ; (e.currentTarget as HTMLImageElement).src = IMAGE_FALLBACK_SRC
+              ; (e.currentTarget as HTMLImageElement).src = imageFallbackSrc()
             }}
             className="h-12 w-12 rounded-lg bg-surface-container-high object-cover"
           />
@@ -129,33 +131,33 @@ const FramesPage = () => {
     },
     {
       key: 'name',
-      header: 'Nama',
+      header: t('admin.col.name'),
       sortable: true,
       render: (item: PhotoFrame) => <span className="font-medium text-on-surface">{item.name}</span>,
     },
     {
       key: 'program',
-      header: 'Program',
-      render: (item: PhotoFrame) => programMap.get(item.program_id ?? '') ?? 'Semua Program',
+      header: t('admin.col.program'),
+      render: (item: PhotoFrame) => programMap.get(item.program_id ?? '') ?? t('admin.common.allPrograms'),
     },
     {
       key: 'is_active',
-      header: 'Status',
+      header: t('admin.col.status'),
       render: (item: PhotoFrame) => (
         <Badge variant={item.is_active ? 'success' : 'neutral'}>
-          {item.is_active ? 'Aktif' : 'Nonaktif'}
+          {item.is_active ? t('admin.status.active') : t('admin.status.inactive')}
         </Badge>
       ),
     },
     {
       key: 'created_at',
-      header: 'Dibuat',
+      header: t('admin.col.created'),
       sortable: true,
       render: (item: PhotoFrame) => formatDate(item.created_at),
     },
     {
       key: 'actions',
-      header: 'Aksi',
+      header: t('admin.col.action'),
       align: 'right',
       render: (item: PhotoFrame) => (
         <div className="flex items-center justify-end gap-2">
@@ -163,21 +165,21 @@ const FramesPage = () => {
             variant="ghost"
             size="sm"
             icon={<Pencil className="w-4 h-4" />}
-            tooltip="Edit"
+            tooltip={t('admin.common.edit')}
             onClick={() => navigate('/admin/frames/' + item.id + '/edit')}
           />
           <Button
             variant="ghost"
             size="sm"
             icon={item.is_active ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
-            tooltip={item.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+            tooltip={item.is_active ? t('admin.common.deactivate') : t('admin.common.activate')}
             onClick={() => handleToggle(item)}
           />
           <Button
             variant="ghost"
             size="sm"
             icon={<Trash2 className="w-4 h-4 text-error" />}
-            tooltip="Hapus"
+            tooltip={t('common.delete')}
             onClick={() => setDeleteId(item.id)}
           />
         </div>
@@ -188,10 +190,10 @@ const FramesPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Frame Manager"
-        subtitle="Kelola frame PNG untuk Smart Photo."
+        title={t('admin.sidebar.frames')}
+        subtitle={t('admin.frames.subtitle')}
         actions={
-          <Button icon={<Upload className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.FRAME_UPLOAD)}>Upload Frame</Button>
+          <Button icon={<Upload className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.FRAME_UPLOAD)}>{t('admin.frames.uploadTitle')}</Button>
         }
       />
 
@@ -205,13 +207,13 @@ const FramesPage = () => {
       {error && (
         <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
           <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
-          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+          <Button variant="secondary" size="sm" onClick={refresh}>{t('common.error.retry')}</Button>
         </div>
       )}
 
       <div
         role="group"
-        aria-label="Filter status"
+        aria-label={t('admin.frames.filterStatusAria')}
         className="flex w-fit gap-1 rounded-full bg-surface-container-low p-1"
       >
         {STATUS_FILTERS.map((filter) => (
@@ -230,7 +232,7 @@ const FramesPage = () => {
                 : 'text-on-surface-variant hover:text-on-surface',
             )}
           >
-            {filter.label}
+            {t(filter.labelKey)}
           </button>
         ))}
       </div>
@@ -248,7 +250,7 @@ const FramesPage = () => {
         getRowId={(item: PhotoFrame) => item.id}
         actions={
           <Select
-            aria-label="Program"
+            aria-label={t('admin.col.program')}
             value={programFilter}
             onChange={(e) => {
               setProgramFilter(e.target.value)
@@ -256,7 +258,7 @@ const FramesPage = () => {
             }}
             className="w-56"
             options={[
-              { value: 'all', label: 'Semua Program' },
+              { value: 'all', label: t('admin.common.allPrograms') },
               ...programs.map((p) => ({ value: p.id, label: p.name })),
             ]}
           />
@@ -264,8 +266,8 @@ const FramesPage = () => {
         emptyState={
           <ListEmptyState
             icon={<Image className="w-12 h-12" />}
-            title="Belum ada frame"
-            description="Klik 'Upload Frame' di atas untuk mengupload frame PNG pertama."
+            title={t('admin.frames.emptyTitle')}
+            description={t('admin.frames.emptyDescList')}
           />
         }
       />
@@ -278,13 +280,13 @@ const FramesPage = () => {
         />
       )}
 
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Hapus Frame" footer={
+      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title={t('admin.frames.deleteTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDeleteId(null)}>Batal</Button>
-          <Button variant="danger" onClick={handleDelete}>Hapus</Button>
+          <Button variant="secondary" onClick={() => setDeleteId(null)}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={handleDelete}>{t('common.delete')}</Button>
         </div>
       }>
-        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menghapus frame ini?</p>
+        <p className="text-sm text-on-surface-variant">{t('admin.frames.deleteMsg')}</p>
       </Modal>
     </div>
   )

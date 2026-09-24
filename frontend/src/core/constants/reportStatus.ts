@@ -9,12 +9,12 @@ export const reportStatusBadge: Record<ReportStatus, ReportStatusBadge> = {
   [ReportStatus.SENT]: 'primary',
 }
 
-export const reportStatusLabel: Record<ReportStatus, string> = {
-  [ReportStatus.DRAFT]: 'Draft',
-  [ReportStatus.PENDING_REVIEW]: 'Perlu Review',
-  [ReportStatus.APPROVED]: 'Disetujui',
-  [ReportStatus.SENT]: 'Terkirim',
-}
+export const reportStatusLabel = {
+  [ReportStatus.DRAFT]: 'admin.reportStatus.draft',
+  [ReportStatus.PENDING_REVIEW]: 'admin.reportStatus.pendingReview',
+  [ReportStatus.APPROVED]: 'admin.reportStatus.approved',
+  [ReportStatus.SENT]: 'admin.reportStatus.sent',
+} as const satisfies Record<ReportStatus, string>
 
 export const reportStatusBg: Record<ReportStatus, string> = {
   [ReportStatus.DRAFT]: 'bg-surface-variant text-on-surface-variant',
@@ -23,7 +23,7 @@ export const reportStatusBg: Record<ReportStatus, string> = {
   [ReportStatus.SENT]: 'bg-primary-container text-on-primary-container',
 }
 
-export const NO_ASSESSMENT_LABEL = 'Belum Dinilai'
+export const NO_ASSESSMENT_LABEL = 'common.assessment.rating0'
 export const NO_ASSESSMENT_BADGE: ReportStatusBadge = 'warning'
-export const NO_REPORT_LABEL = 'Belum Ada Laporan'
+export const NO_REPORT_LABEL = 'admin.reportStatus.noReport'
 export const NO_REPORT_BADGE: ReportStatusBadge = 'neutral'

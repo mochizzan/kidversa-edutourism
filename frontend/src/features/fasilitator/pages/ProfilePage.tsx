@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import {
   User,
@@ -11,9 +12,11 @@ import {
   Camera,
   ChevronRight,
   Pencil,
+  Globe,
   Smartphone,
   Layers,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { Card } from '../../../shared/components/ui/Card'
 import { ROUTES } from '../../../core/constants/app'
 import { Button } from '../../../shared/components/ui/Button'
@@ -26,6 +29,8 @@ import { AvatarUploadModal } from '../../../shared/components/ui/AvatarUploadMod
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
 import { cn } from '../../../core/utils'
 import { getMediaUrl } from '../../../core/utils/media'
+import { LanguageSwitcherModal } from '../../../shared/components/ui/LanguageSwitcherModal'
+import { LANGUAGES } from '@/core/i18n/locales'
 
 const roleLabel: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
@@ -42,6 +47,9 @@ const ProfilePage = () => {
   const [pendingDragFile, setPendingDragFile] = useState<File | null>(null)
   const [avatarDragOver, setAvatarDragOver] = useState(false)
   const dragCounterRef = useRef(0)
+  const { t, i18n } = useTranslation()
+  const [langOpen, setLangOpen] = useState(false)
+  const activeEndonym = LANGUAGES.find((l) => l.code === (i18n.resolvedLanguage ?? 'id'))?.endonym ?? 'Bahasa Indonesia'
 
   const handleAvatarDragEnter = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation()
@@ -77,14 +85,14 @@ const ProfilePage = () => {
           <div className='w-14 h-14 rounded-2xl bg-[#F1EAFE] flex items-center justify-center mx-auto mb-4'>
             <User className='w-7 h-7 text-[#6D28D9]' />
           </div>
-          <h3 className='text-lg font-bold text-slate-900'>Tidak dapat memuat profil</h3>
-          <p className='text-sm text-slate-500 mt-1.5'>Silakan login ulang ke dalam sistem.</p>
+          <h3 className='text-lg font-bold text-slate-900'>{t('fasilitator.profile.loadErrorTitle')}</h3>
+          <p className='text-sm text-slate-500 mt-1.5'>{t('fasilitator.profile.loadErrorDesc')}</p>
           <Button
             variant='primary'
             className='mt-6 w-full bg-[#6D28D9] hover:bg-[#5B21B6] text-white'
             onClick={handleLogout}
           >
-            Login Ulang
+            {t('fasilitator.profile.relogin')}
           </Button>
         </div>
       </div>
@@ -96,10 +104,10 @@ const ProfilePage = () => {
       {/* ── Page Title ── */}
       <div className='space-y-1 mb-6 md:mb-7 lg:mb-8'>
         <h2 className='text-[28px] md:text-[32px] lg:text-[36px] font-bold text-slate-900 leading-tight'>
-          Profil
+          {t('fasilitator.profile.title')}
         </h2>
         <p className='text-[13px] md:text-[14px] lg:text-[16px] text-slate-500 font-normal'>
-          Kelola informasi akun dan preferensi aplikasi Anda.
+          {t('fasilitator.profile.subtitle')}
         </p>
       </div>
 
@@ -128,10 +136,10 @@ const ProfilePage = () => {
                 </span>
               )}
             </div>
-            <Tooltip content='Ubah foto profil'>
+            <Tooltip content={t('fasilitator.profile.changeAvatar')}>
               <button
                 type='button'
-                aria-label='Ubah foto profil'
+                aria-label={t('fasilitator.profile.changeAvatar')}
                 onClick={() => { setPendingDragFile(null); setShowAvatarModal(true) }}
                 className='absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-[#6D28D9] border-[3px] border-white flex items-center justify-center text-white shadow-md hover:bg-[#5B21B6] transition-all hover:scale-105 active:scale-95'
               >
@@ -147,7 +155,7 @@ const ProfilePage = () => {
               </h3>
               <button
                 type='button'
-                aria-label='Edit nama'
+                aria-label={t('fasilitator.profile.editName')}
                 onClick={() => setEditField('name')}
                 className='shrink-0 w-7 h-7 rounded-lg bg-[#F1EAFE] text-[#6D28D9] hover:bg-[#E9D8FD] active:scale-95 transition-all flex items-center justify-center'
               >
@@ -161,7 +169,7 @@ const ProfilePage = () => {
             <div className='flex flex-wrap items-center justify-center md:justify-start gap-2 mt-3 md:mt-4'>
               <span className='inline-flex items-center gap-1.5 px-3 md:px-4 h-9 md:h-10 rounded-[12px] border border-[#E8E8E8] bg-[#F8F9FB] text-[11px] md:text-[12px] font-semibold text-slate-600'>
                 <User className='w-3.5 h-3.5' />
-                <span className='text-slate-400'>ID Akun:</span>
+                <span className='text-slate-400'>{t('fasilitator.profile.accountId')}:</span>
                 <span className='font-bold text-[#6D28D9]'>{user.id}</span>
               </span>
               <span className='inline-flex items-center gap-1.5 px-3 md:px-4 h-9 md:h-10 rounded-[12px] border border-[#E8E8E8] bg-[#F8F9FB] text-[11px] md:text-[12px] font-semibold text-slate-600'>
@@ -180,25 +188,25 @@ const ProfilePage = () => {
             <User className='w-4 h-4 text-[#6D28D9]' />
           </div>
           <div>
-            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>Informasi Akun</h4>
-            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>Detail akun yang terdaftar pada sistem.</p>
+            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>{t('fasilitator.profile.accountInfo')}</h4>
+            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>{t('fasilitator.profile.accountInfoDesc')}</p>
           </div>
         </div>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4'>
           <InfoItem
             icon={Mail}
-            label='Email'
+            label={t('auth.field.email')}
             value={user.email}
             onEdit={() => setEditField('email')}
           />
           <InfoItem
             icon={Phone}
-            label='Telepon'
+            label={t('fasilitator.profile.telephone')}
             value={user.phone || '-'}
             onEdit={() => setEditField('phone')}
           />
-          <InfoItem icon={Shield} label='Role' value={roleLabel[user.role] || user.role} />
-          <InfoItem icon={User} label='ID Akun' value={user.id} />
+          <InfoItem icon={Shield} label={t('fasilitator.profile.roleField')} value={roleLabel[user.role] || user.role} />
+          <InfoItem icon={User} label={t('fasilitator.profile.accountId')} value={user.id} />
         </div>
       </div>
 
@@ -209,8 +217,8 @@ const ProfilePage = () => {
             <Smartphone className='w-4 h-4 text-[#6D28D9]' />
           </div>
           <div>
-            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>Aplikasi</h4>
-            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>Informasi aplikasi yang Anda gunakan.</p>
+            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>{t('fasilitator.profile.appSection')}</h4>
+            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>{t('fasilitator.profile.appDesc')}</p>
           </div>
         </div>
         <Card
@@ -219,14 +227,14 @@ const ProfilePage = () => {
         >
           <div className='grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-100'>
             <div className='flex items-center justify-between pr-0 md:pr-4 py-2 md:py-0'>
-              <span className='text-sm font-semibold text-slate-500'>Versi</span>
+              <span className='text-sm font-semibold text-slate-500'>{t('fasilitator.profile.version')}</span>
               <span className='text-sm font-bold text-slate-800'>1.0.0</span>
             </div>
             <div className='flex items-center justify-between pl-0 md:pl-4 pt-3 md:pt-0 pb-2 md:pb-0'>
-              <span className='text-sm font-semibold text-slate-500'>Mode</span>
+              <span className='text-sm font-semibold text-slate-500'>{t('fasilitator.profile.mode')}</span>
               {import.meta.env.VITE_DEMO_MODE === 'true' && (
                 <span className='inline-flex px-3 py-1 rounded-full bg-[#F4EBFF] text-[#6D28D9] text-[11px] font-bold border border-purple-100'>
-                  Demo
+                  {t('fasilitator.profile.demoMode')}
                 </span>
               )}
             </div>
@@ -241,29 +249,30 @@ const ProfilePage = () => {
             <Layers className='w-4 h-4 text-[#6D28D9]' />
           </div>
           <div>
-            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>Menu Cepat</h4>
-            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>Akses cepat ke fitur yang sering digunakan.</p>
+            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>{t('fasilitator.profile.quickMenuHeader')}</h4>
+            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>{t('fasilitator.profile.quickMenuHeaderDesc')}</p>
           </div>
         </div>
         <div className='grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4'>
           <QuickMenuItem
             icon={LayoutDashboard}
-            title='Dashboard'
-            desc='Lihat ringkasan aktivitas'
+            title={t('fasilitator.profile.quickMenu.dashboard.title')}
+            desc={t('fasilitator.profile.quickMenu.dashboard.desc')}
             onClick={() => navigate(ROUTES.FASILITATOR.DASHBOARD)}
           />
           <QuickMenuItem
             icon={Users}
-            title='Kelompok'
-            desc='Kelola semua kelompok'
+            title={t('fasilitator.profile.quickMenu.groups.title')}
+            desc={t('fasilitator.profile.quickMenu.groups.desc')}
             onClick={() => navigate(ROUTES.FASILITATOR.GROUPS)}
           />
           <QuickMenuItem
             icon={Camera}
-            title='Kamera'
-            desc='Buka kamera untuk scan QR'
+            title={t('fasilitator.profile.quickMenu.camera.title')}
+            desc={t('fasilitator.profile.quickMenu.camera.desc')}
             onClick={() => navigate(ROUTES.FASILITATOR.CAMERA)}
           />
+          <QuickMenuItem icon={Globe} title={t('common.language.menuLabel')} desc={activeEndonym} onClick={() => setLangOpen(true)} />
         </div>
       </div>
 
@@ -278,8 +287,8 @@ const ProfilePage = () => {
             <LogOut className='w-5 h-5 text-[#DC2626]' />
           </div>
           <div className='text-left'>
-            <p className='text-sm md:text-[15px] font-bold text-[#DC2626]'>Keluar Akun</p>
-            <p className='text-[11px] md:text-xs text-[#DC2626]/60'>Keluar dari akun saat ini</p>
+            <p className='text-sm md:text-[15px] font-bold text-[#DC2626]'>{t('fasilitator.profile.logoutTitle')}</p>
+            <p className='text-[11px] md:text-xs text-[#DC2626]/60'>{t('fasilitator.profile.logoutDesc')}</p>
           </div>
         </div>
         <ChevronRight className='w-5 h-5 text-[#DC2626]/50 group-hover:text-[#DC2626] group-hover:translate-x-1 transition-all shrink-0' />
@@ -310,6 +319,7 @@ const ProfilePage = () => {
         onClose={() => setEditField(null)}
         user={user as UserType}
       />
+      <LanguageSwitcherModal open={langOpen} onClose={() => setLangOpen(false)} />
     </div>
   )
 }
@@ -320,36 +330,39 @@ const InfoItem = ({
   value,
   onEdit,
 }: {
-  icon: any
+  icon: LucideIcon
   label: string
-  value: any
+  value: string
   onEdit?: () => void
-}) => (
-  <div
-    className={cn(
-      'bg-white border border-[#ECECEC] rounded-[14px] p-4 flex items-center gap-3 md:gap-4 shadow-[0_2px_6px_rgba(0,0,0,0.04)]',
-      onEdit && 'pr-3 md:pr-4'
-    )}
-  >
-    <div className='w-10 h-10 rounded-[12px] bg-[#F1EAFE] flex items-center justify-center shrink-0'>
-      <Icon className='w-5 h-5 text-[#6D28D9]' />
+}) => {
+  const { t } = useTranslation()
+  return (
+    <div
+      className={cn(
+        'bg-white border border-[#ECECEC] rounded-[14px] p-4 flex items-center gap-3 md:gap-4 shadow-[0_2px_6px_rgba(0,0,0,0.04)]',
+        onEdit && 'pr-3 md:pr-4'
+      )}
+    >
+      <div className='w-10 h-10 rounded-[12px] bg-[#F1EAFE] flex items-center justify-center shrink-0'>
+        <Icon className='w-5 h-5 text-[#6D28D9]' />
+      </div>
+      <div className='flex-1 min-w-0'>
+        <p className='text-[10px] md:text-[11px] text-slate-400 font-semibold uppercase tracking-wider'>{label}</p>
+        <div className='text-sm md:text-[15px] font-bold text-slate-800 truncate mt-0.5'>{value}</div>
+      </div>
+      {onEdit && (
+        <button
+          type='button'
+          aria-label={t('fasilitator.profile.editFieldAria', { label })}
+          onClick={onEdit}
+          className='shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-[10px] bg-[#F1EAFE] text-[#6D28D9] hover:bg-[#E9D8FD] active:scale-95 transition-all flex items-center justify-center'
+        >
+          <Pencil className='w-4 h-4' />
+        </button>
+      )}
     </div>
-    <div className='flex-1 min-w-0'>
-      <p className='text-[10px] md:text-[11px] text-slate-400 font-semibold uppercase tracking-wider'>{label}</p>
-      <div className='text-sm md:text-[15px] font-bold text-slate-800 truncate mt-0.5'>{value}</div>
-    </div>
-    {onEdit && (
-      <button
-        type='button'
-        aria-label={`Edit ${label}`}
-        onClick={onEdit}
-        className='shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-[10px] bg-[#F1EAFE] text-[#6D28D9] hover:bg-[#E9D8FD] active:scale-95 transition-all flex items-center justify-center'
-      >
-        <Pencil className='w-4 h-4' />
-      </button>
-    )}
-  </div>
-)
+  )
+}
 
 const QuickMenuItem = ({
   icon: Icon,
@@ -357,7 +370,7 @@ const QuickMenuItem = ({
   desc,
   onClick,
 }: {
-  icon: any
+  icon: LucideIcon
   title: string
   desc: string
   onClick: () => void

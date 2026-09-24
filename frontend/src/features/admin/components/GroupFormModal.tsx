@@ -3,6 +3,7 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { useTranslation } from 'react-i18next'
 
 interface GroupFormModalProps {
   open: boolean
@@ -21,6 +22,7 @@ export function GroupFormModal({
   initialName = '',
   existingNames,
 }: GroupFormModalProps) {
+  const { t } = useTranslation()
   const [name, setName] = useState(initialName)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -38,7 +40,7 @@ export function GroupFormModal({
 
     const trimmedName = name.trim()
     if (!trimmedName) {
-      setError('Nama kelompok harus diisi')
+      setError(t('admin.sessions.groupNameRequired'))
       return
     }
 
@@ -51,7 +53,7 @@ export function GroupFormModal({
     )
 
     if (isDuplicate) {
-      setError('Nama kelompok sudah ada. Gunakan nama lain.')
+      setError(t('admin.sessions.groupNameDuplicate'))
       return
     }
 
@@ -70,13 +72,13 @@ export function GroupFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={mode === 'create' ? 'Tambah Kelompok' : 'Edit Kelompok'}
+      title={mode === 'create' ? t('admin.sessions.groupAdd') : t('admin.sessions.groupEdit')}
       size="sm"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          label="Nama Kelompok"
-          placeholder="Contoh: Kelompok Merah"
+          label={t('admin.sessions.groupNameLabel')}
+          placeholder={t('admin.sessions.groupNamePlaceholder')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           error={error}
@@ -86,10 +88,10 @@ export function GroupFormModal({
 
         <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
           <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-            Batal
+            {t('common.cancel')}
           </Button>
           <Button type="submit" loading={submitting}>
-            {mode === 'create' ? 'Tambah' : 'Simpan'}
+            {mode === 'create' ? t('admin.common.add') : t('common.save')}
           </Button>
         </div>
       </form>

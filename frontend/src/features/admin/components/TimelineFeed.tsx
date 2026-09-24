@@ -7,6 +7,8 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { cn } from '../../../core/utils'
+import { i18n } from '../../../core/i18n'
+import { useTranslation } from 'react-i18next'
 import type { TimelineEventRow } from '../../../core/services/live'
 
 interface TimelineFeedProps {
@@ -48,7 +50,7 @@ const typeConfig: Record<
 
 function formatTimestamp(isoString: string): string {
   const date = new Date(isoString)
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat(i18n.resolvedLanguage ?? 'id', {
     hour: '2-digit',
     minute: '2-digit',
     day: 'numeric',
@@ -73,6 +75,7 @@ function SkeletonLine({ widthClass }: { widthClass: string }) {
 }
 
 export function TimelineFeed({ events, loading, className }: TimelineFeedProps) {
+  const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
   const prevLengthRef = useRef(events.length)
 
@@ -102,7 +105,7 @@ export function TimelineFeed({ events, loading, className }: TimelineFeedProps) 
     return (
       <div className={cn('flex flex-col items-center justify-center py-8 text-center', className)}>
         <ArrowRight className="w-8 h-8 text-gray-300 mb-2" />
-        <p className="text-sm text-gray-400">Belum ada aktivitas</p>
+        <p className="text-sm text-gray-400">{t('admin.live.emptyFeed')}</p>
       </div>
     )
   }
@@ -142,7 +145,7 @@ export function TimelineFeed({ events, loading, className }: TimelineFeedProps) 
               </p>
               {event.user_id && (
                 <p className="text-[11px] text-gray-400 mt-0.5">
-                  oleh user ID: {event.user_id}
+                  {t('admin.live.byUser', { id: event.user_id })}
                 </p>
               )}
             </div>

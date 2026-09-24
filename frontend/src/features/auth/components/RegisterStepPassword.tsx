@@ -1,5 +1,6 @@
 import { Lock, Eye, EyeOff } from 'lucide-react'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 import { PasswordStrengthBar } from './PasswordStrengthBar'
 
@@ -24,11 +25,12 @@ export function RegisterStepPassword({
   passwordValue,
   disabled,
 }: RegisterStepPasswordProps) {
+  const { t } = useTranslation()
   return (
     <>
       <div>
         <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-          Password
+          {t('auth.field.password')}
         </label>
         <div className="relative">
           <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
@@ -41,7 +43,7 @@ export function RegisterStepPassword({
               'focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15',
               errors.password ? 'border-error' : 'border-outline-variant/60',
             )}
-            placeholder="Minimal 8 karakter"
+            placeholder={t('auth.field.passwordHint')}
             disabled={disabled}
           />
           <button
@@ -59,7 +61,7 @@ export function RegisterStepPassword({
 
       <div>
         <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-          Konfirmasi Password
+          {t('auth.field.confirmPassword')}
         </label>
         <div className="relative">
           <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
@@ -72,7 +74,7 @@ export function RegisterStepPassword({
               'focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15',
               errors.confirmPassword ? 'border-error' : 'border-outline-variant/60',
             )}
-            placeholder="Ulangi password"
+            placeholder={t('auth.field.repeatPassword')}
             disabled={disabled}
           />
           <button

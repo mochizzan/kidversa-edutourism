@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { UserRole } from '../../../core/types'
 import type { Tenant } from '../../../core/types'
 import { cn } from '../../../core/utils'
@@ -12,11 +13,12 @@ interface RegisterStepTermsProps {
 }
 
 export function RegisterStepTerms({ register, errors, isSubmitting, tenants = [] }: RegisterStepTermsProps) {
+  const { t } = useTranslation()
   return (
     <>
       <div>
         <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-          Cabang / Tenant
+          {t('auth.register.branchLabel')}
         </label>
         <select
           {...register('tenant_id')}
@@ -28,7 +30,7 @@ export function RegisterStepTerms({ register, errors, isSubmitting, tenants = []
           )}
           disabled={isSubmitting}
         >
-          <option value="">Pilih cabang...</option>
+          <option value="">{t('auth.register.branchPlaceholder')}</option>
           {tenants.map((tenant) => (
             <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
           ))}
@@ -38,7 +40,7 @@ export function RegisterStepTerms({ register, errors, isSubmitting, tenants = []
 
       <div>
         <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-          Peran
+          {t('auth.register.roleLabel')}
         </label>
         <select
           {...register('role')}
@@ -65,13 +67,13 @@ export function RegisterStepTerms({ register, errors, isSubmitting, tenants = []
           disabled={isSubmitting}
         />
         <span className="text-sm text-on-surface-variant/60 leading-relaxed">
-          Saya setuju dengan{' '}
+          {t('auth.register.termsPrefix')}{' '}
           <Link to="/terms" className="text-primary font-semibold hover:text-primary-dark transition-colors">
-            Syarat & Ketentuan
+            {t('auth.register.termsLink')}
           </Link>{' '}
-          dan{' '}
+          {t('auth.register.termsAnd')}{' '}
           <Link to="/privacy" className="text-primary font-semibold hover:text-primary-dark transition-colors">
-            Kebijakan Privasi
+            {t('auth.register.privacyLink')}
           </Link>
         </span>
       </div>

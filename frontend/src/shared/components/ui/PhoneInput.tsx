@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 import { combinePhone, detectCountry, getCountryOptions } from '../../../core/utils/phone'
 
@@ -28,6 +29,7 @@ export function PhoneInput({
   autoFocus,
   placeholder,
 }: PhoneInputProps) {
+  const { t } = useTranslation()
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
   const errorId = `${inputId}-error`
   const hintId = `${inputId}-hint`
@@ -64,7 +66,7 @@ export function PhoneInput({
       )}
       <div className="flex">
         <select
-          aria-label="Kode negara"
+          aria-label={t('common.phone.countryCode')}
           value={iso}
           onChange={(e) => handleCountryChange(e.target.value)}
           disabled={disabled}

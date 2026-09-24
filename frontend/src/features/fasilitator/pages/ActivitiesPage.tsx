@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Calendar, Users, CheckCircle, XCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
@@ -34,6 +35,7 @@ function SkeletonRow() {
 }
 
 const ActivitiesPage = () => {
+  const { t } = useTranslation()
   const { user } = useAuth()
 
   const [loading, setLoading] = useState(true)
@@ -81,7 +83,7 @@ const ActivitiesPage = () => {
         const stageName =
           (repStage && stageNameMap.get(repStage.program_stage_id)) ||
           (detail.stages[0] && stageNameMap.get(detail.stages[0].program_stage_id)) ||
-          'Topik'
+          t('fasilitator.topicFallback')
 
         items.push({
           id: session.id,
@@ -112,7 +114,7 @@ const ActivitiesPage = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Aktivitas Saya" subtitle="Riwayat sesi dan topik yang telah dikerjakan." />
+        <PageHeader title={t('fasilitator.activities.pageTitle')} subtitle={t('fasilitator.activities.subtitleTopik')} />
         <div className="bg-surface rounded-2xl p-4 shadow-sm border border-outline-variant/50 animate-pulse">
           <div className="h-10 bg-surface-container-high rounded w-48" />
         </div>
@@ -129,7 +131,7 @@ const ActivitiesPage = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Aktivitas Saya" />
+        <PageHeader title={t('fasilitator.activities.pageTitle')} />
         <ErrorState message={error} onRetry={fetchActivities} />
       </div>
     )
@@ -138,8 +140,8 @@ const ActivitiesPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Aktivitas Saya"
-        subtitle="Riwayat sesi dan stage yang telah dikerjakan."
+        title={t('fasilitator.activities.pageTitle')}
+        subtitle={t('fasilitator.activities.subtitleStage')}
       />
 
       {/* Date Filter */}
@@ -153,7 +155,7 @@ const ActivitiesPage = () => {
             className="border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface bg-surface focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
           />
           <span className="text-sm text-on-surface-variant">
-            {filteredActivities.length} aktivitas ditemukan
+            {t('fasilitator.activities.foundCount', { count: filteredActivities.length })}
           </span>
         </div>
       </div>
@@ -175,7 +177,7 @@ const ActivitiesPage = () => {
                     variant={activity.status === 'COMPLETED' ? 'success' : 'danger'}
                     size="sm"
                   >
-                    {activity.status === 'COMPLETED' ? 'Selesai' : 'Dibatalkan'}
+                    {activity.status === 'COMPLETED' ? t('fasilitator.status.completed') : t('fasilitator.status.cancelled')}
                   </Badge>
                 </div>
 
@@ -190,7 +192,7 @@ const ActivitiesPage = () => {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Users className="w-4 h-4 shrink-0" />
-                    <span>{activity.childrenAssessed} anak dinilai</span>
+                    <span>{t('fasilitator.activities.assessedChildren', { count: activity.childrenAssessed })}</span>
                   </div>
                 </div>
               </div>
@@ -210,8 +212,8 @@ const ActivitiesPage = () => {
         {filteredActivities.length === 0 && !loading && (
           <EmptyState
             icon={<Calendar className="w-12 h-12" />}
-            title="Belum ada aktivitas"
-            description="Tidak ada sesi selesai atau dibatalkan pada tanggal ini."
+            title={t('fasilitator.activities.emptyTitle')}
+            description={t('fasilitator.activities.emptyDesc')}
           />
         )}
       </div>

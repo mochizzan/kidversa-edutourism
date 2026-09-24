@@ -19,6 +19,7 @@
 import { API_ROUTES } from '../constants/apiRoutes'
 import { getActiveTenantId } from '../utils/tenant'
 import { STORAGE_KEYS } from '../constants/storage'
+import { i18n } from '../i18n'
 
 export type ConnectionState = 'online' | 'degraded' | 'reconnecting'
 
@@ -176,7 +177,7 @@ function backoff(attempt: number): Promise<void> {
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
-  let message = 'Terjadi kesalahan. Silakan coba lagi.'
+  let message = i18n.t('errors.default')
   let code = 'unknown'
   try {
     const data = await response.json()

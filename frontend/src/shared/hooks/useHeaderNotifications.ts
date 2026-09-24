@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { i18n } from '../../core/i18n'
 import { useAuth } from '../../core/hooks/useAuth'
 import { useTenantStore } from '../../core/stores/tenantStore'
 import { isSuperAdmin } from '../../core/utils/permissions'
@@ -45,8 +46,8 @@ export function useHeaderNotifications() {
           tenant_id: tenantId,
           tenant_name: n.title,
           type: 'user_approval',
-          title: n.title || 'Pendaftaran Menunggu',
-          description: n.message || 'Pengguna baru menunggu persetujuan',
+          title: n.title || i18n.t('common.notifications.pendingTitle'),
+          description: n.message || i18n.t('common.notifications.pendingDesc'),
           route,
           color: 'text-purple-600 bg-purple-100',
           count: 1,

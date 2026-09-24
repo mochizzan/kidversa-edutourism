@@ -13,8 +13,10 @@ import { programSubstageService } from '../../../core/services/program-substages
 import { activityListPath, activityNewPath, activityDetailPath } from '../../../core/constants/app'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Program, ProgramStage, ProgramSubstage } from '../../../core/types'
+import { useTranslation } from 'react-i18next'
 
 const ActivityFormPage = () => {
+  const { t } = useTranslation()
   const { activityId } = useParams<{ activityId: string }>()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -69,7 +71,7 @@ const ActivityFormPage = () => {
         try {
           const found = await programSubstageService.getById(activityId)
           if (!found) {
-            addToast({ type: 'error', message: 'Kegiatan tidak ditemukan' })
+            addToast({ type: 'error', message: t('admin.activities.notFound') })
             navigate(activityListPath())
             return
           }
@@ -122,15 +124,15 @@ const ActivityFormPage = () => {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!programId) {
-      addToast({ type: 'error', message: 'Program wajib dipilih' })
+      addToast({ type: 'error', message: t('admin.topic.programRequired') })
       return
     }
     if (!stageId) {
-      addToast({ type: 'error', message: 'Topik wajib dipilih' })
+      addToast({ type: 'error', message: t('admin.activities.stageRequired') })
       return
     }
     if (!name.trim()) {
-      addToast({ type: 'error', message: 'Nama kegiatan wajib diisi' })
+      addToast({ type: 'error', message: t('admin.activities.nameRequired') })
       return
     }
 
@@ -144,7 +146,7 @@ const ActivityFormPage = () => {
           name: name.trim(),
           description: description.trim() || undefined,
         })
-        addToast({ type: 'success', message: 'Kegiatan berhasil dibuat' })
+        addToast({ type: 'success', message: t('admin.activities.createdToast') })
         navigate(activityDetailPath(created.id))
       } else if (activityId) {
         const updated = await programSubstageService.update(activityId, {
@@ -152,7 +154,7 @@ const ActivityFormPage = () => {
           name: name.trim(),
           description: description.trim() || undefined,
         })
-        addToast({ type: 'success', message: 'Kegiatan berhasil diperbarui' })
+        addToast({ type: 'success', message: t('admin.activities.updatedToast') })
         navigate(activityDetailPath(updated.id))
       }
     } catch (err) {
@@ -181,10 +183,10 @@ const ActivityFormPage = () => {
   if (!isNew && !activity) {
     return (
       <div className="text-center text-on-surface-variant py-12">
-        Kegiatan tidak ditemukan
+        {t('admin.activities.notFound')}
         <div className="mt-4">
           <Button variant="secondary" onClick={() => navigate(activityListPath())}>
-            Kembali
+            {t('common.back')}
           </Button>
         </div>
       </div>
@@ -194,19 +196,19 @@ const ActivityFormPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isNew ? 'Tambah Kegiatan Baru' : `Edit Kegiatan: ${activity?.name ?? ''}`}
-        subtitle={selectedProgram ? `Program: ${selectedProgram.name}` : 'Pilih program dan topik terlebih dahulu'}
+        title={isNew ? t('admin.activities.newTitle') : t('admin.activities.editTitle', { name: activity?.name ?? '' })}
+        subtitle={selectedProgram ? `Program: ${selectedProgram.name}` : t('admin.activities.pickFirst')}
         breadcrumbs={[
-          { label: 'Kegiatan', href: activityListPath() },
-          { label: isNew ? 'Buat Baru' : activity?.name || 'Edit' },
+          { label: t('admin.activities.title'), href: activityListPath() },
+          { label: isNew ? t('admin.common.createNew') : activity?.name || t('admin.common.edit') },
         ]}
       />
 
       <Card>
         <form className="space-y-5" onSubmit={handleSubmit}>
           <Select
-            label="Program"
-            placeholder="Pilih Program"
+            label={t('admin.col.program')}
+            placeholder={t('admin.topic.pickProgram')}
             value={programId}
             options={programOptions}
             onChange={(e) => handleProgramChange(e.target.value)}
@@ -215,8 +217,8 @@ const ActivityFormPage = () => {
           />
 
           <Select
-            label="Topik"
-            placeholder={programId ? 'Pilih Topik' : 'Pilih Program Dulu'}
+            label={t('admin.topic.pageTitle')}
+            placeholder={programId ? t('admin.activities.pickTopic') : t('admin.activities.pickProgramDulu')}
             value={stageId}
             options={stageOptions}
             onChange={(e) => setStageId(e.target.value)}
@@ -225,26 +227,26 @@ const ActivityFormPage = () => {
           />
 
           <Input
-            label="Nama Kegiatan"
+            label={t('admin.activities.nameLabel')}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Nama kegiatan"
+            placeholder={t('admin.activities.namePlaceholder')}
             required
           />
 
           <Input
-            label="Deskripsi"
+            label={t('admin.activities.descLabel')}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Deskripsi singkat kegiatan"
+            placeholder={t('admin.activities.descPlaceholder')}
           />
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" type="button" onClick={handleCancel}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={saving}>
-              Simpan
+              {t('common.save')}
             </Button>
           </div>
         </form>

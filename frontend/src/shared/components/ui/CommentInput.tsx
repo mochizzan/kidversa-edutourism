@@ -1,4 +1,5 @@
 import { useRef, useEffect, type ChangeEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 
 interface CommentInputProps {
@@ -15,9 +16,10 @@ export function CommentInput({
   onChange,
   disabled = false,
   maxLength = 300,
-  placeholder = 'Tulis komentar...',
+  placeholder,
   className,
 }: CommentInputProps) {
+  const { t } = useTranslation()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const remaining = maxLength - value.length
   const isOverLimit = remaining < 0
@@ -44,7 +46,7 @@ export function CommentInput({
         value={value}
         onChange={handleChange}
         disabled={disabled}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('common.comment.placeholder')}
         rows={3}
         className={cn(
           'w-full rounded-xl border border-outline-variant bg-surface px-4 py-3 text-sm resize-none overflow-hidden',
@@ -53,7 +55,7 @@ export function CommentInput({
           'disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant',
           isOverLimit && 'border-error focus:border-error focus:ring-error-container'
         )}
-        aria-label="Komentar"
+        aria-label={t('common.comment.aria')}
       />
       <div className="flex justify-end mt-1">
         <span

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Camera, ShieldCheck, ShieldX } from 'lucide-react'
 import { ROUTES } from '../../../core/constants/app'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
@@ -12,6 +13,7 @@ import { SessionStatus } from '../../../core/types/enums'
 import type { CreateAssessmentDTO } from '../../../core/types'
 
 const ChildAssessmentPage = () => {
+  const { t } = useTranslation()
   const { groupId, childId } = useParams<{ groupId: string; childId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -79,7 +81,7 @@ const ChildAssessmentPage = () => {
   if (error && !childDetail) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Penilaian Anak" />
+        <PageHeader title={t('fasilitator.assessment.pageTitle')} />
         <ErrorState message={error} onRetry={fetchData} />
       </div>
     )
@@ -89,8 +91,8 @@ const ChildAssessmentPage = () => {
   if (!childDetail || !participant) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Penilaian Anak" />
-        <ErrorState message="Data anak tidak ditemukan" onRetry={fetchData} />
+        <PageHeader title={t('fasilitator.assessment.pageTitle')} />
+        <ErrorState message={t('fasilitator.assessment.childNotFound')} onRetry={fetchData} />
       </div>
     )
   }
@@ -100,19 +102,19 @@ const ChildAssessmentPage = () => {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Penilaian Anak"
+          title={t('fasilitator.assessment.pageTitle')}
           breadcrumbs={[
-            { label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD },
+            { label: t('common.dashboard'), href: ROUTES.FASILITATOR.DASHBOARD },
             { label: participant.child_name },
           ]}
         />
         <ErrorState
-          message="Sesi belum dimulai. Penilaian tidak dapat dilakukan."
+          message={t('fasilitator.assessment.sessionNotStarted')}
           onRetry={fetchData}
         />
         <div className="flex sm:justify-start">
           <Button variant="secondary" onClick={handleBack} className="w-full sm:w-auto">
-            Kembali ke Kelompok
+            {t('fasilitator.assessment.backToGroup')}
           </Button>
         </div>
       </div>
@@ -122,9 +124,9 @@ const ChildAssessmentPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Penilaian Anak"
+        title={t('fasilitator.assessment.pageTitle')}
         breadcrumbs={[
-          { label: 'Dashboard', href: ROUTES.FASILITATOR.DASHBOARD },
+          { label: t('common.dashboard'), href: ROUTES.FASILITATOR.DASHBOARD },
           { label: participant.child_name },
         ]}
       />
@@ -140,7 +142,7 @@ const ChildAssessmentPage = () => {
               {participant.child_name}
             </h2>
             <p className="text-sm text-on-surface-variant">
-              {participant.child_age} tahun
+              {t('fasilitator.child.years', { age: participant.child_age })}
               {participant.school_name ? ` - ${participant.school_name}` : ''}
             </p>
           </div>
@@ -149,7 +151,7 @@ const ChildAssessmentPage = () => {
         {!isMine && (
           <div className="mb-6 flex items-center gap-2 rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
             <ShieldX className="w-4 h-4 shrink-0" />
-            Bukan kelompok Anda — penilaian hanya dapat dilihat (mode baca saja).
+            {t('fasilitator.assessment.readOnlyAssess')}
           </div>
         )}
 
@@ -158,11 +160,11 @@ const ChildAssessmentPage = () => {
           <div className="flex items-center gap-1.5 text-xs">
             {hasConsentPhoto ? (
               <span className="flex items-center gap-1 text-green-600">
-                <ShieldCheck className="w-3.5 h-3.5" /> Izin Foto
+                <ShieldCheck className="w-3.5 h-3.5" /> {t('fasilitator.assessment.consentPhoto')}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-yellow-600">
-                <ShieldX className="w-3.5 h-3.5" /> Tidak Ada Izin Foto
+                <ShieldX className="w-3.5 h-3.5" /> {t('fasilitator.assessment.noConsentPhoto')}
               </span>
             )}
           </div>
@@ -172,7 +174,7 @@ const ChildAssessmentPage = () => {
       {/* Attendance status banner */}
       {!isPresent && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-700">
-          Anak ini tidak hadir di sesi ini. Penilaian tidak dapat dilakukan.
+          {t('fasilitator.assessment.absentBanner')}
         </div>
       )}
 
@@ -187,7 +189,7 @@ const ChildAssessmentPage = () => {
                 assessment={assessmentMap.get(kegiatan.id)}
                 kegiatanName={
                   childDetail.programSubstageNameMap[kegiatan.program_substage_id] ??
-                  `Kegiatan ${idx + 1}`
+                  t('fasilitator.assessment.fallbackKegiatan', { n: idx + 1 })
                 }
                 participantId={participant.id}
                 isMine={isMine}
@@ -199,7 +201,7 @@ const ChildAssessmentPage = () => {
         ) : (
           <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50 text-center">
             <p className="text-sm text-on-surface-variant">
-              Belum ada kegiatan untuk dinilai.
+              {t('fasilitator.assessment.emptyKegiatan')}
             </p>
           </div>
         )
@@ -207,7 +209,7 @@ const ChildAssessmentPage = () => {
 
       {/* Quick Actions */}
       <div className="bg-surface rounded-2xl p-6 shadow-sm border border-outline-variant/50">
-        <h3 className="text-sm font-semibold text-on-surface mb-4">Aksi Cepat</h3>
+        <h3 className="text-sm font-semibold text-on-surface mb-4">{t('fasilitator.assessment.quickActions')}</h3>
         <div className="flex flex-wrap gap-3">
           <div className="flex-1 min-w-[180px]">
             {hasConsentPhoto && isMine ? (
@@ -220,12 +222,12 @@ const ChildAssessmentPage = () => {
                 }
               >
                 <Camera className="w-5 h-5" />
-                Ambil Foto
+                {t('fasilitator.takePhoto')}
               </button>
             ) : (
               <div className="w-full px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm flex items-center gap-2">
                 <ShieldX className="w-4 h-4 shrink-0" />
-                <span>Tidak ada izin foto</span>
+                <span>{t('fasilitator.assessment.noConsentMsg')}</span>
               </div>
             )}
           </div>
@@ -235,7 +237,7 @@ const ChildAssessmentPage = () => {
       {/* Back button */}
       <div className="flex sm:justify-start">
         <Button variant="secondary" onClick={handleBack} className="w-full sm:w-auto">
-          Kembali ke Kelompok
+          {t('fasilitator.assessment.backToGroup')}
         </Button>
       </div>
     </div>

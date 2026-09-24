@@ -9,9 +9,11 @@ import { programService } from '../../../core/services/programs'
 import { BadgeEditor } from '../components/BadgeEditor'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { programListPath, programDetailPath } from '../../../core/constants/app'
+import { useTranslation } from 'react-i18next'
 import type { Program } from '../../../core/types'
 
 const ProgramFormPage = () => {
+  const { t } = useTranslation()
   const { programId } = useParams<{ programId: string }>()
   const navigate = useNavigate()
   const { addToast } = useGlobalToast()
@@ -51,7 +53,7 @@ const ProgramFormPage = () => {
     e.preventDefault()
     const trimmedName = name.trim()
     if (!trimmedName) {
-      addToast({ type: 'error', message: 'Nama program tidak boleh kosong' })
+      addToast({ type: 'error', message: t('admin.programs.nameRequired') })
       return
     }
     setSaving(true)
@@ -65,11 +67,11 @@ const ProgramFormPage = () => {
       }
       if (isEdit && programId) {
         result = await programService.update(programId, { ...payload, is_active: isActive })
-        addToast({ type: 'success', message: 'Perubahan berhasil disimpan' })
+        addToast({ type: 'success', message: t('admin.programs.savedToast') })
         navigate(programDetailPath(result.id), { replace: true })
       } else {
         result = await programService.create(payload)
-        addToast({ type: 'success', message: 'Program berhasil dibuat' })
+        addToast({ type: 'success', message: t('admin.programs.createdToast') })
         navigate(programDetailPath(result.id), { state: { fromCreate: true } })
       }
     } catch (err) {
@@ -86,33 +88,33 @@ const ProgramFormPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isEdit ? 'Edit Program' : 'Buat Program Baru'}
-        subtitle={isEdit ? 'Perbarui informasi program.' : 'Tambahkan program edutourism baru.'}
+        title={isEdit ? t('admin.programs.editTitle') : t('admin.programs.newTitle')}
+        subtitle={isEdit ? t('admin.programs.editSubtitle') : t('admin.programs.newSubtitle')}
         breadcrumbs={[
-          { label: 'Programs', href: programListPath() },
-          { label: isEdit ? 'Edit Program' : 'Buat Baru' },
+          { label: t('admin.sidebar.programs'), href: programListPath() },
+          { label: isEdit ? t('admin.programs.editTitle') : t('admin.common.createNew') },
         ]}
       />
 
       <Card>
         <form className="space-y-6 max-w-2xl" onSubmit={handleSubmit}>
           <Input
-            label="Nama Program"
+            label={t('admin.col.programName')}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Nama program"
+            placeholder={t('admin.programs.namePlaceholder')}
             required
             disabled={saving}
           />
 
           <div>
-            <label className="block text-sm font-medium text-on-surface mb-1">Deskripsi</label>
+            <label className="block text-sm font-medium text-on-surface mb-1">{t('admin.programs.descLabel')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
               rows={4}
-              placeholder="Deskripsi program (opsional)"
+              placeholder={t('admin.programs.descPlaceholder')}
               disabled={saving}
             />
           </div>
@@ -127,16 +129,16 @@ const ProgramFormPage = () => {
                 className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
                 disabled={saving}
               />
-              <label htmlFor="is-active" className="text-sm text-on-surface">Program Aktif</label>
+              <label htmlFor="is-active" className="text-sm text-on-surface">{t('admin.programs.activeLabel')}</label>
             </div>
           )}
 
           <BadgeEditor
-            title="Badge Final Program"
+            title={t('admin.programs.finalBadgeTitle')}
             variant="final"
             name={finalBadgeName}
             imageUrl={finalBadgeImageUrl}
-            helperText="Diberikan otomatis ke anak setelah semua topik dalam program ini selesai."
+            helperText={t('admin.programs.finalBadgeHelp')}
             onNameChange={setFinalBadgeName}
             onImageChange={setFinalBadgeImageUrl}
           />
@@ -148,10 +150,10 @@ const ProgramFormPage = () => {
               onClick={() => navigate(programListPath())}
               disabled={saving}
             >
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={saving}>
-              {isEdit ? 'Simpan Perubahan' : 'Simpan Program'}
+              {isEdit ? t('admin.programs.saveChanges') : t('admin.programs.saveBtn')}
             </Button>
           </div>
         </form>

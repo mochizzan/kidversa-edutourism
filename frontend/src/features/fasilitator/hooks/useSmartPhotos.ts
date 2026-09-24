@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { i18n } from '../../../core/i18n'
 import { photoService } from '../../../core/services/photos'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import type { SmartPhoto, Participant } from '../../../core/types'
@@ -22,7 +23,7 @@ export function useSmartPhotos(childId: string | undefined) {
       const updated = await photoService.getByParticipant(childId)
       setPhotos(updated)
     } catch {
-      addToast({ type: 'error', message: 'Gagal memuat ulang foto.' })
+      addToast({ type: 'error', message: i18n.t('fasilitator.photos.reloadError') })
     }
   }, [childId, addToast])
 

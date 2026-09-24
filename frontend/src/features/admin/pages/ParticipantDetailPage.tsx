@@ -15,8 +15,10 @@ import { participantService } from '../../../core/services/participants'
 import { sessionService } from '../../../core/services/sessions'
 import type { Participant } from '../../../core/types'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { useTranslation } from 'react-i18next'
 
 const ParticipantDetailPage = () => {
+  const { t } = useTranslation()
   const { participantId } = useParams<{ participantId: string }>()
   const navigate = useNavigate()
   const { addToast } = useGlobalToast()
@@ -54,12 +56,12 @@ const ParticipantDetailPage = () => {
       // Global participant deletes are not exposed by the backend; remove the
       // participant from its session instead.
       if (!participant.session_id) {
-        addToast({ type: 'error', message: 'Peserta tanpa sesi tidak dapat dihapus dari sini' })
+        addToast({ type: 'error', message: t('admin.participants.noSessionDelete') })
         setConfirmOpen(false)
         return
       }
       await sessionService.removeParticipant(participant.session_id, participant.id)
-      addToast({ type: 'success', message: 'Peserta berhasil dihapus' })
+      addToast({ type: 'success', message: t('admin.participants.deletedToast') })
       navigate(ROUTES.ADMIN.PARTICIPANTS)
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
@@ -69,15 +71,15 @@ const ParticipantDetailPage = () => {
   }
 
   if (loading) {
-    return <div className="text-on-surface-variant">Memuat detail peserta...</div>
+    return <div className="text-on-surface-variant">{t('admin.participants.detailLoading')}</div>
   }
 
   if (!participant) {
     return (
       <ErrorState
-        title="Peserta tidak ditemukan"
-        message="Data peserta yang dicari tidak tersedia."
-        action={{ label: 'Kembali', onClick: () => navigate(ROUTES.ADMIN.PARTICIPANTS) }}
+        title={t('admin.participants.notFound')}
+        message={t('admin.participants.notFoundDesc')}
+        action={{ label: t('common.back'), onClick: () => navigate(ROUTES.ADMIN.PARTICIPANTS) }}
       />
     )
   }
@@ -86,54 +88,54 @@ const ParticipantDetailPage = () => {
     <div className="space-y-6">
       <PageHeader
         breadcrumbs={[
-          { label: 'Peserta', href: ROUTES.ADMIN.PARTICIPANTS },
+          { label: t('admin.sidebar.participants'), href: ROUTES.ADMIN.PARTICIPANTS },
           { label: participant.child_name },
         ]}
         title={participant.child_name}
-        subtitle={`${participant.child_age} tahun${participant.school_name ? ` · ${participant.school_name}` : ''} · ${participant.parent_name}`}
+        subtitle={`${t('admin.participants.ageShort', { age: participant.child_age })}${participant.school_name ? ` · ${participant.school_name}` : ''} · ${participant.parent_name}`}
         actions={
           <div className="flex items-center gap-2">
             <Link to={`${ROUTES.ADMIN.PARTICIPANTS}/${participant.id}/edit`}>
-              <Button variant="secondary" icon={<Pencil className="w-4 h-4" />}>Edit</Button>
+              <Button variant="secondary" icon={<Pencil className="w-4 h-4" />}>{t('admin.common.edit')}</Button>
             </Link>
-            <Button variant="danger" icon={<Trash2 className="w-4 h-4" />} onClick={() => setConfirmOpen(true)}>Hapus</Button>
+            <Button variant="danger" icon={<Trash2 className="w-4 h-4" />} onClick={() => setConfirmOpen(true)}>{t('common.delete')}</Button>
           </div>
         }
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="Identitas">
+        <Card title={t('admin.participants.identityCard')}>
           <div className="space-y-3 text-sm text-on-surface-variant">
             <p className="flex items-center gap-2"><UserRound className="w-4 h-4" /> {participant.child_name}</p>
-            <p className="flex items-center gap-2"><CalendarDays className="w-4 h-4" /> {participant.child_age} tahun</p>
-            <p className="flex items-center gap-2"><School2 className="w-4 h-4" /> {participant.school_name || 'Tidak ada sekolah'}</p>
+            <p className="flex items-center gap-2"><CalendarDays className="w-4 h-4" /> {t('admin.participants.ageShort', { age: participant.child_age })}</p>
+            <p className="flex items-center gap-2"><School2 className="w-4 h-4" /> {participant.school_name || t('admin.participants.noSchool')}</p>
             <p className="flex items-center gap-2"><Phone className="w-4 h-4" /> {participant.parent_phone}</p>
             <p className="flex items-center gap-2"><Mail className="w-4 h-4" /> {participant.parent_email || '-'}</p>
           </div>
         </Card>
 
-        <Card title="Sesi">
+        <Card title={t('admin.col.session')}>
           {participant.session_id ? (
             <div className="space-y-3 text-sm text-on-surface-variant">
-              <p>Peserta sudah masuk sesi.</p>
-              <Badge variant="primary">Status terikat sesi</Badge>
+              <p>{t('admin.participants.inSessionSentence')}</p>
+              <Badge variant="primary">{t('admin.participants.boundStatus')}</Badge>
             </div>
           ) : (
-            <EmptyState title="Peserta belum masuk sesi" description="Peserta ini masih master data dan belum memiliki progres sesi." />
+            <EmptyState title={t('admin.participants.notJoinedTitle')} description={t('admin.participants.notJoinedDesc')} />
           )}
         </Card>
 
-        <Card title="Persetujuan">
+        <Card title={t('admin.participants.consentCard')}>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={participant.consent_photo ? 'success' : 'danger'} size="sm">
                 <Camera className="w-3 h-3 mr-1" />
-                Foto: {participant.consent_photo ? 'Diizinkan' : 'Tidak Diizinkan'}
+                {participant.consent_photo ? t('admin.participants.consentPhotoYes') : t('admin.participants.consentPhotoNo')}
               </Badge>
             </div>
             {participant.consent_at && (
               <p className="text-xs text-on-surface-variant">
-                Disetujui: {formatDateTime(participant.consent_at)}
+                {t('admin.participants.approvedAt', { date: formatDateTime(participant.consent_at) })}
               </p>
             )}
           </div>
@@ -142,8 +144,8 @@ const ParticipantDetailPage = () => {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Hapus Peserta"
-        message={`Yakin ingin menghapus peserta "${participant.child_name}"?\n\nPeserta yang sudah terhubung ke sesi atau memiliki aktivitas tidak dapat dihapus. Tindakan ini tidak dapat dibatalkan.`}
+        title={t('admin.participants.deleteTitle')}
+        message={t('admin.participants.detailDeleteMsg', { name: participant.child_name })}
         onConfirm={handleDelete}
         onClose={() => setConfirmOpen(false)}
       />

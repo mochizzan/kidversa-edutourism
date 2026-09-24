@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { i18n } from '../../core/i18n'
 import { userService } from '../../core/services/users'
 import { programService } from '../../core/services/programs'
 import { ROUTES } from '../../core/constants/app'
@@ -53,30 +54,30 @@ export function useGlobalSearch(): UseGlobalSearchResult {
       const groups: SearchResultGroup[] = []
       if (usersRes.data.length > 0) {
         groups.push({
-          category: 'Users',
+          category: i18n.t('common.search.users'),
           route: ROUTES.ADMIN.USERS,
           items: usersRes.data.map((u) => ({ id: u.id, label: u.name, subtitle: `${u.email} · ${u.role}`, route: `${ROUTES.ADMIN.USERS}?highlight=${u.id}` })),
         })
       }
       if (programsRes.data.length > 0) {
         groups.push({
-          category: 'Programs',
+          category: i18n.t('common.search.programs'),
           route: ROUTES.ADMIN.PROGRAMS,
           items: programsRes.data.map((p) => ({ id: p.id, label: p.name, subtitle: p.description ?? '', route: `${ROUTES.ADMIN.PROGRAMS}?highlight=${p.id}` })),
         })
       }
       if (sessionsRes.data.length > 0) {
         groups.push({
-          category: 'Sessions',
+          category: i18n.t('common.search.sessions'),
           route: ROUTES.ADMIN.SESSIONS,
           items: sessionsRes.data.map((s: { id: string; name: string; location: string; status: string }) => ({ id: s.id, label: s.name, subtitle: `${s.location} · ${s.status}`, route: `${ROUTES.ADMIN.SESSIONS}?highlight=${s.id}` })),
         })
       }
       if (framesRes.data.length > 0) {
         groups.push({
-          category: 'Frames',
+          category: i18n.t('common.search.frames'),
           route: ROUTES.ADMIN.FRAMES,
-          items: framesRes.data.map((f) => ({ id: f.id, label: f.name, subtitle: f.is_active ? 'Aktif' : 'Nonaktif', route: `${ROUTES.ADMIN.FRAMES}?highlight=${f.id}` })),
+          items: framesRes.data.map((f) => ({ id: f.id, label: f.name, subtitle: f.is_active ? i18n.t('common.search.active') : i18n.t('common.search.inactive'), route: `${ROUTES.ADMIN.FRAMES}?highlight=${f.id}` })),
         })
       }
       setResults(groups)

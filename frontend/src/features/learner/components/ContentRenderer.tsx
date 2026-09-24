@@ -1,11 +1,12 @@
 import type { StageContent } from '../../../core/types/entities'
 import { StageContentFileType } from '../../../core/types/enums'
+import { useTranslation } from 'react-i18next'
 import { extractYouTubeEmbedUrl } from '../../../core/utils/youtube'
 
 interface ContentRendererProps {
-  content: StageContent
-  isMuted: boolean
-  onEnded: () => void
+ content: StageContent
+ isMuted: boolean
+ onEnded: () => void
 }
 
 /**
@@ -17,61 +18,62 @@ interface ContentRendererProps {
  * request — so the `/api/media/kiosk/content/:id` path is never taken.
  */
 export function ContentRenderer({ content, isMuted, onEnded }: ContentRendererProps) {
-  const isYouTube =
-    content.file_type === StageContentFileType.VIDEO && !!content.youtube_url
-  const hasFile = !!content.file_url
+ const { t } = useTranslation()
+ const isYouTube =
+  content.file_type === StageContentFileType.VIDEO && !!content.youtube_url
+ const hasFile = !!content.file_url
 
-  if (content.file_type === StageContentFileType.VIDEO) {
-    if (isYouTube) {
-      return (
-        <iframe
-          key={content.id}
-          src={`${extractYouTubeEmbedUrl(content.youtube_url!) ?? content.youtube_url}?autoplay=1&mute=${isMuted ? 1 : 0}`}
-          className="w-full h-full border-0"
-          title={content.title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      )
-    }
-    if (hasFile) {
-      return (
-        <video
-          key={content.id}
-          src={content.file_url}
-          className="max-w-full max-h-full"
-          muted={isMuted}
-          controls
-          onEnded={onEnded}
-        />
-      )
-    }
-  } else if (content.file_type === StageContentFileType.IMAGE && hasFile) {
-    return (
-      <img
-        key={content.id}
-        src={content.file_url}
-        alt={content.title}
-        className="max-w-full max-h-full object-contain"
-      />
-    )
-  } else if (content.file_type === StageContentFileType.GAME_BUNDLE) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <iframe
-          key={content.id}
-          src={content.file_url}
-          className="w-full h-full border-0"
-          title={content.title}
-          allow="fullscreen"
-        />
-      </div>
-    )
+ if (content.file_type === StageContentFileType.VIDEO) {
+  if (isYouTube) {
+   return (
+    <iframe
+     key={content.id}
+     src={`${extractYouTubeEmbedUrl(content.youtube_url!) ?? content.youtube_url}?autoplay=1&mute=${isMuted ? 1 : 0}`}
+     className="w-full h-full border-0"
+     title={content.title}
+     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+     allowFullScreen
+    />
+   )
   }
-
+  if (hasFile) {
+   return (
+    <video
+     key={content.id}
+     src={content.file_url}
+     className="max-w-full max-h-full"
+     muted={isMuted}
+     controls
+     onEnded={onEnded}
+    />
+   )
+  }
+ } else if (content.file_type === StageContentFileType.IMAGE && hasFile) {
   return (
-    <div className="text-center text-white/70 p-8">
-      <p>Konten tidak valid atau belum tersedia.</p>
-    </div>
+   <img
+    key={content.id}
+    src={content.file_url}
+    alt={content.title}
+    className="max-w-full max-h-full object-contain"
+   />
   )
+ } else if (content.file_type === StageContentFileType.GAME_BUNDLE) {
+  return (
+   <div className="w-full h-full flex items-center justify-center">
+    <iframe
+     key={content.id}
+     src={content.file_url}
+     className="w-full h-full border-0"
+     title={content.title}
+     allow="fullscreen"
+    />
+   </div>
+  )
+ }
+
+ return (
+  <div className="text-center text-white/70 p-8">
+   <p>{t('learner.content.invalid')}</p>
+  </div>
+ )
 }

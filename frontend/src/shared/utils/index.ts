@@ -1,11 +1,12 @@
 export { cn } from '../../core/utils/cn'
 
 import { WIB } from '../../core/constants/timezone'
+import { i18n } from '../../core/i18n'
 
 export function formatDate(date: string | Date) {
   const d = new Date(date)
   if (isNaN(d.getTime())) return '-'
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat(i18n.resolvedLanguage ?? 'id', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -16,7 +17,7 @@ export function formatDate(date: string | Date) {
 export function formatDateTime(date: string | Date) {
   const d = new Date(date)
   if (isNaN(d.getTime())) return '-'
-  const formatted = new Intl.DateTimeFormat('id-ID', {
+  const formatted = new Intl.DateTimeFormat(i18n.resolvedLanguage ?? 'id', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',

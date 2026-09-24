@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Users } from 'lucide-react'
 
 interface SessionParticipation {
@@ -10,14 +11,15 @@ interface TopSessionsProps {
   title?: string
 }
 
-export function TopSessions({ data, title = 'Partisipasi per Sesi' }: TopSessionsProps) {
+export function TopSessions({ data, title }: TopSessionsProps) {
+  const { t } = useTranslation()
   const maxCount = Math.max(...data.map((d) => d.count), 1)
 
   return (
     <div className="bg-surface rounded-3xl p-6 shadow-sm">
-      <h2 className="text-lg font-bold text-on-surface mb-4">{title}</h2>
+      <h2 className="text-lg font-bold text-on-surface mb-4">{title ?? t('common.chart.topSessionsTitle')}</h2>
       {data.length === 0 ? (
-        <p className="text-sm text-on-surface-variant py-4">Belum ada sesi pada filter ini.</p>
+        <p className="text-sm text-on-surface-variant py-4">{t('common.chart.topSessionsEmpty')}</p>
       ) : (
         <div className="space-y-2">
           {data.map((item) => {

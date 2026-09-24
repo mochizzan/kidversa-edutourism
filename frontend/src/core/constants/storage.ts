@@ -4,4 +4,5 @@ export const STORAGE_KEYS = {
   USER: 'kidversa_user',
   LOGIN_ATTEMPTS: 'kidversa_login_attempts',
   LOCKOUT_UNTIL: 'kidversa_lockout_until',
+  LANG: 'kidversa_lang',
 } as const

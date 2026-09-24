@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Search, Bell, Menu, X, Users, FolderOpen, Calendar, Image, Loader2, ChevronRight, UserCheck } from 'lucide-react'
 import ConnectionStatus from '../feedback/ConnectionStatus'
 import { useNavigate } from 'react-router-dom'
@@ -22,6 +23,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ onMenuToggle }: AppHeaderProps) {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -36,10 +38,10 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
 
   const connectionTooltip =
     status === 'online'
-      ? 'Terhubung ke server — Semua data tersinkronisasi'
+      ? t('common.connection.online')
       : status === 'degraded'
-        ? 'Terputus dari server — Koneksi terbatas'
-        : 'Terputus dari server — Mencoba menyambungkan kembali…'
+        ? t('common.connection.degraded')
+        : t('common.connection.reconnecting')
 
   const close = useCallback(() => {
     setFocused(false)
@@ -126,7 +128,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
     <>
       <header className="h-16 lg:h-20 flex-shrink-0 flex items-center gap-3 px-4 lg:px-8 bg-surface border-b border-outline-variant relative z-50">
         {onMenuToggle && (
-          <Tooltip content="Menu">
+          <Tooltip content={t('common.menu')}>
             <button
               onClick={onMenuToggle}
               className="lg:hidden shrink-0 w-9 h-9 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
@@ -138,11 +140,10 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
 
         <div ref={wrapperRef} className="relative w-full max-w-xl">
           <div
-            className={`flex items-center gap-3 transition-all duration-200 text-left px-4 ${
-              focused
-                ? 'bg-surface rounded-t-2xl ring-2 ring-primary shadow-lg py-3.5 lg:py-4'
-                : 'bg-surface-container-low rounded-2xl shadow-sm py-2.5 lg:py-3'
-            }`}
+            className={`flex items-center gap-3 transition-all duration-200 text-left px-4 ${focused
+              ? 'bg-surface rounded-t-2xl ring-2 ring-primary shadow-lg py-3.5 lg:py-4'
+              : 'bg-surface-container-low rounded-2xl shadow-sm py-2.5 lg:py-3'
+              }`}
           >
             <Search className={`w-5 h-5 shrink-0 transition-colors duration-200 ${focused ? 'text-primary' : 'text-on-surface-variant'}`} />
             <input
@@ -151,12 +152,12 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={handleFocus}
-              placeholder="Cari program, sesi, peserta..."
+              placeholder={t('common.search.placeholder')}
               className="flex-1 bg-transparent border-0 outline-none text-sm text-on-surface placeholder-on-surface-variant min-w-0"
             />
             {loading && <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />}
             {query && !loading && (
-              <button onClick={() => setQuery('')} className="shrink-0 p-1 rounded-lg hover:bg-surface-container transition-colors" aria-label="Hapus">
+              <button onClick={() => setQuery('')} className="shrink-0 p-1 rounded-lg hover:bg-surface-container transition-colors" aria-label={t('common.search.clear')}>
                 <X className="w-4 h-4 text-on-surface-variant" />
               </button>
             )}
@@ -170,21 +171,21 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
               {!searched && !loading && (
                 <div className="py-8 text-center">
                   <Search className="w-7 h-7 mx-auto mb-2 text-outline" />
-                  <p className="text-sm text-on-surface-variant">Ketik untuk mulai mencari...</p>
+                  <p className="text-sm text-on-surface-variant">{t('common.search.hint')}</p>
                 </div>
               )}
 
               {loading && flatResults.length === 0 && (
                 <div className="flex items-center justify-center gap-2 py-8 text-on-surface-variant">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">Mencari...</span>
+                  <span className="text-sm">{t('common.search.searching')}</span>
                 </div>
               )}
 
               {!loading && searched && flatResults.length === 0 && (
                 <div className="py-8 text-center">
                   <Search className="w-7 h-7 mx-auto mb-2 text-outline" />
-                  <p className="text-sm text-on-surface-variant px-4">Tidak ditemukan hasil untuk "{query}"</p>
+                  <p className="text-sm text-on-surface-variant px-4">{t('common.search.noResults', { query })}</p>
                 </div>
               )}
 
@@ -243,15 +244,15 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
             </span>
           </Tooltip>
           <div ref={notificationRef} className="relative">
-            <Tooltip content="Notifikasi">
+            <Tooltip content={t('common.notifications.title')}>
               <button
                 onClick={() => {
-                const next = !showNotifications
-                setShowNotifications(next)
-                // Optimistic clear: open the panel and fire-and-forget markAllRead.
-                // SSE notif:update confirms via refetch (badge already 0 locally).
-                if (next) acknowledge()
-              }}
+                  const next = !showNotifications
+                  setShowNotifications(next)
+                  // Optimistic clear: open the panel and fire-and-forget markAllRead.
+                  // SSE notif:update confirms via refetch (badge already 0 locally).
+                  if (next) acknowledge()
+                }}
                 className="relative w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
               >
                 <Bell className="w-5 h-5" />
@@ -265,13 +266,13 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
             {showNotifications && (
               <div className="absolute top-full right-0 mt-2 w-80 bg-surface rounded-2xl shadow-lg border border-outline-variant overflow-hidden z-50 animate-fade-in-up-sm">
                 <div className="px-4 py-3 border-b border-outline-variant">
-                  <h3 className="text-sm font-bold text-on-surface">Notifikasi</h3>
+                  <h3 className="text-sm font-bold text-on-surface">{t('common.notifications.title')}</h3>
                 </div>
                 <div className="max-h-[60vh] overflow-y-auto">
                   {notifications.length === 0 ? (
                     <div className="py-8 text-center">
                       <Bell className="w-7 h-7 mx-auto mb-2 text-outline" />
-                      <p className="text-sm text-on-surface-variant">Tidak ada notifikasi baru</p>
+                      <p className="text-sm text-on-surface-variant">{t('common.notifications.empty')}</p>
                     </div>
                   ) : (
                     <div className="p-2">

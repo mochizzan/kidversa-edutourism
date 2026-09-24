@@ -9,6 +9,7 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { cn } from '../../../core/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { validateParticipantForm, needsAgeConfirm } from '@/core/utils/participantValidation'
+import { useTranslation, Trans } from 'react-i18next'
 import type { Participant, ParticipantSessionInfo } from '../../../core/types'
 
 type ParticipantFormData = {
@@ -57,6 +58,7 @@ export function ParticipantFormModal({
   currentSessionId,
   participantSessionInfos,
 }: ParticipantFormModalProps) {
+  const { t } = useTranslation()
   const [formData, setFormData] = useState<ModalFormState>({
     child_name: '',
     child_age: '',
@@ -167,7 +169,7 @@ export function ParticipantFormModal({
   const getParticipantBadge = (participant: Participant) => {
     const isLinked = linkedParticipantIds?.includes(participant.id) ?? false
     if (isLinked) {
-      return <Badge variant="primary" size="sm">Sudah Ditambahkan</Badge>
+      return <Badge variant="primary" size="sm">{t('admin.participants.addedBadge')}</Badge>
     }
 
     const info = sessionInfoMap.get(participant.id)
@@ -175,14 +177,14 @@ export function ParticipantFormModal({
       return (
         <Badge variant="warning" size="sm">
           <ArrowRightLeft className="w-3 h-3 mr-1" />
-          Migrasi dari {info.session_name}
+          {t('admin.participants.migrateFrom', { name: info.session_name })}
         </Badge>
       )
     }
 
     return (
       <div className="flex gap-1">
-        <Badge variant={participant.consent_photo ? 'success' : 'danger'} size="sm">Foto</Badge>
+        <Badge variant={participant.consent_photo ? 'success' : 'danger'} size="sm">{t('admin.participants.photoBadge')}</Badge>
       </div>
     )
   }
@@ -231,12 +233,12 @@ export function ParticipantFormModal({
   if (selectOnly && mode === 'create') {
     return (
       <>
-        <Modal open={open} onClose={onClose} title="Tambah Peserta" size="lg">
+        <Modal open={open} onClose={onClose} title={t('admin.participants.add')} size="lg">
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
             <input
               type="text"
-              placeholder="Cari nama peserta..."
+              placeholder={t('admin.participants.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setSelectError('') }}
               className="w-full rounded-xl border border-outline-variant bg-surface pl-10 pr-3 py-2 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
@@ -249,9 +251,9 @@ export function ParticipantFormModal({
           )}
 
           {!availableParticipants || availableParticipants.length === 0 ? (
-            <EmptyState icon={<User className="w-12 h-12" />} title="Belum ada peserta yang tersedia" description="Buat data peserta terlebih dahulu dari menu Peserta." />
+            <EmptyState icon={<User className="w-12 h-12" />} title={t('admin.participants.emptyAvailableTitle')} description={t('admin.participants.emptyAvailableDesc')} />
           ) : filteredParticipants.length === 0 ? (
-            <p className="text-center py-8 text-on-surface-variant text-sm">Peserta tidak ditemukan</p>
+            <p className="text-center py-8 text-on-surface-variant text-sm">{t('admin.participants.notFound')}</p>
           ) : (
             <div className="max-h-96 overflow-y-auto space-y-2">
               {filteredParticipants.map(p => {
@@ -274,7 +276,7 @@ export function ParticipantFormModal({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-on-surface">{p.child_name}</span>
-                          <Badge variant="neutral" size="sm">{p.child_age} th</Badge>
+                          <Badge variant="neutral" size="sm">{t('admin.participants.ageAbbr', { age: p.child_age })}</Badge>
                         </div>
                         {p.school_name && <p className="text-sm text-on-surface-variant mt-0.5">{p.school_name}</p>}
                         <p className="text-sm text-on-surface-variant">{p.parent_name} · {p.parent_phone}</p>
@@ -289,30 +291,36 @@ export function ParticipantFormModal({
           )}
 
           <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-outline-variant">
-            <Button variant="secondary" onClick={onClose} disabled={submitting}>Batal</Button>
-            <Button onClick={handleSelectConfirm} disabled={!selectedParticipantId || submitting} loading={submitting}>Tambahkan</Button>
+            <Button variant="secondary" onClick={onClose} disabled={submitting}>{t('common.cancel')}</Button>
+            <Button onClick={handleSelectConfirm} disabled={!selectedParticipantId || submitting} loading={submitting}>{t('admin.participants.addBtn')}</Button>
           </div>
         </Modal>
 
         <Modal
           open={!!migrateConfirm}
           onClose={handleMigrateCancel}
-          title="Pindahkan Peserta"
+          title={t('admin.participants.migrateTitle')}
           size="md"
         >
           <div className="space-y-4">
             <p className="text-sm text-on-surface">
-              Peserta <span className="font-semibold">{migrateConfirm?.participant.child_name}</span> sudah terdaftar di
-              sesi <span className="font-semibold">{migrateConfirm?.session_name}</span>.
+              <Trans
+                i18nKey="admin.participants.migrateRegistered"
+                values={{ name: migrateConfirm?.participant.child_name, session: migrateConfirm?.session_name }}
+                components={{
+                  name: <span className="font-semibold" />,
+                  session: <span className="font-semibold" />,
+                }}
+              />
             </p>
             <p className="text-sm text-on-surface-variant">
-              Pindahkan ke sesi ini? Data di sesi lama akan tetap tersimpan sebagai riwayat.
+              {t('admin.participants.migrateQuestion')}
             </p>
             <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
-              <Button variant="secondary" onClick={handleMigrateCancel} disabled={submitting}>Batal</Button>
+              <Button variant="secondary" onClick={handleMigrateCancel} disabled={submitting}>{t('common.cancel')}</Button>
               <Button onClick={handleMigrateConfirm} loading={submitting}>
                 <ArrowRightLeft className="w-4 h-4 mr-1" />
-                Pindahkan
+                {t('admin.participants.migrateBtn')}
               </Button>
             </div>
           </div>
@@ -328,14 +336,14 @@ export function ParticipantFormModal({
       <Modal
         open={open}
         onClose={onClose}
-        title={mode === 'create' ? 'Tambah Peserta' : 'Edit Peserta'}
+        title={mode === 'create' ? t('admin.participants.add') : t('admin.participants.editTitle')}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-3">
             <Input
-              label="Nama Anak"
-              placeholder="Contoh: Budi Santoso"
+              label={t('admin.participants.childNamePlain')}
+              placeholder={t('admin.participants.childNamePlaceholder')}
               value={formData.child_name}
               onChange={(e) => setFormData({ ...formData, child_name: e.target.value })}
               error={errors.child_name}
@@ -344,26 +352,26 @@ export function ParticipantFormModal({
             />
 
             <Input
-              label="Usia Anak"
+              label={t('admin.participants.ageInputPlain')}
               type="number"
-              placeholder="Contoh: 6"
+              placeholder={t('admin.participants.agePlaceholder')}
               value={formData.child_age}
               onChange={(e) => setFormData({ ...formData, child_age: e.target.value })}
               error={errors.child_age}
-              hint="Masukkan usia anak dalam tahun"
+              hint={t('admin.participants.ageHint')}
               required
             />
 
             <Input
-              label="Nama Sekolah"
-              placeholder="Contoh: TK Harapan Bangsa (opsional)"
+              label={t('admin.participants.schoolLabel')}
+              placeholder={t('admin.participants.schoolPlaceholder')}
               value={formData.school_name}
               onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
             />
 
             <Input
-              label="Nama Orang Tua"
-              placeholder="Contoh: Andi Santoso"
+              label={t('admin.participants.parentNamePlain')}
+              placeholder={t('admin.participants.parentNamePlaceholder')}
               value={formData.parent_name}
               onChange={(e) => setFormData({ ...formData, parent_name: e.target.value })}
               error={errors.parent_name}
@@ -372,19 +380,19 @@ export function ParticipantFormModal({
 
             <PhoneInput
               id="parent_phone"
-              label="No. HP Orang Tua"
+              label={t('admin.participants.parentPhoneLabel')}
               required
               value={formData.parent_phone}
               onChange={(v) => setFormData({ ...formData, parent_phone: v })}
               error={errors.parent_phone}
-              hint="Tanpa 0 di depan — kode negara otomatis"
+              hint={t('admin.participants.phoneHint')}
               placeholder="8123456789"
             />
 
             <Input
-              label="Email Orang Tua"
+              label={t('admin.participants.parentEmailLabel')}
               type="email"
-              placeholder="Contoh: andi@mail.com (opsional)"
+              placeholder={t('admin.participants.parentEmailPlaceholder')}
               value={formData.parent_email}
               onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
               error={errors.parent_email}
@@ -393,10 +401,10 @@ export function ParticipantFormModal({
 
           <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
             <Button type="button" variant="secondary" onClick={onClose} disabled={submitting}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button type="submit" loading={submitting}>
-              {mode === 'create' ? 'Tambah' : 'Simpan'}
+              {mode === 'create' ? t('admin.common.add') : t('common.save')}
             </Button>
           </div>
         </form>
@@ -405,16 +413,16 @@ export function ParticipantFormModal({
       <Modal
         open={ageConfirmOpen}
         onClose={() => setAgeConfirmOpen(false)}
-        title="Konfirmasi Usia"
+        title={t('admin.participants.ageConfirmTitle')}
         size="md"
       >
         <div className="space-y-4">
           <p className="text-sm text-on-surface">
-            {`Usia ${n} tahun terlihat tidak biasa. Apakah benar usia anak ${formData.child_name.trim()} ${n} tahun?`}
+            {t('admin.participants.ageConfirmMsg', { age: n, name: formData.child_name.trim() })}
           </p>
           <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant">
             <Button variant="secondary" onClick={() => setAgeConfirmOpen(false)}>
-              Kembali
+              {t('common.back')}
             </Button>
             <Button
               onClick={() => {
@@ -422,7 +430,7 @@ export function ParticipantFormModal({
                 void doSubmit()
               }}
             >
-              Ya, lanjutkan
+              {t('admin.participants.continueYes')}
             </Button>
           </div>
         </div>

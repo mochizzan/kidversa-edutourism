@@ -28,8 +28,10 @@ import { parentStageId } from '../../../core/utils/substage'
 import { TimelineFeed } from '../components/TimelineFeed'
 import { LiveGroupCard } from '../components/LiveGroupCard'
 import { useLiveMonitor } from '../hooks/useLiveMonitor'
+import { useTranslation } from 'react-i18next'
 
 const LiveMonitorPage = () => {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const isKoordinator = user?.role === UserRole.KOORDINATOR || user?.role === UserRole.ADMIN
   const { addToast } = useGlobalToast()
@@ -64,7 +66,7 @@ const LiveMonitorPage = () => {
   if (loading || liveLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Live Monitor" />
+        <PageHeader title={t('admin.live.pageTitle')} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2].map((i) => (
             <div key={i} className="h-40 bg-surface-variant rounded-xl animate-pulse" />
@@ -78,9 +80,9 @@ const LiveMonitorPage = () => {
   if (error) {
     return (
       <ErrorState
-        title="Gagal Memuat"
+        title={t('admin.live.loadError')}
         message={error}
-        action={{ label: 'Coba Lagi', onClick: fetchData }}
+        action={{ label: t('common.error.retry'), onClick: fetchData }}
       />
     )
   }
@@ -88,11 +90,11 @@ const LiveMonitorPage = () => {
   if (!activeSession) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Live Monitor" />
+        <PageHeader title={t('admin.live.pageTitle')} />
         <EmptyState
           icon={<Radio className="w-12 h-12" />}
-          title="Tidak ada sesi aktif"
-          description="Belum ada sesi yang sedang berlangsung saat ini"
+          title={t('admin.live.emptyTitle')}
+          description={t('admin.live.emptyDesc')}
         />
       </div>
     )
@@ -113,7 +115,7 @@ const LiveMonitorPage = () => {
   const connectionBadge =
     connectionStatus === 'online' ? null : (
       <Badge variant={connectionStatus === 'reconnecting' ? 'warning' : 'neutral'}>
-        {connectionStatus === 'reconnecting' ? 'Menyambung ulang…' : 'Koneksi lemah'}
+        {connectionStatus === 'reconnecting' ? t('admin.live.reconnecting') : t('admin.live.weakConnection')}
       </Badge>
     )
 
@@ -141,7 +143,7 @@ const LiveMonitorPage = () => {
     const { stageId } = activeGroup ? getGroupStatus(activeGroup) : { stageId: undefined }
     const targetStageId = parentStageId(sessionSubstages, stageId) ?? stages[0]?.id
     if (!targetStageId) {
-      addToast({ type: 'error', message: 'Belum ada topik untuk sesi ini.' })
+      addToast({ type: 'error', message: t('admin.live.noTopicToast') })
       return
     }
     setKioskLoading(true)
@@ -164,7 +166,7 @@ const LiveMonitorPage = () => {
     <div className="space-y-6">
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <PageHeader title="Live Monitor" subtitle={activeSession.name} />
+          <PageHeader title={t('admin.live.pageTitle')} subtitle={activeSession.name} />
           <div className="flex items-center gap-4 mt-2 text-sm text-on-surface-variant">
             <span className="flex items-center gap-1">
               <Calendar className="w-4 h-4" />
@@ -178,7 +180,7 @@ const LiveMonitorPage = () => {
               <Badge variant="success">
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  Live
+                  {t('admin.live.live')}
                 </span>
               </Badge>
             )}
@@ -188,7 +190,7 @@ const LiveMonitorPage = () => {
         <div className="flex items-center gap-2">
           {allActiveSessions.length > 1 && (
             <div className="flex items-center gap-2">
-              <label className="text-sm text-on-surface-variant font-medium">Sesi:</label>
+              <label className="text-sm text-on-surface-variant font-medium">{t('admin.live.sessionLabel')}</label>
               <select
                 value={activeSession?.id || ''}
                 onChange={(e) => navigate(`/admin/live/${e.target.value}`)}
@@ -209,7 +211,7 @@ const LiveMonitorPage = () => {
             disabled={kioskLoading || !activeSession || stages.length === 0 || (connectionStatus !== 'online' && groups.length === 0)}
           >
             <Monitor className="w-4 h-4 mr-1" />
-            {kioskLoading ? 'Membuka…' : 'Buka Kiosk'}
+            {kioskLoading ? t('admin.live.openingKiosk') : t('admin.live.openKiosk')}
           </Button>
           <Button variant="ghost" size="sm" onClick={fetchData}>
             <RefreshCw className="w-4 h-4" />
@@ -219,9 +221,9 @@ const LiveMonitorPage = () => {
 
       {allCompleted && (
         <div className="bg-success-container text-on-success-container rounded-xl p-6 text-center">
-          <h2 className="text-xl font-bold">🎉 Semua kelompok selesai!</h2>
+          <h2 className="text-xl font-bold">{t('admin.live.allCompletedTitle')}</h2>
           <p className="mt-1">
-            Sesi telah berakhir. Semua kelompok telah menyelesaikan semua stage.
+            {t('admin.live.allCompletedDesc')}
           </p>
         </div>
       )}
@@ -229,9 +231,9 @@ const LiveMonitorPage = () => {
       {groups.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Total', value: groups.length, icon: Users, color: 'text-on-surface' },
+            { label: t('admin.live.statTotal'), value: groups.length, icon: Users, color: 'text-on-surface' },
             {
-              label: 'Selesai',
+              label: t('admin.status.completed'),
               value: groups.filter(
                 (g) =>
                   g.progress.length > 0 &&
@@ -245,7 +247,7 @@ const LiveMonitorPage = () => {
               color: 'text-green-600',
             },
             {
-              label: 'Berlangsung',
+              label: t('admin.live.statOngoing'),
               value: groups.filter((g) => {
                 const s = getGroupStatus(g).status
                 return s === 'IN_PROGRESS' || s === 'UNLOCKED'
@@ -254,7 +256,7 @@ const LiveMonitorPage = () => {
               color: 'text-amber-600',
             },
             {
-              label: 'Menunggu',
+              label: t('admin.status.waiting'),
               value: groups.filter((g) => getGroupStatus(g).status === 'LOCKED').length,
               icon: Monitor,
               color: 'text-gray-500',
@@ -300,7 +302,7 @@ const LiveMonitorPage = () => {
       </div>
 
       <div className="bg-surface rounded-xl p-5 border border-outline-variant">
-        <h3 className="font-semibold text-on-surface mb-4">Timeline Aktivitas</h3>
+        <h3 className="font-semibold text-on-surface mb-4">{t('admin.live.timelineTitle')}</h3>
         <TimelineFeed events={timeline} />
       </div>
     </div>

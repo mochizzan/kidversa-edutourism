@@ -1,22 +1,23 @@
 import { z } from 'zod'
 import { isValidPhoneNumber } from 'libphonenumber-js'
 import { normalizePhone } from './phone'
+import { i18n } from '../i18n'
 
-// 1. Password rules — messages verbatim from current registerSchema.
+// 1. Password rules — messages resolved from the validation.* catalog at parse time.
 export const zPassword = z
   .string()
-  .min(8, 'Password minimal 8 karakter')
-  .regex(/[A-Z]/, 'Harus ada huruf besar')
-  .regex(/[a-z]/, 'Harus ada huruf kecil')
-  .regex(/[0-9]/, 'Harus ada angka')
+  .min(8, { error: () => ({ message: i18n.t('validation.passwordMin') }) })
+  .regex(/[A-Z]/, { error: () => ({ message: i18n.t('validation.passwordUpper') }) })
+  .regex(/[a-z]/, { error: () => ({ message: i18n.t('validation.passwordLower') }) })
+  .regex(/[0-9]/, { error: () => ({ message: i18n.t('validation.passwordNumber') }) })
 
 // 2. Email core — the ONLY place the email rule lives.
 export function emailError(value: string | undefined, opts: { required: boolean }): string | undefined {
   const trimmed = value?.trim() ?? ''
-  if (!trimmed) return opts.required ? 'Email wajib diisi' : undefined
+  if (!trimmed) return opts.required ? i18n.t('validation.emailRequired') : undefined
   // Format check: one regex-free rule via zod's own email check is NOT reusable
   // standalone — use a pragmatic RFC-lite regex:
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) return 'Format email tidak valid'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) return i18n.t('validation.emailInvalid')
   return undefined
 }
 
@@ -32,10 +33,10 @@ export function zEmail(opts: { required: boolean }) {
 
 export function phoneError(value: string | undefined, opts: { required: boolean }): string | undefined {
   const trimmed = value?.trim() ?? ''
-  if (!trimmed) return opts.required ? 'No. HP wajib diisi' : undefined
+  if (!trimmed) return opts.required ? i18n.t('validation.phoneEmpty') : undefined
   const normalized = normalizePhone(trimmed)          // undefined ⇒ non-digits only
-  if (!normalized) return 'Nomor telepon tidak valid'
-  if (!isValidPhoneNumber(normalized)) return 'Nomor telepon tidak valid'
+  if (!normalized) return i18n.t('validation.phoneInvalid')
+  if (!isValidPhoneNumber(normalized)) return i18n.t('validation.phoneInvalid')
   return undefined
 }
 

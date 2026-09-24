@@ -8,6 +8,7 @@ import { Modal } from '../../../shared/components/ui/Modal'
 import { Input } from '../../../shared/components/ui/Input'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { useTranslation } from 'react-i18next'
 import { tenantService } from '../../../core/services/tenants'
 import { useTenantStore } from '../../../core/stores/tenantStore'
 import type { Tenant } from '../../../core/types'
@@ -22,6 +23,7 @@ function slugify(text: string): string {
 }
 
 const TenantsPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { addToast } = useGlobalToast()
   const { setTenants: setStoreTenants, setActiveTenant } = useTenantStore()
@@ -54,11 +56,11 @@ const TenantsPage = () => {
       setStoreTenants(tenantList)
     } catch {
       // Surface the error instead of silently rendering empty counts.
-      addToast({ type: 'error', message: 'Gagal memuat data tenant.' })
+      addToast({ type: 'error', message: t('admin.tenants.loadError') })
     } finally {
       setLoading(false)
     }
-  }, [setStoreTenants, addToast])
+  }, [setStoreTenants, addToast, t])
 
   useEffect(() => {
     loadTenants()
@@ -87,11 +89,11 @@ const TenantsPage = () => {
   }
 
   const validateSlug = (slug: string, excludeId?: string): string | null => {
-    if (!formName.trim()) return 'Nama wajib diisi'
-    if (!slug.trim()) return 'Slug wajib diisi'
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return 'Slug hanya boleh huruf kecil, angka, dan tanda hubung'
+    if (!formName.trim()) return t('admin.tenants.nameRequired')
+    if (!slug.trim()) return t('admin.tenants.slugRequired')
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return t('admin.tenants.slugFormat')
     const duplicate = tenants.find((t) => t.slug === slug && t.id !== excludeId)
-    if (duplicate) return `Slug "${slug}" sudah digunakan oleh tenant "${duplicate.name}"`
+    if (duplicate) return t('admin.tenants.slugTaken', { slug, name: duplicate.name })
     return null
   }
 
@@ -101,7 +103,7 @@ const TenantsPage = () => {
 
     // Tenant creation is handled server-side (bootstrap); the frontend has no
     // mutation endpoint for tenants, so we surface an informational message.
-    addToast({ type: 'info', message: 'Pembuatan tenant dilakukan melalui administrator server.' })
+    addToast({ type: 'info', message: t('admin.tenants.createInfo') })
     setShowCreateModal(false)
   }
 
@@ -110,7 +112,7 @@ const TenantsPage = () => {
     const error = validateSlug(formSlug, editTarget.id)
     if (error) { setFormError(error); return }
 
-    addToast({ type: 'info', message: 'Pengubahan tenant dilakukan melalui administrator server.' })
+    addToast({ type: 'info', message: t('admin.tenants.editInfo') })
     setShowEditModal(false)
     setEditTarget(null)
   }
@@ -123,7 +125,7 @@ const TenantsPage = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Kelola Tenant" subtitle="Mengelola cabang dan tenant" />
+        <PageHeader title={t('admin.tenants.title')} subtitle={t('admin.tenants.subtitle')} />
         <div className="space-y-4">
           {[1, 2].map((i) => (
             <div key={i} className="animate-pulse bg-surface rounded-2xl p-6 shadow-sm">
@@ -141,27 +143,27 @@ const TenantsPage = () => {
       <Modal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        title="Tambah Tenant"
+        title={t('admin.tenants.add')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowCreateModal(false)}>Batal</Button>
-            <Button variant="primary" onClick={handleSaveCreate}>Simpan</Button>
+            <Button variant="secondary" onClick={() => setShowCreateModal(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" onClick={handleSaveCreate}>{t('common.save')}</Button>
           </div>
         }
       >
         <div className="space-y-4">
           <Input
-            label="Nama Tenant"
+            label={t('admin.tenants.nameLabel')}
             value={formName}
             onChange={(e) => handleNameChange(e.target.value)}
-            placeholder="Contoh: Bandung"
+            placeholder={t('admin.tenants.namePlaceholder')}
           />
           <Input
-            label="Slug"
+            label={t('admin.tenants.slugLabel')}
             value={formSlug}
             onChange={(e) => setFormSlug(e.target.value.toLowerCase())}
-            placeholder="contoh: bandung"
-            hint="Otomatis dari nama, bisa diedit manual"
+            placeholder={t('admin.tenants.slugPlaceholder')}
+            hint={t('admin.tenants.slugHint')}
           />
           {formError && <p className="text-sm text-error">{formError}</p>}
         </div>
@@ -170,27 +172,27 @@ const TenantsPage = () => {
       <Modal
         open={showEditModal}
         onClose={() => { setShowEditModal(false); setEditTarget(null) }}
-        title="Edit Tenant"
+        title={t('admin.tenants.editTitle')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => { setShowEditModal(false); setEditTarget(null) }}>Batal</Button>
-            <Button variant="primary" onClick={handleSaveEdit}>Simpan</Button>
+            <Button variant="secondary" onClick={() => { setShowEditModal(false); setEditTarget(null) }}>{t('common.cancel')}</Button>
+            <Button variant="primary" onClick={handleSaveEdit}>{t('common.save')}</Button>
           </div>
         }
       >
         <div className="space-y-4">
           <Input
-            label="Nama Tenant"
+            label={t('admin.tenants.nameLabel')}
             value={formName}
             onChange={(e) => handleNameChange(e.target.value)}
-            placeholder="Contoh: Bandung"
+            placeholder={t('admin.tenants.namePlaceholder')}
           />
           <Input
-            label="Slug"
+            label={t('admin.tenants.slugLabel')}
             value={formSlug}
             onChange={(e) => setFormSlug(e.target.value.toLowerCase())}
-            placeholder="contoh: bandung"
-            hint="Otomatis dari nama, bisa diedit manual"
+            placeholder={t('admin.tenants.slugPlaceholder')}
+            hint={t('admin.tenants.slugHint')}
           />
           {formError && <p className="text-sm text-error">{formError}</p>}
         </div>
@@ -201,11 +203,11 @@ const TenantsPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Kelola Tenant"
-        subtitle="Mengelola cabang dan tenant"
+        title={t('admin.tenants.title')}
+        subtitle={t('admin.tenants.subtitle')}
         actions={
           <Button icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
-            Tambah Tenant
+            {t('admin.tenants.add')}
           </Button>
         }
       />
@@ -213,8 +215,8 @@ const TenantsPage = () => {
       {tenants.length === 0 ? (
         <EmptyState
           icon={<Building2 className="w-12 h-12" />}
-          title="Belum ada tenant"
-          description="Tenant akan muncul di sini setelah ditambahkan."
+          title={t('admin.tenants.emptyTitle')}
+          description={t('admin.tenants.emptyDesc')}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -232,7 +234,7 @@ const TenantsPage = () => {
 
               <h3 className="text-lg font-bold text-on-surface mb-1">{tenant.name}</h3>
               <p className="text-sm text-on-surface-variant mb-4">
-                {tenantUserCounts[tenant.id] || 0} pengguna terdaftar
+                {t('admin.tenants.userCount', { count: tenantUserCounts[tenant.id] || 0 })}
               </p>
 
               <div className="flex items-center gap-2">
@@ -242,7 +244,7 @@ const TenantsPage = () => {
                   icon={<Users className="w-4 h-4" />}
                   onClick={() => handleViewUsers(tenant)}
                 >
-                  Lihat Pengguna
+                  {t('admin.tenants.viewUsers')}
                 </Button>
                 <Button
                   variant="ghost"
@@ -250,7 +252,7 @@ const TenantsPage = () => {
                   icon={<Edit2 className="w-4 h-4" />}
                   onClick={() => openEdit(tenant)}
                 >
-                  Edit
+                  {t('admin.common.edit')}
                 </Button>
               </div>
             </div>

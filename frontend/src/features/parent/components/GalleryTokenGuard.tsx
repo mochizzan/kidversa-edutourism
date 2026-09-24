@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { galleryService } from '../../../core/services/gallery'
 import { ApiError } from '../../../core/services/backend-client'
 import { SUPPORT_EMAIL } from '../../../core/constants/timezone'
@@ -28,6 +29,7 @@ interface GalleryTokenGuardProps {
 }
 
 export function GalleryTokenGuard({ children }: GalleryTokenGuardProps) {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
 
@@ -69,7 +71,7 @@ export function GalleryTokenGuard({ children }: GalleryTokenGuardProps) {
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mx-auto" />
-          <p className="mt-4 text-sm text-on-surface-variant">Memuat galeri...</p>
+          <p className="mt-4 text-sm text-on-surface-variant">{t('parent.gallery.loading')}</p>
         </div>
       </div>
     )
@@ -83,13 +85,13 @@ export function GalleryTokenGuard({ children }: GalleryTokenGuardProps) {
           <div className="w-16 h-16 rounded-full bg-surface-variant flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">🔗</span>
           </div>
-          <h1 className="text-xl font-bold text-on-surface mb-2">Link tidak valid</h1>
+          <h1 className="text-xl font-bold text-on-surface mb-2">{t('parent.gallery.invalidTitle')}</h1>
           <p className="text-sm text-on-surface-variant mb-6">
-            Tautan galeri tidak valid atau tidak ditemukan. Silakan hubungi koordinator.
+            {t('parent.gallery.invalidDesc')}
           </p>
           <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
-            <span>Butuh bantuan?</span>
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary font-medium hover:underline">Hubungi Kami</a>
+            <span>{t('parent.gallery.needHelp')}</span>
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary font-medium hover:underline">{t('parent.gallery.contactUs')}</a>
           </div>
         </div>
       </div>
@@ -104,13 +106,13 @@ export function GalleryTokenGuard({ children }: GalleryTokenGuardProps) {
           <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">⏰</span>
           </div>
-          <h1 className="text-xl font-bold text-on-surface mb-2">Galeri sudah tidak berlaku</h1>
+          <h1 className="text-xl font-bold text-on-surface mb-2">{t('parent.gallery.expiredTitle')}</h1>
           <p className="text-sm text-on-surface-variant mb-6">
-            Tautan galeri ini sudah kedaluwarsa. Silakan hubungi koordinator untuk tautan baru.
+            {t('parent.gallery.expiredDesc')}
           </p>
           <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
-            <span>Butuh bantuan?</span>
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary font-medium hover:underline">Hubungi Kami</a>
+            <span>{t('parent.gallery.needHelp')}</span>
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary font-medium hover:underline">{t('parent.gallery.contactUs')}</a>
           </div>
         </div>
       </div>
@@ -125,13 +127,13 @@ export function GalleryTokenGuard({ children }: GalleryTokenGuardProps) {
           <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">🚫</span>
           </div>
-          <h1 className="text-xl font-bold text-on-surface mb-2">Galeri ditutup</h1>
+          <h1 className="text-xl font-bold text-on-surface mb-2">{t('parent.gallery.revokedTitle')}</h1>
           <p className="text-sm text-on-surface-variant mb-6">
-            Tautan galeri ini sudah ditutup oleh admin. Silakan hubungi koordinator.
+            {t('parent.gallery.revokedDesc')}
           </p>
           <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
-            <span>Butuh bantuan?</span>
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary font-medium hover:underline">Hubungi Kami</a>
+            <span>{t('parent.gallery.needHelp')}</span>
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary font-medium hover:underline">{t('parent.gallery.contactUs')}</a>
           </div>
         </div>
       </div>

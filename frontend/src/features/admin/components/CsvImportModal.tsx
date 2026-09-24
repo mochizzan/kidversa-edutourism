@@ -4,6 +4,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { useTranslation } from 'react-i18next'
 import { parseCSV, type ImportRow } from '../utils/csvParser'
 
 interface CsvImportModalProps {
@@ -14,6 +15,7 @@ interface CsvImportModalProps {
 
 export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps) {
   const { addToast } = useGlobalToast()
+  const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
   const [parsedRows, setParsedRows] = useState<ImportRow[]>([])
@@ -42,7 +44,7 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
 
   const processFile = (file: File) => {
     if (!file.name.endsWith('.csv')) {
-      addToast({ type: 'error', message: 'Hanya file CSV yang didukung' })
+      addToast({ type: 'error', message: t('admin.participants.csvOnlyError') })
       return
     }
 
@@ -55,7 +57,7 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
       setParseErrors(result.errors)
     }
     reader.onerror = () => {
-      addToast({ type: 'error', message: 'Gagal membaca file' })
+      addToast({ type: 'error', message: t('admin.participants.readError') })
     }
     reader.readAsText(file)
   }
@@ -90,9 +92,9 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
       const groupCount = new Set(parsedRows.map((r) => r.group_name)).size
       setImportSummary({ participants: parsedRows.length, groups: groupCount })
       setImportComplete(true)
-      addToast({ type: 'success', message: `${parsedRows.length} peserta berhasil diimpor` })
+      addToast({ type: 'success', message: t('admin.participants.importedToast', { count: parsedRows.length }) })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Gagal mengimpor data'
+      const message = err instanceof Error ? err.message : t('admin.participants.importError')
       addToast({ type: 'error', message })
     } finally {
       setImporting(false)
@@ -114,7 +116,7 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
   const uniqueGroups = [...new Set(parsedRows.map((r) => r.group_name))]
 
   return (
-    <Modal open={open} onClose={handleClose} title="Import Peserta dari CSV" size="xl">
+    <Modal open={open} onClose={handleClose} title={t('admin.participants.importTitle')} size="xl">
       <div className="space-y-5">
         {!importComplete && !fileName && (
           <>
@@ -130,13 +132,13 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
             >
               <Upload className="w-10 h-10 mx-auto mb-3 text-on-surface-variant" />
               <p className="text-sm font-medium text-on-surface mb-1">
-                Tarik file CSV ke sini atau klik untuk memilih
+                {t('admin.participants.importDropzone')}
               </p>
               <p className="text-xs text-on-surface-variant mb-4">
                 Format: child_name, child_age, school_name, parent_name, parent_phone, parent_email, group_name
               </p>
               <Button variant="secondary" size="sm" icon={<FileText className="w-4 h-4" />}>
-                Pilih File CSV
+                {t('admin.participants.importPickFile')}
               </Button>
               <input
                 ref={fileInputRef}
@@ -149,7 +151,7 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
 
             <div className="text-center">
               <Button variant="ghost" size="sm" icon={<Download className="w-4 h-4" />} onClick={handleDownloadTemplate}>
-                Download Template CSV
+                {t('admin.participants.importTemplate')}
               </Button>
             </div>
           </>
@@ -159,7 +161,7 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
           <div className="flex items-center gap-3 px-4 py-3 bg-surface-container-low rounded-xl">
             <FileText className="w-5 h-5 text-primary" />
             <span className="flex-1 text-sm font-medium text-on-surface truncate">{fileName}</span>
-            <Button variant="ghost" size="sm" icon={<X className="w-4 h-4" />} tooltip="Hapus file" onClick={resetState} />
+            <Button variant="ghost" size="sm" icon={<X className="w-4 h-4" />} tooltip={t('admin.participants.importRemoveFile')} onClick={resetState} />
           </div>
         )}
 
@@ -168,18 +170,18 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
             <div className="flex items-start gap-2 mb-2">
               <AlertCircle className="w-5 h-5 text-on-error-container mt-0.5 shrink-0" />
               <p className="text-sm font-medium text-on-error-container">
-                {parseErrors.length} baris memiliki error
+                {t('admin.participants.importRowErrors', { count: parseErrors.length })}
               </p>
             </div>
             <ul className="space-y-1 ml-7">
               {parseErrors.slice(0, 10).map((err) => (
                 <li key={err.row} className="text-xs text-on-error-container/80">
-                  Baris {err.row}: {err.message}
+                  {t('admin.participants.importRowError', { row: err.row, message: err.message })}
                 </li>
               ))}
               {parseErrors.length > 10 && (
                 <li className="text-xs text-on-error-container/60">
-                  ...dan {parseErrors.length - 10} error lainnya
+                  {t('admin.participants.importMoreErrors', { count: parseErrors.length - 10 })}
                 </li>
               )}
             </ul>
@@ -190,10 +192,10 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium text-on-surface">
-                {parsedRows.length} data valid
+                {t('admin.participants.importValidCount', { count: parsedRows.length })}
                 {uniqueGroups.length > 0 && (
                   <span className="text-on-surface-variant font-normal">
-                    {' '}— {uniqueGroups.length} grup unik: {uniqueGroups.join(', ')}
+                    {' '}{t('admin.participants.importUniqueGroups', { count: uniqueGroups.length, groups: uniqueGroups.join(', ') })}
                   </span>
                 )}
               </p>
@@ -203,12 +205,12 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
               <table className="w-full text-sm">
                 <thead className="bg-surface-container-low sticky top-0">
                   <tr>
-                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">Nama Anak</th>
-                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">Usia</th>
-                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">Sekolah</th>
-                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">Orang Tua</th>
-                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">No. HP</th>
-                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">Grup</th>
+                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">{t('admin.participants.childNamePlain')}</th>
+                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">{t('admin.participants.colUsia')}</th>
+                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">{t('admin.participants.colSchool')}</th>
+                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">{t('admin.participants.parentCol')}</th>
+                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">{t('admin.participants.colPhone')}</th>
+                    <th className="text-left font-medium text-on-surface-variant px-3 py-2">{t('admin.participants.colGroup')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant">
@@ -235,9 +237,9 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
-            <h3 className="text-lg font-semibold text-on-surface mb-1">Import Berhasil!</h3>
+            <h3 className="text-lg font-semibold text-on-surface mb-1">{t('admin.participants.importSuccessTitle')}</h3>
             <p className="text-sm text-on-surface-variant">
-              {importSummary.participants} peserta berhasil diimpor, {importSummary.groups} grup dibuat.
+              {t('admin.participants.importSuccessMsg', { participants: importSummary.participants, groups: importSummary.groups })}
             </p>
           </div>
         )}
@@ -245,23 +247,23 @@ export function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps)
         <div className="flex justify-between items-center pt-2 border-t border-outline-variant">
           <div>
             {fileName && parsedRows.length === 0 && parseErrors.length === 0 && (
-              <p className="text-xs text-on-surface-variant">Tidak ada data valid yang ditemukan</p>
+              <p className="text-xs text-on-surface-variant">{t('admin.participants.importNoValid')}</p>
             )}
           </div>
           <div className="flex gap-2">
             {importComplete ? (
-              <Button onClick={handleClose}>Selesai</Button>
+              <Button onClick={handleClose}>{t('common.done')}</Button>
             ) : (
               <>
                 <Button variant="secondary" onClick={handleClose} disabled={importing}>
-                  Batal
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   onClick={handleImport}
                   disabled={parsedRows.length === 0}
                   loading={importing}
                 >
-                  {importing ? 'Mengimpor...' : `Import ${parsedRows.length} Peserta`}
+                  {importing ? t('admin.participants.importingLabel') : t('admin.participants.importBtn', { count: parsedRows.length })}
                 </Button>
               </>
             )}

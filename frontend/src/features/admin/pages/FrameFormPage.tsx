@@ -11,8 +11,10 @@ import { frameService } from '../../../core/services/frames'
 import { programService } from '../../../core/services/programs'
 import { getMediaUrl } from '../../../core/utils/media'
 import type { Program } from '../../../core/types'
+import { useTranslation } from 'react-i18next'
 
 const FrameFormPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { frameId } = useParams()
   const { addToast } = useGlobalToast()
@@ -46,23 +48,23 @@ const FrameFormPage = () => {
               thumbnail_url: frame.thumbnail_url || '',
             })
           } else {
-            addToast({ type: 'error', message: 'Frame tidak ditemukan' })
+            addToast({ type: 'error', message: t('admin.frames.notFound') })
             navigate(ROUTES.ADMIN.FRAMES)
           }
         } catch {
-          addToast({ type: 'error', message: 'Gagal memuat frame' })
+          addToast({ type: 'error', message: t('admin.frames.loadError') })
         } finally {
           setLoading(false)
         }
       }
       loadFrame()
     }
-  }, [frameId, addToast, navigate])
+  }, [frameId, addToast, navigate, t])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name || !frameId) {
-      addToast({ type: 'error', message: 'Lengkapi semua field yang wajib' })
+      addToast({ type: 'error', message: t('admin.common.fillRequired') })
       return
     }
 
@@ -72,10 +74,10 @@ const FrameFormPage = () => {
         name: form.name,
         program_id: form.program_id || undefined,
       })
-      addToast({ type: 'success', message: 'Frame berhasil diperbarui' })
+      addToast({ type: 'success', message: t('admin.frames.updatedToast') })
       navigate(ROUTES.ADMIN.FRAMES)
     } catch {
-      addToast({ type: 'error', message: 'Gagal menyimpan frame' })
+      addToast({ type: 'error', message: t('admin.frames.saveError') })
     } finally {
       setSaving(false)
     }
@@ -92,11 +94,11 @@ const FrameFormPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Edit Frame"
-        subtitle="Perbarui detail frame"
+        title={t('admin.frames.editTitle')}
+        subtitle={t('admin.frames.editSubtitle')}
         breadcrumbs={[
-          { label: 'Frames', href: ROUTES.ADMIN.FRAMES },
-          { label: 'Edit' },
+          { label: t('admin.frames.pageTitle'), href: ROUTES.ADMIN.FRAMES },
+          { label: t('admin.common.edit') },
         ]}
       />
 
@@ -104,16 +106,16 @@ const FrameFormPage = () => {
         <div className="bg-surface rounded-2xl p-6 shadow-sm space-y-4 flex flex-col md:flex-row gap-6">
           <div className="flex-1 space-y-4">
             <Input
-              label="Nama Frame"
+              label={t('admin.frames.nameLabel')}
               required
               value={form.name}
               onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
             />
 
             <Select
-              label="Program"
+              label={t('admin.col.program')}
               options={[
-                { value: '', label: 'Semua Program' },
+                { value: '', label: t('admin.common.allPrograms') },
                 ...programs.map((p) => ({ value: p.id, label: p.name }))
               ]}
               value={form.program_id}
@@ -122,7 +124,7 @@ const FrameFormPage = () => {
           </div>
 
           <div className="w-full md:w-48 shrink-0">
-            <label className="block text-sm font-medium text-on-surface mb-1">Preview</label>
+            <label className="block text-sm font-medium text-on-surface mb-1">{t('admin.frames.previewLabel')}</label>
             <div className="w-full aspect-[4/3] rounded-xl bg-surface-container-high flex items-center justify-center overflow-hidden border border-outline-variant">
               {form.thumbnail_url || form.file_url ? (
                 <img
@@ -139,10 +141,10 @@ const FrameFormPage = () => {
 
         <div className="flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.FRAMES)}>
-            Batal
+            {t('common.cancel')}
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>
-            Simpan
+            {t('common.save')}
           </Button>
         </div>
       </form>

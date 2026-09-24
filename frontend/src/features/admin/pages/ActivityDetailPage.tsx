@@ -21,14 +21,16 @@ import { STAGE_CONTENT_FILE_TYPE_LABELS, YOUTUBE_LABEL } from '../../../core/con
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Program, ProgramStage, ProgramSubstage, StageContent } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
+import { useTranslation } from 'react-i18next'
 
-const FILE_TYPE_META: Record<StageContentFileType, { icon: React.ReactNode; label: string; fg: string }> = {
-  [StageContentFileType.VIDEO]: { icon: <Play className="w-4 h-4" />, label: 'Video', fg: 'text-blue-700' },
-  [StageContentFileType.IMAGE]: { icon: <Image className="w-4 h-4" />, label: 'Gambar', fg: 'text-emerald-700' },
-  [StageContentFileType.GAME_BUNDLE]: { icon: <Gamepad2 className="w-4 h-4" />, label: 'Game', fg: 'text-purple-700' },
+const FILE_TYPE_META: Record<StageContentFileType, { icon: React.ReactNode; fg: string }> = {
+  [StageContentFileType.VIDEO]: { icon: <Play className="w-4 h-4" />, fg: 'text-blue-700' },
+  [StageContentFileType.IMAGE]: { icon: <Image className="w-4 h-4" />, fg: 'text-emerald-700' },
+  [StageContentFileType.GAME_BUNDLE]: { icon: <Gamepad2 className="w-4 h-4" />, fg: 'text-purple-700' },
 }
 
 const ActivityDetailPage = () => {
+  const { t } = useTranslation()
   const { activityId } = useParams<{ activityId: string }>()
   const navigate = useNavigate()
   const { addToast } = useGlobalToast()
@@ -49,7 +51,7 @@ const ActivityDetailPage = () => {
         try {
           const found = await programSubstageService.getById(activityId)
           if (!found) {
-            addToast({ type: 'error', message: 'Kegiatan tidak ditemukan' })
+            addToast({ type: 'error', message: t('admin.activities.notFound') })
             navigate(activityListPath())
             return
           }
@@ -97,7 +99,7 @@ const ActivityDetailPage = () => {
     setDeleting(true)
     try {
       await programSubstageService.remove(activity.id)
-      addToast({ type: 'success', message: 'Kegiatan dihapus' })
+      addToast({ type: 'success', message: t('admin.activities.deletedToast') })
       setDeleteOpen(false)
       navigate(activityListPath())
     } catch (err) {
@@ -118,10 +120,10 @@ const ActivityDetailPage = () => {
   if (!activity) {
     return (
       <div className="text-center text-on-surface-variant py-12">
-        Kegiatan tidak ditemukan
+        {t('admin.activities.notFound')}
         <div className="mt-4">
           <Button variant="secondary" onClick={() => navigate(activityListPath())}>
-            Kembali
+            {t('common.back')}
           </Button>
         </div>
       </div>
@@ -132,9 +134,9 @@ const ActivityDetailPage = () => {
     <div className="space-y-6">
       <PageHeader
         title={activity.name}
-        subtitle={`Program: ${program?.name || '-'} · Topik: ${stage?.name || '-'}`}
+        subtitle={t('admin.activities.detailSubtitle', { program: program?.name || '-', topic: stage?.name || '-' })}
         breadcrumbs={[
-          { label: 'Kegiatan', href: activityListPath() },
+          { label: t('admin.activities.title'), href: activityListPath() },
           { label: activity.name },
         ]}
         actions={
@@ -144,41 +146,41 @@ const ActivityDetailPage = () => {
               icon={<Pencil className="w-4 h-4" />}
               onClick={() => navigate(activityEditPath(activity.id))}
             >
-              Edit
+              {t('admin.common.edit')}
             </Button>
             <Button variant="danger" icon={<Trash2 className="w-4 h-4" />} onClick={() => setDeleteOpen(true)}>
-              Hapus
+              {t('common.delete')}
             </Button>
           </div>
         }
       />
 
-      <Card title="Informasi Kegiatan">
+      <Card title={t('admin.activities.infoTitle')}>
         <div className="space-y-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Program</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{t('admin.col.program')}</p>
             <p className="text-sm text-on-surface">{program?.name || '-'}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Topik</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{t('admin.topic.pageTitle')}</p>
             <p className="text-sm text-on-surface">{stage?.name || '-'}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Nama Kegiatan</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{t('admin.activities.nameLabel')}</p>
             <p className="text-sm text-on-surface">{activity.name}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Deskripsi</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{t('admin.activities.descLabel')}</p>
             <p className="text-sm text-on-surface">{activity.description || '-'}</p>
           </div>
         </div>
       </Card>
 
       <Card
-        title="Konten yang Ditugaskan"
+        title={t('admin.activities.contentTitle')}
         actions={
           <Link to={newContentHref}>
-            <Button icon={<Plus className="w-4 h-4" />}>Tambah Konten</Button>
+            <Button icon={<Plus className="w-4 h-4" />}>{t('admin.content.add')}</Button>
           </Link>
         }
       >
@@ -189,8 +191,8 @@ const ActivityDetailPage = () => {
         ) : contents.length === 0 ? (
           <ListEmptyState
             icon={<Play className="w-10 h-10" />}
-            title="Belum ada konten"
-            description="Klik 'Tambah Konten' di atas untuk menambahkan konten ke kegiatan ini."
+            title={t('admin.content.emptyTitle')}
+            description={t('admin.activities.emptyContentDesc')}
           />
         ) : (
           <ul className="space-y-2">
@@ -208,15 +210,15 @@ const ActivityDetailPage = () => {
                       <p className="text-sm font-medium text-on-surface truncate">{content.title}</p>
                       <p className="text-xs text-on-surface-variant">
                         <Badge variant="neutral" size="sm" className="mr-1">
-                          {isYouTube ? YOUTUBE_LABEL : STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type]}
+                          {isYouTube ? YOUTUBE_LABEL : t(STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type])}
                         </Badge>
-                        {!isYouTube && `${content.duration_seconds ?? 0} detik`}
+                        {!isYouTube && t('admin.content.duration.seconds', { count: content.duration_seconds ?? 0 })}
                       </p>
                     </div>
                   </div>
                   <Link to={contentEditHref(content.id)}>
                     <Button variant="ghost" size="sm">
-                      Edit
+                      {t('admin.common.edit')}
                     </Button>
                   </Link>
                 </li>
@@ -228,9 +230,9 @@ const ActivityDetailPage = () => {
 
       <ConfirmDialog
         open={deleteOpen}
-        title="Hapus Kegiatan"
-        message={`Yakin ingin menghapus kegiatan "${activity.name}"? Konten yang ditugaskan akan dilepas. Tindakan ini tidak dapat dibatalkan.`}
-        confirmLabel="Hapus"
+        title={t('admin.activities.deleteTitle')}
+        message={t('admin.activities.deleteMsgDetail', { name: activity.name })}
+        confirmLabel={t('common.delete')}
         loading={deleting}
         onConfirm={handleDelete}
         onClose={() => setDeleteOpen(false)}

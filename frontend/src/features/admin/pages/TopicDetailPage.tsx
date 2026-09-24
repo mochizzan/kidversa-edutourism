@@ -14,12 +14,14 @@ import { topicListPath, topicEditPath, activityNewPath } from '../../../core/con
 import { getMediaUrl } from '../../../core/utils/media'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Program, ProgramStage, ProgramSubstage } from '../../../core/types'
+import { useTranslation } from 'react-i18next'
 
 interface TopicDetailState {
   showAddActivityCta?: boolean
 }
 
 const TopicDetailPage = () => {
+  const { t } = useTranslation()
   const { topicId } = useParams<{ topicId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -79,10 +81,10 @@ const TopicDetailPage = () => {
   if (!program || !stage) {
     return (
       <div className="text-center text-on-surface-variant py-12">
-        Topik tidak ditemukan
+        {t('admin.topic.notFound')}
         <div className="mt-4">
           <Button variant="secondary" onClick={() => navigate(topicListPath())}>
-            Kembali ke Daftar Topik
+            {t('admin.topic.backToList')}
           </Button>
         </div>
       </div>
@@ -95,7 +97,7 @@ const TopicDetailPage = () => {
         title={stage.name}
         subtitle={`Program: ${program.name}`}
         breadcrumbs={[
-          { label: 'Topik', href: topicListPath() },
+          { label: t('admin.topic.pageTitle'), href: topicListPath() },
           { label: stage.name },
         ]}
         actions={
@@ -105,7 +107,7 @@ const TopicDetailPage = () => {
               icon={<Pencil className="w-4 h-4" />}
               onClick={() => navigate(topicEditPath(stage.id), { state: { programId: program.id } })}
             >
-              Edit Topik
+              {t('admin.topic.editBtn')}
             </Button>
           </div>
         }
@@ -113,8 +115,8 @@ const TopicDetailPage = () => {
 
       <Tabs
         tabs={[
-          { key: 'detail', label: 'Detail' },
-          { key: 'kegiatan', label: `Kegiatan (${kegiatan.length})` },
+          { key: 'detail', label: t('admin.topic.tabDetail') },
+          { key: 'kegiatan', label: t('admin.topic.activitiesTab', { count: kegiatan.length }) },
         ]}
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as 'detail' | 'kegiatan')}
@@ -125,36 +127,36 @@ const TopicDetailPage = () => {
           <div className="space-y-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                Program
+                {t('admin.col.program')}
               </p>
               <p className="text-sm text-on-surface">{program.name}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                Nama Topik
+                {t('admin.topic.nameLabel')}
               </p>
               <p className="text-sm text-on-surface">{stage.name}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                Deskripsi
+                {t('admin.topic.descLabel')}
               </p>
               <p className="text-sm text-on-surface">{stage.description || '-'}</p>
             </div>
             <div className="flex items-center gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                  Foto Stage
+                  {t('admin.topic.photoStageCol')}
                 </p>
                 <Badge variant={stage.is_photo_stage ? 'success' : 'neutral'}>
-                  {stage.is_photo_stage ? 'Ya' : 'Tidak'}
+                  {stage.is_photo_stage ? t('admin.topic.yes') : t('admin.topic.no')}
                 </Badge>
               </div>
             </div>
 
             <div className="border-t border-outline-variant/50 pt-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-2">
-                Badge Topik
+                {t('admin.topic.badgeTitle')}
               </p>
               {stage.badge_name ? (
                 <div className="flex items-center gap-3">
@@ -180,7 +182,7 @@ const TopicDetailPage = () => {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-on-surface-variant">Badge belum diatur</p>
+                <p className="text-sm text-on-surface-variant">{t('admin.topic.badgeNotSet')}</p>
               )}
             </div>
           </div>
@@ -189,7 +191,7 @@ const TopicDetailPage = () => {
 
       {activeTab === 'kegiatan' && (
         <Card
-          title="Daftar Kegiatan"
+          title={t('admin.topic.listTitle')}
           actions={
             <Button
               icon={<Plus className="w-4 h-4" />}
@@ -198,26 +200,26 @@ const TopicDetailPage = () => {
                 navigate(activityPath)
               }}
             >
-              Tambah Kegiatan
+              {t('admin.activities.add')}
             </Button>
           }
         >
           {showCta && (
             <div className="mb-4 p-3 rounded-xl bg-primary-container text-on-primary-container text-sm flex items-center justify-between gap-3">
-              <span>Topik berhasil dibuat. Tambahkan kegiatan pertama sekarang?</span>
+              <span>{t('admin.topic.ctaMsg')}</span>
               <Button size="sm" onClick={() => navigate(activityPath)}>
-                Tambah Kegiatan
+                {t('admin.activities.add')}
               </Button>
             </div>
           )}
 
           {kegiatanLoading ? (
-            <p className="text-sm text-on-surface-variant py-4">Memuat kegiatan…</p>
+            <p className="text-sm text-on-surface-variant py-4">{t('admin.topic.loadingActivities')}</p>
           ) : kegiatan.length === 0 ? (
             <ListEmptyState
               icon={<FolderOpen className="w-10 h-10" />}
-              title="Belum ada kegiatan"
-              description="Klik 'Tambah Kegiatan' di atas untuk menambahkan kegiatan pertama."
+              title={t('admin.activities.emptyTitle')}
+              description={t('admin.topic.emptyActivitiesDesc')}
             />
           ) : (
             <ol className="divide-y divide-outline-variant/50">

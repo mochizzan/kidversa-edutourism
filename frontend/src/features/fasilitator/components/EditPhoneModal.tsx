@@ -9,14 +9,16 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
 import { useAuthStore } from '../../../core/stores/authStore'
 import type { User } from '../../../core/types'
+import { i18n } from '../../../core/i18n'
+import { useTranslation } from 'react-i18next'
 
 const editPhoneSchema = z.object({
   phone: z
     .string()
     .trim()
-    .min(8, 'Nomor telepon minimal 8 digit')
-    .max(15, 'Nomor telepon maksimal 15 digit')
-    .regex(/^\+?[1-9][\d\s-]*$/, 'Format nomor telepon tidak valid'),
+    .min(8, { error: () => ({ message: i18n.t('validation.phoneMin8') }) })
+    .max(15, { error: () => ({ message: i18n.t('validation.phoneMax15') }) })
+    .regex(/^\+?[1-9][\d\s-]*$/, { error: () => ({ message: i18n.t('validation.phoneFormat') }) }),
 })
 
 type EditPhoneFormData = z.infer<typeof editPhoneSchema>
@@ -28,11 +30,12 @@ interface EditPhoneModalProps {
   onSaved?: (updated: User) => void
 }
 
-const ERROR_MAP: Record<string, string> = {
-  'User not found': 'Data pengguna tidak ditemukan. Silakan login ulang.',
+const ERROR_MAP: Record<string, () => string> = {
+  'User not found': () => i18n.t('fasilitator.edit.userNotFound'),
 }
 
 const EditPhoneModal = ({ open, onClose, user, onSaved }: EditPhoneModalProps) => {
+  const { t } = useTranslation()
   const { addToast } = useGlobalToast()
   const setUser = useAuthStore((s) => s.setUser)
 
@@ -58,11 +61,11 @@ const EditPhoneModal = ({ open, onClose, user, onSaved }: EditPhoneModalProps) =
       const { password_hash: _, ...cleanUser } = updated
       setUser(cleanUser as User)
       onSaved?.(cleanUser as User)
-      addToast({ type: 'success', message: 'Nomor telepon berhasil diperbarui' })
+      addToast({ type: 'success', message: t('fasilitator.edit.phoneSaved') })
       onClose()
     } catch (err) {
       const msg = err instanceof Error ? err.message : ''
-      addToast({ type: 'error', message: ERROR_MAP[msg] ?? 'Gagal memperbarui data. Silakan coba lagi.' })
+      addToast({ type: 'error', message: ERROR_MAP[msg]?.() ?? t('fasilitator.edit.saveFailed') })
     }
   }
 
@@ -70,26 +73,26 @@ const EditPhoneModal = ({ open, onClose, user, onSaved }: EditPhoneModalProps) =
     <Modal
       open={open}
       onClose={onClose}
-      title="Edit Nomor Telepon"
+      title={t('fasilitator.edit.phoneTitle')}
       size="sm"
       footer={
         <div className="flex items-center justify-end gap-3">
           <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
-            Batal
+            {t('common.cancel')}
           </Button>
           <Button
             variant="primary"
             loading={isSubmitting}
             onClick={handleSubmit(onSubmit)}
           >
-            Simpan
+            {t('common.save')}
           </Button>
         </div>
       }
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
-          label="Nomor Telepon"
+          label={t('fasilitator.edit.phoneLabel')}
           type="tel"
           placeholder="08xxxxxxxxxx"
           error={errors.phone?.message}

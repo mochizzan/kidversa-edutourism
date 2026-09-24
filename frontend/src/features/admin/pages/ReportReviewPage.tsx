@@ -26,8 +26,10 @@ import { ReportAssessmentScores } from '../components/ReportAssessmentScores'
 import { ReportMissionSelector } from '../components/ReportMissionSelector'
 import { BadgeList } from '../../../shared/components/data/BadgeList'
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
+import { useTranslation, Trans } from 'react-i18next'
 
 const ReportReviewPage = () => {
+  const { t } = useTranslation()
   const { sessionId, participantId } = useParams<{ sessionId: string; participantId: string }>()
   const navigate = useNavigate()
 
@@ -98,14 +100,14 @@ const ReportReviewPage = () => {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Memuat..."
+          title={t('common.loading')}
           breadcrumbs={[
-            { label: 'Laporan', href: ROUTES.ADMIN.REPORTS },
+            { label: t('admin.reports.title'), href: ROUTES.ADMIN.REPORTS },
             {
-              label: sessionId ? 'Session' : '',
+              label: sessionId ? t('admin.review.crumbSession') : '',
               href: sessionId ? `/admin/reports/${sessionId}` : undefined,
             },
-            { label: 'Review' },
+            { label: t('admin.review.crumbReview') },
           ].filter((b) => b.label)}
         />
         <div className="bg-surface rounded-2xl p-6 animate-pulse space-y-4">
@@ -121,15 +123,15 @@ const ReportReviewPage = () => {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Error"
-          breadcrumbs={[{ label: 'Laporan', href: ROUTES.ADMIN.REPORTS }, { label: 'Review' }]}
+          title={t('admin.reports.errorTitle')}
+          breadcrumbs={[{ label: t('admin.reports.title'), href: ROUTES.ADMIN.REPORTS }, { label: t('admin.review.crumbReview') }]}
         />
         <div className="flex gap-2 justify-center">
           <Button variant="secondary" onClick={() => navigate(`/admin/reports/${sessionId}`)}>
-            Kembali
+            {t('common.back')}
           </Button>
         </div>
-        <ErrorState message={error || 'Data tidak ditemukan.'} onRetry={loadData} />
+        <ErrorState message={error || t('admin.reports.dataNotFound')} onRetry={loadData} />
       </div>
     )
   }
@@ -142,9 +144,9 @@ const ReportReviewPage = () => {
     <div className="space-y-6">
       <PageHeader
         title={participant.child_name}
-        subtitle="Review dan kelola laporan peserta"
+        subtitle={t('admin.review.subtitle')}
         breadcrumbs={[
-          { label: 'Laporan', href: ROUTES.ADMIN.REPORTS },
+          { label: t('admin.reports.title'), href: ROUTES.ADMIN.REPORTS },
           { label: session.name, href: `/admin/reports/${sessionId}` },
           { label: participant.child_name },
         ]}
@@ -155,21 +157,20 @@ const ReportReviewPage = () => {
 
       {topics.length > 1 && (
         <div className="flex flex-wrap gap-2 no-print">
-          {topics.map((t) => (
+          {topics.map((topic) => (
             <button
-              key={t.programStageId}
+              key={topic.programStageId}
               type="button"
               onClick={() => {
-                setActiveTopicId(t.programStageId)
-                void loadTopicMissions(t.programStageId)
+                setActiveTopicId(topic.programStageId)
+                void loadTopicMissions(topic.programStageId)
               }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${
-                activeTopicId === t.programStageId
-                  ? 'bg-primary text-on-primary border-primary'
-                  : 'bg-surface text-on-surface border-outline-variant hover:border-primary'
-              }`}
+              className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${activeTopicId === topic.programStageId
+                ? 'bg-primary text-on-primary border-primary'
+                : 'bg-surface text-on-surface border-outline-variant hover:border-primary'
+                }`}
             >
-              {t.name}
+              {topic.name}
             </button>
           ))}
         </div>
@@ -179,30 +180,27 @@ const ReportReviewPage = () => {
         <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-sm flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium text-yellow-800">Belum ada data penilaian</p>
-            <p className="text-yellow-700 mt-1">
-              Laporan ini belum dapat disetujui atau dikirim karena peserta belum memiliki data
-              penilaian. Lengkapi penilaian terlebih dahulu di halaman Assessment.
-            </p>
+            <p className="font-medium text-yellow-800">{t('admin.review.noAssessmentTitle')}</p>
+            <p className="text-yellow-700 mt-1">{t('admin.review.noAssessmentDesc')}</p>
           </div>
         </div>
       )}
 
       {report.status === ReportStatus.SENT && (
-        <Card title="Ringkasan yang Dikirim" subtitle="Konten yang telah dikirim ke orang tua">
+        <Card title={t('admin.review.sentSummaryTitle')} subtitle={t('admin.review.sentSummarySubtitle')}>
           <div className="space-y-4">
             <div>
               <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
-                Narasi
+                {t('admin.review.narrativeLabel')}
               </p>
               <p className="text-sm text-on-surface whitespace-pre-wrap">{narrativeText || '-'}</p>
             </div>
             <div>
               <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
-                Misi Lanjutan
+                {t('admin.review.missionLabel')}
               </p>
               {assignedMissionIds.length === 0 ? (
-                <p className="text-sm text-on-surface-variant">Tidak ada misi dipilih</p>
+                <p className="text-sm text-on-surface-variant">{t('admin.review.noMission')}</p>
               ) : (
                 <ul className="text-sm text-on-surface space-y-1">
                   {missions
@@ -219,7 +217,7 @@ const ReportReviewPage = () => {
             {photo && (
               <div>
                 <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
-                  Foto
+                  {t('admin.review.photoLabel')}
                 </p>
                 <img
                   src={getMediaUrl('photo', photo.id)}
@@ -229,7 +227,7 @@ const ReportReviewPage = () => {
               </div>
             )}
             <p className="text-xs text-on-surface-variant">
-              Waktu kirim: {report.sent_at ? formatDate(report.sent_at) : '-'}
+              {t('admin.review.sentAt', { date: report.sent_at ? formatDate(report.sent_at) : '-' })}
             </p>
           </div>
         </Card>
@@ -245,7 +243,7 @@ const ReportReviewPage = () => {
                   alt={participant.child_name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
-                    ;(e.target as HTMLImageElement).style.display = 'none'
+                    ; (e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
               ) : (
@@ -257,21 +255,23 @@ const ReportReviewPage = () => {
               <h3 className="text-lg font-bold text-on-surface">{participant.child_name}</h3>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2 text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-on-surface-variant">Usia:</span>
-                  <span className="text-on-surface font-medium">{participant.child_age} tahun</span>
+                  <span className="text-on-surface-variant">{t('admin.review.ageLabel')}</span>
+                  <span className="text-on-surface font-medium">
+                    {t('admin.review.ageYears', { age: participant.child_age })}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-on-surface-variant">Sekolah:</span>
+                  <span className="text-on-surface-variant">{t('admin.review.schoolLabel')}</span>
                   <span className="text-on-surface font-medium">
                     {participant.school_name || '-'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-on-surface-variant">Orang Tua:</span>
+                  <span className="text-on-surface-variant">{t('admin.review.parentLabel')}</span>
                   <span className="text-on-surface font-medium">{participant.parent_name}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-on-surface-variant">Sesi:</span>
+                  <span className="text-on-surface-variant">{t('admin.review.sessionLabel')}</span>
                   <span className="text-on-surface font-medium">{session.name}</span>
                 </div>
               </div>
@@ -280,8 +280,8 @@ const ReportReviewPage = () => {
                 <p className="mt-3 text-xs text-yellow-600 flex items-center gap-1.5 no-print">
                   <Camera className="w-3.5 h-3.5" />
                   {participant.consent_photo === false
-                    ? 'Izin foto tidak diberikan — foto tidak tersedia'
-                    : 'Belum ada foto yang dipilih untuk laporan'}
+                    ? t('admin.review.noPhotoConsent')
+                    : t('admin.review.noPhotoPicked')}
                 </p>
               )}
             </div>
@@ -293,14 +293,14 @@ const ReportReviewPage = () => {
         <ReportAssessmentScores stageInfos={stageInfos} />
 
         {report.status !== ReportStatus.SENT && !hasNoAssessment && (
-          <Card title="Narasi AI" subtitle="Draft narasi yang akan dikirim ke orang tua">
+          <Card title={t('admin.review.narrativeTitle')} subtitle={t('admin.review.narrativeSubtitle')}>
             <textarea
               value={narrativeText}
               onChange={(e) => setNarrativeText(e.target.value)}
               rows={6}
               readOnly={streaming}
               className={`w-full rounded-xl border border-outline-variant bg-surface p-4 text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none resize-y no-print ${streaming ? 'opacity-60' : ''}`}
-              placeholder="Narasi akan muncul setelah laporan di-generate..."
+              placeholder={t('admin.review.narrativePlaceholder')}
             />
             <div className="print-report whitespace-pre-wrap p-4 hidden">{narrativeText}</div>
             <div className="flex items-center justify-between mt-2 no-print">
@@ -312,19 +312,18 @@ const ReportReviewPage = () => {
               >
                 {streaming ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Membuat...
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t('admin.review.building')}
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4 mr-1" /> Buat Narasi AI
+                    <Sparkles className="w-4 h-4 mr-1" /> {t('admin.review.generateNarrative')}
                   </>
                 )}
               </Button>
-              <p className="text-xs text-on-surface-variant">
-                Edit narasi sesuai kebutuhan sebelum menyetujui laporan.
-              </p>
+              <p className="text-xs text-on-surface-variant">{t('admin.review.editHint')}</p>
               <span className="text-xs text-on-surface-variant">
-                {narrativeText.length} karakter{streaming ? ' · mengetik…' : ''}
+                {t('admin.review.charCount', { count: narrativeText.length })}
+                {streaming ? t('admin.review.typing') : ''}
               </span>
             </div>
           </Card>
@@ -344,36 +343,36 @@ const ReportReviewPage = () => {
       {!hasNoAssessment && (
         <div className="flex flex-wrap items-center gap-3 bg-surface rounded-2xl p-4 border border-outline-variant sticky bottom-4 shadow-lg no-print">
           <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/reports/${sessionId}`)}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
+            <ArrowLeft className="w-4 h-4 mr-1" /> {t('common.back')}
           </Button>
           <div className="flex-1" />
           <Button variant="secondary" size="sm" onClick={handleCetak} disabled={!!actionLoading}>
-            <Printer className="w-4 h-4 mr-1" /> Cetak
+            <Printer className="w-4 h-4 mr-1" /> {t('admin.review.print')}
           </Button>
           <Button variant="secondary" size="sm" onClick={handleDownloadPdf} disabled={!!actionLoading}>
             {actionLoading === 'pdf' ? (
               <>
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t('common.processing')}
               </>
             ) : (
               <>
-                <FileText className="w-4 h-4 mr-1" /> Unduh PDF
+                <FileText className="w-4 h-4 mr-1" /> {t('admin.review.downloadPdf')}
               </>
             )}
           </Button>
           <Button variant="secondary" size="sm" onClick={handleDownloadPng} disabled={!!actionLoading}>
             {actionLoading === 'png' ? (
               <>
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t('common.processing')}
               </>
             ) : (
               <>
-                <Camera className="w-4 h-4 mr-1" /> Unduh PNG
+                <Camera className="w-4 h-4 mr-1" /> {t('admin.review.downloadPng')}
               </>
             )}
           </Button>
           {canApprove && (
-            <Tooltip content={!groupCompleted ? 'Kelompok belum diselesaikan oleh fasilitator' : ''}>
+            <Tooltip content={!groupCompleted ? t('admin.review.groupNotCompleted') : ''}>
               <Button
                 size="sm"
                 onClick={() => setShowApproveConfirm(true)}
@@ -381,11 +380,11 @@ const ReportReviewPage = () => {
               >
                 {actionLoading === 'approve' ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Memproses...
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t('common.processing')}
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="w-4 h-4 mr-1" /> Setujui
+                    <CheckCircle className="w-4 h-4 mr-1" /> {t('admin.common.approve')}
                   </>
                 )}
               </Button>
@@ -399,11 +398,11 @@ const ReportReviewPage = () => {
             >
               {actionLoading === 'send' ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Mengirim...
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" /> {t('admin.reports.sending')}
                 </>
               ) : (
                 <>
-                  <Send className="w-4 h-4 mr-1" /> Kirim ke Orang Tua
+                  <Send className="w-4 h-4 mr-1" /> {t('admin.review.sendToParent')}
                 </>
               )}
             </Button>
@@ -414,68 +413,70 @@ const ReportReviewPage = () => {
       <Modal
         open={showApproveConfirm}
         onClose={() => setShowApproveConfirm(false)}
-        title="Setujui Laporan"
+        title={t('admin.review.approveTitle')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowApproveConfirm(false)}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button onClick={onApprove} disabled={actionLoading === 'approve' || !groupCompleted}>
-              {actionLoading === 'approve' ? 'Memproses...' : 'Setujui'}
+              {actionLoading === 'approve' ? t('common.processing') : t('admin.common.approve')}
             </Button>
           </div>
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Setelah disetujui, laporan akan siap dikirim ke orang tua/wali dari{' '}
-          <strong>{participant.child_name}</strong>.
+          <Trans
+            i18nKey="admin.review.approveMsg"
+            values={{ name: participant.child_name }}
+            components={{ strong: <strong /> }}
+          />
         </p>
       </Modal>
 
       <Modal
         open={showSendConfirm}
         onClose={() => setShowSendConfirm(false)}
-        title="Kirim Laporan ke Orang Tua"
+        title={t('admin.review.sendTitle')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowSendConfirm(false)}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button onClick={onSend} disabled={actionLoading === 'send'}>
-              {actionLoading === 'send' ? 'Mengirim...' : 'Kirim'}
+              {actionLoading === 'send' ? t('admin.reports.sending') : t('admin.review.sendBtn')}
             </Button>
           </div>
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Laporan akan dikirim ke orang tua/wali dari <strong>{participant.child_name}</strong>{' '}
-          melalui tautan yang aman. Orang tua akan dapat melihat laporan lengkap beserta misi
-          lanjutan.
+          <Trans
+            i18nKey="admin.review.sendMsg"
+            values={{ name: participant.child_name }}
+            components={{ strong: <strong /> }}
+          />
         </p>
       </Modal>
 
       <Modal
         open={showGenerateConfirm}
         onClose={() => setShowGenerateConfirm(false)}
-        title="Buat Narasi AI"
+        title={t('admin.review.generateNarrative')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowGenerateConfirm(false)}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button onClick={onGenerate} disabled={streaming || actionLoading !== null}>
-              Buat Narasi
+              {t('admin.review.generateNarrativeBtn')}
             </Button>
           </div>
         }
       >
-        <p className="text-sm text-on-surface-variant">
-          Proses ini akan membuat ulang narasi AI. Teks yang sedang diedit akan diganti dengan
-          hasil terbaru.
-        </p>
+        <p className="text-sm text-on-surface-variant">{t('admin.review.generateConfirmMsg')}</p>
       </Modal>
     </div>
   )

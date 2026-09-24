@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { frameService } from '../../../core/services/frames'
 import { ApiError } from '../../../core/services/backend-client'
 import { ROUTES } from '../../../core/constants/app'
+import { i18n } from '../../../core/i18n'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 
 export interface UploadItem {
@@ -75,15 +76,15 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
       files.forEach((file) => {
         const key = `${file.name}-${file.size}`
         if (!ACCEPTED_TYPES.includes(file.type)) {
-          msgs.push(`"${file.name}" bukan file PNG/JPEG.`)
+          msgs.push(i18n.t('admin.frames.warnNotPngJpeg', { name: file.name }))
           return
         }
         if (file.size > MAX_FILE_SIZE) {
-          msgs.push(`"${file.name}" melebihi batas 2 MB.`)
+          msgs.push(i18n.t('admin.frames.warnOversize', { name: file.name }))
           return
         }
         if (existingKeys.has(key) || seenInBatch.has(key)) {
-          msgs.push(`"${file.name}" sudah ada dan dilewati.`)
+          msgs.push(i18n.t('admin.frames.warnDuplicate', { name: file.name }))
           return
         }
         seenInBatch.add(key)
@@ -126,11 +127,11 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (!file) return
       if (!ACCEPTED_TYPES.includes(file.type)) {
-        setWarnings((prev) => [...prev, `"${file.name}" bukan file PNG/JPEG.`])
+        setWarnings((prev) => [...prev, i18n.t('admin.frames.warnNotPngJpeg', { name: file.name })])
         return
       }
       if (file.size > MAX_FILE_SIZE) {
-        setWarnings((prev) => [...prev, `"${file.name}" melebihi batas 2 MB.`])
+        setWarnings((prev) => [...prev, i18n.t('admin.frames.warnOversize', { name: file.name })])
         return
       }
       setItems((prev) =>
@@ -158,7 +159,7 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
     if (items.some((i) => !i.name.trim())) return
 
     if (!tenantId) {
-      setErrorMessage(requiresSelection ? 'Pilih tenant aktif terlebih dahulu.' : 'Tenant belum tersedia.')
+      setErrorMessage(requiresSelection ? i18n.t('admin.frames.selectTenant') : i18n.t('admin.frames.tenantUnavailable'))
       return
     }
 
@@ -180,7 +181,7 @@ export function useFrameUploadQueue(): UseFrameUploadQueueResult {
       navigate(ROUTES.ADMIN.FRAMES)
     } catch (err) {
       setErrorMessage(
-        err instanceof ApiError ? err.message : 'Gagal menyimpan frame. Silakan coba lagi.',
+        err instanceof ApiError ? err.message : i18n.t('admin.frames.saveRetryError'),
       )
     } finally {
       setIsSaving(false)

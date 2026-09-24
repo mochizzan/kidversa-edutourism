@@ -1,4 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../core/utils'
 import { useAuth } from '../../core/hooks/useAuth'
 import { ErrorBoundary } from '../components/feedback/ErrorBoundary'
@@ -15,22 +16,22 @@ import {
 
 const navItems = [
   {
-    label: 'Dashboard',
+    labelKey: 'fasilitator.nav.dashboard',
     path: ROUTES.FASILITATOR.DASHBOARD,
     icon: LayoutDashboard,
   },
   {
-    label: 'Groups',
+    labelKey: 'fasilitator.nav.groups',
     path: ROUTES.FASILITATOR.GROUPS,
     icon: Users,
   },
   {
-    label: 'Camera',
+    labelKey: 'fasilitator.nav.camera',
     path: ROUTES.FASILITATOR.CAMERA,
     icon: Camera,
   },
   {
-    label: 'Profile',
+    labelKey: 'fasilitator.nav.profile',
     path: ROUTES.FASILITATOR.PROFILE,
     icon: User,
   },
@@ -38,6 +39,7 @@ const navItems = [
 
 const FasilitatorLayout = () => {
   const location = useLocation()
+  const { t } = useTranslation()
   const { user } = useAuth()
 
   const userName = user?.name?.split(' ')[0] || 'Fasilitator'
@@ -51,7 +53,7 @@ const FasilitatorLayout = () => {
           <Logo className="w-9 h-9 md:w-10 md:h-10 rounded-lg object-contain shrink-0 shadow-sm" />
           <div className="min-w-0">
             <h1 className="text-sm md:text-base font-bold text-on-surface leading-tight truncate">
-              Hai, {userName}
+              {t('fasilitator.hello', { name: userName })}
             </h1>
             <p className="text-[10px] md:text-[11px] text-on-surface-variant font-normal leading-tight">
               Fasilitator
@@ -63,7 +65,7 @@ const FasilitatorLayout = () => {
           <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-full px-3 py-1.5 text-xs font-semibold text-green-700">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]" />
             <Cloud className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Cloud</span>
+            <span className="hidden sm:inline">{t('fasilitator.cloud')}</span>
           </div>
         </div>
       </header>
@@ -119,7 +121,7 @@ const FasilitatorLayout = () => {
                       : 'text-outline-variant'
                   )}
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </span>
               </Link>
             )

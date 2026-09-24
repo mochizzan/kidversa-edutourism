@@ -85,3 +85,6 @@ tasks/
 tmp/
 # CocoIndex Code (ccc)
 /.cocoindex_code/
+node_modules
+/node_modules
+./node_modules

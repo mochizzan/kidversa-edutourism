@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Users, Calendar } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
 import { liveService } from '../../../core/services/live'
@@ -34,6 +35,7 @@ function SkeletonCard() {
 }
 
 const GroupsPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
@@ -100,7 +102,7 @@ const GroupsPage = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Semua Kelompok" />
+        <PageHeader title={t('fasilitator.groups.pageTitle')} />
         <div className="grid gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <SkeletonCard key={i} />
@@ -114,7 +116,7 @@ const GroupsPage = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Semua Kelompok" />
+        <PageHeader title={t('fasilitator.groups.pageTitle')} />
         <ErrorState message={error} onRetry={fetchData} />
       </div>
     )
@@ -124,11 +126,11 @@ const GroupsPage = () => {
   if (sessions.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Semua Kelompok" />
+        <PageHeader title={t('fasilitator.groups.pageTitle')} />
         <EmptyState
           icon={<Users className="w-12 h-12" />}
-          title="Belum ada kelompok"
-          description="Belum ada sesi aktif dengan kelompok yang tersedia."
+          title={t('fasilitator.groups.emptyTitle')}
+          description={t('fasilitator.groups.emptyDesc')}
         />
       </div>
     )
@@ -136,7 +138,7 @@ const GroupsPage = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Semua Kelompok" />
+      <PageHeader title={t('fasilitator.groups.pageTitle')} />
 
       {sessions.map((session) => {
         const groups = groupsBySession[session.id] || []
@@ -150,7 +152,7 @@ const GroupsPage = () => {
 
             {groups.length === 0 ? (
               <p className="text-sm text-on-surface-variant ml-7">
-                Belum ada kelompok untuk sesi ini.
+                {t('fasilitator.groups.emptySession')}
               </p>
             ) : (
               <div className="grid gap-3 md:grid-cols-2">

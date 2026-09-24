@@ -7,6 +7,7 @@ import { programService } from '../../../core/services/programs'
 import { useLiveSession } from '../../../core/hooks/useLiveSession'
 import { SessionStatus, GroupStageProgressStatus } from '../../../core/types/enums'
 import { ApiError } from '../../../core/services/backend-client'
+import { i18n } from '../../../core/i18n'
 import { redirectToLogin } from '../../../core/stores/authStore'
 import { parentStageId, substagesOfStage } from '../../../core/utils/substage'
 import type { Session, SessionStage, ProgramStage, SessionSubstage } from '../../../core/types'
@@ -102,7 +103,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
         setStageNames({})
       }
     } catch {
-      setError('Gagal memuat data live monitor')
+      setError(i18n.t('admin.live.loadMonitorError'))
     } finally {
       setLoading(false)
     }

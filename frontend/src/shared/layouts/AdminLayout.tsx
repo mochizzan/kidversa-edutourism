@@ -20,8 +20,10 @@ import {
   Layers,
   List,
   ChevronDown,
+  Globe,
 } from 'lucide-react'
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Logo } from '../components/ui/Logo'
 import { ROUTES } from '../../core/constants/app'
 import { cn } from '../../core/utils'
@@ -29,7 +31,8 @@ import { useAuth } from '../../core/hooks/useAuth'
 import { AppHeader } from '../components/layout/AppHeader'
 import { Tooltip } from '../components/ui/Tooltip'
 import { TenantSwitcher } from '../components/ui/TenantSwitcher'
-import { ADMIN_ROUTE_ACCESS, RouteAccess } from '../../core/utils/permissions'
+import { LanguageSwitcherModal } from '../components/ui/LanguageSwitcherModal'
+import { ADMIN_ROUTE_ACCESS } from '../../core/utils/permissions'
 import { UserRole } from '../../core/types/enums'
 import type { ReactNode } from 'react'
 
@@ -50,8 +53,34 @@ const iconByPath: Record<string, ReactNode> = {
   consent: <ShieldCheck className="w-5 h-5" />,
 }
 
+// Sidebar copy lives in the i18n catalog. Keys are looked up by the literal
+// `path` from ADMIN_ROUTE_ACCESS, so a route missing here is a compile error.
+const SIDEBAR_LABEL_KEYS = {
+  dashboard: 'admin.sidebar.dashboard',
+  live: 'admin.sidebar.live',
+  programs: 'admin.sidebar.programs',
+  topics: 'admin.sidebar.topics',
+  activities: 'admin.sidebar.activities',
+  sessions: 'admin.sidebar.sessions',
+  participants: 'admin.sidebar.participants',
+  reports: 'admin.sidebar.reports',
+  missions: 'admin.sidebar.missions',
+  content: 'admin.sidebar.content',
+  frames: 'admin.sidebar.frames',
+  tenants: 'admin.sidebar.tenants',
+  users: 'admin.sidebar.users',
+  consent: 'admin.sidebar.consent',
+} as const
+
+const SECTION_LABEL_KEYS = {
+  OVERVIEW: 'admin.sidebar.sections.overview',
+  PROGRAM: 'admin.sidebar.sections.program',
+  CONTENT: 'admin.sidebar.sections.content',
+  SETTINGS: 'admin.sidebar.sections.settings',
+} as const
+
 interface MenuItem {
-  label: string
+  labelKey: (typeof SIDEBAR_LABEL_KEYS)[keyof typeof SIDEBAR_LABEL_KEYS]
   path: string
   icon: ReactNode
 }
@@ -62,15 +91,17 @@ function isProgramSubPath(pathname: string): boolean {
   return PROGRAM_SUB_PATHS.some((p) => pathname === `/admin/${p}` || pathname.startsWith(`/admin/${p}/`))
 }
 
-const SECTION_ORDER = ['OVERVIEW', 'PROGRAM', 'CONTENT', 'SETTINGS']
+const SECTION_ORDER = ['OVERVIEW', 'PROGRAM', 'CONTENT', 'SETTINGS'] as const
 
-function buildMenuSections(userRole: string | undefined): { section: string; items: MenuItem[] }[] {
+function buildMenuSections(
+  userRole: string | undefined,
+): { section: (typeof SECTION_ORDER)[number]; items: MenuItem[] }[] {
   if (!userRole) return []
   const bySection = new Map<string, MenuItem[]>()
-  ADMIN_ROUTE_ACCESS.forEach((access: RouteAccess) => {
-    if (access.roles.includes(userRole as RouteAccess['roles'][number])) {
+  ADMIN_ROUTE_ACCESS.forEach((access) => {
+    if ((access.roles as readonly UserRole[]).includes(userRole as UserRole)) {
       const item: MenuItem = {
-        label: access.label,
+        labelKey: SIDEBAR_LABEL_KEYS[access.path],
         path: `/admin/${access.path}`,
         icon: iconByPath[access.path],
       }
@@ -89,9 +120,11 @@ const AdminLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [programExpanded, setProgramExpanded] = useState(true)
+  const [langOpen, setLangOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { t } = useTranslation()
 
   if (location.pathname === '/admin') {
     return <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />
@@ -138,7 +171,7 @@ const AdminLayout = () => {
           <button
             onClick={closeDrawer}
             className="lg:hidden shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors -mr-1"
-            aria-label="Tutup sidebar"
+            aria-label={t('admin.sidebar.closeMobile')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -149,6 +182,18 @@ const AdminLayout = () => {
             <TenantSwitcher />
           </div>
         )}
+
+        <div className="px-3 py-2 border-b border-outline-variant">
+          <Tooltip content={isCollapsed ? t('admin.sidebar.language') : ''}>
+            <button type="button" onClick={() => setLangOpen(true)} aria-label={t('admin.sidebar.language')}
+              className={cn('flex items-center py-3 rounded-xl transition-all duration-200 w-full text-on-surface-variant hover:bg-surface-container',
+                isCollapsed ? 'px-[18px] justify-center' : 'px-3')}>
+              <Globe className="w-5 h-5 shrink-0" />
+              <span className={cn('text-sm truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
+                isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3')}>{t('admin.sidebar.language')}</span>
+            </button>
+          </Tooltip>
+        </div>
 
         <nav className="flex-1 overflow-y-auto p-3">
           {visibleSections.map((section) => {
@@ -165,7 +210,7 @@ const AdminLayout = () => {
                     isCollapsed ? 'max-h-0 opacity-0 mb-0 py-0' : 'max-h-8 opacity-100 mb-2'
                   )}
                 >
-                  {section.section}
+                  {t(SECTION_LABEL_KEYS[section.section])}
                 </h3>
                 <div className="flex flex-col gap-1">
                   {isProgram && programItems.length > 0 && (
@@ -183,7 +228,7 @@ const AdminLayout = () => {
                         >
                           <span className="flex items-center gap-3">
                             <FolderOpen className="w-5 h-5" />
-                            <span className="text-sm font-medium">Program</span>
+                            <span className="text-sm font-medium">{t('admin.sidebar.programGroup')}</span>
                           </span>
                           <ChevronDown className={cn('w-4 h-4 transition-transform duration-200', expanded ? 'rotate-180' : '')} />
                         </button>
@@ -191,7 +236,7 @@ const AdminLayout = () => {
                       {(isCollapsed || expanded) && programItems.map((item) => {
                         const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
                         return (
-                          <Tooltip key={item.path} content={isCollapsed ? item.label : ''}>
+                          <Tooltip key={item.path} content={isCollapsed ? t(item.labelKey) : ''}>
                             <Link
                               to={item.path}
                               onClick={closeDrawer}
@@ -207,7 +252,7 @@ const AdminLayout = () => {
                               <span className={cn(
                                 'text-sm truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
                                 isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
-                              )}>{item.label}</span>
+                              )}>{t(item.labelKey)}</span>
                             </Link>
                           </Tooltip>
                         )
@@ -218,7 +263,7 @@ const AdminLayout = () => {
                   {otherItems.map((item) => {
                     const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/')
                     return (
-                      <Tooltip key={item.path} content={isCollapsed ? item.label : ''}>
+                      <Tooltip key={item.path} content={isCollapsed ? t(item.labelKey) : ''}>
                         <Link
                           to={item.path}
                           onClick={closeDrawer}
@@ -234,7 +279,7 @@ const AdminLayout = () => {
                           <span className={cn(
                             'text-sm truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
                             isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
-                          )}>{item.label}</span>
+                          )}>{t(item.labelKey)}</span>
                         </Link>
                       </Tooltip>
                     )
@@ -247,7 +292,7 @@ const AdminLayout = () => {
 
         <div className="p-3 border-t border-outline-variant shrink-0">
           <div className="flex flex-col gap-1">
-            <Tooltip content={isCollapsed ? 'Perluas Sidebar' : ''}>
+            <Tooltip content={isCollapsed ? t('admin.sidebar.expand') : ''}>
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                 className={cn(
@@ -264,11 +309,11 @@ const AdminLayout = () => {
                   'truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
                   isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
                 )}>
-                  {isCollapsed ? 'Perluas Sidebar' : 'Tutup Sidebar'}
+                  {isCollapsed ? t('admin.sidebar.expand') : t('admin.sidebar.collapse')}
                 </span>
               </button>
             </Tooltip>
-            <Tooltip content={isCollapsed ? 'Keluar' : ''}>
+            <Tooltip content={isCollapsed ? t('admin.sidebar.logout') : ''}>
               <button
                 onClick={handleLogout}
                 className={cn(
@@ -281,7 +326,7 @@ const AdminLayout = () => {
                   'truncate transition-all duration-200 overflow-hidden whitespace-nowrap',
                   isCollapsed ? 'max-w-0 opacity-0 ml-0' : 'max-w-[200px] opacity-100 ml-3'
                 )}>
-                  Keluar
+                  {t('admin.sidebar.logout')}
                 </span>
               </button>
             </Tooltip>
@@ -299,6 +344,7 @@ const AdminLayout = () => {
           </div>
         </main>
       </div>
+      <LanguageSwitcherModal open={langOpen} onClose={() => setLangOpen(false)} />
     </div>
   )
 }

@@ -9,6 +9,7 @@ import { getContentThumbnailSrc } from '../../../core/utils/content'
 import { getActiveTenantId } from '../../../core/utils/tenant'
 import { STAGE_CONTENT_FILE_TYPE_LABELS, YOUTUBE_LABEL } from '../../../core/constants/labels'
 import { Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface ContentPickerModalProps {
   open: boolean
@@ -18,6 +19,7 @@ interface ContentPickerModalProps {
 }
 
 const ContentPickerModal = ({ open, stageId: _stageId, onClose, onPicked }: ContentPickerModalProps) => {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [contents, setContents] = useState<Content[]>([])
   const [search, setSearch] = useState('')
@@ -45,10 +47,10 @@ const ContentPickerModal = ({ open, stageId: _stageId, onClose, onPicked }: Cont
   const tenantId = getActiveTenantId() ?? undefined
 
   return (
-    <Modal open={open} onClose={onClose} title="Pilih Konten dari Perpustakaan" size="lg">
+    <Modal open={open} onClose={onClose} title={t('admin.content.pickerTitle')} size="lg">
       <div className="space-y-3">
         <Input
-          placeholder="Cari konten..."
+          placeholder={t('admin.content.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -59,7 +61,7 @@ const ContentPickerModal = ({ open, stageId: _stageId, onClose, onPicked }: Cont
           </div>
         ) : contents.length === 0 ? (
           <p className="text-sm text-on-surface-variant text-center py-10">
-            Tidak ada konten yang cocok.
+            {t('admin.content.pickerEmpty')}
           </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto pr-1">
@@ -80,7 +82,7 @@ const ContentPickerModal = ({ open, stageId: _stageId, onClose, onPicked }: Cont
                     ) : thumbnail.type === 'video' && thumbnail.src ? (
                       <video src={thumbnail.src} className="w-full h-full object-cover" preload="metadata" muted />
                     ) : (
-                      <span className="text-xs text-on-surface-variant">No Preview</span>
+                      <span className="text-xs text-on-surface-variant">{t('admin.content.noPreview')}</span>
                     )}
                   </div>
                   <div className="p-2">
@@ -90,7 +92,7 @@ const ContentPickerModal = ({ open, stageId: _stageId, onClose, onPicked }: Cont
                     <p className="text-xs text-on-surface-variant">
                       {isYouTube
                         ? YOUTUBE_LABEL
-                        : STAGE_CONTENT_FILE_TYPE_LABELS[item.file_type]}
+                        : t(STAGE_CONTENT_FILE_TYPE_LABELS[item.file_type])}
                     </p>
                   </div>
                 </button>
@@ -101,7 +103,7 @@ const ContentPickerModal = ({ open, stageId: _stageId, onClose, onPicked }: Cont
 
         <div className="flex justify-end pt-2">
           <Button variant="secondary" onClick={onClose}>
-            Batal
+            {t('common.cancel')}
           </Button>
         </div>
       </div>

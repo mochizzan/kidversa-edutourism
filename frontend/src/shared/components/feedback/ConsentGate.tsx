@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Camera } from 'lucide-react'
 import { cn } from '../../../core/utils'
 
@@ -12,10 +13,9 @@ interface ConsentGateProps {
 
 const cfg = {
   icon: Camera,
-  title: 'Izin Foto Diperlukan',
-  description: 'Orang tua/wali belum memberikan izin untuk mengambil foto',
-  detail:
-    'Pengambilan foto tidak dapat dilakukan tanpa persetujuan dari orang tua atau wali.',
+  titleKey: 'common.consent.title',
+  descriptionKey: 'common.consent.description',
+  detailKey: 'common.consent.detail',
 } as const
 
 export function ConsentGate({
@@ -25,6 +25,8 @@ export function ConsentGate({
   children,
   className,
 }: ConsentGateProps) {
+  const { t } = useTranslation()
+
   if (hasConsent) {
     return <>{children}</>
   }
@@ -46,17 +48,17 @@ export function ConsentGate({
         <div className="flex items-center justify-center gap-2 mb-3">
           <Icon className="w-5 h-5 text-amber-500 shrink-0" />
           <h3 className="text-lg font-semibold text-on-surface">
-            {cfg.title}
+            {t(cfg.titleKey)}
           </h3>
         </div>
 
         <p className="text-sm text-on-surface-variant mb-1">
-          {cfg.description}{' '}
+          {t(cfg.descriptionKey)}{' '}
           <span className="font-medium text-on-surface">{childName}</span>.
         </p>
 
         <p className="text-xs text-on-surface-variant mb-8">
-          {cfg.detail}
+          {t(cfg.detailKey)}
         </p>
 
         {onBack && (
@@ -64,7 +66,7 @@ export function ConsentGate({
             onClick={onBack}
             className="px-6 py-2.5 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
-            Kembali
+            {t('common.consent.back')}
           </button>
         )}
       </div>

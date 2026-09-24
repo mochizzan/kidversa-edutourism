@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { AlertCircle, RefreshCw } from 'lucide-react'
+import { i18n } from '../../../core/i18n'
 
 interface Props {
   children: ReactNode
@@ -28,13 +29,13 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex flex-col items-center justify-center p-8 text-center min-h-[300px]">
           <AlertCircle className="w-12 h-12 text-error mb-4" />
-          <h2 className="text-lg font-semibold text-on-surface mb-2">Terjadi Kesalahan</h2>
+          <h2 className="text-lg font-semibold text-on-surface mb-2">{i18n.t('common.error.title')}</h2>
           <p className="text-sm text-on-surface-variant mb-4">{this.state.error?.message}</p>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary-dark transition-colors"
           >
-            <RefreshCw className="w-4 h-4" /> Coba Lagi
+            <RefreshCw className="w-4 h-4" /> {i18n.t('common.error.retry')}
           </button>
         </div>
       )

@@ -12,6 +12,8 @@ import { cn } from '../../../core/utils'
 import { apiRequest } from '../../../core/services/backend-client'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { zEmail, zPassword } from '../../../core/utils/validation'
+import { i18n } from '../../../core/i18n'
+import { useTranslation } from 'react-i18next'
 import type { Tenant } from '../../../core/types'
 import { WizardTimeline } from '../components/WizardTimeline'
 import { RegisterStepName } from '../components/RegisterStepName'
@@ -22,25 +24,25 @@ import { Logo } from '../../../shared/components/ui/Logo'
 
 export const registerSchema = z
   .object({
-    name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
+    name: z.string().min(2, { error: () => ({ message: i18n.t('validation.nameMin') }) }).max(100, { error: () => ({ message: i18n.t('validation.nameMax') }) }),
     email: zEmail({ required: true }),
     password: zPassword,
     confirmPassword: z.string(),
-    tenant_id: z.string().min(1, 'Pilih cabang/tenant'),
-    role: z.enum([UserRole.ADMIN, UserRole.KOORDINATOR, UserRole.FASILITATOR], { message: 'Pilih peran yang valid' }),
-    terms: z.literal(true, { message: 'Wajib menyetujui syarat & ketentuan' }),
+    tenant_id: z.string().min(1, { error: () => ({ message: i18n.t('validation.tenantRequired') }) }),
+    role: z.enum([UserRole.ADMIN, UserRole.KOORDINATOR, UserRole.FASILITATOR], { error: () => ({ message: i18n.t('validation.roleInvalid') }) }),
+    terms: z.literal(true, { error: () => ({ message: i18n.t('validation.termsRequired') }) }),
     honeypot: z.string().max(0).optional().or(z.literal('')),
   })
-  .refine((d) => d.password === d.confirmPassword, { message: 'Password tidak cocok', path: ['confirmPassword'] })
+  .refine((d) => d.password === d.confirmPassword, { error: () => ({ message: i18n.t('validation.confirmMismatch') }), path: ['confirmPassword'] })
 
 type RegisterFormData = z.infer<typeof registerSchema>
 
 // ── Steps ──
 const STEPS = [
-  { label: 'Nama', desc: 'Masukkan nama lengkap Anda' },
-  { label: 'Email', desc: 'Email yang aktif digunakan' },
-  { label: 'Password', desc: 'Minimal 8 karakter, ada huruf besar, kecil & angka' },
-  { label: 'Daftar', desc: 'Lengkapi data terakhir' },
+  { labelKey: 'auth.register.stepName', descKey: 'auth.register.stepNameDesc' },
+  { labelKey: 'auth.register.stepEmail', descKey: 'auth.register.stepEmailDesc' },
+  { labelKey: 'auth.register.stepPassword', descKey: 'auth.register.stepPasswordDesc' },
+  { labelKey: 'auth.register.stepConfirm', descKey: 'auth.register.stepConfirmDesc' },
 ] as const
 
 const RegisterPage = () => {
@@ -53,6 +55,8 @@ const RegisterPage = () => {
 
   const navigate = useNavigate()
   const { register: registerUser } = useAuth()
+  const { t } = useTranslation()
+  const steps = STEPS.map((s) => ({ label: t(s.labelKey), desc: t(s.descKey) }))
 
   const {
     register,
@@ -96,7 +100,7 @@ const RegisterPage = () => {
     try {
       await registerUser({ tenant_id: data.tenant_id, email: data.email, password: data.password, role: data.role, name: data.name })
       setIsSuccess(true)
-      setTimeout(() => navigate(ROUTES.AUTH.LOGIN, { replace: true, state: { message: 'Registrasi berhasil! Akun Anda menunggu persetujuan admin.' } }), 2000)
+      setTimeout(() => navigate(ROUTES.AUTH.LOGIN, { replace: true, state: { message: t('auth.register.successMessage') } }), 2000)
     } catch (err) {
       setGeneralError(friendlyError(err))
     }
@@ -109,8 +113,8 @@ const RegisterPage = () => {
         <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
           <Check className="w-8 h-8 text-green-600" />
         </div>
-        <h2 className="text-xl font-bold text-on-surface mb-1">Registrasi Berhasil!</h2>
-        <p className="text-sm text-on-surface-variant/60 text-center max-w-[280px]">Akun Anda sedang menunggu persetujuan admin. Anda akan diarahkan ke halaman login…</p>
+        <h2 className="text-xl font-bold text-on-surface mb-1">{t('auth.register.successTitle')}</h2>
+        <p className="text-sm text-on-surface-variant/60 text-center max-w-[280px]">{t('auth.register.successDesc')}</p>
       </div>
     )
   }
@@ -122,8 +126,8 @@ const RegisterPage = () => {
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-dark shadow-lg shadow-primary/25 flex items-center justify-center mb-3">
           <Logo alt="Kidversa" className="w-8 h-8 object-contain" />
         </div>
-        <h2 className="text-xl font-bold text-on-surface tracking-tight text-center">Buat Akun Baru</h2>
-        <p className="text-sm text-on-surface-variant/60 mt-1.5 text-center max-w-[240px] leading-relaxed">{STEPS[step].desc}</p>
+        <h2 className="text-xl font-bold text-on-surface tracking-tight text-center">{t('auth.register.title')}</h2>
+        <p className="text-sm text-on-surface-variant/60 mt-1.5 text-center max-w-[240px] leading-relaxed">{steps[step].desc}</p>
       </div>
 
       {/* ── Error ── */}
@@ -134,7 +138,7 @@ const RegisterPage = () => {
         </div>
       )}
 
-      <WizardTimeline steps={STEPS} currentStep={step} />
+      <WizardTimeline steps={steps} currentStep={step} />
 
       {/* ── Step content ── */}
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -177,8 +181,8 @@ const RegisterPage = () => {
             )}
           >
             {isSubmitting ? (
-              <><div className="animate-spin rounded-full h-4 w-4 border-2 border-on-primary border-t-transparent" /><span>Memproses…</span></>
-            ) : 'Daftar'}
+              <><div className="animate-spin rounded-full h-4 w-4 border-2 border-on-primary border-t-transparent" /><span>{t('auth.form.processing')}</span></>
+            ) : t('common.signUp')}
           </button>
         )}
 
@@ -195,7 +199,7 @@ const RegisterPage = () => {
                 'disabled:opacity-50 disabled:cursor-not-allowed',
               )}
             >
-              <ChevronLeft className="w-4 h-4" /> Kembali
+              <ChevronLeft className="w-4 h-4" /> {t('common.back')}
             </button>
           )}
           {step < STEPS.length - 1 && (
@@ -209,7 +213,7 @@ const RegisterPage = () => {
                 'active:scale-[0.98] active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed',
               )}
             >
-              Lanjut <ChevronRight className="w-4 h-4" />
+              {t('auth.register.next')} <ChevronRight className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -217,8 +221,8 @@ const RegisterPage = () => {
 
       {/* ── Login link ── */}
       <p className="mt-6 text-center text-sm text-on-surface-variant/50">
-        Sudah punya akun?{' '}
-        <Link to={ROUTES.AUTH.LOGIN} className="text-primary font-semibold hover:text-primary-dark transition-colors">Masuk</Link>
+        {t('auth.register.haveAccount')}{' '}
+        <Link to={ROUTES.AUTH.LOGIN} className="text-primary font-semibold hover:text-primary-dark transition-colors">{t('common.signIn')}</Link>
       </p>
     </>
   )

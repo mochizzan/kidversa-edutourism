@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { i18n } from '../../../core/i18n'
 import { sessionService } from '../../../core/services/sessions'
 import { assessmentService } from '../../../core/services/assessments'
 import { attendanceService } from '../../../core/services/attendance'
@@ -198,7 +199,7 @@ export function useChildAssessment(childId: string | undefined, sessionId?: stri
       }
 
       if (!detail) {
-        setError('Data anak tidak ditemukan')
+        setError(i18n.t('fasilitator.assessment.childNotFound'))
         return
       }
       setChildDetail(detail)

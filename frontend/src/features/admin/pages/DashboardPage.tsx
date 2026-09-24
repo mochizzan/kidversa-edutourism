@@ -21,6 +21,8 @@ import {
   wibDateKey,
 } from '../utils/analytics'
 import { FETCH_ALL_LIMIT } from '../../../core/constants/api'
+import { i18n } from '../../../core/i18n'
+import { useTranslation } from 'react-i18next'
 import { programService } from '../../../core/services/programs'
 import { sessionService } from '../../../core/services/sessions'
 import { participantService } from '../../../core/services/participants'
@@ -65,6 +67,7 @@ const roleLabels: Record<string, string> = {
 }
 
 const DashboardPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTab>('summary')
   const [loading, setLoading] = useState(true)
@@ -195,7 +198,7 @@ const DashboardPage = () => {
           activityList.push({
             id: `session-${s.id}`,
             type: 'session_created',
-            title: 'Sesi Baru Dibuat',
+            title: t('admin.dashboard.activity.sessionCreated'),
             description: s.name,
             timestamp: s.created_at,
             icon: Calendar,
@@ -208,8 +211,8 @@ const DashboardPage = () => {
           activityList.push({
             id: `active-session`,
             type: 'session_active',
-            title: 'Sesi Sedang Berlangsung',
-            description: `${active.length} sesi aktif`,
+            title: t('admin.dashboard.activity.sessionActive'),
+            description: t('admin.dashboard.activity.activeCount', { count: active.length }),
             timestamp: new Date().toISOString(),
             icon: Play,
             color: 'text-green-600 bg-green-100',
@@ -221,8 +224,8 @@ const DashboardPage = () => {
           activityList.push({
             id: `pending-reports`,
             type: 'reports_pending',
-            title: 'Laporan Perlu Review',
-            description: `${pendingReportsCount} laporan menunggu persetujuan`,
+            title: t('admin.dashboard.activity.reportsPending'),
+            description: t('admin.dashboard.activity.pendingCount', { count: pendingReportsCount }),
             timestamp: new Date().toISOString(),
             icon: FileText,
             color: 'text-purple-600 bg-purple-100',
@@ -245,7 +248,7 @@ const DashboardPage = () => {
   const sessionCards = activeSessions.map((session) => ({
     id: session.id,
     name: session.name,
-    programName: programNames[session.program_id] ?? 'Program tidak ditemukan',
+    programName: programNames[session.program_id] ?? t('admin.dashboard.programMissing'),
     status: session.status,
     statusLabel: statusLabels[session.status] || session.status,
     sessionDate: session.session_date,
@@ -260,7 +263,7 @@ const DashboardPage = () => {
     avatar: user.avatar_url,
   }))
 
-  const rangeText = dateRange === 'all' ? 'semua waktu' : `${dateRange} hari terakhir`
+  const rangeText = dateRange === 'all' ? t('admin.dashboard.rangeAll') : t('admin.dashboard.rangeDays', { count: Number(dateRange) })
   const now = new Date()
 
   const passesProgramStatus = (s: Session) =>
@@ -372,11 +375,11 @@ const DashboardPage = () => {
     const diffHours = Math.floor(diffMins / 60)
     const diffDays = Math.floor(diffHours / 24)
 
-    if (diffMins < 1) return 'Baru saja'
-    if (diffMins < 60) return `${diffMins} menit lalu`
-    if (diffHours < 24) return `${diffHours} jam lalu`
-    if (diffDays < 7) return `${diffDays} hari lalu`
-    return date.toLocaleDateString('id-ID')
+    if (diffMins < 1) return t('admin.dashboard.timeAgo.justNow')
+    if (diffMins < 60) return t('admin.dashboard.timeAgo.minutes', { count: diffMins })
+    if (diffHours < 24) return t('admin.dashboard.timeAgo.hours', { count: diffHours })
+    if (diffDays < 7) return t('admin.dashboard.timeAgo.days', { count: diffDays })
+    return date.toLocaleDateString(i18n.resolvedLanguage ?? 'id')
   }
 
   return (
@@ -385,8 +388,8 @@ const DashboardPage = () => {
         activeKey={activeDashboardTab}
         onChange={(key) => setActiveDashboardTab(key as DashboardTab)}
         tabs={[
-          { key: 'summary', label: 'Ringkasan' },
-          { key: 'analytics', label: 'Analitik', icon: <BarChart3 className="w-4 h-4" /> },
+          { key: 'summary', label: t('admin.dashboard.tabSummary') },
+          { key: 'analytics', label: t('admin.dashboard.tabAnalytics'), icon: <BarChart3 className="w-4 h-4" /> },
         ]}
       />
 
@@ -401,31 +404,31 @@ const DashboardPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <CategoryCard
                 icon={FolderOpen}
-                title={loading ? '...' : `${stats.totalPrograms} Program`}
-                subtitle="Total program"
+                title={loading ? '...' : t('admin.dashboard.cat.programs', { count: stats.totalPrograms })}
+                subtitle={t('admin.dashboard.cat.programsSub')}
                 iconBg="bg-primary-container text-primary"
                 onClick={() => navigate(ROUTES.ADMIN.PROGRAMS)}
               />
               <CategoryCard
                 icon={Calendar}
-                title={loading ? '...' : `${stats.activeSessions} Sesi`}
-                subtitle="Sesi aktif"
+                title={loading ? '...' : t('admin.dashboard.cat.sessions', { count: stats.activeSessions })}
+                subtitle={t('admin.dashboard.cat.sessionsSub')}
                 iconBg="bg-secondary-container text-secondary"
                 onClick={() => navigate(ROUTES.ADMIN.SESSIONS)}
               />
               <CategoryCard
                 icon={Users}
-                title={loading ? '...' : `${stats.totalParticipants} Peserta`}
-                subtitle="Total peserta"
+                title={loading ? '...' : t('admin.dashboard.cat.participants', { count: stats.totalParticipants })}
+                subtitle={t('admin.dashboard.cat.participantsSub')}
                 iconBg="bg-tertiary-container text-tertiary"
                 onClick={() => navigate(ROUTES.ADMIN.PARTICIPANTS)}
               />
             </div>
 
-            {sessionCards.length > 0 && <SessionCarousel sessions={sessionCards} title="Sesi Aktif" />}
+            {sessionCards.length > 0 && <SessionCarousel sessions={sessionCards} title={t('admin.dashboard.activeSessionsTitle')} />}
 
             <div className="bg-surface rounded-3xl p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-on-surface mb-4">Aktivitas Terbaru</h2>
+              <h2 className="text-lg font-bold text-on-surface mb-4">{t('admin.dashboard.latestActivity')}</h2>
 
               {loading ? (
                 <div className="space-y-4">
@@ -440,7 +443,7 @@ const DashboardPage = () => {
                   ))}
                 </div>
               ) : activities.length === 0 ? (
-                <p className="text-on-surface-variant text-sm py-4">Belum ada aktivitas terbaru</p>
+                <p className="text-on-surface-variant text-sm py-4">{t('admin.dashboard.noActivity')}</p>
               ) : (
                 <div className="space-y-3">
                   {activities.map((activity) => {
@@ -487,33 +490,33 @@ const DashboardPage = () => {
             <KpiCard
               icon={<Users className="w-5 h-5" />}
               value={registeredInRange.length}
-              label="Pendaftar"
-              subtitle={`Dibuat dalam ${rangeText}`}
+              label={t('admin.dashboard.kpi.registrants')}
+              subtitle={t('admin.dashboard.kpi.registrantsSub', { range: rangeText })}
               accent="purple"
             />
             <KpiCard
               icon={<Calendar className="w-5 h-5" />}
               value={activeInFiltered}
-              label="Sesi Aktif"
-              subtitle={`Status aktif dalam ${rangeText}`}
+              label={t('admin.dashboard.activeSessionsTitle')}
+              subtitle={t('admin.dashboard.kpi.activeSub', { range: rangeText })}
               accent="amber"
             />
             <KpiCard
               icon={<Star className="w-5 h-5" />}
               value={avgRating}
-              label="Rata-rata Penilaian"
+              label={t('admin.dashboard.kpi.avgLabel')}
               subtitle={
                 ratedAssessments.length > 0
-                  ? `Rata-rata 1–5 ★ dari ${ratedAssessments.length} penilaian`
-                  : 'Belum ada penilaian'
+                  ? t('admin.dashboard.kpi.avgSub', { count: ratedAssessments.length })
+                  : t('admin.dashboard.kpi.avgEmpty')
               }
               accent="green"
             />
             <KpiCard
               icon={<FileText className="w-5 h-5" />}
               value={reportCountsByStatus.find((r) => r.status === ReportStatus.SENT)?.count ?? 0}
-              label="Laporan Terkirim"
-              subtitle={`Dari ${filteredReports.length} laporan sesi terfilter`}
+              label={t('admin.dashboard.kpi.sentLabel')}
+              subtitle={t('admin.dashboard.kpi.sentSub', { count: filteredReports.length })}
               accent="purple"
             />
           </div>

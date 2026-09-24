@@ -1,4 +1,5 @@
 import { Star, Camera, CheckCircle, XCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 
 interface ChildListItemProps {
@@ -28,6 +29,7 @@ export function ChildListItem({
   onPhoto,
   className,
 }: ChildListItemProps) {
+  const { t } = useTranslation()
   return (
     <div
       className={cn(
@@ -45,7 +47,7 @@ export function ChildListItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-on-surface text-sm">{name}</span>
-          <span className="text-xs text-on-surface-variant">{age} tahun</span>
+          <span className="text-xs text-on-surface-variant">{t('fasilitator.child.years', { age })}</span>
         </div>
         {school && (
           <p className="text-xs text-on-surface-variant/70 mt-0.5">{school}</p>
@@ -55,17 +57,17 @@ export function ChildListItem({
             isAssessed ? (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
                 <Star className="w-3 h-3 fill-current" />
-                Sudah dinilai
+                {t('fasilitator.child.assessed')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
                 <Star className="w-3 h-3" />
-                Belum dinilai
+                {t('fasilitator.child.notAssessed')}
               </span>
             )
           ) : (
             <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-              Tidak hadir
+              {t('fasilitator.child.absent')}
             </span>
           )}
         </div>
@@ -86,7 +88,7 @@ export function ChildListItem({
             )}
           >
             {isPresent ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            <span className="hidden sm:inline">{isPresent ? 'Hadir' : 'Tidak Hadir'}</span>
+            <span className="hidden sm:inline">{isPresent ? t('fasilitator.child.present') : t('fasilitator.child.notPresent')}</span>
           </button>
         )}
         {onAssess && (
@@ -100,14 +102,14 @@ export function ChildListItem({
             )}
           >
             <Star className="w-4 h-4" />
-            <span className="hidden sm:inline">Nilai</span>
+            <span className="hidden sm:inline">{t('fasilitator.child.rate')}</span>
           </button>
         )}
         {showPhoto && onPhoto && (
           <button
             onClick={(e) => { e.stopPropagation(); onPhoto() }}
             className="flex items-center justify-center w-10 h-10 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
-            aria-label="Ambil Foto"
+            aria-label={t('fasilitator.takePhoto')}
           >
             <Camera className="w-4 h-4" />
           </button>

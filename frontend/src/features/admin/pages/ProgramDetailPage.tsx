@@ -12,8 +12,10 @@ import { formatDate } from '../../../shared/utils'
 import { ROUTES, topicListPath, topicNewPath, programListPath } from '../../../core/constants/app'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { ProgramInfoTab } from '../components/ProgramInfoTab'
+import { useTranslation } from 'react-i18next'
 
 const ProgramDetailPage = () => {
+  const { t } = useTranslation()
   const { programId } = useParams<{ programId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -47,7 +49,7 @@ const ProgramDetailPage = () => {
   }, [programId, addToast])
 
   if (loading) return <div className="flex items-center justify-center h-64">Loading...</div>
-  if (!program) return <div className="text-center text-on-surface-variant">Program not found</div>
+  if (!program) return <div className="text-center text-on-surface-variant">{t('admin.programs.notFound')}</div>
 
   const showTopicCta = stages.length === 0 || (location.state as { fromCreate?: boolean } | null)?.fromCreate
 
@@ -55,8 +57,8 @@ const ProgramDetailPage = () => {
     <div className="space-y-6">
       <PageHeader
         title={program.name}
-        subtitle={`Dibuat ${formatDate(program.created_at)}`}
-        breadcrumbs={[{ label: 'Programs', href: programListPath() }, { label: program.name }]}
+        subtitle={t('admin.programs.createdLine', { date: formatDate(program.created_at) })}
+        breadcrumbs={[{ label: t('admin.sidebar.programs'), href: programListPath() }, { label: program.name }]}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -65,7 +67,7 @@ const ProgramDetailPage = () => {
               icon={<Pencil className="w-4 h-4" />}
               onClick={() => navigate(`${ROUTES.ADMIN.PROGRAMS}/${program.id}/edit`)}
             >
-              Edit Program
+              {t('admin.programs.editTitle')}
             </Button>
             <Button
               variant="secondary"
@@ -73,10 +75,10 @@ const ProgramDetailPage = () => {
               icon={<Layers className="w-4 h-4" />}
               onClick={() => navigate(topicListPath({ programId: program.id }))}
             >
-              Lihat Semua Topik
+              {t('admin.topic.viewAll')}
             </Button>
             <Badge variant={program.is_active ? 'success' : 'neutral'}>
-              {program.is_active ? 'Aktif' : 'Nonaktif'}
+              {program.is_active ? t('admin.status.active') : t('admin.status.inactive')}
             </Badge>
           </div>
         }
@@ -87,19 +89,19 @@ const ProgramDetailPage = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-2">
             <div>
               <h3 className="text-sm font-semibold text-on-primary-container">
-                {stages.length === 0 ? 'Program ini belum memiliki topik' : 'Program berhasil dibuat'}
+                {stages.length === 0 ? t('admin.programs.noTopicTitle') : t('admin.programs.createdToast')}
               </h3>
               <p className="text-sm text-on-primary-container/80">
                 {stages.length === 0
-                  ? 'Tambahkan topik pertama untuk memulai perjalanan edutourism.'
-                  : 'Sekarang tambahkan topik pertama untuk melengkapi program.'}
+                  ? t('admin.programs.noTopicDesc')
+                  : t('admin.programs.createdDesc')}
               </p>
             </div>
             <Button
               icon={<Plus className="w-4 h-4" />}
               onClick={() => navigate(topicNewPath({ programId: program.id }))}
             >
-              Tambah Topik
+              {t('admin.topic.add')}
             </Button>
           </div>
         </Card>

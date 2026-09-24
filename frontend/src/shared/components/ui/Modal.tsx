@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '../../../core/utils'
@@ -15,6 +16,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, size = 'md', children, footer, closeOnOverlay = true }: ModalProps) {
+  const { t } = useTranslation()
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,10 +49,10 @@ export function Modal({ open, onClose, title, size = 'md', children, footer, clo
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
           <h3 id="modal-title" className="text-lg font-semibold text-on-surface">{title}</h3>
-          <Tooltip content="Tutup">
+          <Tooltip content={t('common.close')}>
             <button
               onClick={onClose}
-              aria-label="Close dialog"
+              aria-label={t('common.closeDialog')}
               className="p-1 text-on-surface-variant hover:text-on-surface rounded-lg hover:bg-surface-container transition-colors"
             >
               <X className="w-5 h-5" />

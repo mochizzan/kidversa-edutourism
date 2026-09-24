@@ -51,28 +51,29 @@ export function getApprovalNotificationRoles(): UserRole[] {
 
 export interface RouteAccess {
   path: string
-  label: string
-  roles: UserRole[]
-  tenantFree?: boolean
+  roles: readonly UserRole[]
   section: string
+  tenantFree?: boolean
 }
 
-export const ADMIN_ROUTE_ACCESS: RouteAccess[] = [
-  { path: 'dashboard', section: 'OVERVIEW', label: 'Dashboard', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'live', section: 'OVERVIEW', label: 'Live Monitor', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'programs', section: 'PROGRAM', label: 'Daftar Program', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'topics', section: 'PROGRAM', label: 'Daftar Topik', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'activities', section: 'PROGRAM', label: 'Daftar Kegiatan', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'sessions', section: 'PROGRAM', label: 'Sessions', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'participants', section: 'PROGRAM', label: 'Peserta', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'reports', section: 'PROGRAM', label: 'Reports', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  { path: 'missions', section: 'PROGRAM', label: 'Missions', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-  { path: 'content', section: 'CONTENT', label: 'Content Manager', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-  { path: 'frames', section: 'CONTENT', label: 'Frame Manager', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-  { path: 'tenants', section: 'SETTINGS', label: 'Tenants', roles: [UserRole.SUPER_ADMIN], tenantFree: true },
-  { path: 'users', section: 'SETTINGS', label: 'Users', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
-  { path: 'consent', section: 'SETTINGS', label: 'Consent Monitor', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-]
+// Literal `as const` gives `path`/`section` a literal union so AdminLayout can
+// index its sidebar label-key maps with compile-time missing-key detection.
+export const ADMIN_ROUTE_ACCESS = [
+  { path: 'dashboard', section: 'OVERVIEW', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'live', section: 'OVERVIEW', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'programs', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'topics', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'activities', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'sessions', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'participants', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'reports', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'missions', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+  { path: 'content', section: 'CONTENT', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { path: 'frames', section: 'CONTENT', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { path: 'tenants', section: 'SETTINGS', roles: [UserRole.SUPER_ADMIN] },
+  { path: 'users', section: 'SETTINGS', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+  { path: 'consent', section: 'SETTINGS', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
+] as const
 
 export function getRouteAccess(segment: string): RouteAccess | undefined {
   return ADMIN_ROUTE_ACCESS.find((r) => r.path === segment)

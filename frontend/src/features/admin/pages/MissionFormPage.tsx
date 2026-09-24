@@ -12,8 +12,10 @@ import { programService } from '../../../core/services/programs'
 import type { Program, ProgramStage } from '../../../core/types'
 import { cn } from '../../../core/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { useTranslation } from 'react-i18next'
 
 const MissionFormPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { missionId } = useParams()
   const { addToast } = useGlobalToast()
@@ -74,7 +76,7 @@ const MissionFormPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.program_id || !form.title) {
-      addToast({ type: 'error', message: 'Lengkapi semua field yang wajib' })
+      addToast({ type: 'error', message: t('admin.common.fillRequired') })
       return
     }
 
@@ -86,14 +88,14 @@ const MissionFormPage = () => {
           title: form.title,
           related_stage_ids: selectedStages.length > 0 ? selectedStages : undefined,
         })
-        addToast({ type: 'success', message: 'Misi berhasil diperbarui' })
+        addToast({ type: 'success', message: t('admin.missions.updatedToast') })
       } else {
         await missionService.create({
           program_id: form.program_id,
           title: form.title,
           related_stage_ids: selectedStages.length > 0 ? selectedStages : undefined,
         })
-        addToast({ type: 'success', message: 'Misi baru berhasil ditambahkan' })
+        addToast({ type: 'success', message: t('admin.missions.createdToast') })
       }
       navigate(ROUTES.ADMIN.MISSIONS)
     } catch (err) {
@@ -114,38 +116,38 @@ const MissionFormPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isEdit ? 'Edit Misi' : 'Tambah Misi Baru'}
-        subtitle={isEdit ? 'Perbarui detail misi' : 'Buat misi baru untuk program'}
+        title={isEdit ? t('admin.missions.editTitle') : t('admin.missions.new')}
+        subtitle={isEdit ? t('admin.missions.editSubtitle') : t('admin.missions.newSubtitle')}
         breadcrumbs={[
-          { label: 'Bank Misi', href: ROUTES.ADMIN.MISSIONS },
-          { label: isEdit ? 'Edit' : 'Tambah' },
+          { label: t('admin.missions.bankTitle'), href: ROUTES.ADMIN.MISSIONS },
+          { label: isEdit ? t('admin.common.edit') : t('admin.common.add') },
         ]}
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-surface rounded-2xl p-6 shadow-sm space-y-4">
           <Select
-            label="Program"
+            label={t('admin.col.program')}
             required
             options={programs.map((p) => ({ value: p.id, label: p.name }))}
             value={form.program_id}
             onChange={(e) => handleProgramChange(e.target.value)}
-            placeholder="Pilih Program"
+            placeholder={t('admin.topic.pickProgram')}
           />
 
           <Input
-            label="Judul Misi"
+            label={t('admin.missions.title')}
             id="judul"
             required
             value={form.title}
             onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-            placeholder="Contoh: Gambar sapi kesukaanku"
+            placeholder={t('admin.missions.titlePlaceholder')}
           />
 
           {stages.length > 0 && (
             <div className="w-full">
               <label className="block text-sm font-medium text-on-surface mb-2">
-                Topik Terkait
+                {t('admin.missions.relatedStages')}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {stages.map((stage) => {
@@ -185,10 +187,10 @@ const MissionFormPage = () => {
 
         <div className="flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.MISSIONS)}>
-            Batal
+            {t('common.cancel')}
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>
-            {isEdit ? 'Simpan' : 'Tambah'}
+            {isEdit ? t('common.save') : t('admin.common.add')}
           </Button>
         </div>
       </form>

@@ -17,6 +17,8 @@ import { tenantService } from '../../../core/services/tenants'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { canApproveUser } from '../../../core/utils/permissions'
+import { i18n } from '../../../core/i18n'
+import { useTranslation, Trans } from 'react-i18next'
 import { ApprovalStatus } from '../../../core/types/enums'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { User, Tenant } from '../../../core/types'
@@ -29,28 +31,29 @@ function parseFilter(value: string | null): FilterTab {
   return ALLOWED_FILTERS.includes(value as FilterTab) ? (value as FilterTab) : 'all'
 }
 
-const TABS: { key: FilterTab; label: string }[] = [
-  { key: 'all', label: 'Semua' },
-  { key: 'pending', label: 'Menunggu Persetujuan' },
-  { key: 'active', label: 'Aktif' },
-  { key: 'inactive', label: 'Nonaktif' },
-  { key: 'rejected', label: 'Ditolak' },
-]
+const TABS = [
+  { key: 'all', labelKey: 'admin.common.all' },
+  { key: 'pending', labelKey: 'admin.users.tabPending' },
+  { key: 'active', labelKey: 'admin.status.active' },
+  { key: 'inactive', labelKey: 'admin.status.inactive' },
+  { key: 'rejected', labelKey: 'admin.status.rejected' },
+] as const
 
 function approvalBadge(status: User['approval_status']) {
   switch (status) {
     case ApprovalStatus.PENDING:
-      return <Badge variant="warning">Menunggu</Badge>
+      return <Badge variant="warning">{i18n.t('admin.status.waiting')}</Badge>
     case ApprovalStatus.APPROVED:
-      return <Badge variant="success">Disetujui</Badge>
+      return <Badge variant="success">{i18n.t('admin.status.approved')}</Badge>
     case ApprovalStatus.REJECTED:
-      return <Badge variant="danger">Ditolak</Badge>
+      return <Badge variant="danger">{i18n.t('admin.status.rejected')}</Badge>
     default:
       return <Badge variant="neutral">-</Badge>
   }
 }
 
 const UsersPage = () => {
+  const { t } = useTranslation()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user: currentUser } = useAuth()
   const { tenantId } = useTenantScope()
@@ -174,7 +177,7 @@ const UsersPage = () => {
   const columns: Column<User>[] = [
     {
       key: 'name',
-      header: 'Nama',
+      header: t('admin.col.name'),
       render: (item: User) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0">
@@ -193,17 +196,17 @@ const UsersPage = () => {
     },
     {
       key: 'role',
-      header: 'Role',
+      header: t('admin.col.role'),
       render: (item: User) => <Badge variant="primary">{item.role}</Badge>,
     },
     ...(isSuperAdminView
       ? [
         {
           key: 'tenant',
-          header: 'Tenant',
+          header: t('admin.col.tenant'),
           render: (item: User) => (
             <span className="text-sm text-on-surface-variant">
-              {item.tenant_id ? tenantMap.get(item.tenant_id)?.name || '-' : 'Platform'}
+              {item.tenant_id ? tenantMap.get(item.tenant_id)?.name || '-' : t('admin.users.platform')}
             </span>
           ),
         } as Column<User>,
@@ -211,17 +214,17 @@ const UsersPage = () => {
       : []),
     {
       key: 'approval_status',
-      header: 'Persetujuan',
+      header: t('admin.col.approval'),
       render: (item: User) => approvalBadge(item.approval_status),
     },
     {
       key: 'is_active',
-      header: 'Status',
-      render: (item: User) => <Badge variant={item.is_active ? 'success' : 'neutral'}>{item.is_active ? 'Aktif' : 'Nonaktif'}</Badge>,
+      header: t('admin.col.status'),
+      render: (item: User) => <Badge variant={item.is_active ? 'success' : 'neutral'}>{item.is_active ? t('admin.status.active') : t('admin.status.inactive')}</Badge>,
     },
     {
       key: 'actions',
-      header: 'Aksi',
+      header: t('admin.col.action'),
       align: 'right',
       render: (item: User) => {
         const canApprove = canApproveUser(currentUser, item.tenant_id)
@@ -236,21 +239,21 @@ const UsersPage = () => {
                   variant="ghost"
                   size="sm"
                   icon={<Check className="w-4 h-4 text-green-600" />}
-                  tooltip="Setujui"
+                  tooltip={t('admin.common.approve')}
                   onClick={() => setApproveId(item.id)}
                 />
                 <Button
                   variant="ghost"
                   size="sm"
                   icon={<XIcon className="w-4 h-4 text-error" />}
-                  tooltip="Tolak"
+                  tooltip={t('admin.common.reject')}
                   onClick={() => setRejectId(item.id)}
                 />
               </>
             )}
             {isApprovedActive && (
               <Link to={`/admin/users/${item.id}/edit`}>
-                <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" />
+                <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip={t('admin.common.edit')} />
               </Link>
             )}
             {isApprovedActive && item.role !== UserRole.SUPER_ADMIN && (
@@ -258,7 +261,7 @@ const UsersPage = () => {
                 variant="ghost"
                 size="sm"
                 icon={<Ban className="w-4 h-4 text-error" />}
-                tooltip="Nonaktifkan"
+                tooltip={t('admin.common.deactivate')}
                 onClick={() => setDeactivateId(item.id)}
               />
             )}
@@ -267,7 +270,7 @@ const UsersPage = () => {
                 variant="ghost"
                 size="sm"
                 icon={<Trash2 className="w-4 h-4 text-error" />}
-                tooltip="Hapus"
+                tooltip={t('common.delete')}
                 onClick={() => setDeleteId(item.id)}
               />
             )}
@@ -280,11 +283,11 @@ const UsersPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Users"
-        subtitle="Kelola pengguna sistem."
+        title={t('admin.sidebar.users')}
+        subtitle={t('admin.users.pageSubtitle')}
         actions={
           <Link to={ROUTES.ADMIN.USER_NEW}>
-            <Button icon={<Plus className="w-4 h-4" />}>Tambah User</Button>
+            <Button icon={<Plus className="w-4 h-4" />}>{t('admin.users.add')}</Button>
           </Link>
         }
       />
@@ -292,21 +295,25 @@ const UsersPage = () => {
       {error && (
         <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
           <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
-          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+          <Button variant="secondary" size="sm" onClick={refresh}>{t('common.error.retry')}</Button>
         </div>
       )}
 
-      <Tabs tabs={TABS} activeKey={activeTab} onChange={handleTabChange} />
+      <Tabs
+        tabs={TABS.map((tab) => ({ key: tab.key, label: t(tab.labelKey) }))}
+        activeKey={activeTab}
+        onChange={handleTabChange}
+      />
 
       {isSuperAdminView && (
         <div className="flex items-center gap-3">
-          <label className="text-sm text-on-surface-variant font-medium">Filter Tenant:</label>
+          <label className="text-sm text-on-surface-variant font-medium">{t('admin.users.filterTenant')}</label>
           <select
             value={tenantFilter}
             onChange={(e) => handleTenantFilterChange(e.target.value)}
             className="px-3 py-1.5 rounded-xl border text-sm outline-none bg-surface-container-low border-outline-variant/60 text-on-surface"
           >
-            <option value="">Semua Tenant</option>
+            <option value="">{t('admin.users.allTenants')}</option>
             {tenants.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
@@ -327,53 +334,55 @@ const UsersPage = () => {
         rowClassName={(item: User) => getHighlightClass(item.id)}
       />
 
-      <Modal open={!!approveId} onClose={() => setApproveId(null)} title="Setujui Pendaftaran" footer={
+      <Modal open={!!approveId} onClose={() => setApproveId(null)} title={t('admin.users.approveTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setApproveId(null)}>Batal</Button>
-          <Button variant="primary" onClick={handleApprove}>Setujui</Button>
+          <Button variant="secondary" onClick={() => setApproveId(null)}>{t('common.cancel')}</Button>
+          <Button variant="primary" onClick={handleApprove}>{t('admin.common.approve')}</Button>
         </div>
       }>
-        <p className="text-sm text-on-surface-variant">Setujui pendaftaran pengguna ini? Akun akan diaktifkan.</p>
+        <p className="text-sm text-on-surface-variant">{t('admin.users.approveMsg')}</p>
       </Modal>
 
-      <Modal open={!!rejectId} onClose={() => { setRejectId(null); setRejectReason('') }} title="Tolak Pendaftaran" footer={
+      <Modal open={!!rejectId} onClose={() => { setRejectId(null); setRejectReason('') }} title={t('admin.users.rejectTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => { setRejectId(null); setRejectReason('') }}>Batal</Button>
-          <Button variant="danger" onClick={handleReject}>Tolak</Button>
+          <Button variant="secondary" onClick={() => { setRejectId(null); setRejectReason('') }}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={handleReject}>{t('admin.common.reject')}</Button>
         </div>
       }>
         <div className="space-y-3">
-          <p className="text-sm text-on-surface-variant">Tolak pendaftaran pengguna ini?</p>
+          <p className="text-sm text-on-surface-variant">{t('admin.users.rejectMsg')}</p>
           <div>
-            <label className="text-sm text-on-surface-variant mb-1 block">Alasan (opsional)</label>
+            <label className="text-sm text-on-surface-variant mb-1 block">{t('admin.users.rejectReasonLabel')}</label>
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border text-sm outline-none bg-surface-container-low border-outline-variant/60 text-on-surface resize-none"
               rows={3}
-              placeholder="Alasan penolakan..."
+              placeholder={t('admin.users.rejectReasonPlaceholder')}
             />
           </div>
         </div>
       </Modal>
 
-      <Modal open={!!deactivateId} onClose={() => setDeactivateId(null)} title="Nonaktifkan User" footer={
+      <Modal open={!!deactivateId} onClose={() => setDeactivateId(null)} title={t('admin.users.deactivateTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDeactivateId(null)}>Batal</Button>
-          <Button variant="danger" onClick={handleDeactivate}>Nonaktifkan</Button>
+          <Button variant="secondary" onClick={() => setDeactivateId(null)}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={handleDeactivate}>{t('admin.common.deactivate')}</Button>
         </div>
       }>
-        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menonaktifkan user ini?</p>
+        <p className="text-sm text-on-surface-variant">{t('admin.users.deactivateMsg')}</p>
       </Modal>
 
-      <Modal open={!!deleteId} onClose={() => { setDeleteId(null); setDeleteConfirmText('') }} title="Hapus User Secara Permanen" footer={
+      <Modal open={!!deleteId} onClose={() => { setDeleteId(null); setDeleteConfirmText('') }} title={t('admin.users.deleteTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => { setDeleteId(null); setDeleteConfirmText('') }}>Batal</Button>
-          <Button variant="danger" disabled={deleteConfirmText !== 'HAPUS'} onClick={handleDelete}>Hapus Permanen</Button>
+          <Button variant="secondary" onClick={() => { setDeleteId(null); setDeleteConfirmText('') }}>{t('common.cancel')}</Button>
+          <Button variant="danger" disabled={deleteConfirmText !== 'HAPUS'} onClick={handleDelete}>{t('admin.users.deleteBtn')}</Button>
         </div>
       }>
         <div className="space-y-3">
-          <p className="text-sm text-on-surface-variant">Tindakan ini <b>tidak dapat dibatalkan</b> dan akan menghapus data user dari database. Ketik <b>HAPUS</b> untuk konfirmasi.</p>
+          <p className="text-sm text-on-surface-variant">
+            <Trans i18nKey="admin.users.deleteMsg" components={{ b: <b /> }} />
+          </p>
           <input
             value={deleteConfirmText}
             onChange={(e) => setDeleteConfirmText(e.target.value)}

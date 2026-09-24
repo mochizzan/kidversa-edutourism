@@ -35,10 +35,12 @@ import { useReportSession } from '../hooks/useReportSession'
 import { CompactPagination } from '../../../shared/components/data/CompactPagination'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { Participant } from '../../../core/types'
+import { useTranslation, Trans } from 'react-i18next'
 
 const REPORT_PAGE_SIZE = DEFAULT_CLIENT_PAGE_SIZE
 
 const ReportSessionPage = () => {
+  const { t } = useTranslation()
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
 
@@ -122,8 +124,8 @@ const ReportSessionPage = () => {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Memuat..."
-          breadcrumbs={[{ label: 'Laporan', href: ROUTES.ADMIN.REPORTS }, { label: 'Detail' }]}
+          title={t('common.loading')}
+          breadcrumbs={[{ label: t('admin.reports.title'), href: ROUTES.ADMIN.REPORTS }, { label: t('admin.common.detail') }]}
         />
         <div className="bg-surface rounded-2xl p-6 animate-pulse space-y-4">
           <div className="h-5 bg-surface-variant rounded w-48" />
@@ -140,15 +142,15 @@ const ReportSessionPage = () => {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Error"
-          breadcrumbs={[{ label: 'Laporan', href: ROUTES.ADMIN.REPORTS }, { label: 'Detail' }]}
+          title={t('admin.reports.errorTitle')}
+          breadcrumbs={[{ label: t('admin.reports.title'), href: ROUTES.ADMIN.REPORTS }, { label: t('admin.common.detail') }]}
         />
         <div className="flex gap-2 justify-center">
           <Button variant="secondary" onClick={() => navigate(ROUTES.ADMIN.REPORTS)}>
-            Kembali
+            {t('common.back')}
           </Button>
         </div>
-        <ErrorState message={error || 'Sesi tidak ditemukan.'} onRetry={loadData} />
+        <ErrorState message={error || t('admin.reports.sessionNotFound')} onRetry={loadData} />
       </div>
     )
   }
@@ -158,10 +160,10 @@ const ReportSessionPage = () => {
       <PageHeader
         title={session.name}
         subtitle={`${formatDate(session.session_date)} — ${session.location}`}
-        breadcrumbs={[{ label: 'Laporan', href: ROUTES.ADMIN.REPORTS }, { label: session.name }]}
+        breadcrumbs={[{ label: t('admin.reports.title'), href: ROUTES.ADMIN.REPORTS }, { label: session.name }]}
         actions={
           <Button variant="ghost" size="sm" onClick={() => navigate(ROUTES.ADMIN.REPORTS)}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> Kembali
+            <ArrowLeft className="w-4 h-4 mr-1" /> {t('common.back')}
           </Button>
         }
       />
@@ -187,25 +189,25 @@ const ReportSessionPage = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
-            Total Peserta
+            {t('admin.reports.totalParticipants')}
           </p>
           <p className="text-2xl font-bold text-on-surface mt-1">{topicReports.length}</p>
         </Card>
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
-            Draft
+            {t('admin.reportStatus.draft')}
           </p>
           <p className="text-2xl font-bold text-on-surface mt-1">{topicDraft}</p>
         </Card>
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
-            Disetujui
+            {t('admin.reportStatus.approved')}
           </p>
           <p className="text-2xl font-bold text-green-600 mt-1">{topicApproved}</p>
         </Card>
         <Card className="!p-4">
           <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">
-            Terkirim
+            {t('admin.reportStatus.sent')}
           </p>
           <p className="text-2xl font-bold text-primary mt-1">{topicSent}</p>
         </Card>
@@ -218,16 +220,16 @@ const ReportSessionPage = () => {
         >
           {generating ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Mengenerate...
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('admin.reports.generating')}
             </>
           ) : (
             <>
               <FileText className="w-4 h-4 mr-2" />
               {topicReports.length === 0
-                ? 'Generate Semua'
+                ? t('admin.reports.generateAll')
                 : topicAllHaveReport
-                  ? 'Generate Ulang'
-                  : 'Generate Semua'}
+                  ? t('admin.reports.generateAgain')
+                  : t('admin.reports.generateAll')}
             </>
           )}
         </Button>
@@ -238,11 +240,11 @@ const ReportSessionPage = () => {
         >
           {sending ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Mengirim...
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('admin.reports.sending')}
             </>
           ) : (
             <>
-              <Send className="w-4 h-4 mr-2" /> Kirim Semua ({topicApproved})
+              <Send className="w-4 h-4 mr-2" /> {t('admin.reports.sendAllCount', { count: topicApproved })}
             </>
           )}
         </Button>
@@ -264,7 +266,7 @@ const ReportSessionPage = () => {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cari peserta..."
+          placeholder={t('admin.reports.searchPlaceholder')}
           className="w-full pl-9 pr-4 py-2 rounded-xl border border-outline-variant bg-surface text-sm placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary-container focus:outline-none"
         />
       </div>
@@ -272,9 +274,9 @@ const ReportSessionPage = () => {
       {topicFilteredReports.length === 0 ? (
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
-          title={search ? 'Peserta tidak ditemukan' : 'Belum ada peserta'}
+          title={search ? t('admin.reports.notFoundTitle') : t('admin.participants.emptyTitle')}
           description={
-            search ? 'Coba gunakan kata kunci lain.' : 'Peserta akan muncul setelah ditambahkan ke sesi.'
+            search ? t('admin.reports.notFoundDesc') : t('admin.reports.emptyDesc2')
           }
         />
       ) : (
@@ -314,25 +316,25 @@ const ReportSessionPage = () => {
                       </p>
                       {item.report && (
                         <Badge variant={reportStatusBadge[item.report.status]} size="sm">
-                          {reportStatusLabel[item.report.status]}
+                          {t(reportStatusLabel[item.report.status])}
                         </Badge>
                       )}
                       {showGenerateBtn && (
                         <Badge variant="success" size="sm">
-                          Siap Generate
+                          {t('admin.reports.readyGenerate')}
                         </Badge>
                       )}
                       {isNoAssessment && (
-                        <Tooltip content="Lengkapi penilaian terlebih dahulu di halaman Assessment">
+                        <Tooltip content={t('admin.reports.noAssessmentTip')}>
                           <Badge variant="warning" size="sm">
-                            {NO_ASSESSMENT_LABEL}
+                            {t(NO_ASSESSMENT_LABEL)}
                           </Badge>
                         </Tooltip>
                       )}
                       {isIncomplete && (
-                        <Tooltip content="Peserta belum memiliki penilaian. Lengkapi penilaian terlebih dahulu.">
+                        <Tooltip content={t('admin.reports.incompleteTip')}>
                           <Badge variant="neutral" size="sm">
-                            {NO_REPORT_LABEL}
+                            {t(NO_REPORT_LABEL)}
                           </Badge>
                         </Tooltip>
                       )}
@@ -362,11 +364,11 @@ const ReportSessionPage = () => {
                           onGenerateOne(item.participant.id)
                         }}
                       >
-                        <FileText className="w-3.5 h-3.5 mr-1" /> Generate
+                        <FileText className="w-3.5 h-3.5 mr-1" /> {t('admin.reports.generate')}
                       </Button>
                     )}
                     {item.report?.status === ReportStatus.APPROVED && (
-                      <span className="text-xs text-green-600 font-medium">Siap kirim</span>
+                      <span className="text-xs text-green-600 font-medium">{t('admin.reports.readySend')}</span>
                     )}
                     {isClickable && <ChevronRight className="w-4 h-4 text-on-surface-variant" />}
                   </div>
@@ -399,17 +401,17 @@ const ReportSessionPage = () => {
         totalItems={topicFilteredReports.length}
         pageSize={REPORT_PAGE_SIZE}
         onPageChange={setReportPage}
-        itemLabel="peserta"
+        itemLabel={t('admin.reports.participantNoun')}
       />
 
       <Modal
         open={!!generateResult}
         onClose={() => setGenerateResult(null)}
-        title="Hasil Generate Laporan"
+        title={t('admin.reports.generateResultTitle')}
         size="md"
         footer={
           <div className="flex justify-end">
-            <Button onClick={() => setGenerateResult(null)}>Mengerti</Button>
+            <Button onClick={() => setGenerateResult(null)}>{t('admin.reports.understand')}</Button>
           </div>
         }
       >
@@ -419,8 +421,11 @@ const ReportSessionPage = () => {
               <div className="flex items-start gap-2 text-sm text-on-surface-variant">
                 <CheckCircle className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
                 <p>
-                  Berhasil generate <strong>{generateResult.generatedCount} laporan</strong> untuk
-                  peserta yang sudah memiliki penilaian.
+                  <Trans
+                    i18nKey="admin.reports.generateOk"
+                    values={{ count: generateResult.generatedCount }}
+                    components={{ strong: <strong /> }}
+                  />
                 </p>
               </div>
             )}
@@ -429,8 +434,10 @@ const ReportSessionPage = () => {
                 <div className="flex items-start gap-2 text-sm text-on-surface-variant">
                   <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
                   <p>
-                    Peserta berikut <strong>tidak dapat digenerate</strong> karena belum memiliki data
-                    penilaian:
+                    <Trans
+                      i18nKey="admin.reports.generateSkip"
+                      components={{ strong: <strong /> }}
+                    />
                   </p>
                 </div>
                 <ul className="space-y-2">
@@ -443,7 +450,7 @@ const ReportSessionPage = () => {
                       <span className="font-medium text-on-surface">{p.child_name}</span>
                       <span className="text-on-surface-variant">({p.school_name || '-'})</span>
                       <Badge variant="warning" size="sm">
-                        Belum Dinilai
+                        {t('common.assessment.rating0')}
                       </Badge>
                     </li>
                   ))}
@@ -457,15 +464,15 @@ const ReportSessionPage = () => {
       <Modal
         open={showConfirmSend}
         onClose={() => setShowConfirmSend(false)}
-        title="Konfirmasi Kirim Laporan"
+        title={t('admin.reports.sendConfirmTitle')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setShowConfirmSend(false)}>
-              Batal
+              {t('common.cancel')}
             </Button>
             <Button onClick={onSend} disabled={sending}>
-              {sending ? 'Mengirim...' : `Kirim ${topicApproved} Laporan`}
+              {sending ? t('admin.reports.sending') : t('admin.reports.sendCount', { count: topicApproved })}
             </Button>
           </div>
         }
@@ -474,10 +481,13 @@ const ReportSessionPage = () => {
           <Send className="w-5 h-5 text-primary shrink-0 mt-0.5" />
           <div className="text-sm text-on-surface-variant">
             <p>
-              Anda akan mengirim <strong>{approvedCount} laporan</strong> yang sudah disetujui kepada
-              orang tua/wali masing-masing peserta.
+              <Trans
+                i18nKey="admin.reports.sendConfirmMsg"
+                values={{ count: approvedCount }}
+                components={{ strong: <strong /> }}
+              />
             </p>
-            <p className="mt-2">Tindakan ini tidak dapat dibatalkan.</p>
+            <p className="mt-2">{t('admin.reports.sendConfirmNote')}</p>
           </div>
         </div>
       </Modal>

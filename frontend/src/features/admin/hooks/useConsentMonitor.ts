@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { consentService } from '../../../core/services/consent'
+import { i18n } from '../../../core/i18n'
 import { useConsentProgress } from '../../../shared/hooks/useConsentProgress'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { ConsentFlatItem } from '../../../core/types'
@@ -84,7 +85,7 @@ export function useConsentMonitor(): ConsentFlatData {
       const data = await consentService.getFlat()
       setItems(data)
     } catch {
-      setError('Gagal memuat data consent')
+      setError(i18n.t('admin.consent.loadError'))
     } finally {
       setLoading(false)
     }
@@ -99,7 +100,7 @@ export function useConsentMonitor(): ConsentFlatData {
     if (progress?.type === 'done') {
       addToast({
         type: 'success',
-        message: `Selesai: ${progress.data.sent ?? 0}/${progress.data.total ?? 0} berhasil`,
+        message: i18n.t('admin.consent.batchDone', { sent: progress.data.sent ?? 0, total: progress.data.total ?? 0 }),
       })
       setActiveBatch(null)
       loadData()
@@ -122,11 +123,11 @@ export function useConsentMonitor(): ConsentFlatData {
       setSending((prev) => ({ ...prev, [participantId]: true }))
       try {
         await consentService.sendSingle(participantId, force)
-        addToast({ type: 'success', message: 'Berhasil mengirim permintaan consent' })
+        addToast({ type: 'success', message: i18n.t('admin.consent.sendOkToast') })
         await loadData()
       } catch (err: unknown) {
         const message =
-          err instanceof Error ? err.message : 'Gagal mengirim permintaan consent'
+          err instanceof Error ? err.message : i18n.t('admin.consent.sendErrorToast')
         addToast({ type: 'error', message })
       } finally {
         setSending((prev) => {
@@ -155,7 +156,7 @@ export function useConsentMonitor(): ConsentFlatData {
     if (eligibleSessionIds.length === 0) {
       addToast({
         type: 'warning',
-        message: 'Tidak ada peserta yang perlu dikirimi permintaan consent',
+        message: i18n.t('admin.consent.noneEligibleToast'),
       })
       return
     }
@@ -168,7 +169,7 @@ export function useConsentMonitor(): ConsentFlatData {
 
     addToast({
       type: 'info',
-      message: `Mengirim ke ${eligibleCount} peserta...`,
+      message: i18n.t('admin.consent.sendingCount', { count: eligibleCount }),
     })
 
     // Send batch for each session

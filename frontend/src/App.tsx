@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { RouterProvider } from 'react-router-dom'
 import { router } from './app/router'
 import { useAuthStore, redirectToLogin } from './core/stores/authStore'
@@ -13,6 +14,7 @@ import { Logo } from './shared/components/ui/Logo'
 
 /* ── Splash Screen ── */
 function SplashScreen({ onFinish }: { onFinish: () => void }) {
+  const { t } = useTranslation()
   const [phase, setPhase] = useState<'pop' | 'text' | 'exit'>('pop')
 
   useEffect(() => {
@@ -28,9 +30,8 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
   return (
     <div
-      className={`min-h-screen bg-gradient-to-br from-primary via-primary-dark to-primary-900 flex flex-col items-center justify-center p-8 relative overflow-hidden transition-opacity duration-500 ${
-        phase === 'exit' ? 'opacity-0' : 'opacity-100'
-      }`}
+      className={`min-h-screen bg-gradient-to-br from-primary via-primary-dark to-primary-900 flex flex-col items-center justify-center p-8 relative overflow-hidden transition-opacity duration-500 ${phase === 'exit' ? 'opacity-0' : 'opacity-100'
+        }`}
     >
       {/* Decorative blurs */}
       <div className="absolute -right-24 -bottom-24 w-80 h-80 bg-primary-light/15 rounded-full blur-3xl" />
@@ -51,11 +52,10 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
       {/* Text – slide up */}
       <div
-        className={`transition-all duration-700 delay-300 ease-out text-center mt-8 ${
-          phase === 'text' || phase === 'exit'
-            ? 'opacity-100 translate-y-0'
-            : 'opacity-0 translate-y-6 pointer-events-none'
-        }`}
+        className={`transition-all duration-700 delay-300 ease-out text-center mt-8 ${phase === 'text' || phase === 'exit'
+          ? 'opacity-100 translate-y-0'
+          : 'opacity-0 translate-y-6 pointer-events-none'
+          }`}
       >
         <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
           Kidversa
@@ -64,7 +64,7 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
           Edutourism
         </p>
         <p className="text-primary-300/60 text-xs mt-3 max-w-[180px] mx-auto leading-relaxed">
-          Belajar sambil berpetualang
+          {t('common.splash.tagline')}
         </p>
       </div>
 
@@ -84,6 +84,7 @@ function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
 /* ── App Root ── */
 function App() {
+  const { t } = useTranslation()
   const { checkSession, isLoading } = useAuthStore()
   const [splashDone, setSplashDone] = useState(false)
   const [backendDown, setBackendDown] = useState(false)
@@ -186,16 +187,16 @@ function App() {
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary-dark shadow-lg flex items-center justify-center mb-4">
           <Logo alt="Kidversa" className="w-10 h-10 object-contain" />
         </div>
-        <h1 className="text-xl font-bold text-on-surface">Backend tidak tersedia</h1>
+        <h1 className="text-xl font-bold text-on-surface">{t('common.backend.title')}</h1>
         <p className="text-sm text-on-surface-variant/60 mt-2 max-w-[280px] leading-relaxed">
-          Tidak dapat terhubung ke server. Pastikan server berjalan, lalu coba lagi.
+          {t('common.backend.desc')}
         </p>
         <button
           type="button"
           onClick={() => void runStartup()}
           className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-primary to-primary-dark text-on-primary hover:shadow-lg hover:shadow-primary/25 transition-all"
         >
-          Coba Lagi
+          {t('common.error.retry')}
         </button>
       </div>
     )

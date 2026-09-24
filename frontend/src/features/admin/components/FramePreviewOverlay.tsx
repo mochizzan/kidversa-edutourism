@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 interface FramePreviewOverlayProps {
   src: string
@@ -8,6 +9,7 @@ interface FramePreviewOverlayProps {
 }
 
 export function FramePreviewOverlay({ src, alt, onClose }: FramePreviewOverlayProps) {
+  const { t } = useTranslation()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -22,12 +24,12 @@ export function FramePreviewOverlay({ src, alt, onClose }: FramePreviewOverlayPr
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Pratinjau frame"
+      aria-label={t('admin.frames.previewDialogAria')}
     >
       <img src={src} alt={alt} className="max-h-[85vh] max-w-full rounded-lg object-contain" />
       <button
         type="button"
-        aria-label="Tutup pratinjau"
+        aria-label={t('admin.frames.closePreviewAria')}
         onClick={onClose}
         className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
       >

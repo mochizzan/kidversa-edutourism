@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Building2 } from 'lucide-react'
 import { useTenantStore } from '../../../core/stores/tenantStore'
 import { useAuth } from '../../../core/hooks/useAuth'
@@ -7,6 +8,7 @@ import { isSuperAdmin } from '../../../core/utils/permissions'
 import { cn } from '../../../core/utils'
 
 export function TenantSwitcher() {
+  const { t } = useTranslation()
   const { user, isAuthenticated } = useAuth()
   const { activeTenant, tenants, setActiveTenant, fetchTenants } = useTenantStore()
 
@@ -37,7 +39,7 @@ export function TenantSwitcher() {
           'text-on-surface',
         )}
       >
-        <option value="">Pilih Tenant...</option>
+        <option value="">{t('admin.tenantSwitcher.placeholder')}</option>
         {tenants.map((t: Tenant) => (
           <option key={t.id} value={t.id}>{t.name}</option>
         ))}

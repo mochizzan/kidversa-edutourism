@@ -1,4 +1,6 @@
 // App Constants
+import { i18n } from '../i18n'
+
 export const APP_NAME = 'Kidversa'
 export const APP_DESCRIPTION = 'Platform Edutourism Interaktif untuk Anak - Belajar Sambil Berpetualang!'
 
@@ -16,9 +18,11 @@ export const COLORS = {
 } as const
 
 // Placeholder src for <img> elements whose remote media fails to load —
-// shows "Gagal Muat" instead of the browser's broken-image glyph.
-export const IMAGE_FALLBACK_SRC =
-  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect fill="%23e0e0e0" width="200" height="200"/><text x="50%" y="50%" fill="%23999" text-anchor="middle" dy=".3em" font-size="14" font-family="sans-serif">Gagal Muat</text></svg>'
+// shows a localized "Gagal Muat" instead of the browser's broken-image glyph.
+export function imageFallbackSrc(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect fill="#e0e0e0" width="200" height="200"/><text x="50%" y="50%" fill="#999" text-anchor="middle" dy=".3em" font-size="14" font-family="sans-serif">${i18n.t('common.image.fallback')}</text></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
 
 // Routes
 export const ROUTES = {

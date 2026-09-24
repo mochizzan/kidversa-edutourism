@@ -3,6 +3,7 @@ import { sessionService } from '../../../core/services/sessions'
 import { reportService } from '../../../core/services/reports'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
+import { i18n } from '../../../core/i18n'
 import { ReportStatus } from '../../../core/types/enums'
 import type { Session, Report, Participant, ProgramStage } from '../../../core/types'
 
@@ -61,7 +62,7 @@ export function useReportSession(sessionId: string | undefined) {
       ])
 
       if (!sess) {
-        setError('Sesi tidak ditemukan.')
+        setError(i18n.t('admin.reports.sessionNotFound'))
         setLoading(false)
         return
       }
@@ -73,7 +74,7 @@ export function useReportSession(sessionId: string | undefined) {
       const nameById = new Map(programStages.map((ps) => [ps.id, ps.name]))
 
       const topicTabs: TopicTab[] = sessStages
-        .map((ss) => ({ programStageId: ss.program_stage_id, name: nameById.get(ss.program_stage_id) ?? 'Topik' }))
+        .map((ss) => ({ programStageId: ss.program_stage_id, name: nameById.get(ss.program_stage_id) ?? i18n.t('admin.col.topic') }))
         .filter((t, i, arr) => arr.findIndex((x) => x.programStageId === t.programStageId) === i)
       setTopics(topicTabs)
       setActiveTopicId((prev) => (prev && topicTabs.some((t) => t.programStageId === prev) ? prev : (topicTabs[0]?.programStageId ?? null)))
@@ -125,7 +126,7 @@ export function useReportSession(sessionId: string | undefined) {
 
       setReports(items)
     } catch {
-      setError('Gagal memuat data laporan.')
+      setError(i18n.t('admin.reports.loadDataError'))
     } finally {
       setLoading(false)
     }
@@ -154,7 +155,7 @@ export function useReportSession(sessionId: string | undefined) {
       .map((r) => r.participant)
 
     if (eligible.length === 0) {
-      setGenError('Tidak ada peserta yang eligible untuk generate laporan.')
+      setGenError(i18n.t('admin.reports.eligibleEmptyError'))
       return { ok: false, generatedCount: 0, skippedParticipants: skipped }
     }
 
@@ -164,7 +165,7 @@ export function useReportSession(sessionId: string | undefined) {
       await loadData()
       return { ok: true, generatedCount: eligible.length, skippedParticipants: skipped }
     } catch (e) {
-      setGenError(e instanceof Error ? e.message : 'Gagal generate laporan.')
+      setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
       return { ok: false, generatedCount: 0, skippedParticipants: skipped }
     } finally {
       generatingRef.current = false
@@ -186,7 +187,7 @@ export function useReportSession(sessionId: string | undefined) {
       await loadData()
       return true
     } catch (e) {
-      setGenError(e instanceof Error ? e.message : 'Gagal generate laporan.')
+      setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
       return false
     } finally {
       generatingRef.current = false
@@ -205,7 +206,7 @@ export function useReportSession(sessionId: string | undefined) {
       await loadData()
       return true
     } catch {
-      setError('Gagal mengirim laporan.')
+      setError(i18n.t('admin.reports.sendListError'))
       return false
     } finally {
       setSending(false)

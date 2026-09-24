@@ -11,8 +11,10 @@ import type { Program } from '../../../core/types'
 import { useFrameUploadQueue } from '../hooks/useFrameUploadQueue'
 import { FrameDropZone } from '../components/FrameDropZone'
 import { FrameUploadCard } from '../components/FrameUploadCard'
+import { useTranslation } from 'react-i18next'
 
 const FrameUploadPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [programs, setPrograms] = useState<Program[]>([])
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -29,7 +31,7 @@ const FrameUploadPage = () => {
     programService
       .getAll({ limit: 100 })
       .then((res) => setPrograms(res.data))
-      .catch(() => setProgramError('Gagal memuat daftar program. Pilihan program tidak tersedia.'))
+      .catch(() => setProgramError(t('admin.frames.programFilterLoadError')))
   }, [])
 
   const onClearAll = () => {
@@ -38,28 +40,28 @@ const FrameUploadPage = () => {
   }
 
   const programOptions = [
-    { value: '', label: 'Semua Program' },
+    { value: '', label: t('admin.common.allPrograms') },
     ...programs.map((p) => ({ value: p.id, label: p.name })),
   ]
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Upload Frame"
-        breadcrumbs={[{ label: 'Frames', href: ROUTES.ADMIN.FRAMES }, { label: 'Upload Frame' }]}
+        title={t('admin.frames.uploadTitle')}
+        breadcrumbs={[{ label: t('admin.frames.pageTitle'), href: ROUTES.ADMIN.FRAMES }, { label: t('admin.frames.uploadTitle') }]}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" icon={<ArrowLeft className="h-4 w-4" />}
               onClick={() => navigate(ROUTES.ADMIN.FRAMES)}>
-              Kembali
+              {t('common.back')}
             </Button>
             <Button variant="danger" icon={<Trash2 className="h-4 w-4" />}
               onClick={() => setShowClearConfirm(true)} disabled={items.length === 0}>
-              Hapus Semua
+              {t('admin.frames.clearAll')}
             </Button>
             <Button icon={<Upload className="h-4 w-4" />} onClick={handleSaveAll}
               disabled={items.length === 0 || hasEmptyName} loading={isSaving}>
-              Simpan Semua
+              {t('admin.frames.saveAll')}
             </Button>
           </div>
         }
@@ -69,7 +71,7 @@ const FrameUploadPage = () => {
         <div className="flex items-center gap-2 rounded-2xl bg-error-container/20 p-4 text-sm text-error">
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span className="flex-1">{errorMessage}</span>
-          <button onClick={clearErrorMessage} className="font-medium hover:underline">Tutup</button>
+          <button onClick={clearErrorMessage} className="font-medium hover:underline">{t('common.close')}</button>
         </div>
       )}
 
@@ -79,7 +81,7 @@ const FrameUploadPage = () => {
           <div className="flex-1 space-y-0.5">
             {warnings.map((msg, i) => <p key={i}>{msg}</p>)}
           </div>
-          <button onClick={clearWarnings} className="shrink-0 font-medium hover:underline">Tutup</button>
+          <button onClick={clearWarnings} className="shrink-0 font-medium hover:underline">{t('common.close')}</button>
         </div>
       )}
 
@@ -93,8 +95,8 @@ const FrameUploadPage = () => {
       <FrameDropZone onFilesSelected={processFiles} />
 
       {items.length === 0 ? (
-        <EmptyState icon={<Image className="h-16 w-16" />} title="Belum ada frame"
-          description="Seret dan lepas gambar di atas untuk memulai upload." />
+        <EmptyState icon={<Image className="h-16 w-16" />} title={t('admin.frames.emptyTitle')}
+          description={t('admin.frames.emptyDesc')} />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
@@ -109,14 +111,14 @@ const FrameUploadPage = () => {
         </div>
       )}
 
-      <Modal open={showClearConfirm} onClose={() => setShowClearConfirm(false)} title="Hapus Semua Frame" size="sm"
+      <Modal open={showClearConfirm} onClose={() => setShowClearConfirm(false)} title={t('admin.frames.clearAllTitle')} size="sm"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowClearConfirm(false)}>Batal</Button>
-            <Button variant="danger" onClick={onClearAll}>Hapus Semua</Button>
+            <Button variant="secondary" onClick={() => setShowClearConfirm(false)}>{t('common.cancel')}</Button>
+            <Button variant="danger" onClick={onClearAll}>{t('admin.frames.clearAll')}</Button>
           </div>
         }>
-        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menghapus semua frame dari antrean?</p>
+        <p className="text-sm text-on-surface-variant">{t('admin.frames.clearAllMsg')}</p>
       </Modal>
     </div>
   )

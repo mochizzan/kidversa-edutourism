@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Camera, Users, ChevronRight, Calendar, Lock } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
@@ -20,6 +21,7 @@ interface GroupWithParticipants {
 }
 
 const CameraPage = () => {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -90,7 +92,7 @@ const CameraPage = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Ambil Foto" />
+        <PageHeader title={t('fasilitator.takePhoto')} />
         <div className="animate-pulse space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="bg-surface rounded-2xl p-5 h-24" />
@@ -104,7 +106,7 @@ const CameraPage = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Ambil Foto" />
+        <PageHeader title={t('fasilitator.takePhoto')} />
         <ErrorState message={error} onRetry={fetchData} />
       </div>
     )
@@ -114,11 +116,11 @@ const CameraPage = () => {
   if (groups.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Ambil Foto" />
+        <PageHeader title={t('fasilitator.takePhoto')} />
         <EmptyState
           icon={<Camera className="w-12 h-12" />}
-          title="Belum ada peserta"
-          description="Tidak ada kelompok aktif dengan peserta untuk difoto."
+          title={t('fasilitator.group.emptyTitle')}
+          description={t('fasilitator.camera.emptyDesc')}
         />
       </div>
     )
@@ -126,7 +128,7 @@ const CameraPage = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Ambil Foto" />
+      <PageHeader title={t('fasilitator.takePhoto')} />
 
       {sessionName && (
         <div className="flex items-center gap-2 text-sm text-on-surface-variant">
@@ -150,7 +152,7 @@ const CameraPage = () => {
                       {p.child_name}
                     </p>
                     <p className="text-xs text-on-surface-variant">
-                      {p.school_name} &middot; {p.child_age} thn
+                      {p.school_name} &middot; {p.child_age} {t('fasilitator.camera.yearsShort')}
                     </p>
                   </div>
                 </div>
@@ -158,7 +160,7 @@ const CameraPage = () => {
               const trailing = (
                 <div className="flex items-center gap-2 shrink-0">
                   {noConsent && (
-                    <Badge variant="warning" size="sm">Tidak ada izin</Badge>
+                    <Badge variant="warning" size="sm">{t('fasilitator.camera.noConsentBadge')}</Badge>
                   )}
                   {noConsent ? (
                     <Lock className="w-4 h-4 text-on-surface-variant" />
@@ -173,7 +175,7 @@ const CameraPage = () => {
                   <div
                     key={p.id}
                     aria-disabled
-                    title="Izin foto belum diberikan"
+                    title={t('fasilitator.photos.consentRequired')}
                     className="w-full flex items-center justify-between py-3 px-0 rounded-xl opacity-60 cursor-not-allowed text-left"
                   >
                     {avatar}

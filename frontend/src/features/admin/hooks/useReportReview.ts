@@ -10,7 +10,8 @@ import { badgeService } from '../../../core/services/badges'
 import { missionService } from '../../../core/services/missions'
 import { programService } from '../../../core/services/programs'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
-import { friendlyError, ERROR_MESSAGES } from '../../../core/utils/errorMessages'
+import { friendlyError } from '../../../core/utils/errorMessages'
+import { i18n, tIfExists } from '../../../core/i18n'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { isSuperAdmin } from '../../../core/utils/permissions'
@@ -115,14 +116,14 @@ export function useReportReview(sessionId: string | undefined, participantId: st
         ])
 
       if (!sess) {
-        setError('Sesi tidak ditemukan.')
+        setError(i18n.t('admin.reportReview.sessionMissingError'))
         setLoading(false)
         return
       }
 
       const partReports = sessionReports.filter((r) => r.participant_id === participantId)
       if (partReports.length === 0) {
-        setError('Laporan belum dibuat untuk peserta ini. Generate terlebih dahulu.')
+        setError(i18n.t('admin.reportReview.noReportsError'))
         setLoading(false)
         return
       }
@@ -143,7 +144,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       const tabs: TopicTab[] = sessStages
         .map((ss) => ({
           programStageId: ss.program_stage_id,
-          name: nameById.get(ss.program_stage_id) ?? 'Topik',
+          name: nameById.get(ss.program_stage_id) ?? i18n.t('admin.col.topic'),
         }))
         // Only show topics that have a generated report for this participant.
         .filter((t) => byTopic[t.programStageId] !== undefined)
@@ -155,7 +156,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       const participants = await sessionService.getParticipants(sessionId)
       const part = participants.find((p) => p.id === participantId) || null
       if (!part) {
-        setError('Peserta tidak ditemukan untuk laporan ini.')
+        setError(i18n.t('admin.reportReview.participantMissingError'))
         setLoading(false)
         return
       }
@@ -202,7 +203,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       const programMissions = missionResult.data.filter((m) => m.program_id === sess.program_id)
       setMissions(programMissions)
     } catch {
-      setError('Gagal memuat data laporan.')
+      setError(i18n.t('admin.reportReview.loadError'))
     } finally {
       setLoading(false)
       initialLoadDoneRef.current = true
@@ -276,9 +277,9 @@ export function useReportReview(sessionId: string | undefined, participantId: st
         }
         return merged.slice(0, MAX_MISSIONS)
       })
-      addToast({ type: 'success', message: 'Misi AI berhasil disarankan' })
+      addToast({ type: 'success', message: i18n.t('admin.reportReview.suggestMissionsOk') })
     } catch {
-      addToast({ type: 'error', message: 'Gagal memuat saran misi AI.' })
+      addToast({ type: 'error', message: i18n.t('admin.reportReview.suggestMissionsError') })
     } finally {
       setSuggesting(false)
     }
@@ -297,14 +298,14 @@ export function useReportReview(sessionId: string | undefined, participantId: st
         saTenant,
       )
       await loadData()
-      addToast({ type: 'success', message: 'Laporan berhasil disetujui' })
+      addToast({ type: 'success', message: i18n.t('admin.reportReview.approveOk') })
       return true
     } catch (err: unknown) {
       const apiErr = err as { code?: string }
       if (apiErr?.code === 'group_not_completed') {
-        addToast({ type: 'error', message: 'Kelompok belum diselesaikan oleh fasilitator' })
+        addToast({ type: 'error', message: i18n.t('admin.reportReview.groupNotCompleted') })
       } else {
-        setError('Gagal menyetujui laporan.')
+        setError(i18n.t('admin.reportReview.approveError'))
       }
       return false
     } finally {
@@ -318,10 +319,10 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     try {
       await reportService.send(report.id, saTenant)
       await loadData()
-      addToast({ type: 'success', message: 'Laporan berhasil dikirim ke orang tua' })
+      addToast({ type: 'success', message: i18n.t('admin.reportReview.sendOk') })
       return true
     } catch {
-      setError('Gagal mengirim laporan.')
+      setError(i18n.t('admin.reportReview.sendError'))
       return false
     } finally {
       setActionLoading(null)
@@ -344,7 +345,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
             source.close()
             setNarrativeText(prevTextRef.current)
             setStreaming(false)
-            addToast({ type: 'error', message: 'Gagal memuat streaming narasi.' })
+            addToast({ type: 'error', message: i18n.t('admin.reportReview.narrativeStreamError') })
           },
         },
       )
@@ -365,16 +366,17 @@ export function useReportReview(sessionId: string | undefined, participantId: st
         } catch { /* ignore */ }
         source.close()
         setStreaming(false)
-        addToast({ type: 'success', message: 'Narasi berhasil dibuat.' })
+        addToast({ type: 'success', message: i18n.t('admin.reportReview.narrativeDone') })
       })
       source.addEventListener('error', (ev: MessageEvent) => {
         try {
           const parsed = JSON.parse(ev.data)
           const code: string | undefined = parsed.code
           const msg: string | undefined = parsed.message
+          const localised = (code && tIfExists(`errors.${code}`)) || msg || i18n.t('admin.reportReview.narrativeError')
           addToast({
             type: 'error',
-            message: (code && ERROR_MESSAGES[code]) || msg || 'Gagal membuat narasi.',
+            message: localised,
           })
         } catch { /* ignore */ }
         setNarrativeText(prevTextRef.current)
@@ -510,7 +512,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       if (!html) return
       await captureRaportAsPdf(html, `raport-${participant.child_name}.pdf`)
     } catch {
-      addToast({ type: 'error', message: 'Gagal menghasilkan file PDF.' })
+      addToast({ type: 'error', message: i18n.t('admin.reportReview.pdfError') })
     } finally {
       setActionLoading(null)
     }
@@ -525,7 +527,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       const blob = await captureRaportAsBlob(html)
       downloadBlob(blob, `raport-${participant.child_name}.png`)
     } catch {
-      addToast({ type: 'error', message: 'Gagal menghasilkan gambar raport.' })
+      addToast({ type: 'error', message: i18n.t('admin.reportReview.pngError') })
     } finally {
       setActionLoading(null)
     }

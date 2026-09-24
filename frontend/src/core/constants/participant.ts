@@ -7,4 +7,5 @@ export const PARTICIPANT_AGE = {
   SOFT_MAX: 17,
 } as const
 
+// Value pinned byte-exact by tests/unit/participantValidation.test.ts and id.json (validation.ageRange) — keep unchanged.
 export const PARTICIPANT_AGE_ERROR = 'Usia anak harus 1–120 tahun'

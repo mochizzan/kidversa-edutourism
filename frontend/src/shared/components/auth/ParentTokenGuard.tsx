@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { reportPublicService } from '../../../core/services/reports'
 import { ApiError } from '../../../core/services/backend-client'
@@ -34,6 +35,7 @@ interface ParentTokenGuardProps {
 }
 
 export function ParentTokenGuard({ children, kind = 'report' }: ParentTokenGuardProps) {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') || ''
 
@@ -91,7 +93,7 @@ export function ParentTokenGuard({ children, kind = 'report' }: ParentTokenGuard
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent mx-auto" />
-          <p className="mt-4 text-sm text-on-surface-variant">Memverifikasi tautan...</p>
+          <p className="mt-4 text-sm text-on-surface-variant">{t('parent.token.verifying')}</p>
         </div>
       </div>
     )
@@ -105,17 +107,17 @@ export function ParentTokenGuard({ children, kind = 'report' }: ParentTokenGuard
           <div className="w-16 h-16 rounded-full bg-surface-variant flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">🔗</span>
           </div>
-          <h1 className="text-xl font-bold text-on-surface mb-2">Link tidak valid</h1>
+          <h1 className="text-xl font-bold text-on-surface mb-2">{t('parent.token.invalidTitle')}</h1>
           <p className="text-sm text-on-surface-variant mb-6">
-            Tautan yang Anda akses tidak valid atau tidak ditemukan. Silakan hubungi koordinator untuk mendapatkan tautan baru.
+            {t('parent.token.invalidDesc')}
           </p>
           <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
-            <span>Butuh bantuan?</span>
+            <span>{t('parent.token.needHelp')}</span>
             <a
               href={`mailto:${SUPPORT_EMAIL}`}
               className="text-primary font-medium hover:underline"
             >
-              Hubungi Kami
+              {t('parent.token.contact')}
             </a>
           </div>
         </div>
@@ -131,17 +133,17 @@ export function ParentTokenGuard({ children, kind = 'report' }: ParentTokenGuard
           <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl">⏰</span>
           </div>
-          <h1 className="text-xl font-bold text-on-surface mb-2">Link sudah tidak berlaku</h1>
+          <h1 className="text-xl font-bold text-on-surface mb-2">{t('parent.token.expiredTitle')}</h1>
           <p className="text-sm text-on-surface-variant mb-6">
-            Tautan ini sudah kedaluwarsa. Jika Anda merasa ini kesalahan, silakan hubungi koordinator untuk mendapatkan tautan baru.
+            {t('parent.token.expiredDesc')}
           </p>
           <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
-            <span>Butuh bantuan?</span>
+            <span>{t('parent.token.needHelp')}</span>
             <a
               href={`mailto:${SUPPORT_EMAIL}`}
               className="text-primary font-medium hover:underline"
             >
-              Hubungi Kami
+              {t('parent.token.contact')}
             </a>
           </div>
         </div>

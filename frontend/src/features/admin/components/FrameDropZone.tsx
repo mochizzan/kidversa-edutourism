@@ -1,12 +1,14 @@
 import { useRef } from 'react'
 import { Upload } from 'lucide-react'
 import { cn } from '../../../core/utils'
+import { useTranslation } from 'react-i18next'
 
 interface FrameDropZoneProps {
   onFilesSelected: (fileList: FileList) => void
 }
 
 export function FrameDropZone({ onFilesSelected }: FrameDropZoneProps) {
+  const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation() }
@@ -30,8 +32,8 @@ export function FrameDropZone({ onFilesSelected }: FrameDropZoneProps) {
       )}
     >
       <Upload className="mx-auto mb-3 h-12 w-12 text-on-surface-variant" />
-      <p className="text-base text-on-surface-variant">Seret &amp; lepas gambar atau klik untuk memilih</p>
-      <p className="mt-1 text-sm text-on-surface-variant/60">PNG atau JPEG, maksimal 2MB per file</p>
+      <p className="text-base text-on-surface-variant">{t('admin.frames.dropzoneText')}</p>
+      <p className="mt-1 text-sm text-on-surface-variant/60">{t('admin.frames.dropzoneHint')}</p>
       <input
         ref={fileInputRef}
         type="file"

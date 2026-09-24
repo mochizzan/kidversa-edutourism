@@ -24,7 +24,9 @@ import { friendlyError } from '../../../core/utils/errorMessages'
 import { UserRole } from '../../../core/types'
 import type { UpdateUserDTO } from '../../../core/types'
 import { zEmail, zPassword, zPhone } from '../../../core/utils/validation'
+import { i18n } from '../../../core/i18n'
 import { PasswordStrengthBar } from '../../auth/components/PasswordStrengthBar'
+import { useTranslation } from 'react-i18next'
 
 // zodResolver returns a schema-specific resolver; when isEdit is true the
 // update schema lacks password/confirmPassword, so the types don't overlap.
@@ -34,19 +36,19 @@ function toCreateResolver(r: Resolver<CreateFormData | UpdateFormData>): Resolve
 }
 
 export const createUserSchema = z.object({
-  name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
+  name: z.string().min(2, { error: () => ({ message: i18n.t('validation.nameMin') }) }).max(100, { error: () => ({ message: i18n.t('validation.nameMax') }) }),
   email: zEmail({ required: true }),
   password: zPassword,
   confirmPassword: z.string(),
   phone: zPhone({ required: false }),
   role: z.nativeEnum(UserRole),
 }).refine((d) => d.password === d.confirmPassword, {
-  message: 'Password tidak cocok',
+  error: () => ({ message: i18n.t('validation.confirmMismatch') }),
   path: ['confirmPassword'],
 })
 
 export const updateUserSchema = z.object({
-  name: z.string().min(2, 'Nama minimal 2 karakter').max(100, 'Nama maksimal 100 karakter'),
+  name: z.string().min(2, { error: () => ({ message: i18n.t('validation.nameMin') }) }).max(100, { error: () => ({ message: i18n.t('validation.nameMax') }) }),
   email: zEmail({ required: true }),
   phone: zPhone({ required: false }),
   role: z.nativeEnum(UserRole),
@@ -62,6 +64,7 @@ const roleOptions = [
 ]
 
 const UserFormPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { userId } = useParams()
   const { addToast } = useGlobalToast()
@@ -105,13 +108,13 @@ const UserFormPage = () => {
           } as UpdateFormData)
           setAvatarPreview(foundUser.avatar_url ? getMediaUrl('avatar', foundUser.id) : null)
         } else {
-          addToast({ type: 'error', message: 'User tidak ditemukan' })
+          addToast({ type: 'error', message: t('admin.users.notFound') })
           navigate(ROUTES.ADMIN.USERS)
         }
         setLoading(false)
       })
     }
-  }, [isEdit, userId, addToast, navigate, reset])
+  }, [isEdit, userId, addToast, navigate, reset, t])
 
   const handleAvatarUpload = async (file: File) => {
     try {
@@ -119,7 +122,7 @@ const UserFormPage = () => {
       setAvatarPreview(URL.createObjectURL(file))
       setShowAvatarModal(false)
     } catch {
-      addToast({ type: 'error', message: 'Gagal memproses gambar' })
+      addToast({ type: 'error', message: t('admin.users.imageError') })
     }
   }
 
@@ -143,11 +146,11 @@ const UserFormPage = () => {
         if (avatarFileRef.current) {
           await userService.uploadAvatar(userId, avatarFileRef.current)
         }
-        addToast({ type: 'success', message: 'User berhasil diperbarui' })
+        addToast({ type: 'success', message: t('admin.users.updatedToast') })
         void updated
       } else {
         if (!tenantId) {
-          addToast({ type: 'error', message: requiresSelection ? 'Pilih tenant aktif terlebih dahulu.' : 'Tenant belum tersedia.' })
+          addToast({ type: 'error', message: requiresSelection ? t('admin.users.selectTenant') : t('admin.users.tenantUnavailable') })
           setSaving(false)
           return
         }
@@ -163,7 +166,7 @@ const UserFormPage = () => {
         if (avatarFileRef.current) {
           await userService.uploadAvatar(created.id, avatarFileRef.current)
         }
-        addToast({ type: 'success', message: 'User baru berhasil ditambahkan' })
+        addToast({ type: 'success', message: t('admin.users.createdToast') })
       }
       navigate(ROUTES.ADMIN.USERS)
     } catch (err) {
@@ -174,7 +177,7 @@ const UserFormPage = () => {
         }
         addToast({ type: 'error', message: friendlyError(err) })
       } else {
-        addToast({ type: 'error', message: 'Gagal menyimpan user' })
+        addToast({ type: 'error', message: t('admin.users.saveError') })
       }
     } finally {
       setSaving(false)
@@ -192,11 +195,11 @@ const UserFormPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isEdit ? 'Edit User' : 'Tambah User Baru'}
-        subtitle={isEdit ? 'Perbarui detail pengguna' : 'Buat akun pengguna baru'}
+        title={isEdit ? t('admin.users.editTitle') : t('admin.users.newTitle')}
+        subtitle={isEdit ? t('admin.users.editSubtitle') : t('admin.users.newSubtitle')}
         breadcrumbs={[
-          { label: 'Users', href: ROUTES.ADMIN.USERS },
-          { label: isEdit ? 'Edit' : 'Tambah' },
+          { label: t('admin.sidebar.users'), href: ROUTES.ADMIN.USERS },
+          { label: isEdit ? t('admin.common.edit') : t('admin.common.add') },
         ]}
       />
 
@@ -206,7 +209,7 @@ const UserFormPage = () => {
           <div className="flex items-center gap-4 pb-6 border-b border-outline-variant">
             <div className="relative w-16 h-16 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0">
               {avatarPreview ? (
-                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover rounded-full" />
+                <img src={avatarPreview} alt={t('admin.users.avatarAlt')} className="w-full h-full object-cover rounded-full" />
               ) : (
                 <span className="text-xl font-bold text-primary">
                   {watch('name') ? watch('name').charAt(0).toUpperCase() : 'U'}
@@ -214,15 +217,15 @@ const UserFormPage = () => {
               )}
             </div>
             <div>
-              <p className="text-sm font-medium text-on-surface mb-2">Foto Profil</p>
-              <Tooltip content="Ubah foto profil">
+              <p className="text-sm font-medium text-on-surface mb-2">{t('admin.users.photoLabel')}</p>
+              <Tooltip content={t('admin.users.changePhoto')}>
                 <button
                   type="button"
                   onClick={() => setShowAvatarModal(true)}
                   className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-container-high hover:bg-surface-variant text-on-surface transition-colors"
                 >
                   <Camera className="w-3.5 h-3.5" />
-                  Ganti Foto
+                  {t('admin.users.changePhotoBtn')}
                 </button>
               </Tooltip>
             </div>
@@ -230,14 +233,14 @@ const UserFormPage = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Nama Lengkap"
+              label={t('auth.field.name')}
               required
               error={errors.name?.message}
               {...register('name')}
             />
 
             <Input
-              label="Email"
+              label={t('auth.field.email')}
               type="email"
               required
               error={errors.email?.message}
@@ -247,14 +250,14 @@ const UserFormPage = () => {
             {!isEdit && (
               <>
                 <Input
-                  label="Password"
+                  label={t('auth.field.password')}
                   type="password"
                   required
                   error={errors.password?.message}
                   {...register('password')}
                 />
                 <Input
-                  label="Konfirmasi Password"
+                  label={t('auth.field.confirmPassword')}
                   type="password"
                   required
                   error={errors.confirmPassword?.message}
@@ -271,7 +274,7 @@ const UserFormPage = () => {
                 render={({ field, fieldState }) => (
                   <PhoneInput
                     id="user_phone"
-                    label="No. HP"
+                    label={t('admin.users.phoneLabel')}
                     value={field.value || ''}
                     onChange={field.onChange}
                     error={fieldState.error?.message}
@@ -282,7 +285,7 @@ const UserFormPage = () => {
             </div>
 
             <Select
-              label="Role"
+              label={t('admin.col.role')}
               options={roleOptions}
               error={errors.role?.message}
               disabled={isSelfEdit}
@@ -293,10 +296,10 @@ const UserFormPage = () => {
 
         <div className="flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={() => navigate(ROUTES.ADMIN.USERS)}>
-            Batal
+            {t('common.cancel')}
           </Button>
           <Button type="submit" loading={saving} icon={<Save className="w-4 h-4" />}>
-            {isEdit ? 'Simpan' : 'Tambah'}
+            {isEdit ? t('common.save') : t('admin.common.add')}
           </Button>
         </div>
       </form>

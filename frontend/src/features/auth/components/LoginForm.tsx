@@ -1,5 +1,6 @@
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import type { UseFormRegister, FieldErrors } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 
 interface LoginFormFields {
@@ -18,6 +19,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ register, errors, showPassword, setShowPassword, isSubmitting, isLocked }: LoginFormProps) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-4">
       {/* Honeypot */}
@@ -29,7 +31,7 @@ export function LoginForm({ register, errors, showPassword, setShowPassword, isS
       {/* Email */}
       <div>
         <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-          Email
+          {t('auth.field.email')}
         </label>
         <div className="relative">
           <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
@@ -58,7 +60,7 @@ export function LoginForm({ register, errors, showPassword, setShowPassword, isS
       {/* Password */}
       <div>
         <label className="block text-xs font-semibold text-on-surface-variant mb-1.5 tracking-wide">
-          Password
+          {t('auth.field.password')}
         </label>
         <div className="relative">
           <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant/40 pointer-events-none" />
@@ -74,7 +76,7 @@ export function LoginForm({ register, errors, showPassword, setShowPassword, isS
                 ? 'border-error text-on-surface'
                 : 'border-outline-variant/60 text-on-surface',
             )}
-            placeholder="Masukkan password"
+            placeholder={t('auth.login.passwordPlaceholder')}
             disabled={isSubmitting || isLocked}
             aria-invalid={!!errors.password}
           />
@@ -108,10 +110,10 @@ export function LoginForm({ register, errors, showPassword, setShowPassword, isS
         {isSubmitting ? (
           <>
             <div className="animate-spin rounded-full h-4 w-4 border-2 border-on-primary border-t-transparent" />
-            <span>Memproses…</span>
+            <span>{t('auth.form.processing')}</span>
           </>
         ) : (
-          'Masuk'
+          t('common.signIn')
         )}
       </button>
     </div>

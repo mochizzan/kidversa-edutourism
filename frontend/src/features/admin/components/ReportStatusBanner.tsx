@@ -3,6 +3,7 @@ import { Button } from '../../../shared/components/ui/Button'
 import { cn } from '../../../core/utils'
 import { formatDate } from '../../../shared/utils'
 import { ReportStatus } from '../../../core/types/enums'
+import { useTranslation } from 'react-i18next'
 import {
   reportStatusBadge,
   reportStatusLabel,
@@ -17,6 +18,7 @@ interface ReportStatusBannerProps {
 }
 
 export const ReportStatusBanner = ({ report, copiedLink, onCopyLink }: ReportStatusBannerProps) => {
+  const { t } = useTranslation()
   const parentLink = report.parent_access_token
     ? `${window.location.origin}/parent/report?token=${report.parent_access_token}`
     : ''
@@ -25,23 +27,23 @@ export const ReportStatusBanner = ({ report, copiedLink, onCopyLink }: ReportSta
     <div className={cn('rounded-2xl p-4 flex flex-col gap-3 no-print', reportStatusBg[report.status])}>
       <div className="flex items-center gap-3">
         <Badge variant={reportStatusBadge[report.status] || 'neutral'} size="md">
-          {reportStatusLabel[report.status] || report.status}
+          {t(reportStatusLabel[report.status]) || report.status}
         </Badge>
         <span className="text-sm font-medium">
           {report.status === ReportStatus.SENT
-            ? `Laporan telah dikirim pada ${report.sent_at ? formatDate(report.sent_at) : '-'}`
+            ? t('admin.reports.statusSent', { date: report.sent_at ? formatDate(report.sent_at) : '-' })
             : report.status === ReportStatus.APPROVED
-              ? 'Laporan sudah disetujui dan siap dikirim ke orang tua'
+              ? t('admin.reports.statusApproved')
               : report.status === ReportStatus.DRAFT
-                ? 'Laporan masih dalam bentuk draft, review sebelum dikirim'
-                : 'Laporan menunggu review'}
+                ? t('admin.reports.statusDraft')
+                : t('admin.reports.statusReview')}
         </span>
       </div>
       {report.status === ReportStatus.SENT && report.parent_access_token && (
         <div className="flex flex-wrap items-center gap-2">
           <code className="text-xs bg-black/10 px-2 py-1 rounded-lg break-all">{parentLink}</code>
           <Button variant="ghost" size="sm" onClick={() => onCopyLink(parentLink)}>
-            {copiedLink ? 'Tersalin' : 'Salin Link'}
+            {copiedLink ? t('admin.reports.copied') : t('admin.reports.copyLink')}
           </Button>
           <Button
             variant="ghost"
@@ -50,7 +52,7 @@ export const ReportStatusBanner = ({ report, copiedLink, onCopyLink }: ReportSta
               window.open(`/parent/report?token=${report.parent_access_token}`, '_blank')
             }
           >
-            Buka Halaman Orang Tua
+            {t('admin.reports.openParentPage')}
           </Button>
         </div>
       )}

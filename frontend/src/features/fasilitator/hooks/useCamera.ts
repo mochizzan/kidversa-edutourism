@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { i18n } from '../../../core/i18n'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 
 export type CameraState = 'loading' | 'active' | 'denied' | 'error'
@@ -62,27 +63,27 @@ export function useCamera({ enabled }: UseCameraOptions) {
         case 'NotAllowedError':
         case 'PermissionDeniedError':
           setCameraState('denied')
-          toastMessage = 'Izin kamera ditolak. Izinkan akses kamera di pengaturan browser.'
+          toastMessage = i18n.t('fasilitator.camera.errDenied')
           break
         case 'NotReadableError':
           setCameraState('error')
-          toastMessage = 'Kamera sedang digunakan oleh aplikasi lain. Tutup aplikasi lain lalu coba lagi.'
+          toastMessage = i18n.t('fasilitator.camera.errBusy')
           break
         case 'NotFoundError':
           setCameraState('error')
-          toastMessage = 'Tidak ada kamera yang terdeteksi. Pasang webcam lalu coba lagi.'
+          toastMessage = i18n.t('fasilitator.camera.errNotFound')
           break
         case 'OverconstrainedError':
           setCameraState('error')
-          toastMessage = 'Kamera tidak mendukung resolusi yang diminta. Coba pilih kamera lain.'
+          toastMessage = i18n.t('fasilitator.camera.errResolution')
           break
         case 'AbortError':
           setCameraState('error')
-          toastMessage = 'Akses kamera dibatalkan. Coba lagi.'
+          toastMessage = i18n.t('fasilitator.camera.errAborted')
           break
         default:
           setCameraState('error')
-          toastMessage = 'Gagal mengakses kamera. Periksa koneksi webcam atau berikan izin.'
+          toastMessage = i18n.t('fasilitator.camera.errGeneric')
           break
       }
 
@@ -186,7 +187,7 @@ export function useCamera({ enabled }: UseCameraOptions) {
     if (cameraState !== 'active' || !enabled) return
     if (streamRef.current && videoRef.current) {
       videoRef.current.srcObject = streamRef.current
-      videoRef.current.play().catch(() => {})
+      videoRef.current.play().catch(() => { })
     }
   }, [cameraState, enabled])
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { i18n } from '../../core/i18n'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../core/constants/api'
 import { ApiError } from '../../core/services/backend-client'
 import { useGlobalToast } from '../components/feedback/Toast'
@@ -72,14 +73,14 @@ export function useClientList<T>(
       setRawData(data)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        setError('Sesi berakhir. Silakan masuk kembali.')
+        setError(i18n.t('common.sessionExpired'))
       } else if (err instanceof Error && 'status' in err) {
-        setError('Backend tidak tersedia. Periksa koneksi lalu coba lagi.')
-        addToast({ type: 'error', message: 'Backend tidak tersedia. Coba lagi.' })
+        setError(i18n.t('common.backend.unavailable'))
+        addToast({ type: 'error', message: i18n.t('common.backend.unavailableToast') })
       } else if (err instanceof Error) {
         setError(err.message)
       } else {
-        setError('Gagal memuat data. Coba lagi.')
+        setError(i18n.t('common.loadFailed'))
       }
     } finally {
       setLoading(false)

@@ -20,8 +20,10 @@ import type { Session } from '../../../core/types'
 import type { SessionSubstage } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { useTranslation } from 'react-i18next'
 
 const SessionsPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { tenantId } = useTenantScope()
   const { data: sessions, loading, error, page, totalItems, setPage, setSearch, refresh } = useClientList<Session>({
@@ -44,11 +46,11 @@ const SessionsPage = () => {
     setCancelling(true)
     try {
       await sessionService.cancel(deleteId)
-      addToast({ type: 'success', message: 'Sesi berhasil dibatalkan' })
+      addToast({ type: 'success', message: t('admin.sessions.cancelledToast') })
       setDeleteId(null)
       refresh()
     } catch {
-      addToast({ type: 'error', message: 'Gagal membatalkan sesi' })
+      addToast({ type: 'error', message: t('admin.sessions.cancelError') })
     } finally {
       setCancelling(false)
     }
@@ -59,7 +61,7 @@ const SessionsPage = () => {
     setDeleting(true)
     try {
       await sessionService.delete(deletingId)
-      addToast({ type: 'success', message: 'Sesi berhasil dihapus' })
+      addToast({ type: 'success', message: t('admin.sessions.deletedToast') })
       setDeletingId(null)
       refresh()
     } catch (err) {
@@ -77,12 +79,12 @@ const SessionsPage = () => {
       const unassigned = detail.groups.filter((g) => !g.facilitator_id).length
       if (unassigned > 0) {
         const names = detail.groups.filter((g) => !g.facilitator_id).map((g) => g.name).join(', ')
-        addToast({ type: 'error', message: `Setiap kelompok harus memiliki fasilitator. Kelompok tanpa fasilitator: ${names}` })
+        addToast({ type: 'error', message: t('admin.sessions.startError', { names }) })
         return false
       }
       return true
     } catch {
-      addToast({ type: 'error', message: 'Gagal memeriksa penugasan fasilitator' })
+      addToast({ type: 'error', message: t('admin.sessions.checkError') })
       return false
     }
   }
@@ -93,7 +95,7 @@ const SessionsPage = () => {
     setStartingId(id)
     try {
       await sessionService.start(id)
-      addToast({ type: 'success', message: 'Sesi berhasil dimulai' })
+      addToast({ type: 'success', message: t('admin.sessions.startedToast') })
       refresh()
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
@@ -133,7 +135,7 @@ const SessionsPage = () => {
     setCompletingId(id)
     try {
       await sessionService.complete(id)
-      addToast({ type: 'success', message: 'Sesi berhasil diselesaikan' })
+      addToast({ type: 'success', message: t('admin.sessions.completedToast') })
       refresh()
     } catch (err) {
       addToast({ type: 'error', message: friendlyError(err) })
@@ -145,7 +147,7 @@ const SessionsPage = () => {
   const columns: Column<Session>[] = [
     {
       key: 'name',
-      header: 'Nama Sesi',
+      header: t('admin.col.sessionName'),
       sortable: true,
       render: (item: Session) => (
         <div>
@@ -156,12 +158,12 @@ const SessionsPage = () => {
     },
     {
       key: 'session_date',
-      header: 'Tanggal',
+      header: t('admin.col.date'),
       render: (item: Session) => formatDate(item.session_date),
     },
     {
       key: 'status',
-      header: 'Status',
+      header: t('admin.col.status'),
       render: (item: Session) => {
         const variants: Record<string, 'primary' | 'success' | 'neutral' | 'danger'> = {
           DRAFT: 'neutral',
@@ -174,17 +176,17 @@ const SessionsPage = () => {
     },
     {
       key: 'actions',
-      header: 'Aksi',
+      header: t('admin.col.action'),
       align: 'right',
       render: (item: Session) => (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip="Lihat Detail" onClick={() => navigate(`/admin/sessions/${item.id}`)} />
+          <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip={t('admin.sessions.viewDetail')} onClick={() => navigate(`/admin/sessions/${item.id}`)} />
           {item.status === 'DRAFT' && (
             <Button
               variant="ghost"
               size="sm"
               icon={<Play className="w-4 h-4 text-green-600" />}
-              tooltip="Mulai Sesi"
+              tooltip={t('admin.sessions.start')}
               loading={startingId === item.id}
               disabled={!!startingId}
               onClick={() => handleStart(item.id)}
@@ -195,17 +197,17 @@ const SessionsPage = () => {
               variant="ghost"
               size="sm"
               icon={<CheckCircle2 className="w-4 h-4 text-blue-600" />}
-              tooltip="Selesaikan Sesi"
+              tooltip={t('admin.sessions.complete')}
               loading={completingId === item.id}
               disabled={!!completingId}
               onClick={() => handleComplete(item.id)}
             />
           )}
           {(item.status === 'DRAFT' || item.status === 'ACTIVE') && (
-            <Button variant="ghost" size="sm" icon={<X className="w-4 h-4 text-error" />} tooltip="Batalkan" onClick={() => setDeleteId(item.id)} />
+            <Button variant="ghost" size="sm" icon={<X className="w-4 h-4 text-error" />} tooltip={t('admin.sessions.cancelBtn')} onClick={() => setDeleteId(item.id)} />
           )}
           {(item.status === 'DRAFT' || item.status === 'CANCELLED') && (
-            <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Hapus Sesi" onClick={() => setDeletingId(item.id)} />
+            <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip={t('admin.sessions.delete')} onClick={() => setDeletingId(item.id)} />
           )}
         </div>
       ),
@@ -215,17 +217,17 @@ const SessionsPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Sessions"
-        subtitle="Kelola sesi edutourism."
+        title={t('admin.sidebar.sessions')}
+        subtitle={t('admin.sessions.subtitle')}
         actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.SESSION_NEW)}>Buat Sesi</Button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.SESSION_NEW)}>{t('admin.sessions.add')}</Button>
         }
       />
 
       {error && (
         <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
           <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
-          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+          <Button variant="secondary" size="sm" onClick={refresh}>{t('common.error.retry')}</Button>
         </div>
       )}
 
@@ -243,36 +245,36 @@ const SessionsPage = () => {
         emptyState={
           <ListEmptyState
             icon={<Calendar className="w-12 h-12" />}
-            title="Belum ada sesi"
-            description="Buat sesi pertama untuk memulai."
+            title={t('admin.sessions.emptyTitle')}
+            description={t('admin.sessions.emptyDesc')}
           />
         }
       />
 
-      <Modal open={!!deleteId} onClose={() => { if (!cancelling) setDeleteId(null) }} closeOnOverlay={!cancelling} title="Batalkan Sesi" footer={
+      <Modal open={!!deleteId} onClose={() => { if (!cancelling) setDeleteId(null) }} closeOnOverlay={!cancelling} title={t('admin.sessions.cancelTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDeleteId(null)} disabled={cancelling}>Batal</Button>
-          <Button variant="danger" onClick={handleDelete} loading={cancelling}>Batalkan</Button>
+          <Button variant="secondary" onClick={() => setDeleteId(null)} disabled={cancelling}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={handleDelete} loading={cancelling}>{t('admin.sessions.cancelBtn')}</Button>
         </div>
       }>
-        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin membatalkan sesi ini?</p>
+        <p className="text-sm text-on-surface-variant">{t('admin.sessions.cancelMsg')}</p>
       </Modal>
 
-      <Modal open={!!deletingId} onClose={() => { if (!deleting) setDeletingId(null) }} closeOnOverlay={!deleting} title="Hapus Sesi" footer={
+      <Modal open={!!deletingId} onClose={() => { if (!deleting) setDeletingId(null) }} closeOnOverlay={!deleting} title={t('admin.sessions.deleteTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDeletingId(null)} disabled={deleting}>Batal</Button>
-          <Button variant="danger" onClick={handlePermanentDelete} loading={deleting}>Hapus</Button>
+          <Button variant="secondary" onClick={() => setDeletingId(null)} disabled={deleting}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={handlePermanentDelete} loading={deleting}>{t('common.delete')}</Button>
         </div>
       }>
-        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menghapus sesi ini secara permanen? Seluruh data terkait (kelompok, peserta, konten, laporan) juga akan dihapus. Tindakan ini tidak dapat dibatalkan.</p>
+        <p className="text-sm text-on-surface-variant">{t('admin.sessions.deleteMsg')}</p>
       </Modal>
 
-      <Modal open={ungradedGroupName !== null} onClose={() => setUngradedGroupName(null)} title="Belum Dapat Menyelesaikan Sesi" footer={
+      <Modal open={ungradedGroupName !== null} onClose={() => setUngradedGroupName(null)} title={t('admin.sessions.ungradedTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setUngradedGroupName(null)}>Tutup</Button>
+          <Button variant="secondary" onClick={() => setUngradedGroupName(null)}>{t('common.close')}</Button>
         </div>
       }>
-        <p className="text-sm text-on-surface-variant">There are ungraded students in group {ungradedGroupName}</p>
+        <p className="text-sm text-on-surface-variant">{t('admin.sessions.ungradedMsg', { group: ungradedGroupName ?? '' })}</p>
       </Modal>
     </div>
   )

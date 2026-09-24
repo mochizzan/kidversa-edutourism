@@ -1,3 +1,5 @@
+import { i18n } from '../../../core/i18n'
+
 export interface ImportRow {
   child_name: string
   child_age: number
@@ -19,7 +21,7 @@ export function parseCSV(text: string): ParseResult {
   const errors: { row: number; message: string }[] = []
 
   if (lines.length < 2) {
-    errors.push({ row: 0, message: 'CSV harus memiliki header dan setidaknya satu baris data' })
+    errors.push({ row: 0, message: i18n.t('admin.participants.csvNeedsHeader') })
     return { valid, errors }
   }
 
@@ -34,7 +36,7 @@ export function parseCSV(text: string): ParseResult {
   // Check required columns
   for (const col of requiredColumns) {
     if (!(col in headerMap)) {
-      errors.push({ row: 0, message: `Kolom wajib "${col}" tidak ditemukan di header CSV` })
+      errors.push({ row: 0, message: i18n.t('admin.participants.csvMissingColumn', { col }) })
     }
   }
 
@@ -48,7 +50,7 @@ export function parseCSV(text: string): ParseResult {
     const rowNum = i + 1
 
     if (values.length < requiredColumns.length) {
-      errors.push({ row: rowNum, message: `Jumlah kolom (${values.length}) tidak mencukupi. Minimal ${requiredColumns.length} kolom.` })
+      errors.push({ row: rowNum, message: i18n.t('admin.participants.csvColumnCount', { count: values.length, min: requiredColumns.length }) })
       continue
     }
 
@@ -64,14 +66,14 @@ export function parseCSV(text: string): ParseResult {
 
     const rowErrors: string[] = []
 
-    if (!child_name) rowErrors.push('Nama anak harus diisi')
-    if (!child_age_str && child_age_str !== '0') rowErrors.push('Usia anak harus diisi')
-    if (!parent_name) rowErrors.push('Nama orang tua harus diisi')
-    if (!parent_phone) rowErrors.push('No. HP orang tua harus diisi')
+    if (!child_name) rowErrors.push(i18n.t('admin.participants.csvNameRequired'))
+    if (!child_age_str && child_age_str !== '0') rowErrors.push(i18n.t('admin.participants.csvAgeRequired'))
+    if (!parent_name) rowErrors.push(i18n.t('admin.participants.csvParentRequired'))
+    if (!parent_phone) rowErrors.push(i18n.t('admin.participants.csvPhoneRequired'))
 
     const child_age = parseInt(child_age_str, 10)
     if (child_age_str && (isNaN(child_age) || child_age < 0 || child_age > 18)) {
-      rowErrors.push('Usia anak harus angka antara 0-18')
+      rowErrors.push(i18n.t('admin.participants.csvAgeRange'))
     }
 
     if (rowErrors.length > 0) {

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 import { useConnectionStatus } from '../../hooks/useConnectionStatus'
 
@@ -9,16 +10,14 @@ const CONNECTED: 'online' | 'degraded' | 'reconnecting' = 'online'
 
 const config = {
   connected: {
-    label: 'Terhubung ke server',
-    detail: 'Semua data tersinkronisasi',
+    labelKey: 'common.connection.labelOnline',
     icon: 'text-green-600',
     ring: 'text-green-600',
     glow: 'bg-green-500',
     dot: 'bg-green-500',
   },
   disconnected: {
-    label: 'Terputus dari server',
-    detail: 'Mencoba menyambungkan kembali…',
+    labelKey: 'common.connection.labelOffline',
     icon: 'text-red-600',
     ring: 'text-red-600',
     glow: 'bg-red-500',
@@ -27,6 +26,7 @@ const config = {
 } as const
 
 export default function ConnectionStatus({ className }: ConnectionStatusProps) {
+  const { t } = useTranslation()
   const { status } = useConnectionStatus()
   const isConnected = status === CONNECTED
   const state = isConnected ? config.connected : config.disconnected
@@ -43,7 +43,7 @@ export default function ConnectionStatus({ className }: ConnectionStatusProps) {
         strokeLinecap="round"
         strokeLinejoin="round"
         role="img"
-        aria-label={state.label}
+        aria-label={t(state.labelKey)}
       >
         <path d="M2.5 8.5a15 15 0 0 1 19 0" />
         <path d="M5.5 12a10 10 0 0 1 13 0" />

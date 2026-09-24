@@ -47,7 +47,6 @@ export const TOAST_KEYFRAMES = `
 
 export interface ToastVisualConfig {
   icon: LucideIcon
-  label: string
   bg: string
   text: string
   border: string
@@ -62,7 +61,6 @@ export interface ToastVisualConfig {
 export const TOAST_CONFIG: Record<ToastType, ToastVisualConfig> = {
   success: {
     icon: CheckCircle2,
-    label: 'Berhasil',
     bg: 'bg-green-50/92 dark:bg-green-950/80',
     text: 'text-green-900 dark:text-green-100',
     border: 'border-green-200/50 dark:border-green-700/40',
@@ -75,7 +73,6 @@ export const TOAST_CONFIG: Record<ToastType, ToastVisualConfig> = {
   },
   error: {
     icon: XCircle,
-    label: 'Gagal',
     bg: 'bg-red-50/92 dark:bg-red-950/80',
     text: 'text-red-900 dark:text-red-100',
     border: 'border-red-200/50 dark:border-red-700/40',
@@ -88,20 +85,18 @@ export const TOAST_CONFIG: Record<ToastType, ToastVisualConfig> = {
   },
   warning: {
     icon: AlertTriangle,
-    label: 'Peringatan',
     bg: 'bg-amber-50/92 dark:bg-amber-950/80',
     text: 'text-amber-900 dark:text-amber-100',
     border: 'border-amber-200/50 dark:border-amber-700/40',
     accent: 'bg-amber-500',
     progressBg: 'bg-amber-400/50 dark:bg-amber-500/40',
     shadow: 'shadow-[0_8px_32px_rgba(245,158,11,0.12)] dark:shadow-none',
-    iconWrap: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300',
+    iconWrap: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-300',
     focusRing: 'focus-visible:ring-amber-400',
     badgeBg: 'bg-amber-500',
   },
   info: {
     icon: Info,
-    label: 'Info',
     bg: 'bg-blue-50/92 dark:bg-blue-950/80',
     text: 'text-blue-900 dark:text-blue-100',
     border: 'border-blue-200/50 dark:border-blue-700/40',
@@ -113,3 +108,11 @@ export const TOAST_CONFIG: Record<ToastType, ToastVisualConfig> = {
     badgeBg: 'bg-blue-500',
   },
 }
+
+/** Catalog keys for the human-readable toast type label (rendered via t). */
+export const TOAST_LABEL_KEYS = {
+  success: 'common.toast.success',
+  error: 'common.toast.error',
+  warning: 'common.toast.warning',
+  info: 'common.toast.info',
+} as const

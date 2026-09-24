@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ROUTES } from "../../../core/constants/app";
 import { ArrowLeft, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../../shared/components/ui/Button";
 import { PageHeader } from "../../../shared/components/ui/PageHeader";
 import { useGlobalToast } from "../../../shared/components/feedback/Toast";
@@ -17,6 +18,7 @@ const ContentFormPage = () => {
   const { contentId } = useParams();
   const isEdit = Boolean(contentId);
   const { addToast } = useGlobalToast();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(isEdit);
   const [content, setContent] = useState<Content | null>(null);
@@ -30,7 +32,7 @@ const ContentFormPage = () => {
       .then((c) => {
         if (cancelled) return;
         if (!c) {
-          addToast({ type: "error", message: "Konten tidak ditemukan" });
+          addToast({ type: "error", message: t("admin.content.notFound") });
           navigate(ROUTES.ADMIN.CONTENT);
           return;
         }
@@ -38,7 +40,7 @@ const ContentFormPage = () => {
       })
       .catch(() => {
         if (!cancelled)
-          addToast({ type: "error", message: "Gagal memuat konten" });
+          addToast({ type: "error", message: t("admin.content.loadError") });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -46,7 +48,7 @@ const ContentFormPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [isEdit, contentId, addToast, navigate]);
+  }, [isEdit, contentId, addToast, navigate, t]);
 
   const handleSubmit = async (values: StageContentFormValues, file: File | null) => {
     const youtube = values.youtube_url?.trim() || undefined;
@@ -70,7 +72,7 @@ const ContentFormPage = () => {
             duration_seconds: values.duration_seconds,
           });
         }
-        addToast({ type: "success", message: "Konten berhasil diperbarui" });
+        addToast({ type: "success", message: t("admin.content.updatedToast") });
       } else if (file) {
         await contentService.upload({
           file,
@@ -79,7 +81,7 @@ const ContentFormPage = () => {
           duration_seconds: values.duration_seconds,
           youtube_url: youtube,
         });
-        addToast({ type: "success", message: "Konten baru berhasil ditambahkan" });
+        addToast({ type: "success", message: t("admin.content.createdToast") });
       } else {
         await contentService.create({
           title: values.title.trim(),
@@ -88,11 +90,11 @@ const ContentFormPage = () => {
           file_type: values.file_type,
           duration_seconds: values.duration_seconds,
         });
-        addToast({ type: "success", message: "Konten baru berhasil ditambahkan" });
+        addToast({ type: "success", message: t("admin.content.createdToast") });
       }
       navigate(ROUTES.ADMIN.CONTENT);
     } catch {
-      addToast({ type: "error", message: "Gagal menyimpan konten" });
+      addToast({ type: "error", message: t("admin.content.saveError") });
     } finally {
     }
   };
@@ -108,15 +110,15 @@ const ContentFormPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isEdit ? "Edit Konten" : "Tambah Konten Baru"}
+        title={isEdit ? t("admin.content.editTitle") : t("admin.content.newTitle")}
         subtitle={
           isEdit
-            ? "Perbarui detail konten"
-            : "Buat konten baru untuk perpustakaan tenant"
+            ? t("admin.content.editSubtitle")
+            : t("admin.content.newSubtitle")
         }
         breadcrumbs={[
-          { label: "Content Manager", href: ROUTES.ADMIN.CONTENT },
-          { label: isEdit ? "Edit" : "Tambah" },
+          { label: t("admin.sidebar.content"), href: ROUTES.ADMIN.CONTENT },
+          { label: isEdit ? t("admin.common.edit") : t("admin.common.add") },
         ]}
         actions={
           <Button
@@ -124,7 +126,7 @@ const ContentFormPage = () => {
             icon={<ArrowLeft className="w-4 h-4" />}
             onClick={() => navigate(ROUTES.ADMIN.CONTENT)}
           >
-            Kembali
+            {t("common.back")}
           </Button>
         }
       />

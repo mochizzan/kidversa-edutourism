@@ -26,6 +26,7 @@ import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { programService } from '../../../core/services/programs'
 import { programSubstageService } from '../../../core/services/program-substages'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
+import { useTranslation } from 'react-i18next'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { Program, ProgramStage } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
@@ -35,6 +36,7 @@ interface ExpandedTopicsPanelProps {
 }
 
 function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [stages, setStages] = useState<ProgramStage[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,7 +91,7 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-on-surface">Topik dalam Program</h4>
+        <h4 className="text-sm font-semibold text-on-surface">{t('admin.programs.panelTitle')}</h4>
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
@@ -97,7 +99,7 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
             icon={<PlusCircle className="w-4 h-4" />}
             onClick={() => navigate(topicNewPath({ programId }))}
           >
-            Tambah Topik
+            {t('admin.topic.add')}
           </Button>
           <Button
             variant="ghost"
@@ -105,15 +107,15 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
             icon={<Layers className="w-4 h-4" />}
             onClick={() => navigate(topicListPath({ programId }))}
           >
-            Lihat Semua Topik
+            {t('admin.topic.viewAll')}
           </Button>
         </div>
       </div>
 
       {loading ? (
-        <div className="text-sm text-on-surface-variant">Memuat topik…</div>
+        <div className="text-sm text-on-surface-variant">{t('admin.programs.panelLoading')}</div>
       ) : stages.length === 0 ? (
-        <div className="text-sm text-on-surface-variant">Belum ada topik dalam program ini.</div>
+        <div className="text-sm text-on-surface-variant">{t('admin.programs.panelEmpty')}</div>
       ) : (
         <div className="space-y-3">
           {stages.map((stage) => (
@@ -125,7 +127,7 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
                 {stage.badge_image_url ? (
                   <img
                     src={stage.badge_image_url}
-                    alt={stage.badge_name || 'badge'}
+                    alt={stage.badge_name || t('admin.programs.badgeAlt')}
                     className="h-10 w-10 rounded-full object-cover border border-outline-variant"
                   />
                 ) : (
@@ -136,11 +138,11 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
                 <div className="min-w-0">
                   <p className="font-medium text-on-surface truncate">{stage.name}</p>
                   <p className="text-xs text-on-surface-variant truncate">
-                    {stage.badge_name ? `Badge: ${stage.badge_name}` : 'Tanpa badge'}
+                    {stage.badge_name ? t('admin.programs.badgeLine', { name: stage.badge_name }) : t('admin.programs.noBadge')}
                     {' · '}
-                    {stage.is_photo_stage ? 'Foto-stage' : 'Bukan foto-stage'}
+                    {stage.is_photo_stage ? t('admin.programs.photoStage') : t('admin.programs.notPhotoStage')}
                     {' · '}
-                    {counts[stage.id] ?? 0} Kegiatan
+                    {t('admin.programs.activityCount', { count: counts[stage.id] ?? 0 })}
                   </p>
                 </div>
               </div>
@@ -149,21 +151,21 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
                   variant="ghost"
                   size="sm"
                   icon={<Eye className="w-4 h-4" />}
-                  tooltip="Info"
+                  tooltip={t('admin.common.info')}
                   onClick={() => navigate(topicDetailPath(stage.id))}
                 />
                 <Button
                   variant="ghost"
                   size="sm"
                   icon={<Pencil className="w-4 h-4" />}
-                  tooltip="Edit"
+                  tooltip={t('admin.common.edit')}
                   onClick={() => navigate(topicEditPath(stage.id))}
                 />
                 <Button
                   variant="ghost"
                   size="sm"
                   icon={<Trash2 className="w-4 h-4 text-error" />}
-                  tooltip="Hapus"
+                  tooltip={t('common.delete')}
                   onClick={() => setDeleteStage(stage)}
                 />
               </div>
@@ -175,16 +177,16 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
       <Modal
         open={!!deleteStage}
         onClose={() => setDeleteStage(null)}
-        title="Hapus Topik"
+        title={t('admin.topic.deleteTitle')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setDeleteStage(null)}>Batal</Button>
-            <Button variant="danger" onClick={handleDeleteStage}>Hapus</Button>
+            <Button variant="secondary" onClick={() => setDeleteStage(null)}>{t('common.cancel')}</Button>
+            <Button variant="danger" onClick={handleDeleteStage}>{t('common.delete')}</Button>
           </div>
         }
       >
         <p className="text-sm text-on-surface-variant">
-          Apakah Anda yakin ingin menghapus topik “{deleteStage?.name}”? Seluruh kegiatan di dalamnya juga akan dihapus.
+          {t('admin.topic.deleteMsgPanel', { name: deleteStage?.name ?? '' })}
         </p>
       </Modal>
     </div>
@@ -192,6 +194,7 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
 }
 
 const ProgramsPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { tenantId } = useTenantScope()
   const { data: programs, loading, error, page, totalItems, setPage, setSearch, refresh } = useClientList<Program>({
@@ -217,7 +220,7 @@ const ProgramsPage = () => {
   const columns: Column<Program>[] = [
     {
       key: 'name',
-      header: 'Nama Program',
+      header: t('admin.col.programName'),
       sortable: true,
       render: (item: Program) => (
         <div>
@@ -228,31 +231,31 @@ const ProgramsPage = () => {
     },
     {
       key: 'is_active',
-      header: 'Status',
+      header: t('admin.col.status'),
       render: (item: Program) => (
-        <Badge variant={item.is_active ? 'success' : 'neutral'}>{item.is_active ? 'Aktif' : 'Nonaktif'}</Badge>
+        <Badge variant={item.is_active ? 'success' : 'neutral'}>{item.is_active ? t('admin.status.active') : t('admin.status.inactive')}</Badge>
       ),
     },
     {
       key: 'created_at',
-      header: 'Dibuat',
+      header: t('admin.col.created'),
       render: (item: Program) => formatDate(item.created_at),
     },
     {
       key: 'actions',
-      header: 'Aksi',
+      header: t('admin.col.action'),
       align: 'right',
       render: (item: Program) => (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip="Edit" onClick={() => navigate(programDetailPath(item.id))} />
+          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip={t('admin.common.edit')} onClick={() => navigate(programDetailPath(item.id))} />
           <Button
             variant="ghost"
             size="sm"
             icon={item.is_active ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
-            tooltip="Ubah Status"
+            tooltip={t('admin.common.toggleStatus')}
             onClick={() => handleToggle(item.id)}
           />
-          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip="Hapus" onClick={() => setDeleteId(item.id)} />
+          <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip={t('common.delete')} onClick={() => setDeleteId(item.id)} />
         </div>
       ),
     },
@@ -261,17 +264,17 @@ const ProgramsPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Programs"
-        subtitle="Kelola program edutourism dan topik di dalamnya."
+        title={t('admin.programs.pageTitle')}
+        subtitle={t('admin.programs.pageSubtitle')}
         actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.PROGRAM_NEW)}>Buat Program</Button>
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.PROGRAM_NEW)}>{t('admin.programs.add')}</Button>
         }
       />
 
       {error && (
         <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-error-container text-on-error-container text-sm">
           <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 shrink-0" />{error}</span>
-          <Button variant="secondary" size="sm" onClick={refresh}>Coba Lagi</Button>
+          <Button variant="secondary" size="sm" onClick={refresh}>{t('common.error.retry')}</Button>
         </div>
       )}
 
@@ -290,19 +293,19 @@ const ProgramsPage = () => {
         emptyState={
           <ListEmptyState
             icon={<FolderOpen className="w-12 h-12" />}
-            title="Belum ada program"
-            description="Buat program pertama untuk memulai."
+            title={t('admin.programs.emptyTitle')}
+            description={t('admin.programs.emptyDesc')}
           />
         }
       />
 
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Hapus Program" footer={
+      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title={t('admin.programs.deleteTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDeleteId(null)}>Batal</Button>
-          <Button variant="danger" onClick={handleDelete}>Hapus</Button>
+          <Button variant="secondary" onClick={() => setDeleteId(null)}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={handleDelete}>{t('common.delete')}</Button>
         </div>
       }>
-        <p className="text-sm text-on-surface-variant">Apakah Anda yakin ingin menghapus program ini?</p>
+        <p className="text-sm text-on-surface-variant">{t('admin.programs.deleteMsg')}</p>
       </Modal>
     </div>
   )

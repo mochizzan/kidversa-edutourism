@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Star, Clipboard, ShieldX } from 'lucide-react'
 import { cn } from '../../../core/utils'
 import { Button } from '../../../shared/components/ui/Button'
-import { RATING_LABELS, MAX_STAR_RATING } from '../../../core/constants/assessment'
+import { useTranslation } from 'react-i18next'
+import { RATING_LABEL_KEYS, MAX_STAR_RATING } from '../../../core/constants/assessment'
 import type { Assessment, CreateAssessmentDTO, SessionSubstage } from '../../../core/types'
 
 interface KegiatanCardProps {
@@ -24,6 +25,8 @@ function StarRatingInput({
   onChange: (v: number) => void
   disabled?: boolean
 }) {
+  const { t } = useTranslation()
+  const ratingKey = RATING_LABEL_KEYS[value as keyof typeof RATING_LABEL_KEYS]
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {[1, 2, 3, 4].map((star) => (
@@ -37,7 +40,7 @@ function StarRatingInput({
             'hover:scale-110 active:scale-95',
             disabled && 'cursor-not-allowed opacity-60',
           )}
-          aria-label={`Nilai ${star} dari ${MAX_STAR_RATING} bintang`}
+          aria-label={t('fasilitator.assessment.starAria', { star, max: MAX_STAR_RATING })}
         >
           <Star
             className={cn(
@@ -50,7 +53,7 @@ function StarRatingInput({
         </button>
       ))}
       <span className="ml-2 text-sm font-medium text-gray-600">
-        {RATING_LABELS[value] ?? `${value}/${MAX_STAR_RATING}`}
+        {ratingKey ? t(ratingKey) : `${value}/${MAX_STAR_RATING}`}
       </span>
     </div>
   )
@@ -65,6 +68,7 @@ export function KegiatanCard({
   onSave,
   isSavingGlobal,
 }: KegiatanCardProps) {
+  const { t } = useTranslation()
   const initialStar = useRef(assessment?.star_rating ?? 0)
   const initialComment = useRef(assessment?.comment ?? '')
 
@@ -130,7 +134,7 @@ export function KegiatanCard({
         {!isMine && (
           <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200">
             <ShieldX className="w-3 h-3 inline mr-0.5 -mt-0.5" />
-            Bukan kelompok Anda
+            {t('fasilitator.assessment.notMine')}
           </span>
         )}
       </div>
@@ -138,7 +142,7 @@ export function KegiatanCard({
       {/* Star rating */}
       <div className="mb-3">
         <label className="block text-xs font-medium text-gray-600 mb-1.5">
-          Penilaian Bintang
+          {t('fasilitator.assessment.ratingLabel')}
         </label>
         <StarRatingInput
           value={starRating}
@@ -150,12 +154,12 @@ export function KegiatanCard({
       {/* Comment */}
       <div className="mb-3">
         <label className="block text-xs font-medium text-gray-600 mb-1.5">
-          Komentar
+          {t('fasilitator.assessment.commentLabel')}
         </label>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Tulis komentar tentang kegiatan ini..."
+          placeholder={t('fasilitator.assessment.commentPlaceholder')}
           maxLength={300}
           rows={3}
           disabled={!isMine || isSaving}
@@ -174,11 +178,11 @@ export function KegiatanCard({
           disabled={!isDirty || isSaving || !isMine}
           size="sm"
         >
-          Simpan
+          {t('common.save')}
         </Button>
         {saveSuccess && (
           <span className="text-sm text-green-600 font-medium animate-pulse">
-            ✓ Tersimpan!
+            {t('fasilitator.assessment.saved')}
           </span>
         )}
       </div>

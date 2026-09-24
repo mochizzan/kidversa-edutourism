@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Calendar } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { sessionService } from '../../../core/services/sessions'
@@ -13,12 +14,12 @@ import { friendlyError } from '../../../core/utils/errorMessages'
 
 type FilterKey = 'all' | 'today' | 'completed' | 'cancelled'
 
-const filterLabels: Record<FilterKey, string> = {
-  all: 'Semua',
-  today: 'Hari Ini',
-  completed: 'Selesai',
-  cancelled: 'Dibatalkan',
-}
+const filterLabels = {
+  all: 'fasilitator.dashboard.filterAll',
+  today: 'fasilitator.dashboard.filterToday',
+  completed: 'fasilitator.dashboard.filterCompleted',
+  cancelled: 'fasilitator.dashboard.filterCancelled',
+} as const
 
 const roleLabel: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
@@ -28,6 +29,7 @@ const roleLabel: Record<string, string> = {
 }
 
 const DashboardPage = () => {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -114,7 +116,7 @@ const DashboardPage = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-on-surface">
-            Hai, {user?.name ?? 'Fasilitator'}!
+            {t('fasilitator.dashboard.greeting', { name: user?.name ?? 'Fasilitator' })}
           </h1>
         </div>
         <ErrorState message={error} onRetry={() => fetchSessions(activeFilter)} />
@@ -128,7 +130,7 @@ const DashboardPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-on-surface">
-            Hai, {user?.name ?? 'Fasilitator'}!
+            {t('fasilitator.dashboard.greeting', { name: user?.name ?? 'Fasilitator' })}
           </h1>
           <div className="flex items-center gap-2 mt-1">
             <Badge variant="primary" size="sm">
@@ -141,7 +143,7 @@ const DashboardPage = () => {
       {/* Semua Sesi */}
       <section>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <h2 className="text-lg font-semibold text-on-surface">Semua Sesi</h2>
+          <h2 className="text-lg font-semibold text-on-surface">{t('fasilitator.dashboard.allSessions')}</h2>
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {(Object.keys(filterLabels) as FilterKey[]).map((key) => (
               <button
@@ -156,7 +158,7 @@ const DashboardPage = () => {
                   switching && 'opacity-60 cursor-wait',
                 )}
               >
-                {filterLabels[key]}
+                {t(filterLabels[key])}
               </button>
             ))}
           </div>
@@ -165,11 +167,11 @@ const DashboardPage = () => {
         {sessions.length === 0 ? (
           <EmptyState
             icon={<Calendar className="w-12 h-12" />}
-            title="Belum ada sesi"
+            title={t('fasilitator.dashboard.emptyTitle')}
             description={
               activeFilter === 'all'
-                ? 'Anda belum ditugaskan di sesi manapun.'
-                : `Tidak ada sesi untuk filter "${filterLabels[activeFilter]}".`
+                ? t('fasilitator.dashboard.emptyAll')
+                : t('fasilitator.dashboard.emptyFiltered', { filter: t(filterLabels[activeFilter]) })
             }
           />
         ) : (

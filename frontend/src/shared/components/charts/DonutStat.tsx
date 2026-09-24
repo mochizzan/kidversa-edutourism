@@ -1,13 +1,16 @@
+import { useTranslation } from 'react-i18next'
+import { i18n } from '../../../core/i18n'
 import { useAuth } from '../../../core/hooks/useAuth'
 
 function getGreeting(): string {
   const hour = new Date().getHours()
-  if (hour < 12) return 'Selamat Pagi'
-  if (hour < 17) return 'Selamat Siang'
-  return 'Selamat Malam'
+  if (hour < 12) return i18n.t('common.greeting.morning')
+  if (hour < 17) return i18n.t('common.greeting.afternoon')
+  return i18n.t('common.greeting.evening')
 }
 
 export function DonutStat() {
+  const { t } = useTranslation()
   const { user } = useAuth()
 
   return (
@@ -20,7 +23,7 @@ export function DonutStat() {
           {getGreeting()}, {user?.name || 'Admin'}!
         </h2>
         <p className="text-xs opacity-90 leading-relaxed">
-          Kelola program edutourism Anda dengan mudah. Pantau sesi, peserta, dan laporan dalam satu tempat.
+          {t('common.hero.tagline')}
         </p>
       </div>
       <div className="absolute -right-6 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl transition-all duration-700 group-hover:scale-150 group-hover:opacity-60 group-hover:-translate-x-4 group-hover:-translate-y-4" />

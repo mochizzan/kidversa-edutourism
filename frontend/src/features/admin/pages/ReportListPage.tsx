@@ -14,6 +14,7 @@ import type { Session, Report } from '../../../core/types'
 import { ReportStatus } from '../../../core/types/enums'
 import { cn } from '../../../core/utils'
 import { formatDate } from '../../../shared/utils'
+import { useTranslation } from 'react-i18next'
 
 /* ── Helpers ── */
 const statusVariant: Record<string, 'primary' | 'success' | 'neutral' | 'danger' | 'warning'> = {
@@ -37,6 +38,7 @@ interface SessionWithReports {
 const REPORT_PAGE_SIZE = DEFAULT_CLIENT_PAGE_SIZE
 
 const ReportListPage = () => {
+  const { t } = useTranslation()
   const [sessions, setSessions] = useState<SessionWithReports[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -77,7 +79,7 @@ const ReportListPage = () => {
 
       setSessions(sessionWithReports)
     } catch {
-      setError('Gagal memuat data laporan. Silakan coba lagi.')
+      setError(t('admin.reports.loadError'))
     } finally {
       setLoading(false)
     }
@@ -85,7 +87,7 @@ const ReportListPage = () => {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [t])
 
   useEffect(() => {
     setReportPage(1)
@@ -111,7 +113,7 @@ const ReportListPage = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Laporan" subtitle="Kelola laporan penilaian untuk setiap sesi." />
+        <PageHeader title={t('admin.reports.title')} subtitle={t('admin.reports.subtitle')} />
         <div className="grid gap-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-surface rounded-2xl p-6 animate-pulse">
@@ -129,7 +131,7 @@ const ReportListPage = () => {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Laporan" subtitle="Kelola laporan penilaian untuk setiap sesi." />
+        <PageHeader title={t('admin.reports.title')} subtitle={t('admin.reports.subtitle')} />
         <ErrorState message={error} onRetry={loadData} />
       </div>
     )
@@ -139,11 +141,11 @@ const ReportListPage = () => {
   if (sessions.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Laporan" subtitle="Kelola laporan penilaian untuk setiap sesi." />
+        <PageHeader title={t('admin.reports.title')} subtitle={t('admin.reports.subtitle')} />
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
-          title="Belum ada sesi"
-          description="Buat sesi terlebih dahulu untuk mulai membuat laporan."
+          title={t('admin.sessions.emptyTitle')}
+          description={t('admin.reports.emptyDesc')}
         />
       </div>
     )
@@ -151,22 +153,22 @@ const ReportListPage = () => {
 
   /* ── Filters ── */
   const filters = [
-    { key: 'all', label: 'Semua' },
-    { key: 'has_reports', label: 'Ada Laporan' },
-    { key: 'no_reports', label: 'Belum Ada' },
-    { key: 'draft', label: 'Draft' },
-    { key: 'sent', label: 'Terkirim' },
+    { key: 'all', label: t('admin.common.all') },
+    { key: 'has_reports', label: t('admin.reports.filterHas') },
+    { key: 'no_reports', label: t('admin.reports.filterNone') },
+    { key: 'draft', label: t('admin.reportStatus.draft') },
+    { key: 'sent', label: t('admin.reportStatus.sent') },
   ]
 
   /* ── Render ── */
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Laporan"
-        subtitle="Kelola laporan penilaian untuk setiap sesi."
+        title={t('admin.reports.title')}
+        subtitle={t('admin.reports.subtitle')}
         actions={
           <Button variant="secondary" size="sm" onClick={loadData}>
-            <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+            <RefreshCw className="w-4 h-4 mr-1" /> {t('admin.reports.refresh')}
           </Button>
         }
       />
@@ -193,8 +195,8 @@ const ReportListPage = () => {
       {filteredSessions.length === 0 ? (
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
-          title="Tidak ada sesi"
-          description="Tidak ada sesi yang sesuai dengan filter yang dipilih."
+          title={t('admin.reports.noSessionTitle')}
+          description={t('admin.reports.noSessionDesc')}
         />
       ) : (
         <div className="grid gap-4">
@@ -227,13 +229,13 @@ const ReportListPage = () => {
                 {reportCount > 0 && (
                   <div className="mt-3 flex items-center gap-3 text-sm">
                     <span className="text-on-surface-variant">
-                      {reportCount} laporan
+                      {t('admin.reports.countLaporan', { count: reportCount })}
                     </span>
                     {sentCount > 0 && (
-                      <Badge variant="primary" size="sm">{sentCount} terkirim</Badge>
+                      <Badge variant="primary" size="sm">{t('admin.reports.countSent', { count: sentCount })}</Badge>
                     )}
                     {draftCount > 0 && (
-                      <Badge variant="neutral" size="sm">{draftCount} draft</Badge>
+                      <Badge variant="neutral" size="sm">{t('admin.reports.countDraft', { count: draftCount })}</Badge>
                     )}
                   </div>
                 )}
@@ -248,9 +250,9 @@ const ReportListPage = () => {
                         overallStatus === 'draft' && 'bg-gray-400',
                       )} />
                       <span className="text-xs text-on-surface-variant">
-                        {overallStatus === 'all_sent' && 'Semua laporan sudah dikirim'}
-                        {overallStatus === 'in_progress' && 'Beberapa laporan sudah diproses'}
-                        {overallStatus === 'draft' && 'Laporan masih dalam bentuk draft'}
+                        {overallStatus === 'all_sent' && t('admin.reports.overallAllSent')}
+                        {overallStatus === 'in_progress' && t('admin.reports.overallInProgress')}
+                        {overallStatus === 'draft' && t('admin.reports.overallDraft')}
                       </span>
                     </div>
                   </div>
@@ -267,7 +269,7 @@ const ReportListPage = () => {
         totalItems={filteredSessions.length}
         pageSize={REPORT_PAGE_SIZE}
         onPageChange={setReportPage}
-        itemLabel="sesi"
+        itemLabel={t('admin.reports.sessionNoun')}
       />
     </div>
   )

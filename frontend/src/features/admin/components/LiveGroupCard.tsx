@@ -1,4 +1,5 @@
 import { Lock, Unlock, ArrowRight, CheckCircle2, AlertTriangle, Users, Flag } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Button } from '../../../shared/components/ui/Button'
 import { cn } from '../../../core/utils'
@@ -26,12 +27,12 @@ interface LiveGroupCardProps {
   onCompleteKegiatan: (sessionSubstageId: string) => void
 }
 
-const statusConfig: Record<GroupStatus, { label: string; variant: 'warning' | 'primary' | 'success' | 'neutral' }> = {
-  LOCKED: { label: 'Terkunci', variant: 'neutral' },
-  UNLOCKED: { label: 'Terbuka', variant: 'primary' },
-  IN_PROGRESS: { label: 'Berlangsung', variant: 'warning' },
-  COMPLETED: { label: 'Selesai', variant: 'success' },
-}
+const statusConfig = {
+  LOCKED: { labelKey: 'admin.sessions.stageLocked', variant: 'neutral' },
+  UNLOCKED: { labelKey: 'admin.sessions.unlockedLabel', variant: 'primary' },
+  IN_PROGRESS: { labelKey: 'admin.sessions.stageInProgress', variant: 'warning' },
+  COMPLETED: { labelKey: 'common.done', variant: 'success' },
+} as const satisfies Record<GroupStatus, { labelKey: string; variant: 'warning' | 'primary' | 'success' | 'neutral' }>
 
 export const LiveGroupCard = ({
   group: g,
@@ -49,6 +50,7 @@ export const LiveGroupCard = ({
   onLock,
   onCompleteKegiatan,
 }: LiveGroupCardProps) => {
+  const { t } = useTranslation()
   // stageId is a Kegiatan id (C3), so the SubTopik's leaves are its siblings —
   // the helper resolves up to the parent SubTopik and returns them in order.
   const kegiatanForStage = siblingSubstages(sessionSubstages, stageId)
@@ -66,7 +68,7 @@ export const LiveGroupCard = ({
         return (
           <div className="flex items-center gap-1 mt-3 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5">
             <AlertTriangle className="w-3.5 h-3.5" />
-            <span>⚠️ Melebihi durasi standar</span>
+            <span>⚠️ {t('admin.sessions.durationExceeded')}</span>
           </div>
         )
       }
@@ -87,7 +89,7 @@ export const LiveGroupCard = ({
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-on-surface text-lg">{g.group.name}</h3>
-        <Badge variant={config.variant}>{config.label}</Badge>
+        <Badge variant={config.variant}>{t(config.labelKey)}</Badge>
       </div>
 
       <StageProgressBar
@@ -100,7 +102,7 @@ export const LiveGroupCard = ({
           const ps = programStages.find((pp) => pp.id === ss?.program_stage_id)
           return {
             id: p.session_substage_id,
-            name: stageNames[parentId || ''] || ps?.name || 'Topik',
+            name: stageNames[parentId || ''] || ps?.name || t('admin.col.topic'),
             sequenceOrder: ps?.sequence_order ?? 0,
             status: p.status,
           }
@@ -110,18 +112,18 @@ export const LiveGroupCard = ({
       <div className="flex items-center justify-between mt-4 text-sm">
         <span className="text-on-surface-variant">🎯 {stageNames[activeStageId || ''] || '-'}</span>
         <span className="text-on-surface-variant font-medium">
-          Topik {activeIndex.current}/{activeIndex.total}
+          {t('admin.sessions.topicProgress', { current: activeIndex.current, total: activeIndex.total })}
         </span>
       </div>
 
       <div className="flex items-center gap-1 mt-2 text-sm text-on-surface-variant">
         <Users className="w-4 h-4" />
-        <span>{g.participants.length} anak</span>
+        <span>{t('admin.sessions.childCount', { count: g.participants.length })}</span>
       </div>
 
       {kegiatanForStage.length > 0 && (
         <div className="mt-3 space-y-1.5">
-          <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Kegiatan</p>
+          <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">{t('admin.sessions.kegiatanHeading')}</p>
           {kegiatanForStage.map((k, idx) => {
             const done = k.status === 'COMPLETED'
             return (
@@ -130,7 +132,7 @@ export const LiveGroupCard = ({
                 className="flex items-center justify-between gap-2 rounded-lg bg-surface-variant px-3 py-2"
               >
                 <span className="text-sm text-on-surface truncate">
-                  {done ? '✅' : '⏳'} Kegiatan {idx + 1}
+                  {done ? '✅' : '⏳'} {t('admin.sessions.kegiatanN', { n: idx + 1 })}
                 </span>
                 {!done && isKoordinator && (
                   <Button
@@ -139,7 +141,7 @@ export const LiveGroupCard = ({
                     onClick={() => onCompleteKegiatan(k.id)}
                     icon={<Flag className="w-3.5 h-3.5" />}
                   >
-                    Selesaikan Kegiatan
+                    {t('admin.sessions.finishKegiatan')}
                   </Button>
                 )}
               </div>
@@ -152,20 +154,20 @@ export const LiveGroupCard = ({
         {status === 'LOCKED' && stageId && (
           <Button variant="primary" size="sm" onClick={() => onUnlock(g.group.id, stageId)}>
             <Unlock className="w-4 h-4 mr-1" />
-            Buka Konten
+            {t('admin.sessions.openContent')}
           </Button>
         )}
         {status === 'IN_PROGRESS' && (
           <Button variant="primary" size="sm" onClick={() => onComplete(g.group.id, stageId!)}>
             <CheckCircle2 className="w-4 h-4 mr-1" />
-            Selesai
+            {t('common.done')}
           </Button>
         )}
         {status === 'UNLOCKED' || status === 'IN_PROGRESS' ? (
           <>
             <Button variant="secondary" size="sm" onClick={() => onLock(g.group.id)}>
               <Lock className="w-4 h-4 mr-1" />
-              Kunci Konten
+              {t('admin.sessions.lockContent')}
             </Button>
             {nextLockedStageId && (
               <Button
@@ -174,7 +176,7 @@ export const LiveGroupCard = ({
                 onClick={() => onUnlock(g.group.id, nextLockedStageId)}
               >
                 <ArrowRight className="w-4 h-4 mr-1" />
-                Lanjut ke Topik Berikutnya
+                {t('admin.sessions.nextTopic')}
               </Button>
             )}
           </>

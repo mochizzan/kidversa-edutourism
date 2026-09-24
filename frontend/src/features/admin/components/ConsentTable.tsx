@@ -4,6 +4,7 @@ import { ConsentStatusBadge } from './ConsentStatusBadge'
 import { formatDate, formatDateTime } from '../../../shared/utils'
 import { Button } from '../../../shared/components/ui/Button'
 import { CompactPagination } from '../../../shared/components/data/CompactPagination'
+import { useTranslation } from 'react-i18next'
 
 interface ConsentTableProps {
   items: ConsentFlatItem[]
@@ -28,26 +29,27 @@ export function ConsentTable({
   pageSize = 25,
   onPageChange,
 }: ConsentTableProps) {
+  const { t } = useTranslation()
   return (
     <div>
       {/* Table */}
       <div className="bg-white rounded-xl border border-outline/20 overflow-hidden">
         {/* Header — hidden on mobile */}
         <div className="hidden md:flex items-center gap-4 px-4 py-3 bg-surface-container text-xs font-medium text-on-surface-variant border-b border-outline/10">
-          <span className="flex-1 min-w-0">Program</span>
-          <span className="flex-[1.2] min-w-0">Sesi</span>
-          <span className="flex-1 min-w-0">Anak</span>
-          <span className="hidden lg:block w-28">Telepon</span>
-          <span className="w-24">Status</span>
-          <span className="hidden lg:block w-36">Dijawab</span>
-          <span className="hidden xl:block w-32">Responder</span>
-          <span className="w-24 text-right">Aksi</span>
+          <span className="flex-1 min-w-0">{t('admin.col.program')}</span>
+          <span className="flex-[1.2] min-w-0">{t('admin.col.session')}</span>
+          <span className="flex-1 min-w-0">{t('admin.consent.childCol')}</span>
+          <span className="hidden lg:block w-28">{t('admin.consent.phoneCol')}</span>
+          <span className="w-24">{t('admin.col.status')}</span>
+          <span className="hidden lg:block w-36">{t('admin.consent.answeredCol')}</span>
+          <span className="hidden xl:block w-32">{t('admin.consent.responderCol')}</span>
+          <span className="w-24 text-right">{t('admin.col.action')}</span>
         </div>
 
         {/* Rows */}
         {items.length === 0 ? (
           <div className="px-4 py-12 text-center text-sm text-on-surface-variant">
-            Tidak ada data untuk ditampilkan
+            {t('admin.consent.emptyTable')}
           </div>
         ) : (
           items.map((item) => (
@@ -105,7 +107,7 @@ export function ConsentTable({
                     onClick={() => onSend(item.participant_id)}
                     loading={sending[item.participant_id]}
                   >
-                    Kirim
+                    {t('admin.consent.send')}
                   </Button>
                 ) : item.consent_status === 'pending' || item.consent_status === 'denied' ? (
                   <Button
@@ -115,7 +117,7 @@ export function ConsentTable({
                     onClick={() => onResend(item.participant_id)}
                     loading={sending[item.participant_id]}
                   >
-                    Kirim Ulang
+                    {t('admin.consent.resend')}
                   </Button>
                 ) : (
                   <span className="text-xs text-on-surface-variant">-</span>
@@ -132,7 +134,7 @@ export function ConsentTable({
         totalItems={totalItems}
         pageSize={pageSize}
         onPageChange={onPageChange}
-        itemLabel="peserta"
+        itemLabel={t('admin.consent.itemLabel')}
       />
     </div>
   )
