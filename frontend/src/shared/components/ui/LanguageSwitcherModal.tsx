@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Modal } from './Modal'
+import { FlagIcon } from './FlagIcon'
 import { LANGUAGES } from '@/core/i18n/locales'
 import { cn } from '../../../core/utils'
 
@@ -32,7 +33,7 @@ export function LanguageSwitcherModal({ open, onClose }: LanguageSwitcherModalPr
             aria-current={active === l.code ? 'true' : undefined}
             className={cn('flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left transition-colors',
               active === l.code ? 'bg-primary-container text-on-primary-container' : 'text-on-surface hover:bg-surface-container')}>
-            <span className="text-lg leading-none" aria-hidden="true">{l.flag}</span>
+            <FlagIcon iso={l.country} className="h-4 w-6 shrink-0 text-lg leading-none" />
             <span className="flex-1 min-w-0">
               <span className="block text-sm font-medium truncate">{l.endonym}</span>
               <span className="block text-xs text-on-surface-variant truncate">{l.english}</span>

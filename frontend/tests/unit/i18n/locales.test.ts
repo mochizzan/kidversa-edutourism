@@ -15,9 +15,9 @@ describe('core/i18n/locales metadata', () => {
     expect(LANGUAGE_CODES[0]).toBe('id')
   })
 
-  it('has a non-empty flag, endonym, and english name for every language', () => {
+  it('has a valid country code, endonym, and english name for every language', () => {
     for (const lang of LANGUAGES) {
-      expect(lang.flag.trim(), `${lang.code} flag`).not.toBe('')
+      expect(lang.country, `${lang.code} country`).toMatch(/^[A-Z]{2}$/)
       expect(lang.endonym.trim(), `${lang.code} endonym`).not.toBe('')
       expect(lang.english.trim(), `${lang.code} english`).not.toBe('')
     }

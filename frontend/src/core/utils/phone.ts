@@ -28,7 +28,7 @@ export function normalizePhone(phone?: string): string | undefined {
 
 // --- Country picker helpers untuk PhoneInput (additive; normalizePhone di atas tidak diubah) ---
 
-export type CountryOption = { iso: string; dialCode: string; name: string; flag: string }
+export type CountryOption = { iso: string; dialCode: string; name: string }
 
 let cachedCountryOptions: CountryOption[] | null = null
 
@@ -40,9 +40,6 @@ export function getCountryOptions(): CountryOption[] {
     iso,
     dialCode: String(getCountryCallingCode(iso)),
     name: display.of(iso) ?? iso,
-    flag: String.fromCodePoint(
-      ...[...iso.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
-    ),
   }))
   options.sort((a, b) => collator.compare(a.name, b.name))
   cachedCountryOptions = options

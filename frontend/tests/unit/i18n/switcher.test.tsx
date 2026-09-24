@@ -18,6 +18,8 @@ describe('LanguageSwitcherModal', () => {
 
     const rows = () => document.querySelectorAll('[data-lang-code]')
     expect(rows().length).toBe(9)
+    for (const row of rows()) expect(row.querySelector('svg')).toBeTruthy()
+    expect(document.body.textContent?.match(/[\u{1F1E6}-\u{1F1FF}]/u) ?? null).toBeNull()
 
     const search = screen.getByRole('searchbox')
     fireEvent.change(search, { target: { value: 'Malay' } })

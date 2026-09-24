@@ -4,21 +4,21 @@ export type LanguageCode = (typeof LANGUAGE_CODES)[number]
 
 export interface LanguageMeta {
   code: LanguageCode
-  flag: string // emoji regional indicator
+  country: string // ISO 3166-1 alpha-2
   endonym: string // native name, shown prominently
   english: string // English name, shown secondary + used for search
 }
 
 export const LANGUAGES: readonly LanguageMeta[] = [
-  { code: 'id', flag: '🇮🇩', endonym: 'Bahasa Indonesia', english: 'Indonesian' },
-  { code: 'en', flag: '🇬🇧', endonym: 'English', english: 'English' },
-  { code: 'ms', flag: '🇲🇾', endonym: 'Bahasa Melayu', english: 'Malay' },
-  { code: 'th', flag: '🇹🇭', endonym: 'ไทย', english: 'Thai' },
-  { code: 'tl', flag: '🇵🇭', endonym: 'Tagalog', english: 'Tagalog' },
-  { code: 'ko', flag: '🇰🇷', endonym: '한국어', english: 'Korean' },
-  { code: 'zh', flag: '🇨🇳', endonym: '中文', english: 'Chinese' },
-  { code: 'ja', flag: '🇯🇵', endonym: '日本語', english: 'Japanese' },
-  { code: 'vi', flag: '🇻🇳', endonym: 'Tiếng Việt', english: 'Vietnamese' },
+  { code: 'id', country: 'ID', endonym: 'Bahasa Indonesia', english: 'Indonesian' },
+  { code: 'en', country: 'GB', endonym: 'English', english: 'English' },
+  { code: 'ms', country: 'MY', endonym: 'Bahasa Melayu', english: 'Malay' },
+  { code: 'th', country: 'TH', endonym: 'ไทย', english: 'Thai' },
+  { code: 'tl', country: 'PH', endonym: 'Tagalog', english: 'Tagalog' },
+  { code: 'ko', country: 'KR', endonym: '한국어', english: 'Korean' },
+  { code: 'zh', country: 'CN', endonym: '中文', english: 'Chinese' },
+  { code: 'ja', country: 'JP', endonym: '日本語', english: 'Japanese' },
+  { code: 'vi', country: 'VN', endonym: 'Tiếng Việt', english: 'Vietnamese' },
 ]
 
 export const RTL_LANGUAGE_CODES = [] as const

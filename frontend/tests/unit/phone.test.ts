@@ -42,12 +42,12 @@ describe('detectCountry', () => {
 })
 
 describe('getCountryOptions', () => {
-  it('memuat Indonesia dengan dial code, nama, dan bendera', () => {
+  it('memuat Indonesia dengan dial code dan nama', () => {
     const id = getCountryOptions().find((c) => c.iso === 'ID')
     expect(id).toBeDefined()
     expect(id!.dialCode).toBe('62')
     expect(id!.name).toBe('Indonesia')
-    expect(id!.flag).toBe('🇮🇩')
+    expect('flag' in id!).toBe(false)
   })
 })
 
