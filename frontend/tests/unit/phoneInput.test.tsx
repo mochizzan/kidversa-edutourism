@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { useState } from 'react'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, createEvent } from '@testing-library/react'
 import { PhoneInput } from '@/shared/components/ui/PhoneInput'
 
 function Harness({
@@ -26,11 +26,11 @@ function Harness({
 }
 
 describe('PhoneInput', () => {
-  it('default ID: trigger ISO ID dan adornment +62', () => {
-    const { container } = render(<Harness />)
+  it('default ID: trigger shows +62 exactly once (no duplicated adornment)', () => {
+    render(<Harness />)
     const trigger = screen.getByLabelText('Kode negara')
     expect(trigger.textContent).toContain('+62')
-    expect((container.querySelector('input')!.previousElementSibling as HTMLElement).textContent).toBe('+62')
+    expect(screen.getAllByText('+62')).toHaveLength(1)
   })
 
   it('leading 0 dibuang saat mengetik → memancarkan E.164', () => {
@@ -90,5 +90,43 @@ describe('PhoneInput', () => {
     fireEvent.keyDown(trigger, { key: 'Escape' })
     expect(screen.queryByRole('listbox')).toBeNull()
     expect(document.activeElement).toBe(trigger)
+  })
+
+  it('empty value: country pick persists on trigger without emitting bare dial', () => {
+    const onChange = vi.fn()
+    render(<Harness initial="" onChange={onChange} />)
+    fireEvent.click(screen.getByLabelText('Kode negara'))
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'serikat' } })
+    const us = screen.getAllByRole('option').find((o) => o.getAttribute('data-iso') === 'US')
+    expect(us).toBeTruthy()
+    fireEvent.click(us!)
+    // No digits typed → value stays '' (never a bare '+1' that would trip validation)…
+    expect(onChange).not.toHaveBeenCalledWith('+1')
+    // …but the trigger keeps the picked country instead of reverting to +62.
+    expect(screen.getByLabelText('Kode negara').textContent).toContain('+1')
+  })
+
+  it('empty pick then typing emits E.164 with the picked dial code', () => {
+    const onChange = vi.fn()
+    render(<Harness initial="" onChange={onChange} />)
+    fireEvent.click(screen.getByLabelText('Kode negara'))
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'serikat' } })
+    const us = screen.getAllByRole('option').find((o) => o.getAttribute('data-iso') === 'US')
+    expect(us).toBeTruthy()
+    fireEvent.click(us!)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '8123456789' } })
+    expect(onChange).toHaveBeenLastCalledWith('+18123456789')
+  })
+
+  it('mouse click reaches option: mousedown is cancelled so blur cannot unmount first', () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByLabelText('Kode negara'))
+    // Real browsers shift focus on mousedown; on a non-focusable option that
+    // blurs the wrapper (relatedTarget null) and unmounts the panel before
+    // click fires. Cancelling mousedown preserves the click.
+    const first = screen.getAllByRole('option')[0]
+    const ev = createEvent.mouseDown(first)
+    fireEvent(first, ev)
+    expect(ev.defaultPrevented).toBe(true)
   })
 })

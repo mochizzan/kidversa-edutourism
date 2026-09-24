@@ -101,6 +101,7 @@ export interface ParticipantService {
   getAll(params?: ListParams): Promise<PaginatedResponse<Participant>>
   getById(id: string): Promise<Participant | null>
   create(data: CreateParticipantDTO): Promise<Participant>
+  remove(id: string): Promise<void>
 }
 
 // Users

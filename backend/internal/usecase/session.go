@@ -457,6 +457,16 @@ func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessio
 		return nil, apperrors.BadRequest("validation_error", perr)
 	}
 	parentPhone = normPhone
+	// Reject duplicate participant names (same tenant) before insert. This is
+	// an application-level check — no unique index — so it covers every create
+	// path that goes through this usecase (global + session-scoped).
+	exists, derr := u.sessionRepo.ParticipantNameExists(ctx, tenantID, childName)
+	if derr != nil {
+		return nil, derr
+	}
+	if exists {
+		return nil, apperrors.Conflict("participant_duplicate_name", nil)
+	}
 	p := &entity.Participant{
 		TenantID:     tp,
 		SessionID:    sid,
@@ -697,8 +707,16 @@ func (u *SessionUsecase) GetParticipantGlobal(ctx context.Context, participantID
 	return u.sessionRepo.GetParticipantGlobal(ctx, participantID, tenantID)
 }
 
-// DeleteParticipant removes a participant.
-func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID, _ string) error {
+// DeleteParticipant removes a participant. The repository refuses participants
+// still linked to a session/group or carrying child records. tenantID, when
+// non-empty, must match the participant's tenant (the repository delete itself
+// is by ID only, so the scope is enforced here).
+func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID, tenantID string) error {
+	if tenantID != "" {
+		if _, err := u.sessionRepo.GetParticipantByID(ctx, participantID, tenantID); err != nil {
+			return err
+		}
+	}
 	return u.sessionRepo.DeleteParticipant(ctx, participantID)
 }
 

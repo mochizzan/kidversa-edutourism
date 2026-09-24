@@ -132,6 +132,9 @@ func (r *fakeSessionRepo) ListParticipantsForProgram(ctx context.Context, progra
 func (r *fakeSessionRepo) FindDuplicateParticipants(ctx context.Context, programID, tenantID string, rows []repository.ParticipantInput) ([]repository.DuplicateParticipantInfo, error) {
 	return nil, nil
 }
+func (r *fakeSessionRepo) ParticipantNameExists(ctx context.Context, tenantID, childName string) (bool, error) {
+	return false, nil
+}
 func (r *fakeSessionRepo) Transaction(ctx context.Context, fn func(tx repository.SessionRepository) error) error {
 	return nil
 }

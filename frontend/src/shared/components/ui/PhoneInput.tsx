@@ -39,15 +39,28 @@ export function PhoneInput({
   const hintId = `${inputId}-hint`
   const describedBy = error ? errorId : hint ? hintId : undefined
 
-  const { iso, dialCode, national } = detectCountry(value)
+  const detected = detectCountry(value)
   const countries = getCountryOptions()
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const [flagsReady, setFlagsReady] = useState(false)
+  // Empty value cannot encode a country (detectCountry('') → ID). Remember the
+  // user's pick locally until digits are typed; never emit a bare '+<dial>'.
+  const [pickedIso, setPickedIso] = useState<string | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+
+  // A non-empty value is the source of truth → drop the local pick.
+  useEffect(() => {
+    if (value) setPickedIso(null)
+  }, [value])
+
+  const picked = !value && pickedIso ? countries.find((c) => c.iso === pickedIso) : undefined
+  const iso = picked?.iso ?? detected.iso
+  const dialCode = picked?.dialCode ?? detected.dialCode
+  const national = detected.national
 
   const q = query.trim().toLowerCase()
   const list = countries.filter((c) => !q || c.name.toLowerCase().includes(q) || c.dialCode.includes(q))
@@ -58,17 +71,27 @@ export function PhoneInput({
     if (raw.includes('+')) {
       // Tempelan (paste) internasional → deteksi ulang negara dari digit mentah.
       const digits = raw.replace(/\D/g, '')
-      const detected = detectCountry(`+${digits}`)
-      onChange(combinePhone(detected.national, detected.dialCode))
+      const detectedPaste = detectCountry(`+${digits}`)
+      onChange(combinePhone(detectedPaste.national, detectedPaste.dialCode))
       return
     }
     // combinePhone membuang SATU leading 0 (input lokal "0812…" → "812…").
-    onChange(combinePhone(raw, dialCode))
+    const next = combinePhone(raw, dialCode)
+    // Clearing the field must not lose the picked country: '' carries no
+    // country, so remember it locally until digits are typed again.
+    if (!next) setPickedIso(iso)
+    onChange(next)
   }
 
   const handleCountryChange = (nextIso: string) => {
     const next = countries.find((c) => c.iso === nextIso)
     if (!next) return
+    // Empty input cannot encode a country in value → keep the pick locally
+    // (emitting a bare '+<dial>' would trip phone validation).
+    if (!national) {
+      setPickedIso(nextIso)
+      return
+    }
     onChange(combinePhone(national, next.dialCode))
   }
 
@@ -192,6 +215,10 @@ export function PhoneInput({
                     aria-selected={c.iso === iso}
                     data-iso={c.iso}
                     onMouseEnter={() => setActiveIndex(index)}
+                    // Prevent the wrapper blur (relatedTarget null on
+                    // non-focusable targets) from unmounting the panel
+                    // before click fires in real browsers.
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => chooseCountry(c.iso)}
                     className={cn(
                       'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-left cursor-pointer transition-colors',
@@ -221,9 +248,6 @@ export function PhoneInput({
             error && 'border-error focus-within:border-error focus-within:ring-error-container'
           )}
         >
-          <span className="border-r border-outline-variant px-3 py-2 text-sm text-on-surface-variant">
-            +{dialCode}
-          </span>
           <input
             id={inputId}
             inputMode="numeric"

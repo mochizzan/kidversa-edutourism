@@ -297,6 +297,22 @@ func (r *GormSessionRepository) GetParticipantByID(ctx context.Context, id, tena
 	return m.ToEntity(), nil
 }
 
+// ParticipantNameExists reports whether a live participant with exactly this
+// child_name already exists, scoped to tenantID when non-empty (soft-deleted
+// rows are excluded by the model's DeletedAt). Powers the duplicate-name
+// rejection on create without requiring a unique index.
+func (r *GormSessionRepository) ParticipantNameExists(ctx context.Context, tenantID, childName string) (bool, error) {
+	var n int64
+	q := r.db.WithContext(ctx).Model(&ParticipantModel{}).Where("child_name = ?", childName)
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if err := q.Count(&n).Error; err != nil {
+		return false, apperrors.Internal("internal_error", err)
+	}
+	return n > 0, nil
+}
+
 // GetParticipantGlobal returns a single participant by id, tenant-scoped (the
 // tenant filter is skipped for tenant-less SUPER_ADMIN calls when tenantID == "").
 func (r *GormSessionRepository) GetParticipantGlobal(ctx context.Context, id, tenantID string) (*entity.Participant, error) {

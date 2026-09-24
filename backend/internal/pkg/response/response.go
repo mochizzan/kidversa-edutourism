@@ -93,6 +93,8 @@ func MessageForCode(code string) string {
 		return "Sesi tidak dapat dihapus"
 	case "participant_not_deletable":
 		return "Peserta tidak dapat dihapus"
+	case "participant_duplicate_name":
+		return "Nama peserta sudah digunakan"
 	case "file_type_blocked":
 		return "Tipe berkas diblokir"
 	case "consent_required":

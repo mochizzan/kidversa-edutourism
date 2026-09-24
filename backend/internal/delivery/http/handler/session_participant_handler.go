@@ -127,6 +127,21 @@ func (h *SessionParticipantHandler) ListParticipantsGlobal(c *echo.Context) erro
 	return appresp.OKWithMeta(c, res.Items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
 }
 
+// DeleteParticipantGlobal handles DELETE /api/participants/:id (tenant-scoped
+// via TenantScope middleware). Deletes a standalone participant; participants
+// still linked to a session/group or with child records are rejected by the
+// repository with participant_not_deletable.
+func (h *SessionParticipantHandler) DeleteParticipantGlobal(c *echo.Context) error {
+	pid, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	if err := h.uc.DeleteParticipant((*c).Request().Context(), pid, appmiddleware.GetTenantID(c)); err != nil {
+		return err
+	}
+	return appresp.NoContent(c)
+}
+
 func (h *SessionParticipantHandler) DeleteParticipant(c *echo.Context) error {
 	pid, ok := bindUUID(c, "participantId")
 	if !ok {

@@ -134,15 +134,7 @@ const ParticipantsPage = () => {
     if (!deleteId) return
 
     try {
-      // Global participant deletes are not exposed by the backend; the
-      // participant must be removed from its session instead.
-      const target = participants.find((p) => p.id === deleteId)
-      if (!target?.session_id) {
-        addToast({ type: 'error', message: t('admin.participants.noSessionDelete') })
-        setDeleteId(null)
-        return
-      }
-      await sessionService.removeParticipant(target.session_id, deleteId)
+      await participantService.remove(deleteId)
       addToast({ type: 'success', message: t('admin.participants.deletedToast') })
       setDeleteId(null)
       adjustPageOnDelete()

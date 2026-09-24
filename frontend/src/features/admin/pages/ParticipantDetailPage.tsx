@@ -12,7 +12,6 @@ import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { participantService } from '../../../core/services/participants'
-import { sessionService } from '../../../core/services/sessions'
 import type { Participant } from '../../../core/types'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { useTranslation } from 'react-i18next'
@@ -53,14 +52,7 @@ const ParticipantDetailPage = () => {
   const handleDelete = async () => {
     if (!participant) return
     try {
-      // Global participant deletes are not exposed by the backend; remove the
-      // participant from its session instead.
-      if (!participant.session_id) {
-        addToast({ type: 'error', message: t('admin.participants.noSessionDelete') })
-        setConfirmOpen(false)
-        return
-      }
-      await sessionService.removeParticipant(participant.session_id, participant.id)
+      await participantService.remove(participant.id)
       addToast({ type: 'success', message: t('admin.participants.deletedToast') })
       navigate(ROUTES.ADMIN.PARTICIPANTS)
     } catch (err) {

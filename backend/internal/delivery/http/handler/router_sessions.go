@@ -48,4 +48,5 @@ func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecyc
 	participantsGroup.POST("", ph.CreateParticipantGlobal, authMW, roleMW, appmiddleware.TenantScope())
 	participantsGroup.GET("", ph.ListParticipantsGlobal, authMW, roleMW, appmiddleware.TenantScope())
 	participantsGroup.GET("/:id", ph.GetParticipantGlobal, authMW, roleMW, appmiddleware.TenantScope())
+	participantsGroup.DELETE("/:id", ph.DeleteParticipantGlobal, authMW, roleMW, appmiddleware.TenantScope())
 }

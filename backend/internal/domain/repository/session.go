@@ -107,6 +107,10 @@ type SessionRepository interface {
 	CreateParticipant(ctx context.Context, p *entity.Participant) error
 	GetParticipantByID(ctx context.Context, id, tenantID string) (*entity.Participant, error)
 	GetParticipantGlobal(ctx context.Context, id, tenantID string) (*entity.Participant, error)
+	// ParticipantNameExists reports whether a participant with exactly this
+	// child_name already exists (scoped to tenantID when non-empty). Used to
+	// reject duplicate participant names on create without a schema constraint.
+	ParticipantNameExists(ctx context.Context, tenantID, childName string) (bool, error)
 	ListParticipants(ctx context.Context, sessionID, groupID, tenantID string) ([]entity.Participant, error)
 	ListParticipantsPaginated(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*Paginated[entity.Participant], error)
 	UpdateParticipant(ctx context.Context, p *entity.Participant) error

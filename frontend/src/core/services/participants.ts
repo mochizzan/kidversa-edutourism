@@ -1,6 +1,6 @@
 import type { ParticipantService } from './types'
 import type { Participant, CreateParticipantDTO } from '../types'
-import { listRequest, itemRequest, nullableItemRequest } from './api-envelope'
+import { listRequest, itemRequest, nullableItemRequest, voidRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export const participantService: ParticipantService = {
@@ -28,4 +28,8 @@ export const participantService: ParticipantService = {
       group_id: data.group_id,
       consent_photo: false,
     }),
+
+  // Global DELETE /api/participants/:id (tenant-scoped). The backend rejects
+  // participants still linked to a session/group or with activity (409).
+  remove: (id) => voidRequest('DELETE', API_ROUTES.PARTICIPANTS.DETAIL(id)),
 }
