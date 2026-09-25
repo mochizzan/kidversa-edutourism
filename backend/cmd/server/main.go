@@ -79,6 +79,7 @@ func main() {
 	// Wire the v4 substage repos into the session usecase so CreateSession
 	// clones Kegiatan into session_substages and LinkParticipant clones scores.
 	sessionUC.SetSubstageRepos(programSubstageRepo, sessionSubstageRepo)
+	sessionUC.SetProgramReader(programRepo)
 	sessionUC.SetAssessmentRepo(assessmentRepo)
 	sessionUC.SetUserRepo(userRepo)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
