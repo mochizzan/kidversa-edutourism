@@ -123,6 +123,10 @@ func MessageForCode(code string) string {
 		return "Sesi harus memiliki minimal satu kelompok"
 	case "no_participants":
 		return "Setiap kelompok harus memiliki minimal satu peserta"
+	case "program_has_no_topics":
+		return "Program belum memiliki topik. Tambahkan minimal satu topik beserta kegiatannya sebelum membuat sesi."
+	case "topic_has_no_activities":
+		return "Masih ada topik yang belum memiliki kegiatan. Lengkapi kegiatan pada setiap topik sebelum membuat sesi."
 	case "grading_incomplete":
 		return "Terdapat peserta yang belum dinilai pada sesi ini"
 	case "attendance_not_found":
