@@ -41,6 +41,7 @@ type PublicReportDTO struct {
 	MissionIDs       []string `json:"mission_ids,omitempty"`
 	ReportPDFURL     string   `json:"report_pdf_url,omitempty"`
 	GroupName        string   `json:"group_name,omitempty"`
+	FacilitatorName  string   `json:"facilitator_name,omitempty"`
 	// PhotoURL is the token-free access-photo path, present only when a photo
 	// resolves for this report's topic AND photo consent is granted (omitempty).
 	PhotoURL string `json:"photo_url,omitempty"`
@@ -58,6 +59,7 @@ func NewPublicReportDTO(r *entity.Report, photoURL string) *PublicReportDTO {
 		MissionIDs:       r.MissionIDs,
 		ReportPDFURL:     r.ReportPDFURL,
 		GroupName:        r.GroupName,
+		FacilitatorName:  r.FacilitatorName,
 		PhotoURL:         photoURL,
 	}
 }

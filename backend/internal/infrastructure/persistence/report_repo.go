@@ -236,6 +236,18 @@ func (r *GormReportRepository) GetByToken(ctx context.Context, token string) (*e
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	*e = reports[0]
+	if e.ParticipantID != "" {
+		var facilitatorName string
+		if err := r.db.WithContext(ctx).
+			Select("COALESCE(u.name, '')").
+			Table("participants p").
+			Joins("LEFT JOIN session_groups sg ON sg.id = p.group_id").
+			Joins("LEFT JOIN users u ON u.id = sg.facilitator_id").
+			Where("p.id = ?", e.ParticipantID).
+			Scan(&facilitatorName).Error; err == nil {
+			e.FacilitatorName = facilitatorName
+		}
+	}
 	return e, nil
 }
 

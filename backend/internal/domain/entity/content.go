@@ -61,7 +61,8 @@ type Report struct {
 	GalleryTokenExpiresAt *time.Time   `json:"gallery_token_expires_at,omitempty"`
 	GalleryTokenRevoked   bool         `json:"gallery_token_revoked,omitempty"`
 	MissionIDs            []string     `json:"mission_ids,omitempty" gorm:"-"`
-	GroupName             string       `json:"group_name,omitempty"` // denormalized from session_groups.name
+	GroupName             string       `json:"group_name,omitempty"`                // denormalized from session_groups.name
+	FacilitatorName       string       `json:"facilitator_name,omitempty" gorm:"-"` // denormalisasi read-time dari users.name via session_groups.facilitator_id; tanpa kolom DB (tanpa migrasi), tidak pernah dipersist
 }
 
 // ParticipantMission links a report to a completed mission from the mission bank.
