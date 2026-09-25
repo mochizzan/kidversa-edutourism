@@ -1107,6 +1107,8 @@
     "facilitator_required": "No facilitator assigned yet.",
     "no_groups": "Session must have at least one group.",
     "no_participants": "Each group must have at least one participant.",
+    "program_has_no_topics": "This program has no topics yet. Add at least one topic with its activities before creating a session.",
+    "topic_has_no_activities": "Some topics still have no activities. Complete the activities for every topic before creating a session.",
     "network": "Failed to connect to the server. Check your internet connection.",
     "default": "An error occurred. Please try again."
   },

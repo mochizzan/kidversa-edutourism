@@ -1107,6 +1107,8 @@
     "facilitator_required": "尚未指派引导员。",
     "no_groups": "会话必须至少包含一个小组。",
     "no_participants": "每个小组必须至少包含一名参与者。",
+    "program_has_no_topics": "该项目尚无主题。请先添加至少一个带活动的主题，再创建场次。",
+    "topic_has_no_activities": "仍有主题尚未添加活动。请先补全每个主题的活动，再创建场次。",
     "network": "无法连接到服务器。请检查您的网络连接。",
     "default": "发生错误。请重试。"
   },

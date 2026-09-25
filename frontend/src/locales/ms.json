@@ -1107,6 +1107,8 @@
     "facilitator_required": "Belum ada fasilitator yang ditugaskan.",
     "no_groups": "Sesi mesti mempunyai sekurang-kurangnya satu kumpulan.",
     "no_participants": "Setiap kumpulan mesti mempunyai sekurang-kurangnya seorang peserta.",
+    "program_has_no_topics": "Program belum mempunyai topik. Tambah sekurang-kurangnya satu topik berserta kegiatannya sebelum membuat sesi.",
+    "topic_has_no_activities": "Masih ada topik yang belum mempunyai kegiatan. Lengkapkan kegiatan bagi setiap topik sebelum membuat sesi.",
     "network": "Gagal menyambung ke pelayan. Semak sambungan internet anda.",
     "default": "Ralat berlaku. Sila cuba lagi."
   },

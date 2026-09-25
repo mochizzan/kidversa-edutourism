@@ -1107,6 +1107,8 @@
     "facilitator_required": "Wala pang nakatalagang facilitator.",
     "no_groups": "Dapat may hindi bababa sa isang grupo ang session.",
     "no_participants": "Dapat may hindi bababa sa isang kalahok ang bawat grupo.",
+    "program_has_no_topics": "Wala pang paksa ang program. Magdagdag ng hindi bababa sa isang paksa kasama ang mga gawain nito bago gumawa ng session.",
+    "topic_has_no_activities": "May mga paksa pa ring walang gawain. Kumpletuhin ang mga gawain ng bawat paksa bago gumawa ng session.",
     "network": "Nabigong kumonekta sa server. Suriin ang iyong koneksyon sa internet.",
     "default": "Nagkaroon ng error. Mangyaring subukan muli."
   },

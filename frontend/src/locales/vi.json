@@ -1107,6 +1107,8 @@
     "facilitator_required": "Chưa có người hướng dẫn nào được chỉ định.",
     "no_groups": "Phiên phải có ít nhất một nhóm.",
     "no_participants": "Mỗi nhóm phải có ít nhất một người tham gia.",
+    "program_has_no_topics": "Chương trình chưa có chủ đề nào. Hãy thêm ít nhất một chủ đề kèm hoạt động trước khi tạo phiên.",
+    "topic_has_no_activities": "Vẫn còn chủ đề chưa có hoạt động. Hãy hoàn thiện hoạt động cho mọi chủ đề trước khi tạo phiên.",
     "network": "Không thể kết nối với máy chủ. Vui lòng kiểm tra kết nối internet của bạn.",
     "default": "Đã xảy ra lỗi. Vui lòng thử lại."
   },
