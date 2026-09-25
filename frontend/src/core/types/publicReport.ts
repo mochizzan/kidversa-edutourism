@@ -13,4 +13,6 @@ export interface PublicReport {
   /** Token-free access-photo path; absent when no photo resolves or consent is off. */
   photo_url?: string
   group_name?: string
+  // Nama owner fasilitator kelompok; absent bila kelompok/fasilitator tak ter-set.
+  facilitator_name?: string
 }

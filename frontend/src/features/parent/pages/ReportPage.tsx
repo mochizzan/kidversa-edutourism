@@ -59,7 +59,7 @@ function ReportView() {
         narrative,
         missions: [],
         badges: [],
-        facilitatorName: DEFAULT_FACILITATOR_NAME,
+        facilitatorName: pub.facilitator_name || DEFAULT_FACILITATOR_NAME,
         facilitatorPhotoUrl: undefined,
       })
     }

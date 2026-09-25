@@ -122,7 +122,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     setError(null)
 
     try {
-      const [sess, sessionReports, stageAssessments, sessStages, sessSubstages, partPhotos, sessGroups, picks] =
+      const [sess, sessionReports, stageAssessments, sessStages, sessSubstages, partPhotos, picks] =
         await Promise.all([
           sessionService.getById(sessionId),
           reportService.getBySession(sessionId),
@@ -130,7 +130,6 @@ export function useReportReview(sessionId: string | undefined, participantId: st
           sessionService.getStages(sessionId),
           sessionService.getSubstages(sessionId),
           photoService.getBySession(sessionId),
-          sessionService.getGroups(sessionId),
           photoService.getReportPicks(participantId, sessionId).catch((err) => {
             logError('useReportReview.getReportPicks', err)
             return null
@@ -183,8 +182,8 @@ export function useReportReview(sessionId: string | undefined, participantId: st
         return
       }
       setParticipant(part)
-      setGroups(sessGroups ?? [])
-      const participantGroup = sessGroups?.find((g) => g.id === part?.group_id)
+      setGroups(sess.groups ?? [])
+      const participantGroup = sess.groups?.find((g) => g.id === part?.group_id)
       setGroupCompleted(!participantGroup || participantGroup.status === 'COMPLETED')
 
       try {
@@ -491,7 +490,10 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       narrative,
       missions: missionTitles,
       badges: mappedBadges,
-      facilitatorName: user?.name || DEFAULT_FACILITATOR_NAME,
+      facilitatorName:
+        (participant.group_id
+          ? groups.find((g) => g.id === participant.group_id)?.facilitator_name
+          : undefined)?.trim() || DEFAULT_FACILITATOR_NAME,
       facilitatorPhotoUrl: user?.avatar_url,
       galleryUrl,
     })
