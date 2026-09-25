@@ -1,5 +1,5 @@
 import MINI_RAPORT_TAILWIND_CSS from './miniRaport.styles.css?inline'
-import { RATING_LABELS, MAX_STAR_RATING } from '../../core/constants/assessment'
+import { RATING_ABBREVIATIONS, MAX_STAR_RATING } from '../../core/constants/assessment'
 
 export interface MiniRaportData {
  programName: string
@@ -61,15 +61,14 @@ function stageRowHTML(
 ): string {
  const border = isLast ? '' : 'border-b border-dashed border-gray-200 pb-3'
  const kegiatan = stage.kegiatan && stage.kegiatan.length
-  ? stage.kegiatan
+  ? `<div class="flex items-center gap-2 pb-1 border-b border-gray-200"><span class="flex-1 min-w-0 text-[10px] font-bold tracking-wider text-gray-400">KEGIATAN</span><span class="shrink-0 text-[10px] font-bold tracking-wider text-gray-400">BINTANG</span><span class="w-12 text-center shrink-0 text-[10px] font-bold tracking-wider text-gray-400">LEVEL</span></div>` +
+  stage.kegiatan
    .map(
-    (k) => `
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[12px] font-semibold text-gray-700 truncate">${esc(k.name)}</span>
-            <span class="flex items-center gap-2 shrink-0">
-              <span class="flex gap-0.5 text-brand-star text-sm">${starsHTML(k.starRating)}</span>
-              <span class="text-[11px] text-gray-600 shrink-0">${RATING_LABELS[k.starRating] ?? ''}</span>
-            </span>
+    (k, ki, arr) => `
+          <div class="flex items-center gap-2 py-1${ki === arr.length - 1 ? '' : ' border-b border-dashed border-gray-200'}">
+            <span class="flex-1 min-w-0 truncate text-[12px] font-semibold text-gray-700">${esc(k.name)}</span>
+            <span class="shrink-0 flex gap-0.5 text-brand-star text-sm">${starsHTML(k.starRating)}</span>
+            <span class="w-12 text-center shrink-0 inline-flex items-center justify-center px-1 py-0.5 rounded-full bg-brand-lightPurple text-brand-purple font-black text-[12px]">${RATING_ABBREVIATIONS[k.starRating] ?? '–'}</span>
           </div>`
    )
    .join('')
@@ -88,7 +87,7 @@ function missionsHTML(missions: string[]): string {
   .map(
    (m) => `
       <div class="flex items-start gap-2 min-w-0">
-        <i class="fas fa-square-check text-brand-green text-base shrink-0 mt-0.5"></i>
+        <i class="far fa-square text-brand-green text-base shrink-0 mt-0.5"></i>
         <p class="text-[12px] font-bold text-gray-700 leading-snug line-clamp-2">${esc(m)}</p>
       </div>`
   )
@@ -450,7 +449,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                     <span class="bg-orange-200 text-orange-600 w-8 h-8 rounded-xl flex items-center justify-center text-lg shadow-sm"><i class="fas fa-home"></i></span>
                     <h3 class="font-black text-brand-purple text-[13px]">MISI RUMAH BERSAMA KELUARGA</h3>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-2.5">
                     ${missionsHTML(data.missions)}
                 </div>
             </div>

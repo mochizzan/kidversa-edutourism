@@ -6,6 +6,14 @@ export const RATING_LABELS: Record<number, string> = {
   4: 'BSB - Berkembang Sangat Baik',
 }
 
+export const RATING_ABBREVIATIONS: Record<number, string> = {
+  0: '–',
+  1: 'BB',
+  2: 'MB',
+  3: 'BSH',
+  4: 'BSB',
+}
+
 export const RATING_LABEL_KEYS = {
   0: 'common.assessment.rating0',
   1: 'common.assessment.rating1',
