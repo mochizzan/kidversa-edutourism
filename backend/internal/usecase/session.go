@@ -25,10 +25,18 @@ type ProgramSubstageReader interface {
 	ListSubstages(ctx context.Context, programStageID string) ([]entity.ProgramSubstage, error)
 }
 
+// ProgramReader provides read-only access to a Program by ID.
+// SessionUsecase uses this to verify the program exists before
+// creating a session (strict create gate).
+type ProgramReader interface {
+	GetProgramByID(ctx context.Context, id string) (*entity.Program, error)
+}
+
 // SessionUsecase orchestrates session + Topik + groups + participants business logic.
 type SessionUsecase struct {
 	sessionRepo      repository.SessionRepository
 	programStages    ProgramStageReader
+	programs         ProgramReader
 	programSubstages ProgramSubstageReader
 	sessionSubstages repository.SessionSubstageRepository
 	assessmentRepo   repository.AssessmentRepository
@@ -48,6 +56,10 @@ func (u *SessionUsecase) SetSubstageRepos(programSubstages ProgramSubstageReader
 	u.sessionSubstages = sessionSubstages
 }
 
+// SetProgramReader injects the program reader used by the strict
+// create gate in CreateSession to verify the program exists.
+func (u *SessionUsecase) SetProgramReader(p ProgramReader) { u.programs = p }
+
 // SetAssessmentRepo injects the assessment repo used to clone scored assessments
 // when a participant migrates to a new session (LinkParticipant).
 func (u *SessionUsecase) SetAssessmentRepo(assessmentRepo repository.AssessmentRepository) {
@@ -62,6 +74,29 @@ func (u *SessionUsecase) SetUserRepo(userRepo repository.UserRepository) {
 
 // CreateSession creates a new DRAFT session owned by the tenant.
 func (u *SessionUsecase) CreateSession(ctx context.Context, tenantID, createdBy string, programID, name, sessionDate, startTime, endTime, location, notes string) (*entity.Session, error) {
+	if u.programs != nil {
+		if _, err := u.programs.GetProgramByID(ctx, programID); err != nil {
+			return nil, err
+		}
+	}
+	stages, gerr := u.programStages.ListStages(ctx, programID)
+	if gerr != nil {
+		return nil, gerr
+	}
+	if len(stages) == 0 {
+		return nil, apperrors.BadRequest("program_has_no_topics", nil)
+	}
+	if u.programSubstages != nil {
+		for i := range stages {
+			subs, serr := u.programSubstages.ListSubstages(ctx, stages[i].ID)
+			if serr != nil {
+				return nil, serr
+			}
+			if len(subs) == 0 {
+				return nil, apperrors.BadRequest("topic_has_no_activities", nil)
+			}
+		}
+	}
 	tp := &tenantID
 	if tenantID == "" {
 		tp = nil
