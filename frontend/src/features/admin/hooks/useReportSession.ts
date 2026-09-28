@@ -4,7 +4,9 @@ import { reportService } from '../../../core/services/reports'
 import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { i18n } from '../../../core/i18n'
+import { isSendableReportStatus } from '../../../core/constants/reportStatus'
 import { ReportStatus } from '../../../core/types/enums'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import type { Session, Report, Participant, ProgramStage } from '../../../core/types'
 
 export type ParticipantReportStatus =
@@ -12,6 +14,12 @@ export type ParticipantReportStatus =
   | 'no_assessment'
   | 'ready_to_generate'
   | 'incomplete'
+
+/** Outcome of a Send All run: counts drive the success/partial toast. */
+export interface SendAllResult {
+  sent: number
+  failed: number
+}
 
 export interface ReportListItem {
   participant: Participant
@@ -46,7 +54,10 @@ export function useReportSession(sessionId: string | undefined) {
   const [generating, setGenerating] = useState(false)
   const [sending, setSending] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+  // Per-report Send All failures (one line each); null when the last run was clean.
+  const [sendError, setSendError] = useState<string | null>(null)
   const generatingRef = useRef(false)
+  const { addToast } = useGlobalToast()
 
   const loadData = useCallback(async () => {
     if (!sessionId) return
@@ -195,23 +206,50 @@ export function useReportSession(sessionId: string | undefined) {
     }
   }, [sessionId, loadData])
 
-  const handleSendAll = useCallback(async (): Promise<boolean> => {
-    if (!sessionId) return false
-    setSending(true)
-    try {
-      const approvedReports = reports.filter((r) => r.report?.status === ReportStatus.APPROVED)
-      for (const r of approvedReports) {
-        if (r.report) await reportService.send(r.report.id)
+  const handleSendAll = useCallback(
+    async (mode: 'send' | 'resend'): Promise<SendAllResult> => {
+      if (!sessionId) return { sent: 0, failed: 0 }
+      setSending(true)
+      setSendError(null)
+      let sent = 0
+      const failures: string[] = []
+      try {
+        // Active Topic only. Plain send targets APPROVED + SEND_FAILED (each
+        // attempt mints a fresh parent token, so retrying is idempotent);
+        // resend additionally re-delivers reports already SENT.
+        const targets = reports.filter((r) => {
+          if (r.topicId !== activeTopicId || !r.report) return false
+          return mode === 'resend'
+            ? isSendableReportStatus(r.report.status) || r.report.status === ReportStatus.SENT
+            : isSendableReportStatus(r.report.status)
+        })
+        for (const r of targets) {
+          const reportId = r.report?.id
+          if (!reportId) continue
+          try {
+            // Backend delivers the WhatsApp message and only then marks SENT;
+            // a throw means it recorded SEND_FAILED (retryable).
+            await reportService.send(reportId)
+            sent++
+          } catch (err) {
+            const reason =
+              err instanceof Error && err.message
+                ? err.message
+                : i18n.t('admin.reports.sendListError')
+            failures.push(`${r.participant.child_name}: ${reason}`)
+          }
+        }
+        if (failures.length > 0) setSendError(failures.join('\n'))
+        addToast({
+          type: failures.length > 0 ? 'error' : 'success',
+          message: i18n.t('admin.reports.sendAllResult', { sent, failed: failures.length }),
+        })
+        await loadData()
+        return { sent, failed: failures.length }
+      } finally {
+        setSending(false)
       }
-      await loadData()
-      return true
-    } catch {
-      setError(i18n.t('admin.reports.sendListError'))
-      return false
-    } finally {
-      setSending(false)
-    }
-  }, [sessionId, reports, loadData])
+    }, [sessionId, reports, activeTopicId, loadData, addToast])
 
   const filteredReports = useMemo(() => {
     if (!search) return reports
@@ -222,10 +260,6 @@ export function useReportSession(sessionId: string | undefined) {
         r.participant.school_name?.toLowerCase().includes(q),
     )
   }, [reports, search])
-
-  const approvedCount = reports.filter(
-    (r) => r.report?.status === ReportStatus.APPROVED,
-  ).length
 
   return {
     session,
@@ -241,8 +275,8 @@ export function useReportSession(sessionId: string | undefined) {
     generating,
     sending,
     genError,
+    sendError,
     filteredReports,
-    approvedCount,
     loadData,
     handleGenerateAll,
     handleGenerateOne,

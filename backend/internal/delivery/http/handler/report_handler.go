@@ -57,10 +57,11 @@ func tenantGuard(c *echo.Context, tenantID string) error {
 }
 
 // GetByAccessToken handles GET /api/reports/access?token=... (PUBLIC).
-// Verifies the token (64hex, not revoked, not expired) and returns a DTO
-// stripped of PII and the token itself. photo_url is set only when photo
-// consent is granted AND a photo resolves for the report's topic; the token
-// itself never enters the DTO — the client composes the photo URL.
+// Verifies the token (64hex, not revoked, not expired) and returns the full
+// mini-raport payload (program/child/session, stages, missions, badges,
+// gallery) assembled to equal the admin preview; the raw token itself never
+// enters the DTO. photo_url is set only when photo consent is granted AND a
+// photo resolves for the report's topic — the client composes the photo URL.
 func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 	token := (*c).QueryParam("token")
 	if token == "" {
@@ -88,7 +89,11 @@ func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 			photoURL = "/api/reports/access/photo"
 		}
 	}
-	return appresp.OK(c, dto.NewPublicReportDTO(r, photoURL))
+	view, err := h.uc.BuildPublicReportView(ctx, r)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewPublicReportDTO(r, view, photoURL))
 }
 
 // GetAccessPhoto serves the report's resolved topic photo as raw bytes for
@@ -337,7 +342,10 @@ func (h *ReportHandler) Approve(c *echo.Context) error {
 	return appresp.OK(c, dto.NewReportResponse(r))
 }
 
-// Send handles POST /api/reports/:id/send (generates a fresh parent token).
+// Send handles POST /api/reports/:id/send: mints a fresh parent token and
+// delivers the report link to the parent's WhatsApp — the report is marked
+// SENT only after the gateway accepts the message, otherwise it is recorded as
+// SEND_FAILED (retryable) and the error is returned.
 // The token TTL defaults to the configured ReportTokenTTL, overridable per
 // request via ReportSendRequest.TTLHours.
 func (h *ReportHandler) Send(c *echo.Context) error {

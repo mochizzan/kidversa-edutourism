@@ -66,11 +66,17 @@ type Config struct {
 	TestDBPassword string
 	TestDBName     string
 
-	// WhatsApp (OpenWA self-hosted gateway) — used by the consent delivery flow.
+	// WhatsApp (OpenWA self-hosted gateway) — used by the consent and report
+	// delivery flows.
 	WhatsAppGatewayURL   string
 	WhatsAppAPIKey       string
 	WhatsAppSessionID    string
 	ParentConsentBaseURL string
+	// ParentReportBaseURL is the public URL of the parent mini-raport page
+	// (…/parent/report); the access token is appended as ?token=… when the
+	// report is delivered via WhatsApp. Empty → Send fails with
+	// report_link_not_configured instead of sharing a broken link.
+	ParentReportBaseURL string
 
 	// AI provider selection: "openrouter" (default) or "gemini".
 	// Drives which LLM backend the narrative generator + mission recommender use.
@@ -142,6 +148,7 @@ func Load() *Config {
 		WhatsAppAPIKey:       getEnv("WHATSAPP_API_KEY", ""),
 		WhatsAppSessionID:    getEnv("WHATSAPP_SESSION_ID", ""),
 		ParentConsentBaseURL: getEnv("PARENT_CONSENT_BASE_URL", ""),
+		ParentReportBaseURL:  getEnv("PARENT_REPORT_BASE_URL", ""),
 
 		OpenRouterAPIKey:    getEnv("OPENROUTER_API_KEY", ""),
 		OpenRouterModel:     getEnv("OPENROUTER_MODEL", "google/gemma-4-26b-a4b-it:free"),

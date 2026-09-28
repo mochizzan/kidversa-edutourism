@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
 	"sync"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"kidversa-edutourism-backend/internal/infrastructure/ai"
 	"kidversa-edutourism-backend/internal/pkg/constants"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
+	"kidversa-edutourism-backend/internal/pkg/phoneutil"
 	"kidversa-edutourism-backend/internal/pkg/util"
 )
 
@@ -48,7 +51,12 @@ type Usecase struct {
 	programSubstageRepo    repository.ProgramSubstageRepository
 	sessionSubstageRepo    repository.SessionSubstageRepository
 	galleryRepo            repository.GalleryTokenRepository
-	cfg                    *config.Config
+	// messaging delivers the report link to the parent's WhatsApp on Send.
+	messaging repository.MessagingService
+	// userRepo resolves facilitator names for the public parent payload
+	// (fallback when the read-time join in GetByToken came back empty).
+	userRepo repository.UserRepository
+	cfg      *config.Config
 }
 
 // NewUsecase builds the reports usecase.
@@ -65,6 +73,8 @@ func NewUsecase(
 	sessionSubstageRepo repository.SessionSubstageRepository,
 	galleryRepo repository.GalleryTokenRepository,
 	cfg *config.Config,
+	messaging repository.MessagingService,
+	userRepo repository.UserRepository,
 ) *Usecase {
 	return &Usecase{
 		repo:                   repo,
@@ -78,6 +88,8 @@ func NewUsecase(
 		programSubstageRepo:    programSubstageRepo,
 		sessionSubstageRepo:    sessionSubstageRepo,
 		galleryRepo:            galleryRepo,
+		messaging:              messaging,
+		userRepo:               userRepo,
 		cfg:                    cfg,
 	}
 }
@@ -191,13 +203,30 @@ func buildItems(reportID string, missionIDs []string) []entity.ParticipantMissio
 	return items
 }
 
-// Send generates a fresh unguessable parent access token (anti-IDOR) and marks
-// the report sent. The token is unguessable (32 random bytes → 64 hex chars),
-// scoped to exactly one report, and expires after ttlHours.
+// Send generates a fresh unguessable parent access token (anti-IDOR), delivers
+// the report link to the parent's WhatsApp, and only then marks the report
+// SENT. The token is unguessable (32 random bytes → 64 hex chars), scoped to
+// exactly one report, and expires after ttlHours.
+//
+// Failure handling: a failed delivery is recorded as SEND_FAILED (retryable
+// via the same call) and reported to the caller — the report is never marked
+// SENT before the gateway confirms the message was accepted.
 func (u *Usecase) Send(ctx context.Context, reportID, tenantID string, ttlHours int) (*entity.Report, error) {
 	r, err := u.repo.GetByID(ctx, reportID, tenantID)
 	if err != nil {
 		return nil, err
+	}
+	participant, err := u.sessionRepo.GetParticipantByID(ctx, r.ParticipantID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if u.cfg.ParentReportBaseURL == "" {
+		log.Printf("reports: PARENT_REPORT_BASE_URL is not set; cannot deliver report %s", r.ID)
+		return nil, u.markSendFailed(ctx, r, apperrors.Internal("report_link_not_configured", nil))
+	}
+	digits, derr := phoneutil.WhatsAppDigits(participant.ParentPhone)
+	if derr != nil {
+		return nil, u.markSendFailed(ctx, r, apperrors.BadRequest("whatsapp_number_missing", derr))
 	}
 	tok, err := util.RandomToken()
 	if err != nil {
@@ -207,6 +236,16 @@ func (u *Usecase) Send(ctx context.Context, reportID, tenantID string, ttlHours 
 	r.ParentTokenRevoked = false
 	exp := time.Now().UTC().Add(time.Duration(ttlHours) * time.Hour)
 	r.ParentTokenExpiresAt = &exp
+	// Persist the token before delivery so the shared link is already durable.
+	if err := u.repo.Update(ctx, r); err != nil {
+		return nil, err
+	}
+	link := u.cfg.ParentReportBaseURL + "?token=" + tok
+	msg := buildReportMessage(participant.ParentName, participant.ChildName, u.sessionName(ctx, r, tenantID), link)
+	if serr := u.messaging.SendTextMessage(ctx, digits+"@c.us", msg); serr != nil {
+		log.Printf("reports: whatsapp delivery failed for report %s: %v", r.ID, serr)
+		return nil, u.markSendFailed(ctx, r, apperrors.New(http.StatusBadGateway, "whatsapp_send_failed", serr))
+	}
 	r.Status = entity.ReportSent
 	now := time.Now().UTC()
 	r.SentAt = &now
@@ -214,6 +253,40 @@ func (u *Usecase) Send(ctx context.Context, reportID, tenantID string, ttlHours 
 		return nil, err
 	}
 	return r, nil
+}
+
+// markSendFailed records a retryable delivery failure and returns the error
+// unchanged so handlers surface the original cause.
+func (u *Usecase) markSendFailed(ctx context.Context, r *entity.Report, cause error) error {
+	r.Status = entity.ReportSendFailed
+	if err := u.repo.Update(ctx, r); err != nil {
+		log.Printf("reports: could not record SEND_FAILED for report %s: %v", r.ID, err)
+	}
+	return cause
+}
+
+// sessionName resolves the session label used in the delivery message
+// (best-effort: a lookup failure must not block the send).
+func (u *Usecase) sessionName(ctx context.Context, r *entity.Report, tenantID string) string {
+	s, err := u.sessionRepo.GetSessionByID(ctx, r.SessionID, tenantID)
+	if err != nil || s == nil {
+		return ""
+	}
+	return s.Name
+}
+
+// buildReportMessage composes the WhatsApp text carrying the parent link.
+func buildReportMessage(parentName, childName, sessionName, link string) string {
+	return fmt.Sprintf(`Kidversa Edutourism 🎓
+
+Halo Bapak/Ibu %s,
+
+Rapor %s sudah selesai dan telah disetujui.
+
+Silakan lihat rapor melalui tautan berikut:
+%s
+
+Terima kasih 🙏`, parentName, childName, link)
 }
 
 // RevokeToken invalidates a report's parent access token.

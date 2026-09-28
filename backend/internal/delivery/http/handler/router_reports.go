@@ -14,7 +14,8 @@ import (
 //   - POST /api/reports/:id/generate/stream  (async AI narrative, 202 + SSE)
 //   - GET  /api/reports/:id/generate/stream  (SSE token stream)
 //   - POST /api/reports/:id/approve
-//   - POST /api/reports/:id/send            (generates parent token)
+//   - POST /api/reports/:id/send            (mints parent token + delivers the
+//     link to the parent's WhatsApp; SENT only after the gateway confirms)
 //   - POST /api/reports/:id/revoke-token
 //
 // The public access endpoint is intentionally OUTSIDE JWTAuth; the token itself

@@ -273,6 +273,7 @@
       "groupNotCompleted": "진행자가 그룹을 완료하지 않았습니다",
       "approveError": "보고서 승인에 실패했습니다.",
       "sendOk": "보고서가 학부모에게 전송되었습니다",
+      "resendOk": "보고서가 학부모에게 다시 전송되었습니다",
       "sendError": "보고서 전송에 실패했습니다.",
       "narrativeStreamError": "내러티브 스트리밍을 불러오는 데 실패했습니다.",
       "narrativeDone": "내러티브가 성공적으로 생성되었습니다.",
@@ -329,7 +330,8 @@
       "pendingReview": "검토 필요",
       "approved": "승인됨",
       "sent": "전송됨",
-      "noReport": "보고서 없음"
+      "noReport": "보고서 없음",
+      "sendFailed": "전송 실패"
     },
     "contentType": {
       "video": "비디오",
@@ -865,6 +867,7 @@
       "eligibleEmptyError": "보고서를 생성할 수 있는 참가자가 없습니다.",
       "generateError": "보고서 생성에 실패했습니다.",
       "sendListError": "보고서 전송에 실패했습니다.",
+      "sendAllResult": "{{sent}}개 보고서 전송 완료, {{failed}}개 실패.",
       "generateAll": "모두 생성",
       "generateAgain": "다시 생성",
       "generate": "생성",
@@ -885,6 +888,10 @@
       "sendConfirmTitle": "보고서 전송 확인",
       "sendCount": "{{count}}개의 보고서 전송",
       "sendConfirmMsg": "승인된 <strong>{{count}}개의 보고서</strong>를 각 참가자의 부모/보호자에게 전송합니다.",
+      "resendAllCount": "모두 다시 전송 ({{count}})",
+      "resendCount": "{{count}}개의 보고서 다시 전송",
+      "resendConfirmTitle": "보고서 다시 전송 확인",
+      "resendConfirmMsg": "모든 참가자에게 <strong>{{count}}개의 보고서</strong>를 다시 전송합니다. 이미 전송된 보고서도 포함됩니다.",
       "sendConfirmNote": "이 작업은 취소할 수 없습니다.",
       "statusSent": "보고서가 {{date}}에 전송되었습니다",
       "statusApproved": "보고서가 승인되었으며 부모에게 전송할 준비가 되었습니다",
@@ -945,6 +952,10 @@
       "sendTitle": "학부모에게 보고서 전송",
       "sendBtn": "전송",
       "sendMsg": "보고서는 보안 링크를 통해 <strong>{{name}}</strong>의 학부모/보호자에게 전송됩니다. 학부모는 후속 미션을 포함한 전체 보고서를 확인할 수 있습니다.",
+      "resendToParent": "학부모에게 다시 전송",
+      "resendTitle": "다시 전송 확인",
+      "resendBtn": "다시 전송",
+      "resendMsg": "보고서는 보안 링크를 통해 <strong>{{name}}</strong>의 학부모/보호자에게 다시 전송됩니다.",
       "missionSubtitle": "학부모에게 제공할 미션을 최대 4개까지 선택하세요.",
       "pickFromLibrary": "미션 라이브러리에서 선택",
       "aiSuggest": "미션 맞춤 설정 - AI",
@@ -1411,7 +1422,11 @@
       "iframeTitle": "미니 성적표",
       "print": "인쇄",
       "downloadPdf": "PDF 다운로드",
-      "downloadPng": "PNG 다운로드"
+      "downloadPng": "PNG 다운로드",
+      "zoomIn": "확대",
+      "zoomOut": "축소",
+      "zoomReset": "줌 초기화",
+      "zoomLevel": "줌: {{value}}"
     },
     "gallery": {
       "title": "포토 갤러리",

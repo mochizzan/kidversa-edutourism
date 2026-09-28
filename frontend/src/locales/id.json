@@ -296,6 +296,7 @@
       "groupNotCompleted": "Kelompok belum diselesaikan oleh fasilitator",
       "approveError": "Gagal menyetujui laporan.",
       "sendOk": "Laporan berhasil dikirim ke orang tua",
+      "resendOk": "Laporan berhasil dikirim ulang.",
       "sendError": "Gagal mengirim laporan.",
       "narrativeStreamError": "Gagal memuat streaming narasi.",
       "narrativeDone": "Narasi berhasil dibuat.",
@@ -350,7 +351,8 @@
       "pendingReview": "Perlu Review",
       "approved": "Disetujui",
       "sent": "Terkirim",
-      "noReport": "Belum Ada Laporan"
+      "noReport": "Belum Ada Laporan",
+      "sendFailed": "Gagal Terkirim"
     },
     "contentType": {
       "video": "Video",
@@ -989,6 +991,7 @@
       "eligibleEmptyError": "Tidak ada peserta yang eligible untuk generate laporan.",
       "generateError": "Gagal generate laporan.",
       "sendListError": "Gagal mengirim laporan.",
+      "sendAllResult": "Berhasil mengirim {{sent}} rapor, gagal {{failed}}.",
       "generateAll": "Generate Semua",
       "generateAgain": "Generate Ulang",
       "generate": "Generate",
@@ -1009,6 +1012,10 @@
       "sendConfirmTitle": "Konfirmasi Kirim Laporan",
       "sendCount": "Kirim {{count}} Laporan",
       "sendConfirmMsg": "Anda akan mengirim <strong>{{count}} laporan</strong> yang sudah disetujui kepada orang tua/wali masing-masing peserta.",
+      "resendAllCount": "Kirim Ulang Semua ({{count}})",
+      "resendCount": "Kirim Ulang {{count}} Laporan",
+      "resendConfirmTitle": "Konfirmasi Kirim Ulang Laporan",
+      "resendConfirmMsg": "Anda akan mengirim ulang <strong>{{count}} laporan</strong> kepada seluruh peserta, termasuk yang sudah pernah dikirim.",
       "sendConfirmNote": "Tindakan ini tidak dapat dibatalkan.",
       "statusSent": "Laporan telah dikirim pada {{date}}",
       "statusApproved": "Laporan sudah disetujui dan siap dikirim ke orang tua",
@@ -1069,6 +1076,10 @@
       "sendTitle": "Kirim Laporan ke Orang Tua",
       "sendBtn": "Kirim",
       "sendMsg": "Laporan akan dikirim ke orang tua/wali dari <strong>{{name}}</strong> melalui tautan yang aman. Orang tua akan dapat melihat laporan lengkap beserta misi lanjutan.",
+      "resendToParent": "Kirim Ulang ke Orang Tua",
+      "resendTitle": "Konfirmasi Kirim Ulang",
+      "resendBtn": "Kirim Ulang",
+      "resendMsg": "Laporan akan dikirim ulang ke orang tua/wali dari <strong>{{name}}</strong> melalui tautan yang aman.",
       "missionSubtitle": "Pilih maksimal 4 misi untuk diberikan kepada orang tua",
       "pickFromLibrary": "Pilih dari library misi",
       "aiSuggest": "Sesuaikan Misi - AI",
@@ -1389,7 +1400,11 @@
       "iframeTitle": "Mini Raport",
       "print": "Cetak",
       "downloadPdf": "Unduh PDF",
-      "downloadPng": "Unduh PNG"
+      "downloadPng": "Unduh PNG",
+      "zoomIn": "Perbesar",
+      "zoomOut": "Perkecil",
+      "zoomReset": "Atur ulang zoom",
+      "zoomLevel": "Zoom: {{value}}"
     },
     "gallery": {
       "title": "Galeri Foto",

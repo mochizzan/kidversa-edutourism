@@ -3,6 +3,7 @@ package dto
 import (
 	"kidversa-edutourism-backend/internal/domain/entity"
 	apputil "kidversa-edutourism-backend/internal/pkg/util"
+	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
 )
 
 // ReportResponse is the authenticated read representation of a report.
@@ -30,8 +31,12 @@ func NewReportListResponse(items []entity.Report) *ReportListResponse {
 	return &ReportListResponse{Items: out}
 }
 
-// PublicReportDTO is the anti-IDOR safe view returned to a parent presenting a
-// valid access token. It intentionally omits PII and the raw token.
+// PublicReportDTO is the public view returned to a parent presenting a valid
+// parent access token (GET /api/reports/access). It carries the same content
+// the admin mini-raport preview assembles (program/child/session, stages,
+// missions, badges, gallery) so the parent render matches the admin preview;
+// PII stays limited to the report's own child/program data — parent contact
+// fields never appear, and the raw access token itself NEVER enters the DTO.
 type PublicReportDTO struct {
 	ID               string   `json:"id"`
 	ParticipantID    string   `json:"participant_id"`
@@ -44,23 +49,47 @@ type PublicReportDTO struct {
 	FacilitatorName  string   `json:"facilitator_name,omitempty"`
 	// PhotoURL is the token-free access-photo path, present only when a photo
 	// resolves for this report's topic AND photo consent is granted (omitempty).
-	PhotoURL string `json:"photo_url,omitempty"`
+	PhotoURL           string `json:"photo_url,omitempty"`
+	ProgramName        string `json:"program_name,omitempty"`
+	TopicName          string `json:"topic_name,omitempty"`
+	ChildName          string `json:"child_name,omitempty"`
+	ChildAge           int    `json:"child_age"`
+	SchoolName         string `json:"school_name,omitempty"`
+	SessionDate        string `json:"session_date,omitempty"`
+	GalleryAccessToken string `json:"gallery_access_token,omitempty"`
+	// Stages/Missions/Badges mirror the admin preview as assembled by the
+	// reports usecase; the client applies the RAPORT_LAYOUT caps. Always
+	// present, possibly empty.
+	Stages   []reportsuc.PublicStage   `json:"stages"`
+	Missions []reportsuc.PublicMission `json:"missions"`
+	Badges   []reportsuc.PublicBadge   `json:"badges"`
 }
 
-// NewPublicReportDTO builds the safe public view (no PII beyond IDs, no token).
-// photoURL is "" when no photo resolves or consent is off.
-func NewPublicReportDTO(r *entity.Report, photoURL string) *PublicReportDTO {
+// NewPublicReportDTO builds the public view from the report plus its assembled
+// mini-raport content (view). photoURL is "" when no photo resolves or consent
+// is off. The access token itself is never serialized.
+func NewPublicReportDTO(r *entity.Report, view *reportsuc.PublicReportView, photoURL string) *PublicReportDTO {
 	return &PublicReportDTO{
-		ID:               r.ID,
-		ParticipantID:    r.ParticipantID,
-		SessionID:        r.SessionID,
-		Status:           string(r.Status),
-		AINarrativeFinal: r.AINarrativeFinal,
-		MissionIDs:       r.MissionIDs,
-		ReportPDFURL:     r.ReportPDFURL,
-		GroupName:        r.GroupName,
-		FacilitatorName:  r.FacilitatorName,
-		PhotoURL:         photoURL,
+		ID:                 r.ID,
+		ParticipantID:      r.ParticipantID,
+		SessionID:          r.SessionID,
+		Status:             string(r.Status),
+		AINarrativeFinal:   r.AINarrativeFinal,
+		MissionIDs:         r.MissionIDs,
+		ReportPDFURL:       r.ReportPDFURL,
+		GroupName:          view.GroupName,
+		FacilitatorName:    view.FacilitatorName,
+		PhotoURL:           photoURL,
+		ProgramName:        view.ProgramName,
+		TopicName:          view.TopicName,
+		ChildName:          view.ChildName,
+		ChildAge:           view.ChildAge,
+		SchoolName:         view.SchoolName,
+		SessionDate:        view.SessionDate,
+		GalleryAccessToken: r.GalleryAccessToken,
+		Stages:             view.Stages,
+		Missions:           view.Missions,
+		Badges:             view.Badges,
 	}
 }
 

@@ -133,6 +133,12 @@ func MessageForCode(code string) string {
 		return "Data kehadiran tidak ditemukan"
 	case "assessment_out_of_range":
 		return "Penilaian harus antara 0 sampai 4"
+	case "whatsapp_send_failed":
+		return "Gagal mengirim rapor via WhatsApp. Silakan coba kirim ulang."
+	case "whatsapp_number_missing":
+		return "Nomor WhatsApp orang tua tidak tersedia untuk peserta ini"
+	case "report_link_not_configured":
+		return "Tautan rapor belum dikonfigurasi (PARENT_REPORT_BASE_URL)"
 	case "user_not_deactivatable":
 		return "Akun ini tidak dapat dinonaktifkan"
 	case "user_not_deletable":

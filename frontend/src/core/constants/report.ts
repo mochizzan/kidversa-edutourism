@@ -1,4 +1,8 @@
-export const A4_SHEET_WIDTH = 794 // px — A4 at 96dpi
+// 210mm @96dpi = 793,70px, dibulatkan 794 — HANYA untuk tempat yang
+// mensyaratkan piksel (lebar iframe tersembunyi & input html2canvas/jsPDF).
+// Lembar rapor sendiri (layar & cetak) memakai mm (210mm × 297mm) —
+// lihat .a4-sheet di shared/templates/miniRaport.tailwind.css.
+export const A4_SHEET_WIDTH = 794
 
 export const DEFAULT_FACILITATOR_MESSAGE =
   'Terima kasih telah berpartisipasi dalam Program Kidversa Edu-Tourism. Semoga pengalaman belajar hari ini memberikan inspirasi dan kebahagiaan bagi si kecil. Sampai jumpa di sesi berikutnya!'

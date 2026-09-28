@@ -1120,9 +1120,6 @@
   .max-w-\[200px\] {
     max-width: 200px;
   }
-  .max-w-\[210mm\] {
-    max-width: 210mm;
-  }
   .max-w-\[220px\] {
     max-width: 220px;
   }
@@ -1158,6 +1155,9 @@
   }
   .min-w-0 {
     min-width: 0;
+  }
+  .min-w-\[3\.5rem\] {
+    min-width: 3.5rem;
   }
   .min-w-\[18px\] {
     min-width: 18px;
@@ -1258,6 +1258,12 @@
   .cursor-default {
     cursor: default;
   }
+  .cursor-grab {
+    cursor: grab;
+  }
+  .cursor-grabbing {
+    cursor: grabbing;
+  }
   .cursor-not-allowed {
     cursor: not-allowed;
   }
@@ -1270,11 +1276,17 @@
   .cursor-zoom-in {
     cursor: zoom-in;
   }
+  .touch-none {
+    touch-action: none;
+  }
   .resize-none {
     resize: none;
   }
   .resize-y {
     resize: vertical;
+  }
+  .list-disc {
+    list-style-type: disc;
   }
   .appearance-none {
     appearance: none;
@@ -2249,6 +2261,9 @@
   .pl-4 {
     padding-left: calc(var(--spacing) * 4);
   }
+  .pl-5 {
+    padding-left: calc(var(--spacing) * 5);
+  }
   .pl-9 {
     padding-left: calc(var(--spacing) * 9);
   }
@@ -2601,6 +2616,10 @@
   .italic {
     font-style: italic;
   }
+  .tabular-nums {
+    --tw-numeric-spacing: tabular-nums;
+    font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,) var(--tw-numeric-figure,) var(--tw-numeric-spacing,) var(--tw-numeric-fraction,);
+  }
   .line-through {
     text-decoration-line: line-through;
   }
@@ -2877,6 +2896,10 @@
   .outline-none {
     --tw-outline-style: none;
     outline-style: none;
+  }
+  .select-none {
+    -webkit-user-select: none;
+    user-select: none;
   }
   .ring-inset {
     --tw-ring-inset: inset;
@@ -4377,7 +4400,9 @@
   }
 }
 .a4-sheet {
-  max-width: 794px;
+  width: 210mm;
+  max-width: 210mm;
+  min-height: 297mm;
 }
 @media (max-width: 480px) {
   .a4-sheet {
@@ -4476,6 +4501,26 @@
   inherits: false;
 }
 @property --tw-tracking {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ordinal {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-slashed-zero {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-figure {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-spacing {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-numeric-fraction {
   syntax: "*";
   inherits: false;
 }
@@ -4691,6 +4736,11 @@
       --tw-leading: initial;
       --tw-font-weight: initial;
       --tw-tracking: initial;
+      --tw-ordinal: initial;
+      --tw-slashed-zero: initial;
+      --tw-numeric-figure: initial;
+      --tw-numeric-spacing: initial;
+      --tw-numeric-fraction: initial;
       --tw-shadow: 0 0 #0000;
       --tw-shadow-color: initial;
       --tw-shadow-alpha: 100%;

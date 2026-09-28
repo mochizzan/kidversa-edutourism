@@ -61,6 +61,8 @@ export enum ReportStatus {
   PENDING_REVIEW = 'PENDING_REVIEW',
   APPROVED = 'APPROVED',
   SENT = 'SENT',
+  /** WhatsApp delivery attempted and failed — retryable via Send / Send All. */
+  SEND_FAILED = 'SEND_FAILED',
 }
 
 export enum SyncQueueDataType {

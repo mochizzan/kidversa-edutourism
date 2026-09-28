@@ -273,6 +273,7 @@
       "groupNotCompleted": "Hindi pa tinatapos ng facilitator ang grupo",
       "approveError": "Nabigong aprubahan ang ulat.",
       "sendOk": "Matagumpay na naipadala ang ulat sa magulang",
+      "resendOk": "Matagumpay na naipadala muli ang ulat sa magulang",
       "sendError": "Nabigong ipadala ang ulat.",
       "narrativeStreamError": "Nabigong i-load ang streaming ng naratibo.",
       "narrativeDone": "Matagumpay na nagawa ang naratibo.",
@@ -329,7 +330,8 @@
       "pendingReview": "Kailangan ng Review",
       "approved": "Inaprubahan",
       "sent": "Ipinadala",
-      "noReport": "Walang Ulat"
+      "noReport": "Walang Ulat",
+      "sendFailed": "Nabigong Ipadala"
     },
     "contentType": {
       "video": "Video",
@@ -865,6 +867,7 @@
       "eligibleEmptyError": "Walang kalahok na eligible para sa pag-generate ng ulat.",
       "generateError": "Nabigong i-generate ang ulat.",
       "sendListError": "Nabigong ipadala ang ulat.",
+      "sendAllResult": "Naipadala ang {{sent}} ulat, {{failed}} nabigo.",
       "generateAll": "I-generate Lahat",
       "generateAgain": "I-generate Muli",
       "generate": "I-generate",
@@ -885,6 +888,10 @@
       "sendConfirmTitle": "Kumpirmahin ang Pagpapadala ng Ulat",
       "sendCount": "Ipadala ang {{count}} Ulat",
       "sendConfirmMsg": "Ipapadala mo ang <strong>{{count}} ulat</strong> na naaprubahan na sa mga magulang/guardian ng bawat kalahok.",
+      "resendAllCount": "Ipadala Lahat Muli ({{count}})",
+      "resendCount": "Ipadala Muli ang {{count}} Ulat",
+      "resendConfirmTitle": "Kumpirmahin ang Muling Pagpapadala ng Ulat",
+      "resendConfirmMsg": "Ipapadala mo muli ang <strong>{{count}} ulat</strong> sa lahat ng kalahok, kasama ang mga naipadala na.",
       "sendConfirmNote": "Hindi na mababawi ang aksyong ito.",
       "statusSent": "Naipadala ang ulat noong {{date}}",
       "statusApproved": "Ang ulat ay naaprubahan na at handa nang ipadala sa magulang",
@@ -945,6 +952,10 @@
       "sendTitle": "Ipadala ang Ulat sa Magulang",
       "sendBtn": "Ipadala",
       "sendMsg": "Ang ulat ay ipapadala sa magulang/guardian ni <strong>{{name}}</strong> sa pamamagitan ng isang secure na link. Makikita ng mga magulang ang kumpletong ulat kasama ang mga susunod na misyon.",
+      "resendToParent": "Ipadala Muli sa Magulang",
+      "resendTitle": "Kumpirmahin ang Muling Pagpapadala",
+      "resendBtn": "Ipadala Muli",
+      "resendMsg": "Ang ulat ay ipapadala muli sa magulang/guardian ni <strong>{{name}}</strong> sa pamamagitan ng isang secure na link.",
       "missionSubtitle": "Pumili ng hanggang 4 na misyon na ibibigay sa mga magulang",
       "pickFromLibrary": "Pumili mula sa library ng misyon",
       "aiSuggest": "I-customize ang Misyon - AI",
@@ -1411,7 +1422,11 @@
       "iframeTitle": "Mini Report Card",
       "print": "I-print",
       "downloadPdf": "I-download ang PDF",
-      "downloadPng": "I-download ang PNG"
+      "downloadPng": "I-download ang PNG",
+      "zoomIn": "I-zoom in",
+      "zoomOut": "I-zoom out",
+      "zoomReset": "I-reset ang zoom",
+      "zoomLevel": "Zoom: {{value}}"
     },
     "gallery": {
       "title": "Gallery ng Larawan",

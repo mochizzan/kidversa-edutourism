@@ -273,6 +273,7 @@
       "groupNotCompleted": "Group has not been completed by the facilitator",
       "approveError": "Failed to approve report.",
       "sendOk": "Report sent to parents successfully",
+      "resendOk": "Report resent successfully.",
       "sendError": "Failed to send report.",
       "narrativeStreamError": "Failed to load narrative streaming.",
       "narrativeDone": "Narrative generated successfully.",
@@ -329,7 +330,8 @@
       "pendingReview": "Needs Review",
       "approved": "Approved",
       "sent": "Sent",
-      "noReport": "No Report Yet"
+      "noReport": "No Report Yet",
+      "sendFailed": "Send Failed"
     },
     "contentType": {
       "video": "Video",
@@ -865,6 +867,7 @@
       "eligibleEmptyError": "No participants eligible for report generation.",
       "generateError": "Failed to generate report.",
       "sendListError": "Failed to send report.",
+      "sendAllResult": "Sent {{sent}} reports, {{failed}} failed.",
       "generateAll": "Generate All",
       "generateAgain": "Regenerate",
       "generate": "Generate",
@@ -885,6 +888,10 @@
       "sendConfirmTitle": "Confirm Report Submission",
       "sendCount": "Send {{count}} Reports",
       "sendConfirmMsg": "You are about to send <strong>{{count}} approved reports</strong> to each participant's parent/guardian.",
+      "resendAllCount": "Resend All ({{count}})",
+      "resendCount": "Resend {{count}} Reports",
+      "resendConfirmTitle": "Confirm Report Resend",
+      "resendConfirmMsg": "You are about to resend <strong>{{count}} reports</strong> to all participants, including those already sent.",
       "sendConfirmNote": "This action cannot be undone.",
       "statusSent": "Report sent on {{date}}",
       "statusApproved": "Report approved and ready to be sent to parents",
@@ -945,6 +952,10 @@
       "sendTitle": "Send Report to Parent",
       "sendBtn": "Send",
       "sendMsg": "The report will be sent to the parent/guardian of <strong>{{name}}</strong> via a secure link. Parents will be able to view the full report along with follow-up missions.",
+      "resendToParent": "Resend to Parent",
+      "resendTitle": "Confirm Resend",
+      "resendBtn": "Resend",
+      "resendMsg": "The report will be resent to the parent/guardian of <strong>{{name}}</strong> via a secure link.",
       "missionSubtitle": "Select a maximum of 4 missions to provide to parents",
       "pickFromLibrary": "Select from mission library",
       "aiSuggest": "Customize Mission - AI",
@@ -1411,7 +1422,11 @@
       "iframeTitle": "Mini Report",
       "print": "Print",
       "downloadPdf": "Download PDF",
-      "downloadPng": "Download PNG"
+      "downloadPng": "Download PNG",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "zoomReset": "Reset zoom",
+      "zoomLevel": "Zoom: {{value}}"
     },
     "gallery": {
       "title": "Photo Gallery",

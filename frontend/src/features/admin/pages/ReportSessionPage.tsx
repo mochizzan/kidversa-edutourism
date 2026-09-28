@@ -5,7 +5,6 @@ import {
   FileText,
   Send,
   ArrowLeft,
-  RefreshCw,
   Search,
   AlertTriangle,
   User,
@@ -28,6 +27,7 @@ import { formatDate } from '../../../shared/utils'
 import {
   reportStatusBadge,
   reportStatusLabel,
+  isSendableReportStatus,
   NO_ASSESSMENT_LABEL,
   NO_REPORT_LABEL,
 } from '../../../core/constants/reportStatus'
@@ -57,8 +57,8 @@ const ReportSessionPage = () => {
     generating,
     sending,
     genError,
+    sendError,
     filteredReports,
-    approvedCount,
     loadData,
     handleGenerateAll,
     handleGenerateOne,
@@ -69,15 +69,29 @@ const ReportSessionPage = () => {
   // and bulk counts below are scoped to that Topic.
   const topicReports = reports.filter((r) => r.topicId === activeTopicId)
   const topicFilteredReports = filteredReports.filter((r) => r.topicId === activeTopicId)
-  const topicApproved = topicReports.filter((r) => r.report?.status === ReportStatus.APPROVED).length
+  // Sendable = APPROVED + SEND_FAILED (failed deliveries are retried by Send All).
+  const topicSendable = topicReports.filter(
+    (r) => r.report && isSendableReportStatus(r.report.status),
+  ).length
   const topicSent = topicReports.filter((r) => r.report?.status === ReportStatus.SENT).length
+  // Resend mode: at least one report in this Topic is already SENT, so the bulk
+  // action re-delivers every finalized report (SENT + APPROVED + SEND_FAILED).
+  const isResendMode = topicSent > 0
+  const topicResendTargets = topicReports.filter(
+    (r) =>
+      r.report &&
+      (isSendableReportStatus(r.report.status) || r.report.status === ReportStatus.SENT),
+  ).length
+  const sendTargetCount = isResendMode ? topicResendTargets : topicSendable
+  // Status-card count (APPROVED only) — sendable ≠ approved once a send failed.
+  const topicApproved = topicReports.filter((r) => r.report?.status === ReportStatus.APPROVED).length
   const topicDraft = topicReports.filter((r) => r.report?.status === ReportStatus.DRAFT).length
   const topicAllFinalized =
     topicReports.length > 0 &&
     topicReports.every(
       (r) =>
-        r.report &&
-        (r.report.status === ReportStatus.APPROVED || r.report.status === ReportStatus.SENT),
+        !!r.report &&
+        (isSendableReportStatus(r.report.status) || r.report.status === ReportStatus.SENT),
     )
   const topicAllHaveReport = topicReports.length > 0 && topicReports.every((r) => r.report)
 
@@ -116,8 +130,10 @@ const ReportSessionPage = () => {
   }
 
   const onSend = async () => {
-    const ok = await handleSendAll()
-    if (ok) setShowConfirmSend(false)
+    // Always close the dialog: the toast + failure banner carry the outcome,
+    // and a partial failure is retried by pressing Send All again.
+    await handleSendAll(isResendMode ? 'resend' : 'send')
+    setShowConfirmSend(false)
   }
 
   if (loading) {
@@ -236,7 +252,7 @@ const ReportSessionPage = () => {
         <Button
           variant="secondary"
           onClick={() => setShowConfirmSend(true)}
-          disabled={topicApproved === 0 || sending}
+          disabled={sendTargetCount === 0 || sending}
         >
           {sending ? (
             <>
@@ -244,12 +260,12 @@ const ReportSessionPage = () => {
             </>
           ) : (
             <>
-              <Send className="w-4 h-4 mr-2" /> {t('admin.reports.sendAllCount', { count: topicApproved })}
+              <Send className="w-4 h-4 mr-2" />
+              {t(isResendMode ? 'admin.reports.resendAllCount' : 'admin.reports.sendAllCount', {
+                count: sendTargetCount,
+              })}
             </>
           )}
-        </Button>
-        <Button variant="ghost" size="sm" onClick={loadData}>
-          <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
 
@@ -257,6 +273,20 @@ const ReportSessionPage = () => {
         <div className="bg-error-container text-on-error-container rounded-2xl p-4 text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {genError}
+        </div>
+      )}
+
+      {sendError && (
+        <div className="bg-error-container text-on-error-container rounded-2xl p-4 text-sm space-y-1">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            {t('admin.reports.sendListError')}
+          </div>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {sendError.split('\n').map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -464,7 +494,7 @@ const ReportSessionPage = () => {
       <Modal
         open={showConfirmSend}
         onClose={() => setShowConfirmSend(false)}
-        title={t('admin.reports.sendConfirmTitle')}
+        title={t(isResendMode ? 'admin.reports.resendConfirmTitle' : 'admin.reports.sendConfirmTitle')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
@@ -472,7 +502,11 @@ const ReportSessionPage = () => {
               {t('common.cancel')}
             </Button>
             <Button onClick={onSend} disabled={sending}>
-              {sending ? t('admin.reports.sending') : t('admin.reports.sendCount', { count: topicApproved })}
+              {sending
+                ? t('admin.reports.sending')
+                : t(isResendMode ? 'admin.reports.resendCount' : 'admin.reports.sendCount', {
+                  count: sendTargetCount,
+                })}
             </Button>
           </div>
         }
@@ -482,8 +516,10 @@ const ReportSessionPage = () => {
           <div className="text-sm text-on-surface-variant">
             <p>
               <Trans
-                i18nKey="admin.reports.sendConfirmMsg"
-                values={{ count: approvedCount }}
+                i18nKey={
+                  isResendMode ? 'admin.reports.resendConfirmMsg' : 'admin.reports.sendConfirmMsg'
+                }
+                values={{ count: sendTargetCount }}
                 components={{ strong: <strong /> }}
               />
             </p>

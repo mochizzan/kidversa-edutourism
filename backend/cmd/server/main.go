@@ -71,6 +71,9 @@ func main() {
 	aiClient := ai.NewClient(cfg)
 	narrativeGen := ai.NewNarrativeGeneratorForProvider(cfg, reportRepo, sessionRepo, assessmentRepo, programRepo, sessionSubstageRepo)
 
+	// WhatsApp gateway (OpenWA) — shared by the consent and report delivery flows.
+	waGateway := messaging.NewWhatsAppGateway(cfg)
+
 	// Usecases.
 	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, auth.NewKioskStore(db.DB), cfg.BcryptCost)
 	userUC := auth.NewUserUsecase(userRepo, notifRepo, hub, cfg.BcryptCost)
@@ -86,7 +89,7 @@ func main() {
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, sessionRepo, badgeUC)
 	attendanceUC := attendanceuc.NewUsecase(attendanceRepo)
-	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg)
+	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg, waGateway, userRepo)
 
 	// Handlers.
 	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite, sessionRepo)
@@ -113,7 +116,7 @@ func main() {
 	registry.Report = handler.NewReportHandler(reportsUC, cfg, sessionRepo, hub, consentRepo, photoRepo)
 	registry.MissionBank = handler.NewMissionBankHandler(missionBankRepo)
 	registry.ParticipantMission = handler.NewParticipantMissionHandler(participantMissionRepo)
-	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo, messaging.NewWhatsAppGateway(cfg), cfg, hub)
+	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo, waGateway, cfg, hub)
 	registry.Frame = handler.NewFrameHandler(frameRepo)
 	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, frameRepo, contentRepo, userRepo, consentRepo)
 	registry.Media = handler.NewMediaHandler(cfg, photoRepo, consentRepo, sessionRepo, frameRepo, contentRepo, userRepo)

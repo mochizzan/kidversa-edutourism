@@ -273,6 +273,7 @@
       "groupNotCompleted": "Kumpulan belum diselesaikan oleh fasilitator",
       "approveError": "Gagal meluluskan laporan.",
       "sendOk": "Laporan berjaya dihantar kepada ibu bapa",
+      "resendOk": "Laporan berjaya dihantar semula kepada ibu bapa",
       "sendError": "Gagal menghantar laporan.",
       "narrativeStreamError": "Gagal memuatkan penstriman naratif.",
       "narrativeDone": "Naratif berjaya dicipta.",
@@ -329,7 +330,8 @@
       "pendingReview": "Perlu Semakan",
       "approved": "Diluluskan",
       "sent": "Dihantar",
-      "noReport": "Tiada Laporan"
+      "noReport": "Tiada Laporan",
+      "sendFailed": "Gagal Hantar"
     },
     "contentType": {
       "video": "Video",
@@ -865,6 +867,7 @@
       "eligibleEmptyError": "Tiada peserta yang layak untuk menjana laporan.",
       "generateError": "Gagal menjana laporan.",
       "sendListError": "Gagal menghantar laporan.",
+      "sendAllResult": "Berjaya menghantar {{sent}} laporan, {{failed}} gagal.",
       "generateAll": "Jana Semua",
       "generateAgain": "Jana Semula",
       "generate": "Jana",
@@ -885,6 +888,10 @@
       "sendConfirmTitle": "Pengesahan Hantar Laporan",
       "sendCount": "Hantar {{count}} Laporan",
       "sendConfirmMsg": "Anda akan menghantar <strong>{{count}} laporan</strong> yang telah diluluskan kepada ibu bapa/penjaga setiap peserta.",
+      "resendAllCount": "Hantar Semula Semua ({{count}})",
+      "resendCount": "Hantar Semula {{count}} Laporan",
+      "resendConfirmTitle": "Pengesahan Hantar Semula Laporan",
+      "resendConfirmMsg": "Anda akan menghantar semula <strong>{{count}} laporan</strong> kepada semua peserta, termasuk yang telah dihantar sebelum ini.",
       "sendConfirmNote": "Tindakan ini tidak boleh dibatalkan.",
       "statusSent": "Laporan telah dihantar pada {{date}}",
       "statusApproved": "Laporan telah diluluskan dan sedia dihantar kepada ibu bapa",
@@ -945,6 +952,10 @@
       "sendTitle": "Hantar Laporan kepada Ibu Bapa",
       "sendBtn": "Hantar",
       "sendMsg": "Laporan akan dihantar kepada ibu bapa/penjaga <strong>{{name}}</strong> melalui pautan yang selamat. Ibu bapa akan dapat melihat laporan lengkap berserta misi lanjutan.",
+      "resendToParent": "Hantar Semula kepada Ibu Bapa",
+      "resendTitle": "Pengesahan Hantar Semula",
+      "resendBtn": "Hantar Semula",
+      "resendMsg": "Laporan akan dihantar semula kepada ibu bapa/penjaga <strong>{{name}}</strong> melalui pautan yang selamat.",
       "missionSubtitle": "Pilih maksimum 4 misi untuk diberikan kepada ibu bapa",
       "pickFromLibrary": "Pilih daripada pustaka misi",
       "aiSuggest": "Sesuaikan Misi - AI",
@@ -1411,7 +1422,11 @@
       "iframeTitle": "Laporan Mini",
       "print": "Cetak",
       "downloadPdf": "Muat turun PDF",
-      "downloadPng": "Muat turun PNG"
+      "downloadPng": "Muat turun PNG",
+      "zoomIn": "Besarkan",
+      "zoomOut": "Kecilkan",
+      "zoomReset": "Set semula zum",
+      "zoomLevel": "Zum: {{value}}"
     },
     "gallery": {
       "title": "Galeri Foto",

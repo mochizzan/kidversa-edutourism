@@ -16,12 +16,23 @@
   --color-brand-text: #334155;
 }
 
-/* Batas lebar lembar A4. Ditulis di sini, bukan sebagai utility
-   `max-w-[${A4_SHEET_WIDTH}px]` di template: nilai itu diinterpolasi saat runtime
-   sehingga @source (baris 2) tidak pernah melihat literalnya dan utility-nya tidak
-   ikut ter-generate — kelas tersebut no-op. */
+/* Representasi kertas A4 tetap di layar: lebar TETAP 210mm, tinggi
+   min-height 297mm (210mm @96dpi = 793,70px dan 297mm = 1122,52px). Lembar
+   yang muat selalu tepat A4; isi yang melampaui satu halaman MEMANJANG (bukan
+   terpotong) agar tidak ada data yang hilang di layar — cetak/PDF tetap
+   dikembalikan ke A4 penuh lewat mekanisme --print-scale / jsPDF. Nilai px
+   hanya dipakai di tempat yang mensyaratkan piksel — A4_SHEET_WIDTH (794,
+   pembulatan 793,70) untuk lebar iframe tersembunyi & input html2canvas/jsPDF
+   (core/constants/report.ts, core/utils/raportCapture.ts).
+
+   Ditulis sebagai CSS statis di sini (bukan utility `max-w-[…]` di class attr):
+   aturan di lapisan @layer utilities kalah dari CSS biasa, jadi dimensi ini
+   harus tetap statis agar terbaca @source (baris 2) dan menjadi satu-satunya
+   sumber dimensi lembar di layar. */
 .a4-sheet {
-  max-width: 794px;
+  width: 210mm;
+  max-width: 210mm;
+  min-height: 297mm;
 }
 
 @media (max-width: 480px) {

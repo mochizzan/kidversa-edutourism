@@ -43,7 +43,7 @@ import type {
   SessionSubstage,
   SessionGroup,
 } from '../../../core/types'
-import { SessionStageStatus } from '../../../core/types/enums'
+import { ReportStatus } from '../../../core/types/enums'
 
 export interface KegiatanRow {
   sessionSubstage: SessionSubstage
@@ -335,19 +335,37 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
   const handleSend = useCallback(async () => {
     if (!report?.id) return
+    const wasSent = report.status === ReportStatus.SENT
     setActionLoading('send')
     try {
       await reportService.send(report.id, saTenant)
       await loadData()
-      addToast({ type: 'success', message: i18n.t('admin.reportReview.sendOk') })
+      addToast({
+        type: 'success',
+        message: i18n.t(wasSent ? 'admin.reportReview.resendOk' : 'admin.reportReview.sendOk'),
+      })
       return true
-    } catch {
-      setError(i18n.t('admin.reportReview.sendError'))
+    } catch (err) {
+      // Backend recorded SEND_FAILED (its Send marks failed deliveries retryable);
+      // mirror it locally so the button flips back to Send without a full reload.
+      if (activeTopicId) {
+        setReportsByTopic((prev) => {
+          const r = prev[activeTopicId]
+          if (!r) return prev
+          return { ...prev, [activeTopicId]: { ...r, status: ReportStatus.SEND_FAILED } }
+        })
+      }
+      // Keep the review page alive (setError would replace it with an error
+      // state) — the backend message explains what to fix before retrying.
+      addToast({
+        type: 'error',
+        message: err instanceof Error && err.message ? err.message : i18n.t('admin.reportReview.sendError'),
+      })
       return false
     } finally {
       setActionLoading(null)
     }
-  }, [report?.id, loadData, addToast, saTenant])
+  }, [report?.id, report?.status, activeTopicId, loadData, addToast, saTenant])
 
   const handleGenerateNarrative = useCallback(async (force = false) => {
     if (!report?.id || streaming) return false
@@ -440,18 +458,16 @@ export function useReportReview(sessionId: string | undefined, participantId: st
       .map((m) => m.title)
     if (missionTitles.length === 0) {
       const picked = selectMissionsForParticipant({
-        participantId: participant.id,
         assessments: stageInfos.flatMap((si) =>
           si.kegiatan.map((k) => k.assessment).filter((a): a is NonNullable<typeof a> => !!a),
         ),
         availableMissions: missions,
-        sessionStages: stageInfos.map((si) => ({
-          id: si.sessionStageId,
-          session_id: sessionId ?? '',
-          program_stage_id: si.programStage.id,
-          status: SessionStageStatus.COMPLETED,
-          created_at: '',
-        })),
+        substages: stageInfos.flatMap((si) =>
+          si.kegiatan.map((k) => ({
+            id: k.sessionSubstage.id,
+            program_stage_id: si.programStage.id,
+          })),
+        ),
       })
       const pickedIds = picked.slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
       missionTitles = missions

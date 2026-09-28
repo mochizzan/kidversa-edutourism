@@ -237,11 +237,13 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
         }
         ::-webkit-scrollbar { width: 0; background: transparent; }
 
-        /* ===== Layout A4: sheet selalu setinggi kertas, footer menempel di bawah ===== */
+        /* ===== Layout A4: footer menempel di bawah lembar =====
+           Dimensi kertas (width/height 210mm/297mm) didefinisikan di
+           miniRaport.tailwind.css agar berdampingan dengan override mode-card
+           (max-width: 480px) dan tetap sebagai CSS statis yang dibaca @source. */
         .a4-sheet {
             display: flex;
             flex-direction: column;
-            min-height: 297mm;
         }
         .raport-main {
             flex: 1 1 auto;
@@ -293,6 +295,10 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             .a4-sheet {
                 width: 210mm !important;
                 max-width: 210mm !important;
+                /* Tinggi mengikuti konten alami; min-height 297mm menjaga
+                   floor A4 — skala --print-scale di bawah yang mengecilkannya
+                   persis ke 297mm. Saat konten muat A4, tinggi = 297mm. */
+                height: auto !important;
                 min-height: 297mm !important;
                 display: flex !important;
                 flex-direction: column !important;
@@ -315,9 +321,14 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
         function __raportBeforePrint() {
             var sheet = document.querySelector('.a4-sheet')
             if (!sheet) return
+            // Ukur tinggi tata-letak konten, bukan kotak hasil transform:
+            // rect.height bisa dibatasi min-height: 297mm (layar) atau sudah
+            // terkecilkan skala print sebelumnya, sedangkan scrollHeight selalu
+            // melaporkan tinggi konten sebenarnya (termasuk yang overflow).
             var rect = sheet.getBoundingClientRect()
-            if (!rect || !rect.height) return
-            var hMm = (rect.height / 96) * 25.4
+            var hPx = Math.max(rect ? rect.height : 0, sheet.scrollHeight)
+            if (!hPx) return
+            var hMm = (hPx / 96) * 25.4
             var scale = Math.min(1, 297 / hMm)
             document.documentElement.style.setProperty('--print-scale', String(scale))
         }
@@ -347,7 +358,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
 </head>
 <body class="py-10 px-4 antialiased text-brand-text flex justify-center">
 
-    <div class="a4-sheet w-full max-w-[210mm] bg-white rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-gray-200 z-10">
+    <div class="a4-sheet bg-white rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-gray-200 z-10">
 
         <header class="flex justify-between items-start px-8 pt-4 pb-2 relative">
 

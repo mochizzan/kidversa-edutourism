@@ -273,6 +273,7 @@
       "groupNotCompleted": "小组尚未由引导师完成",
       "approveError": "批准报告失败。",
       "sendOk": "报告已成功发送给家长",
+      "resendOk": "报告已成功重新发送给家长",
       "sendError": "发送报告失败。",
       "narrativeStreamError": "加载叙述流失败。",
       "narrativeDone": "叙述生成成功。",
@@ -329,7 +330,8 @@
       "pendingReview": "待审核",
       "approved": "已批准",
       "sent": "已发送",
-      "noReport": "暂无报告"
+      "noReport": "暂无报告",
+      "sendFailed": "发送失败"
     },
     "contentType": {
       "video": "视频",
@@ -865,6 +867,7 @@
       "eligibleEmptyError": "没有符合生成报告条件的学员。",
       "generateError": "生成报告失败。",
       "sendListError": "发送报告失败。",
+      "sendAllResult": "已发送 {{sent}} 份报告，{{failed}} 份失败。",
       "generateAll": "全部生成",
       "generateAgain": "重新生成",
       "generate": "生成",
@@ -885,6 +888,10 @@
       "sendConfirmTitle": "确认发送报告",
       "sendCount": "发送 {{count}} 份报告",
       "sendConfirmMsg": "您即将向各学员的家长/监护人发送 <strong>{{count}} 份已批准的报告</strong>。",
+      "resendAllCount": "重新发送全部 ({{count}})",
+      "resendCount": "重新发送 {{count}} 份报告",
+      "resendConfirmTitle": "确认重新发送报告",
+      "resendConfirmMsg": "您即将向所有学员重新发送 <strong>{{count}} 份报告</strong>，包括已发送过的报告。",
       "sendConfirmNote": "此操作无法撤销。",
       "statusSent": "报告已于 {{date}} 发送",
       "statusApproved": "报告已批准，准备发送给家长",
@@ -945,6 +952,10 @@
       "sendTitle": "发送报告给家长",
       "sendBtn": "发送",
       "sendMsg": "报告将通过安全链接发送给 <strong>{{name}}</strong> 的家长/监护人。家长将能够查看完整报告及后续任务。",
+      "resendToParent": "重新发送给家长",
+      "resendTitle": "确认重新发送",
+      "resendBtn": "重新发送",
+      "resendMsg": "报告将通过安全链接重新发送给 <strong>{{name}}</strong> 的家长/监护人。",
       "missionSubtitle": "最多选择 4 个任务发送给家长",
       "pickFromLibrary": "从任务库中选择",
       "aiSuggest": "自定义任务 - AI",
@@ -1411,7 +1422,11 @@
       "iframeTitle": "迷你成绩单",
       "print": "打印",
       "downloadPdf": "下载 PDF",
-      "downloadPng": "下载 PNG"
+      "downloadPng": "下载 PNG",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "zoomReset": "重置缩放",
+      "zoomLevel": "缩放: {{value}}"
     },
     "gallery": {
       "title": "照片库",

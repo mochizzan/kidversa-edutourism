@@ -18,6 +18,7 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { ReportStatus } from '../../../core/types/enums'
+import { isSendableReportStatus } from '../../../core/constants/reportStatus'
 import { formatDate } from '../../../shared/utils'
 import { getMediaUrl } from '../../../core/utils/media'
 import { useReportReview } from '../hooks/useReportReview'
@@ -138,7 +139,8 @@ const ReportReviewPage = () => {
 
   const canApprove =
     report.status === ReportStatus.DRAFT || report.status === ReportStatus.PENDING_REVIEW
-  const canSend = report.status === ReportStatus.APPROVED
+  const isResend = report.status === ReportStatus.SENT
+  const canSend = isSendableReportStatus(report.status) || isResend
 
   return (
     <div className="space-y-6">
@@ -402,7 +404,8 @@ const ReportReviewPage = () => {
                 </>
               ) : (
                 <>
-                  <Send className="w-4 h-4 mr-1" /> {t('admin.review.sendToParent')}
+                  <Send className="w-4 h-4 mr-1" />{' '}
+                  {t(isResend ? 'admin.review.resendToParent' : 'admin.review.sendToParent')}
                 </>
               )}
             </Button>
@@ -438,7 +441,7 @@ const ReportReviewPage = () => {
       <Modal
         open={showSendConfirm}
         onClose={() => setShowSendConfirm(false)}
-        title={t('admin.review.sendTitle')}
+        title={t(isResend ? 'admin.review.resendTitle' : 'admin.review.sendTitle')}
         size="sm"
         footer={
           <div className="flex justify-end gap-2">
@@ -446,14 +449,16 @@ const ReportReviewPage = () => {
               {t('common.cancel')}
             </Button>
             <Button onClick={onSend} disabled={actionLoading === 'send'}>
-              {actionLoading === 'send' ? t('admin.reports.sending') : t('admin.review.sendBtn')}
+              {actionLoading === 'send'
+                ? t('admin.reports.sending')
+                : t(isResend ? 'admin.review.resendBtn' : 'admin.review.sendBtn')}
             </Button>
           </div>
         }
       >
         <p className="text-sm text-on-surface-variant">
           <Trans
-            i18nKey="admin.review.sendMsg"
+            i18nKey={isResend ? 'admin.review.resendMsg' : 'admin.review.sendMsg'}
             values={{ name: participant.child_name }}
             components={{ strong: <strong /> }}
           />

@@ -273,6 +273,7 @@
       "groupNotCompleted": "Nhóm chưa được điều phối viên hoàn thành",
       "approveError": "Phê duyệt báo cáo thất bại.",
       "sendOk": "Báo cáo đã được gửi thành công cho phụ huynh",
+      "resendOk": "Báo cáo đã được gửi lại thành công cho phụ huynh",
       "sendError": "Gửi báo cáo thất bại.",
       "narrativeStreamError": "Tải luồng tường thuật thất bại.",
       "narrativeDone": "Tường thuật đã được tạo thành công.",
@@ -329,7 +330,8 @@
       "pendingReview": "Cần xem xét",
       "approved": "Đã phê duyệt",
       "sent": "Đã gửi",
-      "noReport": "Chưa có báo cáo"
+      "noReport": "Chưa có báo cáo",
+      "sendFailed": "Gửi thất bại"
     },
     "contentType": {
       "video": "Video",
@@ -865,6 +867,7 @@
       "eligibleEmptyError": "Không có người tham gia nào đủ điều kiện để tạo báo cáo.",
       "generateError": "Không thể tạo báo cáo.",
       "sendListError": "Không thể gửi báo cáo.",
+      "sendAllResult": "Đã gửi {{sent}} báo cáo, {{failed}} thất bại.",
       "generateAll": "Tạo tất cả",
       "generateAgain": "Tạo lại",
       "generate": "Tạo",
@@ -885,6 +888,10 @@
       "sendConfirmTitle": "Xác nhận gửi báo cáo",
       "sendCount": "Gửi {{count}} báo cáo",
       "sendConfirmMsg": "Bạn sẽ gửi <strong>{{count}} báo cáo</strong> đã được phê duyệt cho phụ huynh/người giám hộ của từng người tham gia.",
+      "resendAllCount": "Gửi lại tất cả ({{count}})",
+      "resendCount": "Gửi lại {{count}} báo cáo",
+      "resendConfirmTitle": "Xác nhận gửi lại báo cáo",
+      "resendConfirmMsg": "Bạn sẽ gửi lại <strong>{{count}} báo cáo</strong> cho tất cả người tham gia, bao gồm cả những báo cáo đã gửi trước đó.",
       "sendConfirmNote": "Hành động này không thể hoàn tác.",
       "statusSent": "Báo cáo đã được gửi vào {{date}}",
       "statusApproved": "Báo cáo đã được phê duyệt và sẵn sàng gửi cho phụ huynh",
@@ -945,6 +952,10 @@
       "sendTitle": "Gửi báo cáo cho phụ huynh",
       "sendBtn": "Gửi",
       "sendMsg": "Báo cáo sẽ được gửi cho phụ huynh/người giám hộ của <strong>{{name}}</strong> qua liên kết bảo mật. Phụ huynh sẽ có thể xem báo cáo đầy đủ cùng với các nhiệm vụ tiếp theo.",
+      "resendToParent": "Gửi lại cho phụ huynh",
+      "resendTitle": "Xác nhận gửi lại",
+      "resendBtn": "Gửi lại",
+      "resendMsg": "Báo cáo sẽ được gửi lại cho phụ huynh/người giám hộ của <strong>{{name}}</strong> qua liên kết bảo mật.",
       "missionSubtitle": "Chọn tối đa 4 nhiệm vụ để gửi cho phụ huynh",
       "pickFromLibrary": "Chọn từ thư viện nhiệm vụ",
       "aiSuggest": "Tùy chỉnh Nhiệm vụ - AI",
@@ -1411,7 +1422,11 @@
       "iframeTitle": "Phiếu điểm mini",
       "print": "In",
       "downloadPdf": "Tải xuống PDF",
-      "downloadPng": "Tải xuống PNG"
+      "downloadPng": "Tải xuống PNG",
+      "zoomIn": "Phóng to",
+      "zoomOut": "Thu nhỏ",
+      "zoomReset": "Đặt lại thu phóng",
+      "zoomLevel": "Thu phóng: {{value}}"
     },
     "gallery": {
       "title": "Thư viện ảnh",

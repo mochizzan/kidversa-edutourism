@@ -60,7 +60,7 @@ export function ParentTokenGuard({ children, kind = 'report' }: ParentTokenGuard
         .then((res) => {
           setState({
             token,
-            report: (res ?? null) as PublicReport | null,
+            report: res ?? null,
             participant: null,
             loading: false,
             error: null,

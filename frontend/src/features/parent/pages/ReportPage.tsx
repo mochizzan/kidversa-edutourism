@@ -1,17 +1,23 @@
 import { useEffect, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText, Printer, Camera } from 'lucide-react'
+import QRCode from 'qrcode'
 import { Button } from '../../../shared/components/ui/Button'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
+import { RaportZoomPan } from '../../../shared/components/feedback/RaportZoomPan'
 import { Loader2 } from 'lucide-react'
 import {
   ParentTokenGuard,
   useParentToken,
 } from '../../../shared/components/auth/ParentTokenGuard'
-import type { PublicReport } from '../../../core/types'
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
+import { formatDate } from '../../../shared/utils'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
-import { DEFAULT_FACILITATOR_NAME, A4_SHEET_WIDTH } from '../../../core/constants/report'
+import {
+  DEFAULT_FACILITATOR_NAME,
+  RAPORT_LAYOUT,
+  A4_SHEET_WIDTH,
+} from '../../../core/constants/report'
 import { API_ROUTES } from '@/core/constants/apiRoutes'
 
 /* ── Inner report component ── */
@@ -32,46 +38,83 @@ function ReportView() {
   useEffect(() => {
     if (!report) return
 
-    const pub = report as PublicReport
+    let cancelled = false
 
-    const buildHtml = () => {
-      // The public report payload is an anti-IDOR view: it exposes the final
-      // narrative only — never PII. The DTO has no participant name, school,
-      // group, stages, badges, or gallery info, so we pass the official
-      // degraded defaults the template knows how to render (—, empty states).
-      const narrative = pub.ai_narrative_final || ''
+    // Parity with the admin preview: the extended GET /api/reports/access
+    // payload is mapped field-by-field exactly like
+    // useReportReview.buildRaportHtml → generateMiniRaportHTML (same caps,
+    // defaults, QR options), so the parent rapor content matches the admin.
+    const buildHtml = async () => {
+      const stages = report.stages ?? []
+      const detailStages = stages.slice(0, RAPORT_LAYOUT.MAX_DETAIL_STAGES)
+      const extraTopicsCount = Math.max(0, stages.length - RAPORT_LAYOUT.MAX_DETAIL_STAGES)
 
-      // BUG-2 fix: the parent side never fetches MissionBank, so the UUIDs in
-      // mission_ids cannot be resolved to titles. Passing them would expose raw
-      // UUIDs to parents; the template's empty-state covers this instead.
+      let galleryUrl: string | undefined
+      if (report.gallery_access_token) {
+        try {
+          galleryUrl = await QRCode.toDataURL(
+            `${window.location.origin}/gallery?token=${report.gallery_access_token}`,
+            { width: 128, margin: 1, errorCorrectionLevel: 'M' },
+          )
+        } catch {
+          /* leave undefined — template placeholder fallback */
+        }
+      }
+
       return generateMiniRaportHTML({
-        programName: '',
-        topicName: '',
-        childName: 'Ananda',
-        childAge: 0,
-        childSchool: undefined,
-        childGroup: pub.group_name,
-        sessionDate: '',
-        photoUrl: pub.photo_url
+        programName: report.program_name || '',
+        topicName: report.topic_name || '',
+        childName: report.child_name || '',
+        childAge: report.child_age ?? 0,
+        childSchool: report.school_name || undefined,
+        childGroup: report.group_name || undefined,
+        sessionDate: formatDate(report.session_date ?? ''),
+        photoUrl: report.photo_url
           ? `${API_ROUTES.REPORTS.ACCESS_PHOTO}?token=${encodeURIComponent(token)}`
           : undefined,
-        stages: [],
-        narrative,
-        missions: [],
-        badges: [],
-        facilitatorName: pub.facilitator_name || DEFAULT_FACILITATOR_NAME,
-        facilitatorPhotoUrl: undefined,
+        stages: detailStages.map((s, i) => ({
+          name: s.name,
+          sequenceOrder: s.sequence_order ?? i + 1,
+          kegiatan: (s.kegiatan ?? []).map((k) => ({
+            name: k.name,
+            starRating: k.star_rating ?? 0,
+          })),
+        })),
+        extraTopicsCount: extraTopicsCount > 0 ? extraTopicsCount : undefined,
+        narrative: report.ai_narrative_final || '',
+        missions: (report.missions ?? [])
+          .slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
+          .map((m) => m.title),
+        badges: (report.badges ?? [])
+          .slice(0, RAPORT_LAYOUT.MAX_BADGES_PREVIEW)
+          .map((b) => ({
+            badgeName: b.badge_name,
+            badgeImageUrl: b.badge_image_url || undefined,
+          })),
+        facilitatorName: report.facilitator_name?.trim() || DEFAULT_FACILITATOR_NAME,
+        // facilitatorPhotoUrl intentionally omitted: the template never renders it.
+        galleryUrl,
       })
     }
 
-    try {
-      setRaportHtml(buildHtml())
-    } catch {
-      setError(t('parent.report.loadError'))
-    } finally {
-      setLoading(false)
+    buildHtml()
+      .then((html) => {
+        if (cancelled) return
+        setRaportHtml(html)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setError(t('parent.report.loadError'))
+      })
+      .finally(() => {
+        if (cancelled) return
+        setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
     }
-  }, [report])
+  }, [report, token, t])
 
   /* ── Cetak: print the existing rendered iframe directly ── */
   const handleCetak = () => {
@@ -152,10 +195,10 @@ function ReportView() {
     )
   }
 
-  /* ── Render: mini raport fills viewport + floating toolbar ── */
+  /* ── Render: fixed-width A4 sheet inside the zoom/pan viewport ── */
   return (
     <div className="relative min-h-screen bg-gray-200 print-report">
-      <div className="mx-auto w-full max-w-full overflow-x-auto">
+      <RaportZoomPan sheetWidth={A4_SHEET_WIDTH}>
         <div style={{ width: A4_SHEET_WIDTH, height: iframeHeight || 'auto' }}>
           <iframe
             ref={iframeRef}
@@ -166,7 +209,7 @@ function ReportView() {
             style={{ width: A4_SHEET_WIDTH, border: 'none' }}
           />
         </div>
-      </div>
+      </RaportZoomPan>
 
       {downloadError && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-2 shadow-lg no-print">

@@ -273,6 +273,7 @@
       "groupNotCompleted": "ファシリテーターによってグループが完了されていません",
       "approveError": "レポートの承認に失敗しました。",
       "sendOk": "レポートを保護者に送信しました",
+      "resendOk": "レポートを保護者に再送信しました",
       "sendError": "レポートの送信に失敗しました。",
       "narrativeStreamError": "ナラティブストリーミングの読み込みに失敗しました。",
       "narrativeDone": "ナラティブが作成されました。",
@@ -329,7 +330,8 @@
       "pendingReview": "レビュー待ち",
       "approved": "承認済み",
       "sent": "送信済み",
-      "noReport": "レポートなし"
+      "noReport": "レポートなし",
+      "sendFailed": "送信失敗"
     },
     "contentType": {
       "video": "動画",
@@ -865,6 +867,7 @@
       "eligibleEmptyError": "レポート生成対象の参加者がいません。",
       "generateError": "レポートの生成に失敗しました。",
       "sendListError": "レポートの送信に失敗しました。",
+      "sendAllResult": "{{sent}}件のレポートを送信し、{{failed}}件が失敗しました。",
       "generateAll": "すべて生成",
       "generateAgain": "再生成",
       "generate": "生成",
@@ -885,6 +888,10 @@
       "sendConfirmTitle": "レポート送信の確認",
       "sendCount": "{{count}}件のレポートを送信",
       "sendConfirmMsg": "承認済みの<strong>{{count}}件のレポート</strong>を各保護者に送信します。",
+      "resendAllCount": "すべてを再送信 ({{count}})",
+      "resendCount": "{{count}}件のレポートを再送信",
+      "resendConfirmTitle": "レポート再送信の確認",
+      "resendConfirmMsg": "すべての参加者に<strong>{{count}}件のレポート</strong>を再送信します。既に送信されたものも含まれます。",
       "sendConfirmNote": "この操作は取り消せません。",
       "statusSent": "レポートは{{date}}に送信されました",
       "statusApproved": "レポートは承認済みで、保護者に送信可能です",
@@ -945,6 +952,10 @@
       "sendTitle": "保護者にレポートを送信",
       "sendBtn": "送信",
       "sendMsg": "レポートは安全なリンクを通じて<strong>{{name}}</strong>の保護者/後見人に送信されます。保護者はフォローアップミッションを含むレポート全体を確認できます。",
+      "resendToParent": "保護者に再送信",
+      "resendTitle": "再送信の確認",
+      "resendBtn": "再送信",
+      "resendMsg": "レポートは安全なリンクを通じて<strong>{{name}}</strong>の保護者/後見人に再送信されます。",
       "missionSubtitle": "保護者に提供するミッションを最大4つ選択してください",
       "pickFromLibrary": "ミッションライブラリから選択",
       "aiSuggest": "ミッションをカスタマイズ - AI",
@@ -1411,7 +1422,11 @@
       "iframeTitle": "ミニレポート",
       "print": "印刷",
       "downloadPdf": "PDFをダウンロード",
-      "downloadPng": "PNGをダウンロード"
+      "downloadPng": "PNGをダウンロード",
+      "zoomIn": "拡大",
+      "zoomOut": "縮小",
+      "zoomReset": "ズームをリセット",
+      "zoomLevel": "ズーム: {{value}}"
     },
     "gallery": {
       "title": "フォトギャラリー",

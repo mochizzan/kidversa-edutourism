@@ -32,11 +32,13 @@ export const ReportStatusBanner = ({ report, copiedLink, onCopyLink }: ReportSta
         <span className="text-sm font-medium">
           {report.status === ReportStatus.SENT
             ? t('admin.reports.statusSent', { date: report.sent_at ? formatDate(report.sent_at) : '-' })
-            : report.status === ReportStatus.APPROVED
-              ? t('admin.reports.statusApproved')
-              : report.status === ReportStatus.DRAFT
-                ? t('admin.reports.statusDraft')
-                : t('admin.reports.statusReview')}
+            : report.status === ReportStatus.SEND_FAILED
+              ? t('admin.reportStatus.sendFailed')
+              : report.status === ReportStatus.APPROVED
+                ? t('admin.reports.statusApproved')
+                : report.status === ReportStatus.DRAFT
+                  ? t('admin.reports.statusDraft')
+                  : t('admin.reports.statusReview')}
         </span>
       </div>
       {report.status === ReportStatus.SENT && report.parent_access_token && (

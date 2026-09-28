@@ -101,6 +101,10 @@ const (
 	ReportPendingReview ReportStatus = "PENDING_REVIEW"
 	ReportApproved      ReportStatus = "APPROVED"
 	ReportSent          ReportStatus = "SENT"
+	// ReportSendFailed marks an approved report whose WhatsApp delivery was
+	// attempted and failed. It is retryable (Send may run again) and must never
+	// be presented as SENT before the gateway confirms delivery.
+	ReportSendFailed ReportStatus = "SEND_FAILED"
 )
 
 // ApprovalStatus enumerates user approval states (lowercase to match DB enum).
