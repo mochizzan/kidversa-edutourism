@@ -249,10 +249,16 @@ const GroupPage = () => {
     }
     setCompleting(true)
     try {
-      // Complete EVERY Kegiatan leaf of the active SubTopik (C7). Sequential so
-      // a mid-way failure surfaces; each call posts a Kegiatan id only.
+      // Complete EVERY Kegiatan leaf of the active SubTopik (C7) via the
+      // group-scoped override (POST /api/live/groups/:groupId/stages/:id/complete).
+      // This writes group_stage_progress rows per group — the source of truth
+      // for group completion. The old code called the global
+      // POST /api/session-substages/:id/complete which only flips the shared
+      // session_substages row, so session_groups.status stayed WAITING forever
+      // while the toast still showed success. Sequential so a mid-way failure
+      // surfaces; each call posts a Kegiatan id only.
       for (const leaf of activeLeaves) {
-        await liveService.completeSessionSubstage(leaf.id)
+        await liveService.completeStage(groupId, leaf.id)
       }
       await liveService.addTimelineEvent(
         groupDetail.session.id,
@@ -263,7 +269,9 @@ const GroupPage = () => {
       )
       confirm.dismiss()
       addToast({ type: 'success', message: t('fasilitator.group.completeSuccess') })
-      navigate(ROUTES.FASILITATOR.DASHBOARD)
+      // Stay on this page and refresh so the completed state renders; the old
+      // code pushed to the dashboard which hid the (never-changing) status.
+      await fetchData()
     } catch {
       addToast({ type: 'error', message: t('fasilitator.group.completeError') })
     } finally {
@@ -393,6 +401,11 @@ const GroupPage = () => {
     !user || user.role !== 'FASILITATOR' || group.facilitator_id === user.id
 
   const isSessionActive = groupDetail.session.status === SessionStatus.ACTIVE
+  // Completion is terminal: once the group row is COMPLETED, hide the CTA
+  // entirely (the old code kept rendering an enabled button because the
+  // status never changed server-side). While the refetch is in flight the
+  // button simply disables via `completing`/refresh.
+  const isGroupCompleted = group.status === 'COMPLETED'
 
   return (
     <div className="space-y-6">
@@ -471,8 +484,9 @@ const GroupPage = () => {
         </div>
       )}
 
-      {/* Group complete button */}
-      {participants.length > 0 && (
+      {/* Group complete button — hidden once terminal COMPLETED so it
+          can never be clicked repeatedly after success. */}
+      {participants.length > 0 && !isGroupCompleted && (
         <GroupCompleteButton
           totalChildren={participants.length}
           assessedCount={assessedCount}

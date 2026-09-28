@@ -125,6 +125,33 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, substageID string,
 		return nil, err
 	}
 	s.publish(ctx, g.SessionID, "stage:"+string(action), p)
+	// Promote the group to COMPLETED once every progress row for it is
+	// COMPLETED or SKIPPED. The fasilitator "Selesaikan Kelompok" flow only
+	// writes per-Kegiatan progress rows (completeStage per leaf) — without
+	// this, session_groups.status stays WAITING forever even though the list
+	// pages derive COMPLETED from progress. Mirrors
+	// badge.CheckAndCompleteGroup (kept for the PUT status path).
+	if action == ActionComplete || action == ActionSkip {
+		if g.Status != entity.GroupCompleted {
+			all, aerr := s.repo.GetProgressByGroup(ctx, groupID)
+			if aerr == nil && len(all) > 0 {
+				done := true
+				for i := range all {
+					if all[i].Status != entity.ProgressCompleted && all[i].Status != entity.ProgressSkipped {
+						done = false
+						break
+					}
+				}
+				if done {
+					g.Status = entity.GroupCompleted
+					if uerr := s.repo.UpdateGroup(ctx, g); uerr != nil {
+						return nil, uerr
+					}
+					s.publish(ctx, g.SessionID, "group:completed", g)
+				}
+			}
+		}
+	}
 	return p, nil
 }
 
