@@ -90,7 +90,7 @@ Aplikasi mengintegrasikan empat ekosistem pengguna yang saling terhubung dalam s
 *   **Auth:** JWT access (15m) + refresh (HttpOnly cookie, 7d), bcrypt, revocation (jti denylist).
 *   **Realtime:** SSE hub (live monitoring).
 *   **AI:** OpenRouter narrative generation untuk laporan.
-*   **Messaging:** WhatsApp gateway (consent link orang tua).
+*   **Messaging:** WhatsApp gateway (consent link & tautan rapor orang tua).
 
 ### Infrastruktur
 *   **Orchestration:** Docker Compose (profile `dev` & `prod`) — `mariadb:12`, `backend`, `frontend`.

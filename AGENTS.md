@@ -1,411 +1,172 @@
 # Repository Guidelines
 
-Authoritative guide for AI coding assistants working in the **Kidversa Edutourism**
-monorepo. Verified 2026-09-19 against the actual repository state (CodeGraph +
-cocoindex-code index + direct file reads). The old `README.md` is stale in
-places — treat this file as the source of truth.
+Authoritative guide for AI assistants working in the **Kidversa Edutourism** monorepo. Verified against code 2026-09-27. Where `README.md` disagrees with this file or the code, trust the code — README is stale in several places (test scripts, compose profiles, migrations).
 
 ## Project Overview
 
-**Kidversa Edutourism** is a tenant-isolated SaaS platform for Indonesian
-schools that combines child developmental assessment with edutourism trip
-management.
+Multi-tenant SaaS for Indonesian schools combining child developmental assessment with edutourism trip management. Admins/facilitators manage programs, sessions, groups, participants, assessments, and report (rapor) delivery; parents view token-scoped reports; learners use public kiosk routes.
 
-- **Frontend**: React 19 + TypeScript ~6.0.3 + Vite 8 + Tailwind v4 (CSS-first) + Zustand + PWA
-- **Backend**: Go 1.26 (1.26.4) + Echo v5 + GORM + MariaDB 12
-- **Messaging**: OpenWA/Baileys WhatsApp engine for consent links
-- **AI**: OpenRouter or Gemini (provider switchable) for narrative report generation
-- **Orchestration**: Docker Compose + nginx reverse proxy
-
-**Roles.** Only **four** roles exist as backend user roles
-(`entity.UserRole`): `SUPER_ADMIN`, `ADMIN`, `KOORDINATOR`, `FASILITATOR`.
-The "Parent" and "Learner/Kiosk" access patterns are **frontend-only,
-token-scoped public routes** (see `RouteGuard` `public` mode) — they are NOT
-backend user roles and never appear in `roles` middleware.
+- **Backend**: Go 1.26 + Echo v5 + GORM + MariaDB 12 (`backend/`)
+- **Frontend**: React 19 + TypeScript ~6.0.3 + Vite 8 + Tailwind v4 (CSS-first) + Zustand + PWA (`frontend/`)
+- **Messaging/AI**: OpenWA/Baileys WhatsApp gateway for consent/report delivery; OpenRouter or Gemini (switchable) for narrative report generation.
+- **Roles**: only 4 backend roles — `SUPER_ADMIN`, `ADMIN`, `KOORDINATOR`, `FASILITATOR`. "Parent"/"Learner" are frontend-only, token-scoped public routes (`RouteGuard` `public` mode), never backend roles.
 
 ## Architecture & Data Flow
 
-### Backend — Layered Monolith
+### Backend layering
 
 ```
-cmd/
-  server/main.go          # API entry point + manual DI wiring (14 repos, 6 usecases, ~19 handlers)
-  migrate/main.go         # golang-migrate runner + idempotent superadmin/tenant seed
-
-internal/
-  config/                 # env → validated Config struct (~40 env vars)
-  domain/
-    entity/               # BaseModel; enums.go (4 roles + typed enums w/ Valid(): SessionStatus, GroupStatus, ReportStatus, ApprovalStatus, SyncStatus, ContentType, ConsentType, TimelineEventType, …)
-    repository/           # 15 interface files + Paginated[T] + Filter structs + result types
-  usecase/                # session.go + 5 sub-packages (assessment, attendance, badge, live, reports)
-  delivery/http/
-    handler/              # ~19 handler structs + router_*.go + sse_helpers.go + phase7_common.go
-    middleware/           # auth.go, error.go, ratelimit.go, validator.go, recover.go
-    dto/                  # request/response structs (15+ DTOs)
-  infrastructure/
-    persistence/          # GORM models (embed entity + BeforeCreate UUID hooks) + 17 repos + db.go
-    auth/                 # JWT + bcrypt + refresh rotation with reuse-detection + jti denylist + kiosk tokens
-    ai/                   # OpenRouter/Gemini factory + narrative_generator + prompts/
-    messaging/            # whatsapp.go (OpenWA)
-    migration/            # golang-migrate runner (DB allowlist + dirty-recovery skip)
-  pkg/
-    errors/               # AppError{Status,Code,Err} + constructors + MessageForCode (40+ Indonesian msgs)
-    response/             # Envelope{Data,Meta,Error} + 8 helpers
-    sse/                  # Backend interface + Hub (ring-buffer replay, keepalive)
-    constants/            # 15 tuning constants
-    util/                 # token, video_probe, now, util
+delivery/http (router, middleware, handler, dto)
+  → usecase (business logic, AppError)
+  → domain/repository (interfaces)   ← implemented by infrastructure/persistence (GORM)
+  → domain/entity (framework-free models)
 ```
 
-**Request flow.** `router.go` registers global `SecurityHeaders → CORS → Recover → ErrorHandler + validator`; per-route `JWTAuth → RequireRole → TenantScope` are attached **inside each `Register*Routes` function** (not a single global chain). Usecases depend only on `domain` (Interface-Segregation): e.g. `SessionUsecase` depends on narrow `ProgramStageReader`/`ProgramSubstageReader` interfaces, assessment depends on `BadgeEvaluator`, reports depends on `NarrativeGenerator` + `MissionLLMClient`. Optional deps use setter injection.
+- **Entry + DI**: `backend/cmd/server/main.go` — manual constructor wiring (config → DB → JWT/revoker → SSE hub → repos → usecases → `handler.NewRegistry` → `httppkg.NewRouter(deps)`). No DI framework; optional cross-usecase deps via setters.
+- **Routing**: single table `delivery/http/router.go` mounts `/api` + `/health` with global `SecurityHeaders → CORS → Recover → ErrorHandler`; each resource has its own `handler/router_*.go` attaching `authMW (JWTAuth) → roleMW (RequireRole) → TenantScope()` per route.
+- **Tenant flow**: `JWTAuth` sets user/tenant/role claims → `TenantScope` resolves tenant (SA: `X-Tenant-Id` header, or `?tenant_id=` for SSE, else 400 `tenant_required`; non-SA: JWT tenant only, header present → **401**) → handler reads `appmiddleware.GetTenantID(c)` → repo scopes via `scopeByTenant` (`infrastructure/persistence/helpers.go`).
+- **Errors → envelope**: handlers just `return err`; `middleware/error.go` `ErrorHandler` maps `AppError` to `{data, meta, error}` via `pkg/response` helpers; `MessageForCode` maps stable snake_case codes to Indonesian messages.
+- **SSE**: `GET .../stream` uses **cookie auth** (`kidversa_session`) because EventSource cannot send headers; flow `handler → sse_helpers.go streamSSE → pkg/sse/hub` (ring-buffer replay + keepalive). Publish sites: `usecase/live`, notification usecases.
 
-**SSE dual-auth.** Live/Notification `GET .../stream` routes use **cookie-based** auth
-(the `kidversa_session` cookie) so browsers' `EventSource` works; regular API routes use
-**Bearer** tokens. Media (photos/frames/avatar) is fully public with consent gating
-in-handler. Context keys: `CtxUserID`, `CtxTenantID`, `CtxRole`, `CtxClaims`.
+### Frontend flow
 
-**Response envelope** (every endpoint):
-```json
-{ "data": ..., "meta": { "page": 1, "limit": 25, "total": 100 }, "error": { "code": "snake_case", "message": "Indonesian text" } }
-```
-
-### Frontend — Feature-Role SPA
+`main.tsx` (i18n ready before render, PWA) → `App.tsx` (health check → `checkSession()` → SA `fetchTenants()` + auto-select → `RouterProvider`) → `app/router.tsx` (role route arrays).
 
 ```
-frontend/src/
-  features/               # role-based dirs, each with pages/ components/ hooks/
-    admin/ (29 pages, 24 components, 6 hooks, utils/csvParser)
-    fasilitator/ (7 pages, 10 components, 5 hooks)
-    parent/ (4 pages, 1 component)
-    learner/ (1 page, 1 component)
-    auth/ (3 pages, 11 components, 1 hook)
-  core/
-    services/             # 18 domain shims + backend-client + api-envelope + types
-    stores/               # Zustand: authStore, tenantStore, toastStore
-    hooks/                # useAuth, useTenantScope, useLiveSession (+ index.ts)
-    types/                # enums, entities, api DTOs, gallery, publicReport, toast
-    constants/             # api, apiRoutes, app, timing, errors, etc.
-    utils/                # permissions, tenant, jwtClaims, media, validation, etc.
-    theme/
-  shared/
-    components/           # auth (3), feedback (7 + toast/), ui (18), data (5), charts (7), layout (1)
-    layouts/              # AdminLayout, ParentLayout, MainLayout, AuthLayout, FasilitatorLayout
-    hooks/                # useCrudList + 7 others
-    templates/            # miniRaport.tailwind.css → compiled styles
-  app/
-    router.tsx            # createBrowserRouter (React Router v7), 7 route tables
-    routes/               # index, admin, fasilitator, parent, learner, auth, helpers
-  App.tsx                 # startup orchestrator
-  main.tsx                # React 19 root + PWA registration
-  index.css               # Tailwind v4 @theme
-  pages/                  # NotFoundPage.tsx
+Component → core/services/<domain>.ts shim → api-envelope.ts (unwrap/normalize/paginate)
+         → backend-client.ts (Authorization, refresh, X-Tenant-Id for SA) → Vite proxy/nginx → backend
 ```
 
-**Data flow:** `Component → service shim (core/services/<domain>.ts)` →
-`api-envelope.ts` (unwrap/normalize/paginate) → `backend-client.ts` (token,
-refresh, `X-Tenant-Id`) → Vite proxy / nginx → backend.
-
-**`App.tsx` startup sequence:** health check → backend-unavailable panel (retry) →
-`checkSession` (single-flight) → SUPER_ADMIN active-tenant fetch (3-retry cold-start
-backoff for seed races) → auto-select `tenants[0]` → 3-phase splash → global 401 handler →
-public kiosk bypass.
-
-**Auth model (frontend):** access token held in-memory (module scope); refresh token in an
-`HttpOnly` cookie that is **always** `SameSite=None; Secure=true`; user in
-`sessionStorage`. `BroadcastChannel` coordinates cross-tab refresh. Proactive refresh at
-~13 min (access TTL is 15 m); 401 → refresh → retry up to 3×. `setTokens(access, _refresh)`
-intentionally ignores the refresh param; SSE streams use the `kidversa_session` cookie.
-
-**`RouteGuard`** (unified) has three modes:
-- `segment` (admin) — resolves roles + tenant from `ADMIN_ROUTE_ACCESS`, wraps `TenantGuard`.
-- `allowedRoles` (fasilitator) — role-only gate, no tenant scoping.
-- `public` — token-scoped (parent report/consent, learner kiosk); page validates the token.
+- **Guards**: `shared/components/auth/RouteGuard.tsx` — `segment` (admin: roles + tenant via `ADMIN_ROUTE_ACCESS`/`getRouteAccess`), `allowedRoles` (fasilitator), `public` (token-scoped parent/learner; page validates the token).
+- **State**: Zustand (`authStore`, `tenantStore`, `toastStore`); cross-store access via `useXxxStore.getState()`. User is persisted to sessionStorage (must survive reloads); access token lives in memory only; refresh token is an HttpOnly cookie.
+- **Auth**: proactive refresh at ~13 min; 401 → refresh → retry (max 3); `BroadcastChannel` coordinates cross-tab refresh.
 
 ## Key Directories
 
 | Path | Purpose |
 |---|---|
-| `backend/cmd/server/main.go` | API entry point + manual DI |
-| `backend/cmd/migrate/main.go` | Migrations + superadmin/tenant seed |
-| `backend/internal/config/config.go` | ~40 env vars → `Config` struct |
-| `backend/internal/domain/entity/` | `BaseModel`, `enums.go` (4 roles + 13 enums), 10 entity files |
-| `backend/internal/domain/repository/` | 15 interface files + `Paginated[T]`, `Filter`, result types |
-| `backend/internal/usecase/` | `session.go` + `assessment/`, `attendance/`, `badge/`, `live/`, `reports/` |
-| `backend/internal/delivery/http/handler/` | Registry + `router_*.go` + `*_handler.go` |
-| `backend/internal/delivery/http/middleware/` | JWTAuth/RequireRole/TenantScope, error, rate-limit, validator, recover |
-| `backend/internal/infrastructure/persistence/` | GORM models + 17 repos + `db.go` |
-| `backend/internal/infrastructure/auth/` | JWT, bcrypt, refresh rotation, kiosk tokens, revoker |
-| `backend/internal/infrastructure/ai/` | OpenRouter/Gemini factory + narrative generator |
-| `backend/internal/pkg/` | `errors/`, `response/`, `sse/`, `constants/`, `util/` |
-| `backend/migrations/` | `00000N_<name>.up.sql`/`.down.sql` |
-| `backend/.github/workflows/ci.yml` | Go + frontend CI |
-| `frontend/src/features/` | Role-based directories |
-| `frontend/src/core/` | services, stores, hooks, types, constants, utils |
-| `frontend/src/shared/` | layouts, components, hooks, templates |
-| `frontend/src/app/` | `router.tsx` + route table builders |
-| `nginx/default.conf` | Container reverse proxy (listen 8080) |
-| `nginx/vps.conf` | VPS host nginx (:80) |
-| `tmp/` | Ad-hoc manual smoke scripts (NOT in CI) |
+| `backend/cmd/server`, `backend/cmd/migrate` | API entry + manual DI; migration runner + superadmin/tenant seed |
+| `backend/internal/delivery/http/` | `router.go`; `handler/` (`*_handler.go`, `router_*.go`, `registry.go`, `phase7_common.go` bind/validate/pagination helpers); `middleware/`; `dto/` |
+| `backend/internal/usecase/` | Business logic: flat `session.go` + `assessment/ attendance/ badge/ live/ reports/` |
+| `backend/internal/domain/` | `entity/` (models, enums) + `repository/` (interfaces, filters, `Paginated[T]`) |
+| `backend/internal/infrastructure/` | `persistence/` (GORM `*_repo.go`/`*_model.go`), `auth/` (JWT, revoker, auth/user/tenant usecases), `ai/`, `messaging/`, `migration/` |
+| `backend/internal/pkg/` | `errors/ response/ sse/ constants/ util/ phoneutil/` |
+| `backend/migrations/` | `000001_init_schema` … `000004_report_photo_picks` (`.up.sql`/`.down.sql`) |
+| `frontend/src/app/` | `router.tsx` + `routes/` tables + guard helpers (`guardedRoute`, `lazyRoute`) |
+| `frontend/src/core/` | `services/` (shims + `backend-client` + `api-envelope`), `stores/`, `hooks/`, `types/`, `constants/`, `utils/`, `i18n/` |
+| `frontend/src/features/` | Role dirs: `admin/ fasilitator/ parent/ learner/ auth/` (pages/components/hooks) |
+| `frontend/src/shared/` | Cross-feature `components/ layouts/ hooks/ templates/` (incl. mini-raport CSS source) |
+| `frontend/src/locales/` | i18n JSON for 9 languages (id, en, ja, ko, ms, th, tl, vi, zh) |
+| `frontend/tests/unit/` | Vitest suites + `test-utils.tsx` |
+| `tmp/` | Gitignored ad-hoc manual scripts (API probes, Puppeteer flows) + result artifacts; never in CI, never commit |
+| `nginx/`, `compose.yml`, `scripts/push-ghcr.sh` | Reverse-proxy configs; production stack (GHCR pull); manual image publish |
 
 ## Development Commands
 
-### Frontend
-
 ```bash
-cd frontend
-pnpm install
-pnpm dev                          # Vite dev server :5173, proxies /api → :8080
-pnpm build:raport-css             # miniRaport.tailwind.css → miniRaport.styles.css
-pnpm build                        # CSS + tsc -b + vite build
-pnpm preview
-```
-
-### Backend
-
-```bash
-cd backend
-gofmt -w .                       # REQUIRED; CI fails on unformatted files
+# Backend (run from backend/)
+gofmt -w .               # REQUIRED before commit; CI gate is `gofmt -l .` (must be empty)
 go vet ./...
 go build ./...
-go test ./...                     # requires a running MariaDB (see Testing & QA)
-go run ./cmd/migrate              # Migrations + superadmin/tenant seed
-go run ./cmd/server               # API :8080
+go test ./...             # runs without a DB today (fakes + sqlmock); TEST_DB_* exists for future integration tests
+go run ./cmd/migrate      # migrations + seed (needs BOOTSTRAP_SUPERADMIN_PASSWORD)
+go run ./cmd/server       # API :8080, health GET /health
+air                      # live reload (backend/.air.toml)
+
+# Frontend (run from frontend/)
+pnpm install
+pnpm dev                  # Vite :5173, proxies /api → :8080 (SSE-aware for /stream)
+pnpm build                # miniRaport CSS + tsc -b + vite build
+pnpm preview
+pnpm test:unit:run        # vitest once
+pnpm test:unit:typecheck  # tsc over tests/ (pnpm build's tsc -b does NOT cover tests/)
+
+# Stack
+docker compose pull && docker compose up -d    # root compose.yml is PRODUCTION-only: GHCR images, no build/profiles
+cd backend && docker compose up -d --build     # dev backend only (host MariaDB)
+scripts/push-ghcr.sh                           # manual image publish (no image CI exists)
 ```
 
-Air live-reload (`backend/.air.toml`) is configured; run `air` from `backend/`.
-
-### Full Stack
-
-```bash
-docker compose up -d --build      # MariaDB :3307, backend :8080, frontend :8002, wa-engine :2785
-docker compose down               # stops containers; does NOT remove bind-mount data
-docker compose logs -f backend
-```
-
-Dev shortcut for backend-only (frontend runs via `pnpm dev`): `cd backend && docker compose -f docker-compose.yml up -d --build` (uses host MariaDB at `.env`).
+**Ports**: 5173 Vite · 8080 backend · 8002 frontend nginx · 3307 MariaDB (compose) / 3306 local+CI · 2785 OpenWA · 80 host nginx (`nginx/vps.conf`). Compose binds everything to `127.0.0.1`; `nginx/vps.conf` is the only intended public entry.
 
 ## Code Conventions & Common Patterns
 
 ### Backend (Go)
 
-- **Files**: `snake_case.go` — e.g. `router_sessions.go`, `session_repo.go`
-- **Packages**: lowercase flat names — `handler`, `dto`, `entity`, `repository`, `persistence`, `errors`, `response`
-- **Import aliases**: `apperrors` (errors), `appresp` (response), `appmiddleware` (middleware), `apputil` (util).
-- **Structs**: PascalCase exported; repository interfaces in `domain/repository`.
-
-**Entity / BaseModel pattern**
-```go
-type BaseModel struct {
-    ID        string    `json:"id"`
-    CreatedAt time.Time `json:"created_at"`
-    UpdatedAt time.Time `json:"updated_at"`
-}
-```
-
-**GORM model pattern** — models embed the entity (not a separate `BaseModel`
-field, which would inject phantom columns). `BeforeCreate` hooks take an
-**unnamed** `*gorm.DB` receiver:
-```go
-type SessionModel struct {
-    entity.Session
-    DeletedAt gorm.DeletedAt `gorm:"index"`
-}
-func (SessionModel) TableName() string { return "sessions" }
-func (m *SessionModel) BeforeCreate(tx *gorm.DB) error { /* UUID + timestamps */ }
-```
-Each model exposes `ToEntity()` / `fromEntity()`.
-
-**Error handling** — stable `snake_case` codes; `MessageForCode()` maps them to
-Indonesian UI text. `AsAppError` unwraps for assertions in tests.
-```go
-apperrors.BadRequest("validation_error", err)
-apperrors.NotFound("not_found", err)
-apperrors.Conflict("conflict", err)
-apperrors.Internal("internal_error", err)
-```
-
-**Response helpers** — note the signatures (parameter is `*echo.Context`,
-pagination is a single `*Meta`):
-```go
-appresp.OK(c *echo.Context, data interface{})                              // 200
-appresp.OKWithMeta(c *echo.Context, data interface{}, meta *Meta)          // 200
-appresp.Created(c *echo.Context, data interface{})                         // 201
-appresp.Accepted(c *echo.Context)                                          // 202
-appresp.AcceptedWithData(c *echo.Context, data interface{})                // 202
-appresp.NoContent(c *echo.Context)                                         // 204
-appresp.Fail(c *echo.Context, status int, code string)                     // code→message
-appresp.FailMsg(c *echo.Context, status int, code, msg string)             // explicit message
-```
-
-**Bind/validate helper** — shared in `phase7_common.go`:
-```go
-func bindAndValidate(c *echo.Context, req interface{}) error { /* Bind→400 invalid_body; Validate→400 validation_error */ }
-```
-Programs use a stricter variant (`bindAndValidateStrict`) with `DisallowUnknownFields()`
-to reject legacy fields (e.g. `thumbnail_url`) with `400 invalid_body`.
-
-**Auth cookies** — the auth handler **always** sets `Secure=true` and
-`SameSite=None`, **ignoring** `COOKIE_SECURE`/`COOKIE_SAMESITE` from `.env`. This is
-intentional (cross-origin iframe / 127.0.0.1 edge parity); do not rely on the env
-vars for auth cookie attributes. The *access* token is returned in the JSON body
-and held in-memory by the frontend. Refresh tokens use 1-use rotation with
-reuse-detection and a `jti` denylist (`infrastructure/auth/revoker.go`).
-
-**Tenant scope** — `X-Tenant-Id` is honored only for `SUPER_ADMIN`; all other
-roles are scoped to their JWT tenant and the header is ignored on writes
-(anti-forgery). SUPER_ADMIN must always send an explicit active tenant for
-scoped APIs and SSE.
-
-**Pagination constants** (`pkg/constants`): `DefaultPageLimit = 25`,
-`MaxPageLimit = 100`.
+- **File naming**: handlers `*_handler.go`, route mounters `router_*.go`, GORM repos `*_repo.go`, models `*_model.go`, DTOs `dto/<domain>.go`; packages match dirs. Import aliases: `apperrors`, `appresp`, `appmiddleware`, `httppkg`, and usecase aliases like `assessmentuc`.
+- **Echo v5**: handlers are `func (h *XHandler) List(c *echo.Context) error` and the context is **dereferenced everywhere**: `(*c).QueryParam(...)`, `(*c).Request().Context()` — `c.Param(...)` won't compile.
+- **Errors**: `apperrors.BadRequest("validation_error", err)` / `NotFound` / `Conflict` / `Internal` — stable snake_case codes; assert codes in tests via `apperrors.AsAppError`.
+- **Response helpers** (take `*echo.Context`): `appresp.OK`, `OKWithMeta`, `Created`, `Accepted`, `NoContent`, `Fail`, `FailMsg`.
+- **Handler helpers** in `handler/phase7_common.go`: `bindAndValidate(c, &req)` (→ 400 `invalid_body`/`validation_error`), `bindUUID`, `pagination(c)`. Some routes use `bindAndValidateStrict` (rejects unknown fields).
+- **Partial updates use pointer DTO fields**: `UpdateUserRequest{ IsActive *bool \`json:"is_active,omitempty"\` }`. The usecase patch is *empty-means-skip* (a plain `string,omitempty` can never clear a value). GORM `.Updates(model)` likewise skips zero-valued fields.
+- **GORM models embed the entity**: `type SessionModel struct { entity.Session; DeletedAt gorm.DeletedAt }` — a named field injects phantom columns. `TableName()` + `BeforeCreate` (UUID/timestamps) is load-bearing: skipping it inserts `""` as PK.
+- **Route mounting pattern**: `RegisterXxxRoutes(g, h, jm, revoker, ...)` builds `authMW`/`roleMW`, then `g.GET("", h.List, authMW, roleMW, appmiddleware.TenantScope())`.
 
 ### Frontend (TypeScript / React)
 
-- **Components**: `PascalCase.tsx` — `SessionsPage.tsx`, `SessionCard.tsx`, functional only.
-- **Hooks/utils/services/stores**: `camelCase.ts` — `useCrudList.ts`, `authStore.ts`.
-- **Constants**: `UPPER_SNAKE_CASE` — `PAGE_SIZE`, `FETCH_ALL_LIMIT`, `ROUTES`.
-- **Path alias**: `@/*` → `./src/*`.
-- **Text**: all UI text in Indonesian.
-- **Icons**: Lucide, imported individually.
-
-**Service pattern**
-```ts
-import { listRequest, itemRequest, voidRequest } from './api-envelope'
-export const sessionService: SessionService = {
-  list: (params) => listRequest('/api/sessions', params),
-  get: (id) => itemRequest(`/api/sessions/${id}`),
-  create: (data) => voidRequest('/api/sessions', { method: 'POST', body: data }),
-}
-```
-
-**Zustand store pattern** (cross-store via `useAuthStore.getState()`):
-```ts
-const useAuthStore = create<AuthState>((set, get) => ({
-  user: null, token: null, isAuthenticated: false,
-  login: async (credentials) => { /* ... */ },
-  logout: () => { /* ... */ },
-}))
-```
-
-**Partial-update DTOs** use pointer fields so zero-values can be distinguished
-from "not sent" (mirrors the backend `?fields=` patch semantics):
-```ts
-// PATCH updates only set fields; unset optional fields stay nil
-const patch: UpdateProgramDTO = { name: 'New Name' }  // is_active omitted → not changed
-```
-
-**Pagination** (`core/constants/api.ts`): `PAGE_SIZE = 10`,
-`DEFAULT_CLIENT_PAGE_SIZE = 25`, `FETCH_ALL_LIMIT = 100` (backend hard cap).
-`listRequest` auto-loops pagination when `limit >= 100`; `itemsRequest` handles the
-nested `{ data: { items: [] } }` shape (reports, consent, participant-missions);
-`nullableItemRequest` returns `null` on 404 instead of throwing.
-
-### Tailwind v4 (CSS-first)
-
-No `tailwind.config.js`. Theme tokens live in `frontend/src/index.css`:
-```css
-@import "tailwindcss";
-@theme {
-  --color-primary: #5B2C8D;
-  --color-accent: #F5A623;
-  --animate-fade-in-up: fadeInUp 0.4s ease-out;
-}
-```
-PDF report styles are compiled from
-`frontend/src/shared/templates/miniRaport.tailwind.css` into
-`miniRaport.styles.css` via `pnpm build:raport-css`.
+- **Naming**: `PascalCase.tsx` components/pages, `camelCase.ts` hooks/utils/services/stores, `UPPER_SNAKE_CASE` constants; alias `@/*` → `./src/*`; all UI text in Indonesian; Lucide icons.
+- **Service shims**: interface in `core/services/types.ts`, exported singleton using `listRequest`/`itemRequest`/`voidRequest`… — never raw `fetch`:
+  ```ts
+  export const sessionService: SessionService = {
+    list: (params) => listRequest(API_ROUTES.SESSIONS.BASE, params),
+  }
+  ```
+- **Envelope shapes differ**: most lists are `{data:[...]}` → `listRequest`; reports/consent/participant-missions/mission-banks wrap as `{data:{items:[]}}` → `itemsRequest`; `nullableItemRequest` returns `null` on 404. `limit >= 100` silently loops all pages (`fetchAllPages`); backend hard cap is 100.
+- **Tenant**: `X-Tenant-Id` is attached only for SUPER_ADMIN (`backend-client.ts` / `getActiveTenantId`); `tenant_id` null → `""` via `normalizeTenantId`. Never add the header globally — backend 401s non-SA requests that carry it.
+- **Constants**: URLs from `API_ROUTES` (`core/constants/apiRoutes.ts`, `encodeURIComponent` builders), paths from `ROUTES` (`core/constants/app.ts`).
+- **Zustand**: cross-store reads via `getState()`; `setUser` must persist to sessionStorage or reload loses the session. List pages use `shared/hooks/useCrudList` — it keys its cache by `fetchFn.toString()` and deliberately keeps `fetchFn` out of effect deps; adding it causes an infinite loop.
+- **Tailwind v4 is CSS-first**: tokens in `frontend/src/index.css` `@theme`. `miniRaport.styles.css` is **generated** — edit `miniRaport.tailwind.css` and run `pnpm build:raport-css`, never the compiled file.
 
 ## Important Files
 
-| File | Purpose |
+| File | Why it matters |
 |---|---|
-| `backend/go.mod` | Module `kidversa-edutourism-backend`, go 1.26.4 |
-| `backend/.env` / `.env.example` | ~40 env vars (dev uses `.env`; compose injects `.env`) |
-| `backend/.air.toml` | Air hot-reload config |
-| `backend/cmd/server/main.go` | Bootstrap + manual DI + graceful shutdown |
-| `backend/cmd/migrate/main.go` | Migration runner + seed |
-| `backend/internal/config/config.go` | Env-driven config validation |
-| `backend/internal/delivery/http/router.go` | Echo assembly + middleware chain |
-| `backend/internal/delivery/http/handler/registry.go` | Single `Registry` holding all handlers |
-| `backend/internal/delivery/http/middleware/auth.go` | JWTAuth, RequireRole, TenantScope |
-| `backend/internal/delivery/http/middleware/error.go` | Error normalization to envelope |
-| `backend/internal/pkg/errors/errors.go` | `AppError` constructors + `MessageForCode()` |
-| `backend/internal/pkg/response/response.go` | Envelope helpers |
-| `backend/internal/pkg/sse/hub.go` | SSE pub/sub with ring buffers + replay |
-| `backend/internal/domain/entity/base.go` | `BaseModel` |
-| `backend/internal/domain/entity/enums.go` | Typed enums |
-| `backend/internal/domain/repository/user.go` | Repository interface pattern |
-| `backend/internal/infrastructure/persistence/db.go` | GORM/MariaDB connection |
-| `frontend/package.json` | React 19, Vite 8, Tailwind v4, Zustand, PWA |
-| `frontend/vite.config.ts` | Vite + Tailwind + PWA + `/api` proxy (SSE-aware) |
-| `frontend/tsconfig.json` | Strict TS, `@/*` alias |
-| `frontend/src/main.tsx` | React 19 root + PWA registration |
+| `backend/cmd/server/main.go` | Entry point + all manual wiring |
+| `backend/cmd/migrate/main.go` | Migrations + idempotent seed; dirty state needs a manual `schema_migrations` fix |
+| `backend/internal/delivery/http/router.go` | The only route table + middleware chain |
+| `backend/internal/delivery/http/handler/registry.go` | Registry holding every handler |
+| `backend/internal/delivery/http/middleware/auth.go` | `JWTAuth`, `RequireRole`, `TenantScope` |
+| `backend/internal/delivery/http/middleware/error.go` | `AppError` → response envelope |
+| `backend/internal/pkg/response/response.go`, `pkg/errors/errors.go` | Envelope helpers + `AppError`/`MessageForCode` |
+| `backend/internal/pkg/sse/hub.go` | SSE pub/sub with replay |
+| `backend/internal/config/config.go` | Env loading + startup validation (~40 env vars) |
 | `frontend/src/App.tsx` | Startup orchestrator (health, session, tenant, splash) |
-| `frontend/src/app/router.tsx` | `createBrowserRouter` (React Router v7) |
-| `frontend/src/core/services/backend-client.ts` | HTTP/SSE client, token refresh, BroadcastChannel |
-| `frontend/src/core/services/api-envelope.ts` | Unwrap envelope, tenant_id normalization, pagination |
-| `frontend/src/core/stores/authStore.ts` | Zustand auth state |
-| `frontend/src/core/stores/tenantStore.ts` | SUPER_ADMIN active tenant |
+| `frontend/src/app/router.tsx` | `createBrowserRouter` route composition |
+| `frontend/src/core/services/backend-client.ts` | HTTP/SSE client, token refresh, tenant header |
+| `frontend/src/core/services/api-envelope.ts` | Envelope unwrap, pagination, tenant normalization |
 | `frontend/src/shared/components/auth/RouteGuard.tsx` | Unified auth gate (3 modes) |
-| `frontend/src/index.css` | Tailwind v4 theme entry |
-| `compose.yml` | Production stack |
-| `backend/docker-compose.yml` | Backend-only dev compose |
-| `nginx/default.conf` | Container reverse proxy |
-| `nginx/vps.conf` | Host (VPS) reverse proxy |
+| `frontend/vite.config.ts` | Alias, dev proxy (SSE-aware), PWA |
+| `backend/.github/workflows/ci.yml` | The documented command gates (see caveat below) |
+| `compose.yml`, `nginx/default.conf`, `nginx/vps.conf` | Production stack + reverse proxies |
 
-## Runtime / Tooling Preferences
+## Runtime/Tooling Preferences
 
-- **Backend runtime**: Go 1.26.4 (CI), `golang:1.26-alpine` (Docker). Static `CGO_ENABLED=0` build; runtime image is `alpine:3.24` (+ ffmpeg, ca-certificates).
-- **Frontend runtime**: Node ≥20.19.0 / ≥22.12.0. **CI uses Node 20** (`setup-node@v4`); the **Docker multi-stage build uses `node:22-alpine`**. Both are compatible with Vite 8.
-- **Database**: MariaDB 12 (`mariadb:12`). Host port 3307 in production compose; 3306 in dev/CI.
-- **Package manager**: **pnpm** via Corepack (no npm/yarn workflows).
-- **Formatter/linter**: **`gofmt` only** for Go. There is **no ESLint/Prettier/golangci-lint** — CI enforces `gofmt -l .` (must be empty). Frontend quality is enforced by `pnpm build` (TypeScript `tsc -b` + Vite) and strict `tsconfig.json`.
-- **Code intelligence indexes** (gitignored, auto-maintained):
-  - `.codegraph/` — CodeGraph native SQLite index (active).
-  - `.cocoindex_code/` — cocoindex-code index (active; config at `.cocoindex_code/settings.yml`).
-  - `.codebase-memory/` — codebase knowledge-graph artifacts.
-- **Ports (dev)**: Vite 5173 · backend 8080 · frontend nginx 8002 · OpenWA 2785 · MariaDB 3307 (compose) / 3306 (dev/CI). All container ports are bound to `127.0.0.1` (not public); the host nginx (`nginx/vps.conf`) is the only public entry point on :80.
-- **No Makefile** exists. The root `package.json` is a pnpm-workspace manifest (runtime deps `bcryptjs`, `puppeteer-core`; devDep `mysql2`) with **no scripts** — it is tooling metadata only, not a build target.
+- **Go 1.26.4**, formatted with **gofmt only** — there is no golangci-lint/revive config.
+- **Node**: CI uses Node 20, Docker build uses `node:22-alpine`; no `.nvmrc`/`engines` pin. **pnpm** via corepack for `frontend/` only. The root `package.json` is a scriptless dep manifest with its own lockfiles — a second, independent pnpm install zone; run builds/tests from `frontend/`.
+- **No ESLint/Prettier/Biome** — frontend gates are `tsc` (two tsconfigs) + vitest. Don't invent lint commands.
+- **Server startup constraints**: refuses to start if `JWT_SECRET` < 32 bytes; `BOOTSTRAP_SUPERADMIN_PASSWORD` (≥8 chars) required for bootstrap. Auth cookies are hard-set `Secure; SameSite=None` (env vars ignored, intentional). Backend container runs `migrate` first and **fails closed** if migrations fail.
+- **CI caveat**: the only workflow lives at `backend/.github/workflows/ci.yml`, but GitHub Actions loads workflows from a root `.github/` that does not exist — treat it as the documented command list and reproduce the gates locally:
+  `gofmt -l .` (empty) → `go vet ./...` → `go build ./...` → `go test ./...` → `pnpm build` → `pnpm test:unit:run` → `pnpm test:unit:typecheck`.
+- **SSE must stay special-cased in three places**: Vite proxy (keep-alive for `/stream`), `nginx/default.conf` (`proxy_buffering off`, 86400s timeout), `nginx/vps.conf`. A plain `proxy_pass` rewrite breaks live monitoring.
+- **Local harness rules** in `.omp/rules/` (gitignored) ban shell grep/sed/awk and heredoc file creation — use the repo search/edit tools instead.
+- **Never commit**: `tmp/` artifacts (logs/screenshots/credentials), `.env`, `backups/*.sql`, generated `miniRaport.styles.css` edits that weren't rebuilt.
 
 ## Testing & QA
 
-### Current state — build gates are authoritative (there is no test suite)
+### Backend — 13 `*_test.go` files, stdlib `testing` only
 
-- **Backend**: exactly **two** test files under `backend/tests/` (NOT `internal/usecase/`):
-  - `backend/tests/assessment/assessment_test.go` — package `assessment_test`, **7** tests for `assessment.Usecase.Upsert` using hand-rolled `fakeAssessmentRepo`/`fakeSessionRepo`/`fakeBadgeEvaluator`.
-  - `backend/tests/users_usecase_test.go` — package `auth_test`, **4** tests for `auth.UserUsecase.UpdateUser` self-role-change guards using an in-memory `fakeUserRepo`.
-  - Total: **11 test functions**. Framework: Go `testing` only — **no testify, no mocking library**. Tests are pure unit tests over usecase logic with hand-rolled fake structs implementing the `domain/repository` interfaces; they share a `requireAppErrorCode(t, err, want)` helper that unwraps `apperrors.AsAppError` to assert `snake_case` codes. No DB, no HTTP (no `TestMain`, no `httptest`, no migrations run in tests).
-  - Invoke: `go test ./...` from `backend/` (needs a running MariaDB; CI provides a `mariadb:12` service).
-- **Frontend**: **no tests**. `package.json` has no `test` script; no jest/vitest in deps; `frontend/**/*.{test,spec}.{ts,tsx}` → 0 matches.
-- **E2E**: none. `tmp/` holds ~40 ad-hoc manual smoke scripts (`.mjs`/`.test.mjs`/`.sh`/`.tsx`, e.g. `smoke-api.mjs`, `smoke-ui.mjs`, `verify.sh`, `bug1-assessment.test.mjs`, `01-foundation.mjs`…`99-collate.mjs`) with result artifacts (`*.log`, `*.json`, `*.png`). **Never wired to CI.**
+- 12 external-package files under `backend/tests/` (`session_create_gate_test.go`, `users_usecase_test.go`, `reports/`, `reportphoto/`, `assessment/`, `participant/`, `phoneutil/`, `frame/`) + 1 white-box `backend/internal/delivery/http/handler/report_photo_resolution_test.go`.
+- **No testify/gomock** — hand-rolled in-file fakes implementing `domain/repository` interfaces; handler tests use `httptest` + `echo.New()` with `e.Validator = appmiddleware.NewValidator()`; one GORM repo test uses `go-sqlmock`.
+- Recurring per-package helper `requireAppErrorCode(t, err, want)` (duplicated per package, not shared).
+- **No test opens a database** — `TEST_DB_*`/`TestDBDSN` exist for future integration tests but are currently unused; `go test ./...` runs without MariaDB.
+- Run: `cd backend && go test ./...`
 
-### CI pipeline — `backend/.github/workflows/ci.yml`
+### Frontend — Vitest 5 + jsdom + Testing Library
 
-Two jobs (`push` any branch + `pull_request`):
-
-- **backend** (`working-directory: backend`): `golang:1.26`; `mariadb:12` service (root/admin, db `kidversa_test`, 3306) with `TEST_DB_*` env. Steps: `checkout` → `setup-go@v5` → `gofmt -l .` (**gate: must be empty, else exit 1**) → `go vet ./...` → `go build ./...` → `go test ./...`.
-- **frontend** (`working-directory: frontend`): `setup-node@v4` (Node 20) → `corepack enable` + `pnpm@latest activate` → `pnpm install` → `pnpm build`.
-
-### Quality gates (in order)
-
-1. `gofmt -l .` — fails CI if any file is unformatted
-2. `go vet ./...`
-3. `go build ./...`
-4. `go test ./...`
-5. `pnpm build` (TypeScript `tsc -b` + Vite + Tailwind compilation)
-
-> The CI MariaDB `kidversa_test` service is currently **unused** by the unit tests (they are pure in-memory) — it exists for future integration tests.
-
-### Migrations
-
-- Location: `backend/migrations/` — naming `00000N_<snake_description>.up.sql` / `.down.sql`.
-- Current set: `000001_init_schema`, `000002_simplify_program_hierarchy`, `000003_remove_program_thumbnail`.
-- Runner: `backend/internal/infrastructure/migration/migrate.go` (golang-migrate). Creates the database via an allowlist (only `kidversa`/`kidversa_test` literals; deny-by-default to avoid SQL-injection on DDL identifiers), waits with backoff, and applies up-migrations with retry + skip-on-persistent-DDL recovery (Force()s past a failing version, logs loudly).
-- Entry point: `backend/cmd/migrate/main.go`. The binary is copied into the Docker image and the `compose.yml` backend `CMD` runs `migrate` (3 attempts) before `server`, failing closed if the schema is broken.
-
-### Gotchas for AI assistants (verified)
-
-- `frontend update()` calls commonly omit `tenant_id`; `api-envelope.normalizeTenantId` converts `null → ""`. Ensure the active tenant is sent explicitly for SUPER_ADMIN-scoped writes.
-- GORM embedded `BaseModel`-style structs inject phantom columns if modeled as a named field — always **embed** the entity (`entity.Session` as an anonymous field), not `Session entity.Session`.
-- `setUser` in the auth flow must persist user to `sessionStorage` (not just in-memory) so `BroadcastChannel`/tab-restore survives.
-- `SUPER_ADMIN` always requires an explicit active tenant for scoped APIs and SSE streams.
-- `App.tsx` has a cold-start race: if the SUPER_ADMIN's tenant fetch returns empty (seed not yet complete), it retries 3× — do not remove the retry/backoff.
+- 20 suites in `frontend/tests/unit/**` (+ `i18n/` subfolder) with shared helper `frontend/tests/unit/test-utils.tsx`. Nothing inside `frontend/src/`.
+- **Always render through `tests/unit/test-utils.tsx`** — importing `render` from `@testing-library/react` directly hits a React 19.2/RTL act-flush bug that renders nothing.
+- Mock services with `vi.mock('@/core/services/...')`; replicate `ApiError` with the same constructor signature so `instanceof` checks work at runtime.
+- `vitest.setup.ts` seeds `localStorage['kidversa_lang']='id'` then **dynamically** awaits `./src/core/i18n` — converting to a static import silently breaks locale assumptions.
+- Commands: `pnpm test:unit` (watch), `pnpm test:unit:run`, `pnpm test:unit:typecheck` (covers `tests/**`; `pnpm build`'s `tsc -b` does not).
+- **No coverage** config, thresholds, or jobs exist.
+- `tmp/*.test.mjs` are Node/Puppeteer scripts, not Vitest — they are never picked up by `pnpm test:unit`.
