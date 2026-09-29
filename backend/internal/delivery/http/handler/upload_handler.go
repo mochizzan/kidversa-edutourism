@@ -105,7 +105,6 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 		IsReportPhoto:   isReport,
 		TakenBy:         takenBy,
 		TakenAt:         takenAt,
-		SyncStatus:      entity.SyncLocal,
 	}
 	if fid := strings.TrimSpace((*c).FormValue("frame_id")); fid != "" {
 		rec.FrameID = &fid

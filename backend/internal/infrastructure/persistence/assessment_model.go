@@ -26,9 +26,6 @@ func (m *AssessmentModel) BeforeCreate(*gorm.DB) error {
 		m.CreatedAt = time.Now()
 	}
 	m.UpdatedAt = m.CreatedAt
-	if m.SyncStatus == "" {
-		m.SyncStatus = entity.SyncLocal
-	}
 	return nil
 }
 

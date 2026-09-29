@@ -3,8 +3,6 @@ package assessment
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -41,38 +39,17 @@ func isNotFound(err error) bool {
 	return ok && code == "not_found"
 }
 
-var validSyncStatuses = map[entity.SyncStatus]bool{
-	entity.SyncLocal: true, entity.SyncUploading: true,
-	entity.SyncSynced: true, entity.SyncFailed: true,
-}
-
-func normalizeSyncStatus(s string) (entity.SyncStatus, error) {
-	if s == "" {
-		return "", nil
-	}
-	up := entity.SyncStatus(strings.ToUpper(s))
-	if !validSyncStatuses[up] {
-		return "", fmt.Errorf("invalid sync_status %q", s)
-	}
-	return up, nil
-}
-
 // Upsert creates or updates an assessment keyed on (participant_id, session_substage_id).
 // starRating 0 is a valid "absent/not-yet-scored" marker (DB DEFAULT 1); the
 // contract treats >=1 as scored. actorRole gates the write to the participant's
 // group owner when the actor is a FASILITATOR; ADMIN/KOORDINATOR/SUPER_ADMIN bypass.
-func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy, actorID, actorRole string, assessedAt time.Time, syncStatus string, tenantID string) (*entity.Assessment, error) {
+func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy, actorID, actorRole string, assessedAt time.Time, tenantID string) (*entity.Assessment, error) {
 	if req.ParticipantID == "" || req.SessionSubstageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
 	}
 	if assessedBy == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
 	}
-	normSync, errSync := normalizeSyncStatus(syncStatus)
-	if errSync != nil {
-		return nil, apperrors.BadRequest("validation_error", errSync)
-	}
-	syncStatus = string(normSync) // may be "" -> defaults preserved
 	if err := u.assertOwnership(ctx, req.ParticipantID, actorID, actorRole); err != nil {
 		return nil, err
 	}
@@ -109,9 +86,6 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 			if !assessedAt.IsZero() {
 				soft.AssessedAt = assessedAt
 			}
-			if syncStatus != "" {
-				soft.SyncStatus = entity.SyncStatus(syncStatus)
-			}
 			if err := u.repo.Revive(ctx, soft); err != nil {
 				return nil, err
 			}
@@ -130,9 +104,6 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 		if !assessedAt.IsZero() {
 			existing.AssessedAt = assessedAt
 		}
-		if syncStatus != "" {
-			existing.SyncStatus = entity.SyncStatus(syncStatus)
-		}
 		if err := u.repo.Update(ctx, existing); err != nil {
 			return nil, err
 		}
@@ -146,13 +117,9 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 		Comment:           comment,
 		AssessedBy:        assessedBy,
 		AssessedAt:        assessedAt,
-		SyncStatus:        entity.SyncStatus(syncStatus),
 	}
 	if a.AssessedAt.IsZero() {
 		a.AssessedAt = apputil.Now()
-	}
-	if a.SyncStatus == "" {
-		a.SyncStatus = entity.SyncLocal
 	}
 	if err := u.repo.Create(ctx, a); err != nil {
 		return nil, err

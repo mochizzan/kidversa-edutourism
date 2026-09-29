@@ -76,16 +76,6 @@ const (
 	ProgressSkipped    GroupStageProgressStatus = "SKIPPED"
 )
 
-// SyncStatus enumerates sync queue states.
-type SyncStatus string
-
-const (
-	SyncLocal     SyncStatus = "LOCAL"
-	SyncUploading SyncStatus = "UPLOADING"
-	SyncSynced    SyncStatus = "SYNCED"
-	SyncFailed    SyncStatus = "FAILED"
-)
-
 // ConsentType enumerates consent kinds.
 type ConsentType string
 

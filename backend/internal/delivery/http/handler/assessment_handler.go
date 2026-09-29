@@ -29,7 +29,7 @@ func (h *AssessmentHandler) Upsert(c *echo.Context) error {
 	}
 	a, err := h.uc.Upsert((*c).Request().Context(),
 		repository.AssessmentFilter{ParticipantID: req.ParticipantID, SessionID: req.SessionID, SessionSubstageID: req.SessionSubstageID},
-		req.StarRating, req.Comment, appmiddleware.GetUserID(c), appmiddleware.GetUserID(c), appmiddleware.GetRole(c), apputil.ParseISOOrNow(req.AssessedAt), req.SyncStatus, appmiddleware.GetTenantID(c))
+		req.StarRating, req.Comment, appmiddleware.GetUserID(c), appmiddleware.GetUserID(c), appmiddleware.GetRole(c), apputil.ParseISOOrNow(req.AssessedAt), appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

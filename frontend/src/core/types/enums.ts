@@ -45,13 +45,6 @@ export enum GroupStageProgressStatus {
   SKIPPED = 'SKIPPED',
 }
 
-export enum SyncStatus {
-  LOCAL = 'LOCAL',
-  UPLOADING = 'UPLOADING',
-  SYNCED = 'SYNCED',
-  FAILED = 'FAILED',
-}
-
 export enum ConsentType {
   PHOTO = 'PHOTO',
 }

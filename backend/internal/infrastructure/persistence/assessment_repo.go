@@ -182,7 +182,6 @@ func (r *GormAssessmentRepository) Update(ctx context.Context, a *entity.Assessm
 		"comment":             a.Comment,
 		"assessed_by":         a.AssessedBy,
 		"assessed_at":         a.AssessedAt,
-		"sync_status":         a.SyncStatus,
 	}
 	if err := r.db.WithContext(ctx).Model(&AssessmentModel{}).Where("id = ?", a.ID).Updates(fields).Error; err != nil {
 		if isDuplicate(err) {
@@ -208,7 +207,6 @@ func (r *GormAssessmentRepository) Revive(ctx context.Context, a *entity.Assessm
 		"comment":             a.Comment,
 		"assessed_by":         a.AssessedBy,
 		"assessed_at":         a.AssessedAt,
-		"sync_status":         a.SyncStatus,
 		"deleted_at":          nil,
 	}
 	if err := r.db.WithContext(ctx).Model(&AssessmentModel{}).Where("id = ?", a.ID).Updates(fields).Error; err != nil {

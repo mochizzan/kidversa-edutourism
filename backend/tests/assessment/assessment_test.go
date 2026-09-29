@@ -190,7 +190,7 @@ func TestUsecase_Upsert_SessionActive_Succeeds(t *testing.T) {
 		ParticipantID:     "participant-1",
 		SessionID:         "session-1",
 		SessionSubstageID: "substage-1",
-	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "", "tenant-1")
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -206,7 +206,7 @@ func TestUsecase_Upsert_SessionDraft_Fails(t *testing.T) {
 		ParticipantID:     "participant-1",
 		SessionID:         "session-1",
 		SessionSubstageID: "substage-1",
-	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "", "tenant-1")
+	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	requireAppErrorCode(t, err, "session_not_active")
 }
 
@@ -220,7 +220,7 @@ func TestUsecase_Upsert_SessionCompleted_Fails(t *testing.T) {
 		ParticipantID:     "participant-1",
 		SessionID:         "session-1",
 		SessionSubstageID: "substage-1",
-	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "", "tenant-1")
+	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	requireAppErrorCode(t, err, "session_not_active")
 }
 
@@ -234,7 +234,7 @@ func TestUsecase_Upsert_SessionCancelled_Fails(t *testing.T) {
 		ParticipantID:     "participant-1",
 		SessionID:         "session-1",
 		SessionSubstageID: "substage-1",
-	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "", "tenant-1")
+	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	requireAppErrorCode(t, err, "session_not_active")
 }
 
@@ -248,7 +248,7 @@ func TestUsecase_Upsert_EmptySessionID_Fails(t *testing.T) {
 		ParticipantID:     "participant-1",
 		SessionID:         "",
 		SessionSubstageID: "substage-1",
-	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "", "tenant-1")
+	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	requireAppErrorCode(t, err, "validation_error")
 }
 
@@ -262,7 +262,7 @@ func TestUsecase_Upsert_SessionRepoError_Propagates(t *testing.T) {
 		ParticipantID:     "participant-1",
 		SessionID:         "session-1",
 		SessionSubstageID: "substage-1",
-	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "", "tenant-1")
+	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -278,6 +278,6 @@ func TestUsecase_Upsert_Ownership_Fails(t *testing.T) {
 		ParticipantID:     "participant-1",
 		SessionID:         "session-1",
 		SessionSubstageID: "substage-1",
-	}, 3, "", "facilitator-1", "facilitator-1", string(entity.RoleFasilitator), time.Now(), "", "tenant-1")
+	}, 3, "", "facilitator-1", "facilitator-1", string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	requireAppErrorCode(t, err, "not_group_owner")
 }

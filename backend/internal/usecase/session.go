@@ -831,7 +831,6 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 			Comment:           a.Comment,
 			AssessedBy:        a.AssessedBy,
 			AssessedAt:        a.AssessedAt,
-			SyncStatus:        entity.SyncSynced,
 		}
 		if cerr := u.assessmentRepo.Create(ctx, clone); cerr != nil && !isConflict(cerr) {
 			return cerr

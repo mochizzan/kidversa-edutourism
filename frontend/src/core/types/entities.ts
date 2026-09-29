@@ -265,7 +265,6 @@ export interface Assessment {
  assessed_by: string
  assessed_at: string
  updated_at: string
- sync_status: import('./enums').SyncStatus
 }
 
 export interface SmartPhoto {
@@ -278,7 +277,6 @@ export interface SmartPhoto {
  is_report_photo: boolean
  taken_by: string
  taken_at: string
- sync_status: import('./enums').SyncStatus
 }
 
 /** One topic's chosen report photo, as returned by GET /api/photos/report-picks. */

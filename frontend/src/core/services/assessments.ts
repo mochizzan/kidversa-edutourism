@@ -1,5 +1,4 @@
 import type { Assessment, CreateAssessmentDTO } from '../types'
-import { SyncStatus } from '../types'
 import type { AssessmentService } from './types'
 import { arrayRequest, itemRequest, listRequest } from './api-envelope'
 import { API_ROUTES } from '../constants/apiRoutes'
@@ -11,7 +10,6 @@ interface AssessmentUpsertRequest {
   star_rating: number
   comment?: string
   assessed_at?: string
-  sync_status?: string
 }
 
 const upsert = async (data: CreateAssessmentDTO): Promise<Assessment> => {
@@ -23,7 +21,6 @@ const upsert = async (data: CreateAssessmentDTO): Promise<Assessment> => {
     session_substage_id: data.session_substage_id,
     star_rating: data.star_rating,
     comment: data.comment,
-    sync_status: SyncStatus.SYNCED,
   } as AssessmentUpsertRequest)
 }
 

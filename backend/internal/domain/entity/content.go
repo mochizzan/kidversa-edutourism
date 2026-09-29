@@ -5,30 +5,28 @@ import "time"
 // Assessment is a star-rating + comment given to a participant per Kegiatan (session Kegiatan).
 type Assessment struct {
 	BaseModel
-	ParticipantID     string     `json:"participant_id"`
-	SessionID         string     `json:"session_id"`
-	SessionSubstageID string     `json:"session_substage_id" gorm:"column:session_substage_id"`
-	StarRating        int        `json:"star_rating"`
-	Comment           string     `json:"comment,omitempty"`
-	AssessedBy        string     `json:"assessed_by"`
-	ParticipantName   string     `json:"participant_name,omitempty"` // denormalized from participants.child_name
-	KegiatanName      string     `json:"kegiatan_name,omitempty"`    // denormalized from session_substages.name
-	AssessedAt        time.Time  `json:"assessed_at"`
-	SyncStatus        SyncStatus `json:"sync_status"`
+	ParticipantID     string    `json:"participant_id"`
+	SessionID         string    `json:"session_id"`
+	SessionSubstageID string    `json:"session_substage_id" gorm:"column:session_substage_id"`
+	StarRating        int       `json:"star_rating"`
+	Comment           string    `json:"comment,omitempty"`
+	AssessedBy        string    `json:"assessed_by"`
+	ParticipantName   string    `json:"participant_name,omitempty"` // denormalized from participants.child_name
+	KegiatanName      string    `json:"kegiatan_name,omitempty"`    // denormalized from session_substages.name
+	AssessedAt        time.Time `json:"assessed_at"`
 }
 
 // SmartPhoto is a captured photo of a participant, optionally framed.
 type SmartPhoto struct {
 	BaseModel
-	ParticipantID   string     `json:"participant_id"`
-	SessionID       string     `json:"session_id"`
-	FrameID         *string    `json:"frame_id,omitempty"`
-	OriginalFileURL string     `json:"original_file_url"`
-	FramedFileURL   string     `json:"framed_file_url,omitempty"`
-	IsReportPhoto   bool       `json:"is_report_photo"`
-	TakenBy         string     `json:"taken_by"`
-	TakenAt         time.Time  `json:"taken_at"`
-	SyncStatus      SyncStatus `json:"sync_status"`
+	ParticipantID   string    `json:"participant_id"`
+	SessionID       string    `json:"session_id"`
+	FrameID         *string   `json:"frame_id,omitempty"`
+	OriginalFileURL string    `json:"original_file_url"`
+	FramedFileURL   string    `json:"framed_file_url,omitempty"`
+	IsReportPhoto   bool      `json:"is_report_photo"`
+	TakenBy         string    `json:"taken_by"`
+	TakenAt         time.Time `json:"taken_at"`
 }
 
 // ReportPhotoPick is one participant's chosen report photo for one topic

@@ -12,4 +12,9 @@ whenReady.catch(() => undefined).then(() => {
     </StrictMode>,
   )
 })
-// PWA service worker registration is injected by vite-plugin-pwa (registerSW.js).
+// Network-only service worker: PWA installability without offline caching.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+  })
+}

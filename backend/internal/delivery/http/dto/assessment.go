@@ -11,7 +11,6 @@ type AssessmentUpsertRequest struct {
 	StarRating        int    `json:"star_rating" validate:"min=0,max=4"`
 	Comment           string `json:"comment,omitempty"`
 	AssessedAt        string `json:"assessed_at,omitempty"`
-	SyncStatus        string `json:"sync_status,omitempty"`
 }
 
 // AssessmentResponse is the list/read representation.
