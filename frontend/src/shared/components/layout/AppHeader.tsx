@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Bell, Menu, X, Users, FolderOpen, Calendar, Image, Loader2, ChevronRight, UserCheck } from 'lucide-react'
-import ConnectionStatus from '../feedback/ConnectionStatus'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { Tooltip } from '../ui/Tooltip'
 import { useGlobalSearch } from '../../hooks/useGlobalSearch'
-import { useConnectionStatus } from '../../hooks/useConnectionStatus'
 import { useHeaderNotifications } from '../../hooks/useHeaderNotifications'
 import { useTenantStore } from '../../../core/stores/tenantStore'
 import { isSuperAdmin } from '../../../core/utils/permissions'
@@ -32,14 +30,8 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const { query, setQuery, loading, results, searched, reset } = useGlobalSearch()
   const { notifications, unreadCount, acknowledge } = useHeaderNotifications()
   const { setActiveTenant, tenants } = useTenantStore()
-  const { status } = useConnectionStatus()
   const [focused, setFocused] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-
-  const connectionTooltip =
-    status === 'online'
-      ? t('common.connection.online')
-      : t('common.connection.reconnecting')
 
   const close = useCallback(() => {
     setFocused(false)
@@ -231,15 +223,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         </div>
 
         <div className="flex items-center gap-4 ml-auto shrink-0">
-          <Tooltip content={connectionTooltip}>
-            <span
-              className="w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-surface shadow-sm flex items-center justify-center transition-colors"
-              role="status"
-              aria-live="polite"
-            >
-              <ConnectionStatus />
-            </span>
-          </Tooltip>
           <div ref={notificationRef} className="relative">
             <Tooltip content={t('common.notifications.title')}>
               <button

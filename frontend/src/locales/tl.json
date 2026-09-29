@@ -45,12 +45,6 @@
       "pendingTitle": "Naghihintay na Pagpaparehistro",
       "pendingDesc": "Mga bagong user na naghihintay ng pag-apruba"
     },
-    "connection": {
-      "online": "Nakakonekta sa server — Naka-sync ang lahat ng data",
-      "reconnecting": "Nadiskonekta sa server — Sinusubukang kumonekta muli…",
-      "labelOnline": "Nakakonekta sa server",
-      "labelOffline": "Nadiskonekta sa server"
-    },
     "error": {
       "title": "May naganap na error",
       "message": "May naganap na error habang nilo-load ang data. Mangyaring subukan muli.",
@@ -1156,7 +1150,6 @@
       "profile": "Profile"
     },
     "hello": "Kumusta, {{name}}",
-    "cloud": "Cloud",
     "profile": {
       "quickMenu": {
         "dashboard": {

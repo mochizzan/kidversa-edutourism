@@ -45,12 +45,6 @@
       "pendingTitle": "Pendaftaran Menunggu",
       "pendingDesc": "Pengguna baharu menunggu kelulusan"
     },
-    "connection": {
-      "online": "Disambungkan ke pelayan — Semua data disegerakkan",
-      "reconnecting": "Terputus daripada pelayan — Cuba menyambung semula…",
-      "labelOnline": "Disambungkan ke pelayan",
-      "labelOffline": "Terputus daripada pelayan"
-    },
     "error": {
       "title": "Ralat Berlaku",
       "message": "Ralat berlaku semasa memuatkan data. Sila cuba lagi.",
@@ -1156,7 +1150,6 @@
       "profile": "Profil"
     },
     "hello": "Hai, {{name}}",
-    "cloud": "Awan",
     "profile": {
       "quickMenu": {
         "dashboard": {

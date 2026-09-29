@@ -45,12 +45,6 @@
       "pendingTitle": "Pending Registration",
       "pendingDesc": "New user awaiting approval"
     },
-    "connection": {
-      "online": "Connected to server — All data synchronized",
-      "reconnecting": "Disconnected from server — Attempting to reconnect…",
-      "labelOnline": "Connected to server",
-      "labelOffline": "Disconnected from server"
-    },
     "error": {
       "title": "An Error Occurred",
       "message": "An error occurred while loading data. Please try again.",
@@ -1156,7 +1150,6 @@
       "profile": "Profile"
     },
     "hello": "Hi, {{name}}",
-    "cloud": "Cloud",
     "profile": {
       "quickMenu": {
         "dashboard": {

@@ -45,12 +45,6 @@
       "pendingTitle": "承認待ちの登録",
       "pendingDesc": "承認待ちの新規ユーザー"
     },
-    "connection": {
-      "online": "サーバーに接続済み — すべてのデータが同期されています",
-      "reconnecting": "サーバーから切断されました — 再接続を試みています…",
-      "labelOnline": "サーバーに接続済み",
-      "labelOffline": "サーバーから切断されました"
-    },
     "error": {
       "title": "エラーが発生しました",
       "message": "データの読み込み中にエラーが発生しました。再試行してください。",
@@ -1156,7 +1150,6 @@
       "profile": "プロフィール"
     },
     "hello": "こんにちは、{{name}}さん",
-    "cloud": "クラウド",
     "profile": {
       "quickMenu": {
         "dashboard": {

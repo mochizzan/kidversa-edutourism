@@ -10,7 +10,6 @@ import {
   Users,
   Camera,
   User,
-  Cloud,
 } from 'lucide-react'
 
 
@@ -58,14 +57,6 @@ const FasilitatorLayout = () => {
             <p className="text-[10px] md:text-[11px] text-on-surface-variant font-normal leading-tight">
               Fasilitator
             </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Cloud Status — green pill */}
-          <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-full px-3 py-1.5 text-xs font-semibold text-green-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]" />
-            <Cloud className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{t('fasilitator.cloud')}</span>
           </div>
         </div>
       </header>

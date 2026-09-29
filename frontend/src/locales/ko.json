@@ -45,12 +45,6 @@
       "pendingTitle": "등록 대기 중",
       "pendingDesc": "승인 대기 중인 신규 사용자"
     },
-    "connection": {
-      "online": "서버에 연결됨 — 모든 데이터 동기화 완료",
-      "reconnecting": "서버 연결 끊김 — 재연결 시도 중…",
-      "labelOnline": "서버에 연결됨",
-      "labelOffline": "서버 연결 끊김"
-    },
     "error": {
       "title": "오류 발생",
       "message": "데이터를 불러오는 중 오류가 발생했습니다. 다시 시도하세요.",
@@ -1156,7 +1150,6 @@
       "profile": "프로필"
     },
     "hello": "안녕하세요, {{name}}님",
-    "cloud": "클라우드",
     "profile": {
       "quickMenu": {
         "dashboard": {

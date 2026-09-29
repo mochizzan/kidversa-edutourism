@@ -45,12 +45,6 @@
       "pendingTitle": "待处理注册",
       "pendingDesc": "新用户等待审批"
     },
-    "connection": {
-      "online": "已连接到服务器 — 所有数据已同步",
-      "reconnecting": "与服务器断开连接 — 正在尝试重新连接…",
-      "labelOnline": "已连接到服务器",
-      "labelOffline": "与服务器断开连接"
-    },
     "error": {
       "title": "发生错误",
       "message": "加载数据时发生错误。请重试。",
@@ -1156,7 +1150,6 @@
       "profile": "个人资料"
     },
     "hello": "你好，{{name}}",
-    "cloud": "云端",
     "profile": {
       "quickMenu": {
         "dashboard": {

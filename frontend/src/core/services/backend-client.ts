@@ -116,10 +116,6 @@ export class ApiError extends Error {
 let connection: ConnectionState = 'online'
 const connectionListeners = new Set<(s: ConnectionState) => void>()
 
-export function getConnection(): ConnectionState {
-  return connection
-}
-
 export function setConnection(state: ConnectionState): void {
   if (connection === state) return
   connection = state
@@ -463,7 +459,6 @@ export const backendClient = {
   getTokens,
   setTokens,
   clearTokens,
-  getConnection,
   setConnection,
   subscribeConnection,
   getStoredUser,

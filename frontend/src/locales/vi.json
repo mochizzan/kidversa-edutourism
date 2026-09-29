@@ -45,12 +45,6 @@
       "pendingTitle": "Đăng ký đang chờ xử lý",
       "pendingDesc": "Người dùng mới đang chờ phê duyệt"
     },
-    "connection": {
-      "online": "Đã kết nối với máy chủ — Tất cả dữ liệu đã được đồng bộ",
-      "reconnecting": "Đã ngắt kết nối với máy chủ — Đang thử kết nối lại…",
-      "labelOnline": "Đã kết nối với máy chủ",
-      "labelOffline": "Đã ngắt kết nối với máy chủ"
-    },
     "error": {
       "title": "Đã xảy ra lỗi",
       "message": "Đã xảy ra lỗi khi tải dữ liệu. Vui lòng thử lại.",
@@ -1156,7 +1150,6 @@
       "profile": "Hồ sơ"
     },
     "hello": "Xin chào, {{name}}",
-    "cloud": "Đám mây",
     "profile": {
       "quickMenu": {
         "dashboard": {

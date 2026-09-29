@@ -45,12 +45,6 @@
       "pendingTitle": "Pendaftaran Menunggu",
       "pendingDesc": "Pengguna baru menunggu persetujuan"
     },
-    "connection": {
-      "online": "Terhubung ke server — Semua data tersinkronisasi",
-      "reconnecting": "Terputus dari server — Mencoba menyambungkan kembali…",
-      "labelOnline": "Terhubung ke server",
-      "labelOffline": "Terputus dari server"
-    },
     "error": {
       "title": "Terjadi Kesalahan",
       "message": "Terjadi kesalahan saat memuat data. Silakan coba lagi.",
@@ -1151,7 +1145,6 @@
       "profile": "Profile"
     },
     "hello": "Hai, {{name}}",
-    "cloud": "Cloud",
     "profile": { "quickMenu": {
       "dashboard": { "title": "Dashboard", "desc": "Lihat ringkasan aktivitas" },
       "groups": { "title": "Kelompok", "desc": "Kelola semua kelompok" },
