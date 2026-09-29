@@ -24,23 +24,3 @@ export function getMediaUrl(kind: MediaKind, id: string): string {
  const suffix = tenantId ? `?tenant_id=${tenantId}` : ''
  return `/api/media/${kind}/${id}${suffix}`
 }
-
-/**
- * @deprecated This function is broken — it extracts a UUID from the filename
- * path and uses it as the entity ID, but persistFile() generates a random UUID
- * for the filename that differs from the entity's DB row ID. Use
- * `getMediaUrl(kind, entity.id)` directly instead.
- */
-export function resolveStoredUpload(
- storedPath: string | undefined | null,
- kind: MediaKind,
-): string | null {
- if (!storedPath) return null
- // Already a full/absolute URL or data URL — pass through unchanged.
- if (/^(https?:|data:|blob:)/.test(storedPath)) return storedPath
- const base = storedPath.includes('/') ? storedPath.split('/').pop()! : storedPath
- const dot = base.lastIndexOf('.')
- const id = dot > 0 ? base.slice(0, dot) : base
- if (!id) return null
- return getMediaUrl(kind, id)
-}

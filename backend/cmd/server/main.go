@@ -69,7 +69,7 @@ func main() {
 
 	// AI clients — provider selected via AI_PROVIDER (openrouter | gemini).
 	aiClient := ai.NewClient(cfg)
-	narrativeGen := ai.NewNarrativeGeneratorForProvider(cfg, reportRepo, sessionRepo, assessmentRepo, programRepo, sessionSubstageRepo)
+	narrativeGen := ai.NewNarrativeGeneratorForProvider(aiClient, reportRepo, sessionRepo, assessmentRepo, programRepo, sessionSubstageRepo)
 
 	// WhatsApp gateway (OpenWA) — shared by the consent and report delivery flows.
 	waGateway := messaging.NewWhatsAppGateway(cfg)
@@ -120,7 +120,7 @@ func main() {
 	registry.Frame = handler.NewFrameHandler(frameRepo)
 	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, frameRepo, contentRepo, userRepo, consentRepo)
 	registry.Media = handler.NewMediaHandler(cfg, photoRepo, consentRepo, sessionRepo, frameRepo, contentRepo, userRepo)
-	registry.Gallery = handler.NewGalleryHandler(galleryRepo, reportRepo, photoRepo, sessionRepo, consentRepo, cfg)
+	registry.Gallery = handler.NewGalleryHandler(galleryRepo, reportRepo, photoRepo, sessionRepo, consentRepo)
 
 	deps := httppkg.Deps{
 		Config:   cfg,

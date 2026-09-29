@@ -138,8 +138,6 @@ export function useMissionBank() {
     }
   }, [deleteTarget, addToast, refresh])
 
-  const searchQuery = '' // controlled by DataTable via setSearch only
-
   const changeProgram = useCallback((value: string) => {
     setSelectedProgram(value)
   }, [])
@@ -153,7 +151,6 @@ export function useMissionBank() {
     total: totalItems,
     totalPages,
     selectedProgram,
-    searchQuery,
     deactivateTarget,
     deactivating,
     deleteTarget,

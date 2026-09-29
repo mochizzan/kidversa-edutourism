@@ -95,12 +95,20 @@ func MessageForCode(code string) string {
 		return "Peserta tidak dapat dihapus"
 	case "participant_duplicate_name":
 		return "Nama peserta sudah digunakan"
+	case "already_generating":
+		return "Laporan untuk sesi ini sedang dibuat. Tunggu hingga proses selesai."
+	case "already_sent":
+		return "Permintaan consent sudah dikirimkan sebelumnya."
+	case "already_consented":
+		return "Peserta ini sudah memberikan persetujuan."
+	case "content_tenant_mismatch":
+		return "Konten ini bukan milik tenant aktif."
+	case "self_role_change_not_allowed":
+		return "Anda tidak dapat mengubah peran Anda sendiri."
 	case "file_type_blocked":
 		return "Tipe berkas diblokir"
 	case "consent_required":
 		return "Persetujuan orang tua diperlukan"
-	case "invalid_file":
-		return "Berkas tidak valid"
 	case "token_revoked":
 		return "Token telah dicabut"
 	case "token_required":
@@ -129,10 +137,6 @@ func MessageForCode(code string) string {
 		return "Masih ada topik yang belum memiliki kegiatan. Lengkapi kegiatan pada setiap topik sebelum membuat sesi."
 	case "grading_incomplete":
 		return "Terdapat peserta yang belum dinilai pada sesi ini"
-	case "attendance_not_found":
-		return "Data kehadiran tidak ditemukan"
-	case "assessment_out_of_range":
-		return "Penilaian harus antara 0 sampai 4"
 	case "whatsapp_send_failed":
 		return "Gagal mengirim rapor via WhatsApp. Silakan coba kirim ulang."
 	case "whatsapp_number_missing":

@@ -1,7 +1,8 @@
 // api.ts — shared API request/page-size and upload-size constants.
 
 // Default page size for paginated list endpoints (used when a caller omits
-// `limit`, and as the default `pageSize` for useCrudList).
+// `limit` — api-envelope falls back to it as the request `limit`). List pages
+// paginate client-side with `DEFAULT_CLIENT_PAGE_SIZE` via shared/hooks/useClientList.
 export const PAGE_SIZE = 10
 
 // Default page size for client-side paginated admin tables.

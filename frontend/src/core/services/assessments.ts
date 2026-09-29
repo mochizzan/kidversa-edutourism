@@ -27,18 +27,6 @@ const upsert = async (data: CreateAssessmentDTO): Promise<Assessment> => {
   } as AssessmentUpsertRequest)
 }
 
-const bulkUpsert = async (data: CreateAssessmentDTO[]): Promise<Assessment[]> => {
-  const items: AssessmentUpsertRequest[] = data.map((d) => ({
-    participant_id: d.participant_id,
-    session_id: d.session_id,
-    session_substage_id: d.session_substage_id,
-    star_rating: d.star_rating,
-    comment: d.comment,
-    sync_status: SyncStatus.SYNCED,
-  }))
-  return arrayRequest<Assessment>('POST', `${API_ROUTES.ASSESSMENTS.BASE}/bulk-upsert`, { items })
-}
-
 const getByParticipant = async (participantId: string): Promise<Assessment[]> => {
   return arrayRequest<Assessment>(
     'GET',
@@ -56,7 +44,6 @@ const getBySession = async (sessionId: string): Promise<Assessment[]> => {
 
 export const assessmentService: AssessmentService = {
   upsert,
-  bulkUpsert,
   getByParticipant,
   getBySession,
 }

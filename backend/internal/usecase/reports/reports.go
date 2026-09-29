@@ -289,40 +289,6 @@ Silakan lihat rapor melalui tautan berikut:
 Terima kasih 🙏`, parentName, childName, link)
 }
 
-// RevokeToken invalidates a report's parent access token.
-func (u *Usecase) RevokeToken(ctx context.Context, reportID, tenantID string) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	r.ParentTokenRevoked = true
-	if err := u.repo.Update(ctx, r); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
-// GenerateNarrative produces an AI narrative for a single report.
-// If the report already has a draft narrative, it is skipped and returned as-is.
-func (u *Usecase) GenerateNarrative(ctx context.Context, reportID, tenantID string) (*entity.Report, error) {
-	r, err := u.repo.GetByID(ctx, reportID, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	if r.AINarrativeDraft != "" {
-		return r, nil
-	}
-	text, err := u.gen.Generate(ctx, reportID, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	r.AINarrativeDraft = text
-	if err := u.repo.Update(ctx, r); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
 // StreamNarrative produces an AI narrative for a single report, streaming
 // token deltas via onDelta. If the report already has a draft narrative and
 // force is false, the existing draft is returned without regeneration.

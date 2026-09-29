@@ -47,7 +47,6 @@
     },
     "connection": {
       "online": "Nakakonekta sa server — Naka-sync ang lahat ng data",
-      "degraded": "Nadiskonekta sa server — Limitadong koneksyon",
       "reconnecting": "Nadiskonekta sa server — Sinusubukang kumonekta muli…",
       "labelOnline": "Nakakonekta sa server",
       "labelOffline": "Nadiskonekta sa server"
@@ -181,7 +180,6 @@
       "viewDetail": "Tingnan ang mga Detalye",
       "start": "Simulan ang Sesyon",
       "complete": "Tapusin ang Sesyon",
-      "cancel": "Kanselahin",
       "delete": "Burahin ang Sesyon",
       "loadProgramsError": "Nabigong i-load ang listahan ng programa.",
       "notFound": "Hindi nahanap ang sesyon",
@@ -358,15 +356,8 @@
       "deactivate": "I-deactivate",
       "activate": "I-activate",
       "toggleStatus": "Baguhin ang Status",
-      "description": "Deskripsyon",
-      "programLine": "Programa: {{name}}",
-      "pickProgram": "Pumili ng Programa",
-      "pickProgramFirst": "Piliin muna ang Programa",
       "allPrograms": "Lahat ng Programa",
-      "programRequired": "Kailangang pumili ng programa",
-      "topicRequired": "Kailangang pumili ng paksa",
-      "fillRequired": "Kumpletuhin ang lahat ng kinakailangang field",
-      "pageLoading": "Naglo-load..."
+      "fillRequired": "Kumpletuhin ang lahat ng kinakailangang field"
     },
     "badge": {
       "nameLabel": "Pangalan ng Badge",
@@ -391,7 +382,6 @@
       "programName": "Pangalan ng Programa",
       "sessionName": "Pangalan ng Sesyon",
       "participantName": "Pangalan ng Kalahok",
-      "activityName": "Pangalan ng Aktibidad",
       "assessed": "Pagtatasa"
     },
     "dashboard": {
@@ -462,7 +452,6 @@
       "changePhoto": "Baguhin ang larawan sa profile",
       "changePhotoBtn": "Palitan ang Larawan",
       "phoneLabel": "No. ng Mobile",
-      "roleKoordinator": "Coordinator ng Programa",
       "imageError": "Nabigong iproseso ang larawan",
       "notFound": "Hindi nahanap ang user",
       "updatedToast": "Matagumpay na na-update ang user",
@@ -1101,7 +1090,6 @@
     "validation_error": "Hindi valid ang data. Pakisuri muli ang iyong input.",
     "token_expired": "Nag-expire na ang link. Mangyaring makipag-ugnayan sa coordinator.",
     "token_invalid": "Hindi valid ang link.",
-    "token_consumed": "Nagamit na ang link na ito dati.",
     "tenant_required": "Mangyaring pumili muna ng tenant.",
     "internal_error": "Nagkaroon ng error sa server. Mangyaring subukan muli.",
     "kiosk_invalid": "Nag-expire na ang session o hindi valid ang link.",
@@ -1113,6 +1101,13 @@
     "session_not_deletable": "Hindi maaaring burahin ang session na ito.",
     "participant_not_deletable": "Hindi maaaring burahin ang kalahok na ito.",
     "participant_duplicate_name": "Mayroon nang umiiral na pangalan ng kalahok.",
+    "already_generating": "Binubuo na ang ulat para sa sesyong ito. Mangyaring maghintay na matapos.",
+    "nothing_to_send": "Walang kalahok na kailangang padalhan ng kahilingan ng consent.",
+    "already_sent": "Naipadala na ang kahilingan ng consent dati.",
+    "already_consented": "Nagbigay na ng consent ang kalahok na ito.",
+    "content_tenant_mismatch": "Hindi pagmamay-ari ng aktibong tenant ang nilalaman na ito.",
+    "self_role_change_not_allowed": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
+    "participant_not_in_session": "Hindi rehistrado sa sesyong ito ang kalahok.",
     "bad_request": "Hindi maproseso ang kahilingan.",
     "schema_drift": "Nagkaroon ng error sa istruktura ng database. Makipag-ugnayan sa administrator.",
     "facilitator_required": "Wala pang nakatalagang facilitator.",

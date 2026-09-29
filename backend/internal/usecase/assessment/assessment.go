@@ -173,23 +173,6 @@ func (u *Usecase) afterUpsert(ctx context.Context, a *entity.Assessment) (*entit
 	return a, nil
 }
 
-// BulkUpsert upserts many assessments. actorID/actorRole are threaded per-item for
-// the facilitator ownership gate (see Upsert).
-func (u *Usecase) BulkUpsert(ctx context.Context, items []entity.Assessment, actorID, actorRole, tenantID string) ([]entity.Assessment, error) {
-	out := make([]entity.Assessment, 0, len(items))
-	for i := range items {
-		it := items[i]
-		res, err := u.Upsert(ctx,
-			repository.AssessmentFilter{ParticipantID: it.ParticipantID, SessionID: it.SessionID, SessionSubstageID: it.SessionSubstageID},
-			it.StarRating, it.Comment, it.AssessedBy, actorID, actorRole, it.AssessedAt, string(it.SyncStatus), tenantID)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *res)
-	}
-	return out, nil
-}
-
 // assertOwnership denies the write when the actor is a FASILITATOR who does not
 // own the participant's group. Non-facilitator roles bypass.
 func (u *Usecase) assertOwnership(ctx context.Context, participantID, actorID, actorRole string) error {
@@ -209,9 +192,4 @@ func (u *Usecase) assertOwnership(ctx context.Context, participantID, actorID, a
 // List returns assessments matching the filter (paginated).
 func (u *Usecase) List(ctx context.Context, f repository.AssessmentFilter, page, limit int) (*repository.Paginated[entity.Assessment], error) {
 	return u.repo.List(ctx, f, page, limit)
-}
-
-// Delete removes an assessment by id.
-func (u *Usecase) Delete(ctx context.Context, id string) error {
-	return u.repo.Delete(ctx, id)
 }

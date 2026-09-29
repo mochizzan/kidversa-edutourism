@@ -21,7 +21,7 @@ const MaxSessionReports = 1000
 const ReportNarrativeConcurrency = 3
 
 // DBPingTimeout bounds the context for connection liveness checks
-// (Ping / HealthPing / keepalive probes in persistence/db.go).
+// (Ping / keepalive probes in persistence/db.go).
 const DBPingTimeout = 3 * time.Second
 
 // DBConnMaxIdleTime closes idle pooled connections before MariaDB's

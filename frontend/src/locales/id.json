@@ -47,7 +47,6 @@
     },
     "connection": {
       "online": "Terhubung ke server — Semua data tersinkronisasi",
-      "degraded": "Terputus dari server — Koneksi terbatas",
       "reconnecting": "Terputus dari server — Mencoba menyambungkan kembali…",
       "labelOnline": "Terhubung ke server",
       "labelOffline": "Terputus dari server"
@@ -231,7 +230,6 @@
     "validation_error": "Data tidak valid. Periksa kembali input Anda.",
     "token_expired": "Tautan sudah kedaluwarsa. Silakan hubungi koordinator.",
     "token_invalid": "Tautan tidak valid.",
-    "token_consumed": "Tautan ini sudah digunakan sebelumnya.",
     "tenant_required": "Silakan pilih tenant terlebih dahulu.",
     "internal_error": "Terjadi kesalahan pada server. Silakan coba lagi.",
     "kiosk_invalid": "Sesi berakhir atau tautan tidak valid.",
@@ -243,6 +241,13 @@
     "session_not_deletable": "Sesi ini tidak dapat dihapus.",
     "participant_not_deletable": "Peserta ini tidak dapat dihapus.",
     "participant_duplicate_name": "Nama peserta sudah digunakan.",
+    "already_generating": "Laporan untuk sesi ini sedang dibuat. Tunggu hingga proses selesai.",
+    "nothing_to_send": "Tidak ada peserta yang perlu dikirimi permintaan consent.",
+    "already_sent": "Permintaan consent sudah dikirimkan sebelumnya.",
+    "already_consented": "Peserta ini sudah memberikan persetujuan.",
+    "content_tenant_mismatch": "Konten ini bukan milik tenant aktif.",
+    "self_role_change_not_allowed": "Anda tidak dapat mengubah peran Anda sendiri.",
+    "participant_not_in_session": "Peserta tidak terdaftar di sesi ini.",
     "bad_request": "Permintaan tidak dapat diproses.",
     "schema_drift": "Terjadi kesalahan pada struktur database. Hubungi administrator.",
     "facilitator_required": "Belum ada fasilitator yang ditugaskan.",
@@ -379,15 +384,8 @@
       "deactivate": "Nonaktifkan",
       "activate": "Aktifkan",
       "toggleStatus": "Ubah Status",
-      "description": "Deskripsi",
-      "programLine": "Program: {{name}}",
-      "pickProgram": "Pilih Program",
-      "pickProgramFirst": "Pilih Program Dulu",
       "allPrograms": "Semua Program",
-      "programRequired": "Program wajib dipilih",
-      "topicRequired": "Topik wajib dipilih",
-      "fillRequired": "Lengkapi semua field yang wajib",
-      "pageLoading": "Loading..."
+      "fillRequired": "Lengkapi semua field yang wajib"
     },
     "badge": {
       "nameLabel": "Nama Badge",
@@ -412,7 +410,6 @@
       "programName": "Nama Program",
       "sessionName": "Nama Sesi",
       "participantName": "Nama Peserta",
-      "activityName": "Nama Kegiatan",
       "assessed": "Penilaian"
     },
     "dashboard": {
@@ -483,7 +480,6 @@
       "changePhoto": "Ubah foto profil",
       "changePhotoBtn": "Ganti Foto",
       "phoneLabel": "No. HP",
-      "roleKoordinator": "Koordinator Program",
       "imageError": "Gagal memproses gambar",
       "notFound": "User tidak ditemukan",
       "updatedToast": "User berhasil diperbarui",
@@ -576,7 +572,6 @@
       "viewDetail": "Lihat Detail",
       "start": "Mulai Sesi",
       "complete": "Selesaikan Sesi",
-      "cancel": "Batalkan",
       "delete": "Hapus Sesi",
       "loadProgramsError": "Gagal memuat daftar program.",
       "notFound": "Session not found",

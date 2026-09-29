@@ -196,47 +196,6 @@ func (u *SessionUsecase) ListSessions(ctx context.Context, f repository.SessionF
 	return u.sessionRepo.ListSessions(ctx, f, page, limit)
 }
 
-// UpdateSession patches mutable session fields (and status when provided).
-func (u *SessionUsecase) UpdateSession(ctx context.Context, id, tenantID, programID, name, sessionDate, startTime, endTime, location, notes, status string) (*entity.Session, error) {
-	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	if programID != "" {
-		s.ProgramID = programID
-	}
-	if name != "" {
-		s.Name = name
-	}
-	if sessionDate != "" {
-		s.SessionDate = sessionDate
-	}
-	if startTime != "" {
-		st := startTime
-		s.StartTime = &st
-	}
-	if endTime != "" {
-		et := endTime
-		s.EndTime = &et
-	}
-	if location != "" {
-		s.Location = location
-	}
-	if notes != "" {
-		s.Notes = notes
-	}
-	if status != "" {
-		if !isValidSessionStatus(status) {
-			return nil, apperrors.BadRequest("validation_error", nil)
-		}
-		s.Status = entity.SessionStatus(status)
-	}
-	if err := u.sessionRepo.UpdateSession(ctx, s); err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
 // StartSession transitions a session DRAFT -> ACTIVE (cascades Topik to ACTIVE).
 func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
 	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
@@ -336,8 +295,15 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID strin
 		return nil, apperrors.Conflict("bad_request", nil)
 	}
 	// Grading completeness gate: every participant in every group must be graded
-	// for every session Kegiatan before the session can be completed.
-	if ungraded, gerr := u.firstUngradedGroup(ctx, id); gerr != nil {
+	// for every session Kegiatan before the session can be completed. The gate
+	// must read assessments under the session's own tenant: the tenant scope
+	// resolves via session_id -> sessions.tenant_id, so a placeholder tenant
+	// matches no sessions and reports every participant as ungraded.
+	gateTenant := tenantID
+	if s.TenantID != nil && *s.TenantID != "" {
+		gateTenant = *s.TenantID
+	}
+	if ungraded, gerr := u.firstUngradedGroup(ctx, id, gateTenant); gerr != nil {
 		return nil, gerr
 	} else if ungraded != "" {
 		return nil, apperrors.BadRequest("grading_incomplete", nil)
@@ -878,8 +844,10 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 // It returns the name of the first group containing an ungraded participant
 // (empty when every participant across every group is fully graded). A
 // participant is "fully graded" when a scored assessment (star_rating >= 1)
-// exists for every session Kegiatan leaf of the session.
-func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID string) (string, error) {
+// exists for every session Kegiatan leaf of the session. tenantID is the
+// session's tenant used to scope the assessment lookups (empty only when the
+// session itself is tenant-less).
+func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID, tenantID string) (string, error) {
 	if u.assessmentRepo == nil || u.sessionSubstages == nil {
 		// Repos unwired (defensive): do not block completion when we cannot verify.
 		return "", nil
@@ -902,7 +870,7 @@ func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID strin
 			return "", perr
 		}
 		for j := range participants {
-			if !u.participantFullyGraded(ctx, participants[j].ID, subIDs) {
+			if !u.participantFullyGraded(ctx, participants[j].ID, subIDs, tenantID) {
 				return groups[i].Name, nil
 			}
 		}
@@ -911,41 +879,27 @@ func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID strin
 }
 
 // participantFullyGraded reports whether the participant has a scored assessment
-// for every one of the given session Kegiatan leaves.
-func (u *SessionUsecase) participantFullyGraded(ctx context.Context, participantID string, sessionSubstageIDs []string) bool {
+// for every one of the given session Kegiatan leaves. It reads the exact unique
+// slot (participant_id, session_substage_id) — the same lookup the assessment
+// upsert writes — scoped to the session's tenant (an empty tenantID skips the
+// tenant scope for tenant-less sessions).
+func (u *SessionUsecase) participantFullyGraded(ctx context.Context, participantID string, sessionSubstageIDs []string, tenantID string) bool {
 	if len(sessionSubstageIDs) == 0 {
 		// No Kegiatan leaves => nothing to grade. Treat as fully graded.
 		return true
 	}
 	for k := range sessionSubstageIDs {
-		scored, lerr := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
-			ParticipantID:     participantID,
-			SessionSubstageID: sessionSubstageIDs[k],
-			TenantID:          "00000000-0000-0000-0000-000000000000",
-		}, 1, 10)
-		if lerr != nil || len(scored.Items) == 0 {
+		a, lerr := u.assessmentRepo.GetByParticipantStage(ctx, participantID, sessionSubstageIDs[k], tenantID)
+		if lerr != nil {
+			// NotFound => never graded; any lookup error => grading cannot be
+			// proven, so treat as ungraded.
 			return false
 		}
-		ok := false
-		for m := range scored.Items {
-			if scored.Items[m].StarRating >= 1 {
-				ok = true
-				break
-			}
-		}
-		if !ok {
+		if a.StarRating < 1 {
 			return false
 		}
 	}
 	return true
-}
-
-func isValidSessionStatus(s string) bool {
-	switch entity.SessionStatus(s) {
-	case entity.SessionDraft, entity.SessionActive, entity.SessionCompleted, entity.SessionCancelled:
-		return true
-	}
-	return false
 }
 
 func isValidGroupStatus(s string) bool {

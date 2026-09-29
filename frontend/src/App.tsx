@@ -137,9 +137,11 @@ function App() {
     setBackendDown(false)
     await checkSession()
     // Hanya fetch tenant + auto-select bila user SUDAH terautentikasi DAN
-    // SUPER_ADMIN. Untuk user belum login, pemanggilan ini memicu 401 lalu
-    // percobaan refresh yang berujung 400 (lihat backendClient.refreshAccessToken).
-    // Untuk non-SA, endpoint ini 403 (Forbidden) — juga tidak perlu dipanggil.
+    // SUPER_ADMIN. Yang dipanggil fetchTenants adalah GET /api/public/tenants —
+    // endpoint anonymous (tanpa JWTAuth/RequireRole, lihat RegisterPublicRoutes),
+    // jadi klaim 401/refresh-400/403 lama tidak berlaku. Pembatasan ke SA di
+    // sini hanya karena SA yang butuh daftar tenant untuk X-Tenant-Id; untuk
+    // user lain pemanggilan ini memang tidak perlu.
     const authState = useAuthStore.getState()
     if (authState.isAuthenticated && authState.user?.role === UserRole.SUPER_ADMIN) {
       try {

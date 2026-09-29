@@ -17,35 +17,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'robots.txt'],
-      manifest: {
-        name: 'Kidversa - Edutourism Platform',
-        short_name: 'Kidversa',
-        description: 'Interactive digital storytelling-based learning platform for kids',
-        theme_color: '#5B2C8D',
-        background_color: '#ffffff',
-        display: 'standalone',
-        scope: '/',
-        start_url: '/',
-        icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
-        ]
-      },
+      includeAssets: ['favicon.svg'],
+      // Single manifest source: public/manifest.webmanifest, linked statically
+      // in index.html. `manifest: false` is required (not just omitting the key)
+      // — omitting falls back to the plugin's defaultManifest, which would still
+      // inject a second <link rel="manifest"> and emit its own webmanifest file.
+      manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       }

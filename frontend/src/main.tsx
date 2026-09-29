@@ -12,15 +12,4 @@ whenReady.catch(() => undefined).then(() => {
     </StrictMode>,
   )
 })
-
-// Register service worker for PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(
-      (_registration) => { },
-      (error) => {
-        console.error('[SW] Registration failed:', error)
-      }
-    )
-  })
-}
+// PWA service worker registration is injected by vite-plugin-pwa (registerSW.js).

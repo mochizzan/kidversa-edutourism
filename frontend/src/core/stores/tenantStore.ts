@@ -1,16 +1,11 @@
 import { create } from 'zustand'
 import type { Tenant } from '../types'
 import { UserRole } from '../types'
-import { apiRequest } from '../services/backend-client'
+import { tenantService } from '../services/tenants'
 import { useAuthStore } from './authStore'
 import { STORAGE_KEYS } from '../constants/storage'
-import { API_ROUTES } from '../constants/apiRoutes'
 
 const ACTIVE_TENANT_KEY = STORAGE_KEYS.ACTIVE_TENANT_ID
-
-interface TenantsResponse {
-  data: Tenant[]
-}
 
 interface TenantState {
   activeTenant: Tenant | null
@@ -40,9 +35,6 @@ export const useTenantStore = create<TenantState>((set) => ({
     set({ tenants, activeTenant: active })
   },
 
-  // TODO(Fase 4 S13): replace the inline apiRequest with tenantService.getAll().
-  // For now this fetches tenants directly from the backend until the service
-  // layer is built.
   fetchTenants: async () => {
     // Cold-start seed race: backend may briefly return an empty tenant list
     // right after bootstrap. For SUPER_ADMIN (who needs a tenant to operate)
@@ -50,14 +42,13 @@ export const useTenantStore = create<TenantState>((set) => ({
     // retried since an empty list is a legitimate bootstrap state. Total wait
     // stays under ~3s (400+800+1600ms = 2.8s).
     const isSA = useAuthStore.getState().user?.role === UserRole.SUPER_ADMIN
-    let res = await apiRequest<TenantsResponse>('GET', API_ROUTES.PUBLIC.TENANTS)
+    let tenants = await tenantService.getPublic()
     const backoffs = [400, 800, 1600]
-    for (let i = 0; i < backoffs.length && res.data.length === 0 && isSA; i++) {
+    for (let i = 0; i < backoffs.length && tenants.length === 0 && isSA; i++) {
       await new Promise((r) => setTimeout(r, backoffs[i]))
-      res = await apiRequest<TenantsResponse>('GET', API_ROUTES.PUBLIC.TENANTS)
+      tenants = await tenantService.getPublic()
     }
 
-    const tenants = res.data
     const savedId = localStorage.getItem(ACTIVE_TENANT_KEY)
     let active = tenants.find((t) => t.id === savedId) || null
 

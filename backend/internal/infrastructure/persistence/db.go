@@ -58,17 +58,6 @@ func (d *DB) Close() error {
 	return sqlDB.Close()
 }
 
-// HealthPing checks the underlying SQL connection is alive (alias for Ping).
-func HealthPing(ctx context.Context, db *gorm.DB) error {
-	sqlDB, err := db.DB()
-	if err != nil {
-		return err
-	}
-	c, cancel := context.WithTimeout(ctx, constants.DBPingTimeout)
-	defer cancel()
-	return sqlDB.PingContext(c)
-}
-
 // OpenSQLDB opens a raw *sql.DB (used by golang-migrate and bootstrap).
 func OpenSQLDB(dsn string) (*sql.DB, error) {
 	return sql.Open("mysql", dsn)

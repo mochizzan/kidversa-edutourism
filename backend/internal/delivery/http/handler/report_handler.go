@@ -146,23 +146,6 @@ func (h *ReportHandler) GetAccessPhoto(c *echo.Context) error {
 	return (*c).Blob(http.StatusOK, ct, blob)
 }
 
-// Generate handles POST /api/reports/:id/generate.
-func (h *ReportHandler) Generate(c *echo.Context) error {
-	id, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
-	}
-	r, err := h.uc.GenerateNarrative((*c).Request().Context(), id, tenantID)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewReportResponse(r))
-}
-
 // GenerateStream handles POST /api/reports/:id/generate/stream (JWT, tenant-scoped).
 // Validates ownership, then kicks off an async narrative generation and returns
 // 202 immediately. Tokens are delivered over the SSE endpoint
@@ -368,23 +351,6 @@ func (h *ReportHandler) Send(c *echo.Context) error {
 		return err
 	}
 	return appresp.OK(c, dto.NewReportTokenResponse(r))
-}
-
-// RevokeToken handles POST /api/reports/:id/revoke-token.
-func (h *ReportHandler) RevokeToken(c *echo.Context) error {
-	id, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
-	}
-	r, err := h.uc.RevokeToken((*c).Request().Context(), id, tenantID)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewReportResponse(r))
 }
 
 // SuggestMissions handles POST /api/reports/:id/suggest-missions.

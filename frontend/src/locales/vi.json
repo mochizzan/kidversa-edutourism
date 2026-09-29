@@ -47,7 +47,6 @@
     },
     "connection": {
       "online": "Đã kết nối với máy chủ — Tất cả dữ liệu đã được đồng bộ",
-      "degraded": "Đã ngắt kết nối với máy chủ — Kết nối hạn chế",
       "reconnecting": "Đã ngắt kết nối với máy chủ — Đang thử kết nối lại…",
       "labelOnline": "Đã kết nối với máy chủ",
       "labelOffline": "Đã ngắt kết nối với máy chủ"
@@ -181,7 +180,6 @@
       "viewDetail": "Xem chi tiết",
       "start": "Bắt đầu phiên",
       "complete": "Hoàn thành phiên",
-      "cancel": "Hủy",
       "delete": "Xóa phiên",
       "loadProgramsError": "Không thể tải danh sách chương trình.",
       "notFound": "Không tìm thấy phiên",
@@ -358,15 +356,8 @@
       "deactivate": "Vô hiệu hóa",
       "activate": "Kích hoạt",
       "toggleStatus": "Thay đổi trạng thái",
-      "description": "Mô tả",
-      "programLine": "Chương trình: {{name}}",
-      "pickProgram": "Chọn chương trình",
-      "pickProgramFirst": "Chọn chương trình trước",
       "allPrograms": "Tất cả chương trình",
-      "programRequired": "Bắt buộc chọn chương trình",
-      "topicRequired": "Bắt buộc chọn chủ đề",
-      "fillRequired": "Vui lòng điền đầy đủ các trường bắt buộc",
-      "pageLoading": "Đang tải..."
+      "fillRequired": "Vui lòng điền đầy đủ các trường bắt buộc"
     },
     "badge": {
       "nameLabel": "Tên huy hiệu",
@@ -391,7 +382,6 @@
       "programName": "Tên chương trình",
       "sessionName": "Tên phiên",
       "participantName": "Tên người tham gia",
-      "activityName": "Tên hoạt động",
       "assessed": "Đánh giá"
     },
     "dashboard": {
@@ -462,7 +452,6 @@
       "changePhoto": "Thay đổi ảnh hồ sơ",
       "changePhotoBtn": "Thay đổi ảnh",
       "phoneLabel": "Số điện thoại",
-      "roleKoordinator": "Điều phối viên chương trình",
       "imageError": "Xử lý hình ảnh thất bại",
       "notFound": "Không tìm thấy người dùng",
       "updatedToast": "Cập nhật người dùng thành công",
@@ -1101,7 +1090,6 @@
     "validation_error": "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin nhập vào.",
     "token_expired": "Liên kết đã hết hạn. Vui lòng liên hệ với điều phối viên.",
     "token_invalid": "Liên kết không hợp lệ.",
-    "token_consumed": "Liên kết này đã được sử dụng trước đó.",
     "tenant_required": "Vui lòng chọn đơn vị trước.",
     "internal_error": "Đã xảy ra lỗi máy chủ. Vui lòng thử lại.",
     "kiosk_invalid": "Phiên làm việc đã kết thúc hoặc liên kết không hợp lệ.",
@@ -1113,6 +1101,13 @@
     "session_not_deletable": "Phiên này không thể xóa.",
     "participant_not_deletable": "Người tham gia này không thể xóa.",
     "participant_duplicate_name": "Tên người tham gia đã tồn tại.",
+    "already_generating": "Báo cáo cho phiên này đang được tạo. Vui lòng đợi hoàn tất.",
+    "nothing_to_send": "Không có người tham gia nào cần gửi yêu cầu đồng ý.",
+    "already_sent": "Yêu cầu đồng ý đã được gửi trước đó.",
+    "already_consented": "Người tham gia này đã đồng ý trước đó.",
+    "content_tenant_mismatch": "Nội dung này không thuộc đơn vị đang hoạt động.",
+    "self_role_change_not_allowed": "Bạn không thể thay đổi vai trò của chính mình.",
+    "participant_not_in_session": "Người tham gia không có trong phiên này.",
     "bad_request": "Yêu cầu không thể xử lý.",
     "schema_drift": "Đã xảy ra lỗi cấu trúc cơ sở dữ liệu. Vui lòng liên hệ quản trị viên.",
     "facilitator_required": "Chưa có người hướng dẫn nào được chỉ định.",

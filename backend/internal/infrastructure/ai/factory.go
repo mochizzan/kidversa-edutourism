@@ -34,15 +34,14 @@ func NewClient(cfg *config.Config) LLMClient {
 }
 
 // NewNarrativeGeneratorForProvider builds a narrative generator bound to the
-// configured provider's client.
+// given provider client (constructed once by the caller via NewClient).
 func NewNarrativeGeneratorForProvider(
-	cfg *config.Config,
+	client LLMClient,
 	reportRepo repository.ReportRepository,
 	sessionRepo repository.SessionRepository,
 	assessmentRepo repository.AssessmentRepository,
 	programRepo repository.ProgramRepository,
 	substageRepo repository.SessionSubstageRepository,
 ) *OpenRouterNarrativeGenerator {
-	client := NewClient(cfg)
 	return NewNarrativeGenerator(client, reportRepo, sessionRepo, assessmentRepo, programRepo, substageRepo)
 }

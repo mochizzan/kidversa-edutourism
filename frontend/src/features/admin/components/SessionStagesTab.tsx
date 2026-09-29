@@ -46,9 +46,10 @@ export function SessionStagesTab({ stages, groups, facilitators, stageMap }: Ses
     <div className="flex flex-col gap-3">
       {stages.map((stage: SessionStage, index: number) => {
         // Opsi A: a group contributes its facilitator to a stage when it is
-        // currently at that stage (current_session_stage_id set via Jump). A
-        // group assigned a facilitator but not yet jumped (WAITING, field NULL)
-        // belongs to the FIRST stage, so the assignment is visible immediately.
+        // currently at that stage (current_session_stage_id set as the group
+        // advances). A group assigned a facilitator but not yet at any stage
+        // (WAITING, field NULL) belongs to the FIRST stage, so the assignment
+        // is visible immediately.
         const isFirstStage = index === 0
         const atStageIds = Array.from(
           new Set(

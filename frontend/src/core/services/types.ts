@@ -15,7 +15,6 @@ import type {
   SessionStage,
   SessionSubstage,
   CreateSessionDTO,
-  UpdateSessionDTO,
   SessionGroup,
   Participant,
   CreateParticipantDTO,
@@ -73,7 +72,6 @@ export interface SessionService {
   getAll(params?: ListParams): Promise<PaginatedResponse<Session>>
   getById(id: string): Promise<Session & { stages: SessionStage[]; groups: (SessionGroup & { participants: Participant[] })[] } | null>
   create(data: CreateSessionDTO): Promise<Session>
-  update(id: string, data: UpdateSessionDTO): Promise<Session>
   start(id: string): Promise<Session>
   complete(id: string): Promise<Session>
   cancel(id: string): Promise<Session>
@@ -122,7 +120,6 @@ export interface UserService {
 export interface FrameService {
   getAll(params?: ListParams): Promise<PaginatedResponse<PhotoFrame>>
   getById(id: string): Promise<PhotoFrame | null>
-  create(data: Omit<PhotoFrame, 'id' | 'created_at'>): Promise<PhotoFrame>
   update(id: string, data: Partial<Omit<PhotoFrame, 'id' | 'created_at'>>): Promise<PhotoFrame>
   deactivate(id: string): Promise<PhotoFrame>
   /** Reactivate a deactivated frame. */
@@ -233,7 +230,6 @@ export interface ConsentInfo {
 // Assessments
 export interface AssessmentService {
   upsert(data: CreateAssessmentDTO): Promise<Assessment>
-  bulkUpsert(data: CreateAssessmentDTO[]): Promise<Assessment[]>
   getByParticipant(participantId: string): Promise<Assessment[]>
   getBySession(sessionId: string): Promise<Assessment[]>
 }

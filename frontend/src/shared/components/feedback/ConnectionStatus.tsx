@@ -6,7 +6,7 @@ interface ConnectionStatusProps {
   className?: string
 }
 
-const CONNECTED: 'online' | 'degraded' | 'reconnecting' = 'online'
+const CONNECTED: 'online' | 'reconnecting' = 'online'
 
 const config = {
   connected: {

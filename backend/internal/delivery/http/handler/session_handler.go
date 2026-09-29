@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
@@ -86,25 +84,6 @@ func toSessionDetailResponse(d *repository.SessionDetail) dto.SessionDetail {
 		Stages:  d.Stages,
 		Groups:  groups,
 	}
-}
-
-func (h *SessionHandler) Update(c *echo.Context) error {
-	id, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
-	var req dto.UpdateSessionRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
-	}
-	s, err := h.uc.UpdateSession((*c).Request().Context(), id, appmiddleware.GetTenantID(c),
-		req.ProgramID, req.Name, req.SessionDate,
-		derefString(req.StartTime), derefString(req.EndTime),
-		req.Location, req.Notes, req.Status)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, s)
 }
 
 func (h *SessionHandler) Delete(c *echo.Context) error {

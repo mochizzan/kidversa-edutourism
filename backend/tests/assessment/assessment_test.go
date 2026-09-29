@@ -45,7 +45,6 @@ func (r *fakeAssessmentRepo) Update(ctx context.Context, a *entity.Assessment) e
 func (r *fakeAssessmentRepo) Revive(ctx context.Context, a *entity.Assessment) error {
 	return r.reviveErr
 }
-func (r *fakeAssessmentRepo) Delete(ctx context.Context, id string) error { return nil }
 func (r *fakeAssessmentRepo) GetGroupFacilitatorIDByParticipant(ctx context.Context, participantID string) (*string, error) {
 	return r.ownerID, r.ownerErr
 }

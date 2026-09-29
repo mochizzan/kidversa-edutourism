@@ -142,8 +142,10 @@ func (h *AuthHandler) ChangePassword(c *echo.Context) error {
 	return appresp.OK(c, map[string]string{"status": "ok"})
 }
 
-// IssueKiosk handles POST /api/auth/kiosk (JWT-protected). It issues a single-use
-// kiosk token bound to the requested session (within the caller's tenant scope).
+// IssueKiosk handles POST /api/auth/kiosk (JWT-protected). It issues a kiosk
+// token bound to the requested session (within the caller's tenant scope).
+// The token is multi-use: it is valid for its full TTL and is never consumed,
+// so the kiosk may retry freely (see kiosk_handler.go KioskAccess).
 func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
 	var req dto.KioskTokenRequest
 	if err := bindAndValidate(c, &req); err != nil {

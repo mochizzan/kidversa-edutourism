@@ -39,9 +39,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const connectionTooltip =
     status === 'online'
       ? t('common.connection.online')
-      : status === 'degraded'
-        ? t('common.connection.degraded')
-        : t('common.connection.reconnecting')
+      : t('common.connection.reconnecting')
 
   const close = useCallback(() => {
     setFocused(false)
@@ -121,7 +119,6 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
 
   const NOTIF_ICONS: Record<string, React.ReactNode> = {
     user_approval: <UserCheck className="w-5 h-5" />,
-    sync: <Loader2 className="w-5 h-5" />,
   }
 
   return (

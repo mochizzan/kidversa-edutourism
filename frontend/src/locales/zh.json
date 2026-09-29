@@ -47,7 +47,6 @@
     },
     "connection": {
       "online": "已连接到服务器 — 所有数据已同步",
-      "degraded": "与服务器断开连接 — 连接受限",
       "reconnecting": "与服务器断开连接 — 正在尝试重新连接…",
       "labelOnline": "已连接到服务器",
       "labelOffline": "与服务器断开连接"
@@ -181,7 +180,6 @@
       "viewDetail": "查看详情",
       "start": "开始课程",
       "complete": "完成课程",
-      "cancel": "取消",
       "delete": "删除课程",
       "loadProgramsError": "加载课程列表失败。",
       "notFound": "未找到课程",
@@ -358,15 +356,8 @@
       "deactivate": "禁用",
       "activate": "激活",
       "toggleStatus": "更改状态",
-      "description": "描述",
-      "programLine": "项目：{{name}}",
-      "pickProgram": "选择项目",
-      "pickProgramFirst": "请先选择项目",
       "allPrograms": "所有项目",
-      "programRequired": "必须选择项目",
-      "topicRequired": "必须选择主题",
-      "fillRequired": "请填写所有必填字段",
-      "pageLoading": "加载中..."
+      "fillRequired": "请填写所有必填字段"
     },
     "badge": {
       "nameLabel": "徽章名称",
@@ -391,7 +382,6 @@
       "programName": "项目名称",
       "sessionName": "课程名称",
       "participantName": "参与者姓名",
-      "activityName": "活动名称",
       "assessed": "评估"
     },
     "dashboard": {
@@ -462,7 +452,6 @@
       "changePhoto": "更改个人资料照片",
       "changePhotoBtn": "更换照片",
       "phoneLabel": "手机号码",
-      "roleKoordinator": "项目协调员",
       "imageError": "图像处理失败",
       "notFound": "未找到用户",
       "updatedToast": "用户更新成功",
@@ -1101,7 +1090,6 @@
     "validation_error": "数据无效。请检查您的输入。",
     "token_expired": "链接已过期。请联系协调员。",
     "token_invalid": "链接无效。",
-    "token_consumed": "此链接已被使用。",
     "tenant_required": "请先选择租户。",
     "internal_error": "服务器发生错误。请重试。",
     "kiosk_invalid": "会话过期或链接无效。",
@@ -1113,6 +1101,13 @@
     "session_not_deletable": "此会话无法删除。",
     "participant_not_deletable": "此参与者无法删除。",
     "participant_duplicate_name": "参与者姓名已存在。",
+    "already_generating": "该会话的报告正在生成中，请等待生成完成。",
+    "nothing_to_send": "没有需要发送同意书请求的参与者。",
+    "already_sent": "同意书请求已发送过。",
+    "already_consented": "该参与者已同意。",
+    "content_tenant_mismatch": "此内容不属于当前租户。",
+    "self_role_change_not_allowed": "您不能更改自己的角色。",
+    "participant_not_in_session": "该参与者不在此会话中。",
     "bad_request": "请求无法处理。",
     "schema_drift": "数据库结构出错。请联系管理员。",
     "facilitator_required": "尚未指派引导员。",

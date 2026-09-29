@@ -155,49 +155,6 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, substageID string,
 	return p, nil
 }
 
-// Jump moves a group to a session Topik (updates its current Topik).
-// actorRole gates the write to the group's owner when the actor is a FASILITATOR.
-func (s *Service) Jump(ctx context.Context, groupID, stageID, actorID, actorRole, callerTenant string) error {
-	g, err := s.repo.GetGroup(ctx, groupID)
-	if err != nil {
-		return err
-	}
-	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
-		return err
-	}
-	if err := assertOwnership(actorRole, g.FacilitatorID, actorID); err != nil {
-		return err
-	}
-	g.CurrentSessionStageID = &stageID
-	if err := s.repo.UpdateGroup(ctx, g); err != nil {
-		return err
-	}
-	s.publish(ctx, g.SessionID, "group:jump", g)
-	return nil
-}
-
-// Reset clears a group's current Topik (back to waiting).
-// actorRole gates the write to the group's owner when the actor is a FASILITATOR.
-func (s *Service) Reset(ctx context.Context, groupID, actorID, actorRole, callerTenant string) error {
-	g, err := s.repo.GetGroup(ctx, groupID)
-	if err != nil {
-		return err
-	}
-	if err := s.assertTenant(ctx, g.SessionID, callerTenant); err != nil {
-		return err
-	}
-	if err := assertOwnership(actorRole, g.FacilitatorID, actorID); err != nil {
-		return err
-	}
-	g.CurrentSessionStageID = nil
-	g.Status = entity.GroupWaiting
-	if err := s.repo.UpdateGroup(ctx, g); err != nil {
-		return err
-	}
-	s.publish(ctx, g.SessionID, "group:reset", g)
-	return nil
-}
-
 // LockStage locks every unlocked session Kegiatan progress row for a group and
 // broadcasts it. Lock/unlock writes are only permitted while the group's owning
 // session is ACTIVE. The operation is idempotent: rows already LOCKED are left
@@ -252,7 +209,7 @@ func (s *Service) LockStage(ctx context.Context, groupID, actorID, actorRole, ca
 
 // PublishEvent records + broadcasts an arbitrary live event for a session.
 // callerTenant is the resolved tenant from the JWT/scope; an owning-tenant
-// mismatch is rejected (consistent with Override/Jump/Reset).
+// mismatch is rejected (consistent with Override/LockStage).
 func (s *Service) PublishEvent(ctx context.Context, sessionID string, e *entity.TimelineEvent, callerTenant string) error {
 	if err := s.assertTenant(ctx, sessionID, callerTenant); err != nil {
 		return err

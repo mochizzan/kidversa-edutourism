@@ -59,30 +59,6 @@ func (h *LiveHandler) Override(c *echo.Context, action live.OverrideAction) erro
 	return appresp.OK(c, p)
 }
 
-// Jump handles POST /groups/:groupId/jump.
-func (h *LiveHandler) Jump(c *echo.Context) error {
-	var req dto.LiveJumpRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	groupID := (*c).Param("groupId")
-	actorID := appmiddleware.GetUserID(c)
-	if err := h.svc.Jump((*c).Request().Context(), groupID, req.StageID, actorID, appmiddleware.GetRole(c), appmiddleware.GetTenantID(c)); err != nil {
-		return err
-	}
-	return appresp.NoContent(c)
-}
-
-// Reset handles POST /groups/:groupId/reset.
-func (h *LiveHandler) Reset(c *echo.Context) error {
-	groupID := (*c).Param("groupId")
-	actorID := appmiddleware.GetUserID(c)
-	if err := h.svc.Reset((*c).Request().Context(), groupID, actorID, appmiddleware.GetRole(c), appmiddleware.GetTenantID(c)); err != nil {
-		return err
-	}
-	return appresp.NoContent(c)
-}
-
 // Lock handles POST /groups/:groupId/lock.
 func (h *LiveHandler) Lock(c *echo.Context) error {
 	groupID := (*c).Param("groupId")

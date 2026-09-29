@@ -17,6 +17,7 @@ import {
 } from '../services/backend-client'
 import { normalizePhone } from '../utils/phone'
 import { decodeJwtClaims } from '../utils/jwtClaims'
+import { useTenantStore } from './tenantStore'
 
 // Single in-flight guard: concurrent checkSession calls (React StrictMode
 // double-invoke in dev) share one resolution instead of racing two refreshes.
@@ -121,6 +122,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAuthenticated: false,
       isLoading: false, // CRITICAL: unblock <App> so login route renders (no infinite spinner)
     })
+    // D-31: logout must not leave the previous tenant selection behind.
+    useTenantStore.getState().clearActiveTenant()
   },
 
   checkSession: async () => {

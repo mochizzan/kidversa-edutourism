@@ -20,7 +20,6 @@ export interface MiniRaportData {
  missions: string[]
  badges: { badgeName: string; badgeImageUrl?: string }[]
  facilitatorName: string
- facilitatorPhotoUrl?: string
  galleryUrl?: string
  partnerLogoUrl?: string
  kidversaLogoUrl?: string
@@ -250,6 +249,16 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             min-height: 0;
         }
 
+        /* ===== Skala dinamis isi lembar (container fixed 210mm × 297mm) =====
+           #raport-scale membungkus seluruh kartu di dalam .raport-main.
+           Lembar & .raport-main TIDAK berubah — hanya isi yang diskalakan
+           (transform:scale, dihitung di klien oleh __fitRaport) agar tinggi
+           cat selalu <= ruang .raport-main: konten muat, tidak menimpa
+           footer, tidak terpotong overflow-hidden lembar. */
+        .raport-scale {
+            transform-origin: top left;
+        }
+
         /* ===== Footer: divider pemisah copyright (kiri) dan QR galeri (kanan) ===== */
         .raport-divider {
             width: 1px;
@@ -270,10 +279,12 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
     </style>
 
     <style>
-        @page {
-            size: A4 portrait;
-            margin: 0;
-        }
+        /* @page { size: A4; margin: 0 } serta dimensi cetak .a4-sheet
+           (210mm × 297mm) kini hidup di miniRaport.tailwind.css — satu sumber
+           geometri kertas untuk layar DAN cetak. Blok ini hanya penyesuaian
+           dokumen saat cetak; geometri lembar tetap statis tanpa skala.
+           Skala isi (#raport-scale oleh __fitRaport) berlaku sama saat cetak —
+           listener beforeprint menghitung ulang tepat sebelum kertas dicetak. */
         @media print {
             * {
                 -webkit-print-color-adjust: exact !important;
@@ -293,20 +304,15 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 background: #ffffff !important;
             }
             .a4-sheet {
-                width: 210mm !important;
-                max-width: 210mm !important;
-                /* Tinggi mengikuti konten alami; min-height 297mm menjaga
-                   floor A4 — skala --print-scale di bawah yang mengecilkannya
-                   persis ke 297mm. Saat konten muat A4, tinggi = 297mm. */
-                height: auto !important;
-                min-height: 297mm !important;
+                /* Dimensi kertas (width/height 210mm/297mm) & @page berasal
+                   dari miniRaport.tailwind.css — di sini hanya tata letak
+                   lembar saat cetak; lembar itu sendiri tanpa transform
+                   (skala transform hanya pada isi #raport-scale). */
                 display: flex !important;
                 flex-direction: column !important;
                 margin: 0 !important;
                 box-shadow: none !important;
                 border-radius: 0 !important;
-                transform: scale(var(--print-scale, 1));
-                transform-origin: top center;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }
@@ -318,21 +324,6 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
     </style>
 
     <script>
-        function __raportBeforePrint() {
-            var sheet = document.querySelector('.a4-sheet')
-            if (!sheet) return
-            // Ukur tinggi tata-letak konten, bukan kotak hasil transform:
-            // rect.height bisa dibatasi min-height: 297mm (layar) atau sudah
-            // terkecilkan skala print sebelumnya, sedangkan scrollHeight selalu
-            // melaporkan tinggi konten sebenarnya (termasuk yang overflow).
-            var rect = sheet.getBoundingClientRect()
-            var hPx = Math.max(rect ? rect.height : 0, sheet.scrollHeight)
-            if (!hPx) return
-            var hMm = (hPx / 96) * 25.4
-            var scale = Math.min(1, 297 / hMm)
-            document.documentElement.style.setProperty('--print-scale', String(scale))
-        }
-
         function __scaleRingkasan() {
             var card = document.getElementById('ringkasan-card')
             var text = document.getElementById('ringkasan-text')
@@ -347,12 +338,92 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             }
         }
 
+        /* ===== Skala dinamis isi lembar (container fixed 210mm × 297mm) =====
+           Geometri kertas TIDAK berubah: .a4-sheet tetap 210mm × 297mm dan
+           .raport-main tetap flex item berukuran sisa ruang. #raport-scale
+           (pembungkus seluruh kartu) diskalakan transform:scale agar tinggi
+           cat <= ruang .raport-main — konten selalu muat, tidak menimpa
+           footer, dan tidak terpotong overflow-hidden lembar.
+           Rasio diukur di klien: pass-1 lebar dikompensasi (100/s)% agar baris
+           menjadi lebih panjang, lalu diukur ulang sampai konvergen (maks 5
+           iterasi). __scaleRingkasan tetap menangani overflow internal kartu
+           ringkasan. Sentinel data-fit dipakai raportCapture.ts agar capture
+           tidak mengambil dokumen sebelum skala diterapkan. */
+        function __fitRaport() {
+            var main = document.querySelector('.raport-main')
+            var wrap = document.getElementById('raport-scale')
+            if (!main || !wrap) return
+            var cs = window.getComputedStyle ? window.getComputedStyle(main) : null
+            var padY = cs ? (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) : 48
+            var budget = main.clientHeight - padY
+            wrap.setAttribute('data-fit', '') // refit sedang berjalan
+            if (budget <= 0) return
+            var s = 1
+            for (var i = 0; i < 5; i++) {
+                wrap.style.width = s === 1 ? '' : (100 / s) + '%'
+                var natural = wrap.offsetHeight
+                if (!natural) break
+                var next = Math.min(1, budget / natural)
+                if (Math.abs(next - s) < 0.005) { s = next; break }
+                s = next
+            }
+            wrap.style.width = s === 1 ? '' : (100 / s) + '%'
+            wrap.style.transformOrigin = 'top left'
+            wrap.style.transform = s < 1 ? 'scale(' + s + ')' : ''
+            wrap.setAttribute('data-fit', 'done')
+        }
+
+        var __fitQueued = false
+        function __scheduleFit() {
+            if (__fitQueued) return
+            __fitQueued = true
+            setTimeout(function () { __fitQueued = false; __fitRaport() }, 0)
+        }
+
+        function __initFit() {
+            __fitRaport()
+            // Web font (Nunito/Caveat) mengubah tinggi teks setelah paint pertama.
+            if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+                document.fonts.ready.then(__scheduleFit, function () {})
+            }
+            if (window.ResizeObserver) {
+                var ro = new ResizeObserver(__scheduleFit)
+                var targets = [
+                    document.querySelector('.a4-sheet'),
+                    document.querySelector('.raport-main'),
+                    document.getElementById('raport-scale')
+                ]
+                for (var i = 0; i < targets.length; i++) {
+                    if (targets[i]) ro.observe(targets[i])
+                }
+            }
+            // Konversi ikon FontAwesome (<i> → <svg>) & fallback gambar mengubah
+            // tinggi kartu: pengamatan struktur DOM memicu pengukuran ulang.
+            if (window.MutationObserver) {
+                var wrap = document.getElementById('raport-scale')
+                if (wrap) {
+                    new MutationObserver(__scheduleFit).observe(wrap, { childList: true, subtree: true })
+                }
+            }
+            // Cetak (Ctrl+P / window.print) mengukur ulang tepat sebelum kertas.
+            if (window.addEventListener) {
+                window.addEventListener('beforeprint', __fitRaport)
+            }
+        }
+
+        // Cetak: lembar selalu 210mm × 297mm (CSS @page/@media print di
+        // miniRaport.tailwind.css) — tanpa --print-scale dinamis pada lembar;
+        // skala isi dihitung ulang oleh __fitRaport lewat listener beforeprint.
         if (window.addEventListener) {
-            window.addEventListener('beforeprint', __raportBeforePrint)
-            window.addEventListener('DOMContentLoaded', __scaleRingkasan)
+            window.addEventListener('DOMContentLoaded', function () {
+                __scaleRingkasan()
+                __initFit()
+            })
         } else if (window.attachEvent) {
-            window.attachEvent('onbeforeprint', __raportBeforePrint)
-            window.attachEvent('onload', __scaleRingkasan)
+            window.attachEvent('onload', function () {
+                __scaleRingkasan()
+                __initFit()
+            })
         }
     </script>
 </head>
@@ -388,7 +459,8 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             <div class="absolute bottom-0 left-8 right-8 border-b border-gray-100"></div>
         </header>
 
-        <main class="raport-main grid grid-cols-12 gap-3 px-8 py-6">
+        <main class="raport-main px-8 py-6">
+            <div id="raport-scale" class="raport-scale grid grid-cols-12 gap-4">
 
             <!-- 1. MOMEN TERBAIK HARI INI (melintasi 3 baris di kiri) -->
             <div class="col-span-4 row-span-3 relative flex flex-col">
@@ -427,7 +499,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             </div>
 
             <!-- 3. LEVEL KEGIATAN -->
-            <div class="col-span-8 bg-white border-2 border-gray-200 rounded-[1.5rem] p-5 pt-6 relative mt-3">
+            <div class="col-span-8 bg-white border-2 border-gray-200 rounded-[1.5rem] p-5 pt-6 relative mt-2">
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
                     <i class="fas fa-star text-brand-star text-xs"></i> LEVEL KEGIATAN
                 </div>
@@ -437,7 +509,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             </div>
 
             <!-- 4. BADGE PENCAPAIAN (compact, kolom kanan, di atas Ringkasan) -->
-            <div class="col-span-8 bg-white border-2 border-brand-badge rounded-[1.25rem] p-3 pt-5 shadow-sm relative min-h-[100px] mt-3">
+            <div class="col-span-8 bg-white border-2 border-brand-badge rounded-[1.25rem] p-3 pt-5 shadow-sm relative min-h-[100px] mt-2">
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
                     <i class="fas fa-award text-xs"></i> BADGE PENCAPAIAN
                 </div>
@@ -460,13 +532,13 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                     <span class="bg-orange-200 text-orange-600 w-8 h-8 rounded-xl flex items-center justify-center text-lg shadow-sm"><i class="fas fa-home"></i></span>
                     <h3 class="font-black text-brand-purple text-[13px]">MISI RUMAH BERSAMA KELUARGA</h3>
                 </div>
-                <div class="flex flex-col gap-2.5">
+                <div class="flex flex-col gap-3">
                     ${missionsHTML(data.missions)}
                 </div>
             </div>
 
             <!-- 6b. PENGESAHAN + TTD -->
-            <div class="col-span-6 bg-white border-2 border-gray-200 rounded-[1.25rem] p-4 pt-5 shadow-sm relative">
+            <div class="col-span-6 bg-white border-2 border-gray-200 rounded-[1.25rem] p-4 pt-5 shadow-sm relative mt-2">
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
                     <i class="fas fa-pen text-xs"></i> PENGESAHAN
                 </div>
@@ -475,6 +547,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                     <p class="text-[13px] font-bold text-brand-purple mb-3">${esc(data.facilitatorName)}</p>
                     <div class="w-full h-[60px] border-2 border-dashed border-gray-300 rounded-lg bg-gray-50"></div>
                 </div>
+            </div>
             </div>
         </main>
 

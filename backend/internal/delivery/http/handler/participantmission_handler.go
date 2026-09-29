@@ -7,7 +7,6 @@ import (
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
-	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	apputil "kidversa-edutourism-backend/internal/pkg/util"
@@ -21,31 +20,6 @@ type ParticipantMissionHandler struct {
 // NewParticipantMissionHandler builds the participant-mission handler.
 func NewParticipantMissionHandler(repo repository.ParticipantMissionRepository) *ParticipantMissionHandler {
 	return &ParticipantMissionHandler{repo: repo}
-}
-
-// Create handles POST /api/participant-missions.
-func (h *ParticipantMissionHandler) Create(c *echo.Context) error {
-	var req dto.ParticipantMissionRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
-	}
-	m := &entity.ParticipantMission{
-		ReportID:      req.ReportID,
-		MissionBankID: req.MissionBankID,
-		IsCompleted:   req.IsCompleted,
-	}
-	if m.IsCompleted {
-		now := apputil.Now()
-		m.CompletedAt = &now
-	}
-	if err := h.repo.Create((*c).Request().Context(), tenantID, m); err != nil {
-		return err
-	}
-	return appresp.Created(c, dto.NewParticipantMissionResponse(m))
 }
 
 // List handles GET /api/participant-missions (GET ""). It dispatches on the
@@ -95,58 +69,6 @@ func (h *ParticipantMissionHandler) ListByParticipant(c *echo.Context) error {
 	return appresp.OK(c, dto.NewParticipantMissionListResponse(items))
 }
 
-// Replace handles POST /api/participant-missions/replace (bulk, transactional).
-// It atomically replaces all participant missions for a report with the given items.
-func (h *ParticipantMissionHandler) Replace(c *echo.Context) error {
-	var req dto.ParticipantMissionBulkRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
-	}
-	items := make([]entity.ParticipantMission, 0, len(req.Items))
-	for i := range req.Items {
-		it := req.Items[i]
-		m := entity.ParticipantMission{
-			ReportID:      req.ReportID,
-			MissionBankID: it.MissionBankID,
-			IsCompleted:   it.IsCompleted,
-		}
-		if m.IsCompleted {
-			now := apputil.Now()
-			m.CompletedAt = &now
-		}
-		items = append(items, m)
-	}
-	if err := h.repo.ReplaceByReport((*c).Request().Context(), tenantID, req.ReportID, items); err != nil {
-		return err
-	}
-	replaced, err := h.repo.GetByReport((*c).Request().Context(), tenantID, req.ReportID)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewParticipantMissionListResponse(replaced))
-}
-
-// GetByID handles GET /api/participant-missions/:id.
-func (h *ParticipantMissionHandler) GetByID(c *echo.Context) error {
-	id, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
-	}
-	m, err := h.repo.GetByID((*c).Request().Context(), tenantID, id)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewParticipantMissionResponse(m))
-}
-
 // Toggle handles POST /api/participant-missions/:id/toggle (completion switch).
 func (h *ParticipantMissionHandler) Toggle(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
@@ -172,20 +94,4 @@ func (h *ParticipantMissionHandler) Toggle(c *echo.Context) error {
 		return err
 	}
 	return appresp.OK(c, dto.NewParticipantMissionResponse(m))
-}
-
-// Delete handles DELETE /api/participant-missions/:id.
-func (h *ParticipantMissionHandler) Delete(c *echo.Context) error {
-	id, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
-	}
-	if err := h.repo.Delete((*c).Request().Context(), tenantID, id); err != nil {
-		return err
-	}
-	return appresp.NoContent(c)
 }

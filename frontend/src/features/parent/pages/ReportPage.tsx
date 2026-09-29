@@ -92,7 +92,6 @@ function ReportView() {
             badgeImageUrl: b.badge_image_url || undefined,
           })),
         facilitatorName: report.facilitator_name?.trim() || DEFAULT_FACILITATOR_NAME,
-        // facilitatorPhotoUrl intentionally omitted: the template never renders it.
         galleryUrl,
       })
     }
@@ -199,14 +198,14 @@ function ReportView() {
   return (
     <div className="relative min-h-screen bg-gray-200 print-report">
       <RaportZoomPan sheetWidth={A4_SHEET_WIDTH}>
-        <div style={{ width: A4_SHEET_WIDTH, height: iframeHeight || 'auto' }}>
+        <div style={{ width: '21cm', height: iframeHeight || 'auto' }}>
           <iframe
             ref={iframeRef}
             srcDoc={raportHtml}
             title={t('parent.report.iframeTitle')}
             onLoad={handleIframeLoad}
             className="border-0 block"
-            style={{ width: A4_SHEET_WIDTH, border: 'none' }}
+            style={{ width: '21cm', border: 'none' }}
           />
         </div>
       </RaportZoomPan>

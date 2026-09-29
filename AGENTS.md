@@ -58,17 +58,17 @@ Component → core/services/<domain>.ts shim → api-envelope.ts (unwrap/normali
 | `frontend/src/shared/` | Cross-feature `components/ layouts/ hooks/ templates/` (incl. mini-raport CSS source) |
 | `frontend/src/locales/` | i18n JSON for 9 languages (id, en, ja, ko, ms, th, tl, vi, zh) |
 | `frontend/tests/unit/` | Vitest suites + `test-utils.tsx` |
-| `tmp/` | Gitignored ad-hoc manual scripts (API probes, Puppeteer flows) + result artifacts; never in CI, never commit |
+| `tmp/` | Gitignored ad-hoc manual scripts (API probes, Puppeteer flows) + result artifacts; never commit |
 | `nginx/`, `compose.yml`, `scripts/push-ghcr.sh` | Reverse-proxy configs; production stack (GHCR pull); manual image publish |
 
 ## Development Commands
 
 ```bash
 # Backend (run from backend/)
-gofmt -w .               # REQUIRED before commit; CI gate is `gofmt -l .` (must be empty)
+gofmt -w .               # REQUIRED before commit; gate: `gofmt -l .` must be empty
 go vet ./...
 go build ./...
-go test ./...             # runs without a DB today (fakes + sqlmock); TEST_DB_* exists for future integration tests
+go test ./...             # runs without a DB today (fakes + sqlmock)
 go run ./cmd/migrate      # migrations + seed (needs BOOTSTRAP_SUPERADMIN_PASSWORD)
 go run ./cmd/server       # API :8080, health GET /health
 air                      # live reload (backend/.air.toml)
@@ -87,7 +87,7 @@ cd backend && docker compose up -d --build     # dev backend only (host MariaDB)
 scripts/push-ghcr.sh                           # manual image publish (no image CI exists)
 ```
 
-**Ports**: 5173 Vite · 8080 backend · 8002 frontend nginx · 3307 MariaDB (compose) / 3306 local+CI · 2785 OpenWA · 80 host nginx (`nginx/vps.conf`). Compose binds everything to `127.0.0.1`; `nginx/vps.conf` is the only intended public entry.
+**Ports**: 5173 Vite · 8080 backend · 8002 frontend nginx · 3307 MariaDB (compose) / 3306 local · 2785 OpenWA · 80 host nginx (`nginx/vps.conf`). Compose binds everything to `127.0.0.1`; `nginx/vps.conf` is the only intended public entry.
 
 ## Code Conventions & Common Patterns
 
@@ -114,7 +114,7 @@ scripts/push-ghcr.sh                           # manual image publish (no image 
 - **Envelope shapes differ**: most lists are `{data:[...]}` → `listRequest`; reports/consent/participant-missions/mission-banks wrap as `{data:{items:[]}}` → `itemsRequest`; `nullableItemRequest` returns `null` on 404. `limit >= 100` silently loops all pages (`fetchAllPages`); backend hard cap is 100.
 - **Tenant**: `X-Tenant-Id` is attached only for SUPER_ADMIN (`backend-client.ts` / `getActiveTenantId`); `tenant_id` null → `""` via `normalizeTenantId`. Never add the header globally — backend 401s non-SA requests that carry it.
 - **Constants**: URLs from `API_ROUTES` (`core/constants/apiRoutes.ts`, `encodeURIComponent` builders), paths from `ROUTES` (`core/constants/app.ts`).
-- **Zustand**: cross-store reads via `getState()`; `setUser` must persist to sessionStorage or reload loses the session. List pages use `shared/hooks/useCrudList` — it keys its cache by `fetchFn.toString()` and deliberately keeps `fetchFn` out of effect deps; adding it causes an infinite loop.
+- **Zustand**: cross-store reads via `getState()`; `setUser` must persist to sessionStorage or reload loses the session. List pages use `shared/hooks/useClientList` — it keeps `fetchFn` in a ref instead of an effect dep (call sites recreate the closure every render; adding it to deps causes an infinite loop) and re-fetches only when `deps` or `refresh()` change.
 - **Tailwind v4 is CSS-first**: tokens in `frontend/src/index.css` `@theme`. `miniRaport.styles.css` is **generated** — edit `miniRaport.tailwind.css` and run `pnpm build:raport-css`, never the compiled file.
 
 ## Important Files
@@ -136,16 +136,15 @@ scripts/push-ghcr.sh                           # manual image publish (no image 
 | `frontend/src/core/services/api-envelope.ts` | Envelope unwrap, pagination, tenant normalization |
 | `frontend/src/shared/components/auth/RouteGuard.tsx` | Unified auth gate (3 modes) |
 | `frontend/vite.config.ts` | Alias, dev proxy (SSE-aware), PWA |
-| `backend/.github/workflows/ci.yml` | The documented command gates (see caveat below) |
 | `compose.yml`, `nginx/default.conf`, `nginx/vps.conf` | Production stack + reverse proxies |
 
 ## Runtime/Tooling Preferences
 
 - **Go 1.26.4**, formatted with **gofmt only** — there is no golangci-lint/revive config.
-- **Node**: CI uses Node 20, Docker build uses `node:22-alpine`; no `.nvmrc`/`engines` pin. **pnpm** via corepack for `frontend/` only. The root `package.json` is a scriptless dep manifest with its own lockfiles — a second, independent pnpm install zone; run builds/tests from `frontend/`.
+- **Node**: Docker build uses `node:22-alpine`; no `.nvmrc`/`engines` pin. **pnpm** via corepack for `frontend/` only. The root `package.json` is a scriptless dep manifest with its own lockfiles — a second, independent pnpm install zone; run builds/tests from `frontend/`.
 - **No ESLint/Prettier/Biome** — frontend gates are `tsc` (two tsconfigs) + vitest. Don't invent lint commands.
 - **Server startup constraints**: refuses to start if `JWT_SECRET` < 32 bytes; `BOOTSTRAP_SUPERADMIN_PASSWORD` (≥8 chars) required for bootstrap. Auth cookies are hard-set `Secure; SameSite=None` (env vars ignored, intentional). Backend container runs `migrate` first and **fails closed** if migrations fail.
-- **CI caveat**: the only workflow lives at `backend/.github/workflows/ci.yml`, but GitHub Actions loads workflows from a root `.github/` that does not exist — treat it as the documented command list and reproduce the gates locally:
+- **No CI/CD pipeline is configured**: GitHub Actions was intentionally removed by decision — no `.github/workflows/` exists anywhere in this repo, so all gates must be run locally:
   `gofmt -l .` (empty) → `go vet ./...` → `go build ./...` → `go test ./...` → `pnpm build` → `pnpm test:unit:run` → `pnpm test:unit:typecheck`.
 - **SSE must stay special-cased in three places**: Vite proxy (keep-alive for `/stream`), `nginx/default.conf` (`proxy_buffering off`, 86400s timeout), `nginx/vps.conf`. A plain `proxy_pass` rewrite breaks live monitoring.
 - **Local harness rules** in `.omp/rules/` (gitignored) ban shell grep/sed/awk and heredoc file creation — use the repo search/edit tools instead.
@@ -153,12 +152,12 @@ scripts/push-ghcr.sh                           # manual image publish (no image 
 
 ## Testing & QA
 
-### Backend — 13 `*_test.go` files, stdlib `testing` only
+### Backend — 14 `*_test.go` files, stdlib `testing` only
 
-- 12 external-package files under `backend/tests/` (`session_create_gate_test.go`, `users_usecase_test.go`, `reports/`, `reportphoto/`, `assessment/`, `participant/`, `phoneutil/`, `frame/`) + 1 white-box `backend/internal/delivery/http/handler/report_photo_resolution_test.go`.
-- **No testify/gomock** — hand-rolled in-file fakes implementing `domain/repository` interfaces; handler tests use `httptest` + `echo.New()` with `e.Validator = appmiddleware.NewValidator()`; one GORM repo test uses `go-sqlmock`.
+- 13 external-package files under `backend/tests/` (`session_create_gate_test.go`, `users_usecase_test.go`, `reports/`, `reportphoto/`, `assessment/`, `missionbank/`, `participant/`, `phoneutil/`, `frame/`) + 1 white-box `backend/internal/delivery/http/handler/report_photo_resolution_test.go`.
+- **No testify/gomock** — hand-rolled in-file fakes implementing `domain/repository` interfaces; handler tests use `httptest` + `echo.New()` with `e.Validator = appmiddleware.NewValidator()`; two GORM repo tests use `go-sqlmock`.
 - Recurring per-package helper `requireAppErrorCode(t, err, want)` (duplicated per package, not shared).
-- **No test opens a database** — `TEST_DB_*`/`TestDBDSN` exist for future integration tests but are currently unused; `go test ./...` runs without MariaDB.
+- **No test opens a database** — `go test ./...` runs without MariaDB.
 - Run: `cd backend && go test ./...`
 
 ### Frontend — Vitest 5 + jsdom + Testing Library

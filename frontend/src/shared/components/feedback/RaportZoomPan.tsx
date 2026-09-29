@@ -15,8 +15,6 @@ export interface RaportZoomPanProps {
 const ZOOM_MIN = 0.25
 const ZOOM_MAX = 4
 const ZOOM_STEP = 0.25
-/** Ruang horizontal (px) saat fit-to-width agar tepi lembar tidak menempel viewport. */
-const FIT_PADDING = 32
 /** Sisa lembar (px) yang wajib tetap terlihat agar lembar tak bisa diseret keluar pandangan. */
 const MIN_VISIBLE_PX = 48
 
@@ -34,7 +32,7 @@ interface DragState {
 }
 
 /** Zoom langkah 25% ke arah `direction`, di-snap ke kelipatan 25% terdekat
- *  yang belum terlewati (fit-to-width awal bisa berada di antara kelipatan). */
+ *  yang belum terlewati. */
 function stepZoom(zoom: number, direction: 1 | -1): number {
  const step =
   direction > 0
@@ -83,7 +81,8 @@ export function RaportZoomPan({ children, sheetWidth }: RaportZoomPanProps): Rea
  const [viewportW, setViewportW] = useState(0)
  const [zoomOverride, setZoomOverride] = useState<number | null>(null)
 
- // Ukur viewport sebelum paint pertama agar lembar langsung tampil fit-to-width.
+ // Ukur viewport sebelum paint pertama agar posisi pan bisa di-clip langsung
+ // (lembar tidak pernah auto-fit — ukuran selalu 100%).
  useLayoutEffect(() => {
   const viewport = viewportRef.current
   if (!viewport) return
@@ -95,12 +94,10 @@ export function RaportZoomPan({ children, sheetWidth }: RaportZoomPanProps): Rea
   return () => observer.disconnect()
  }, [])
 
- // Fit-to-width: seluruh lebar A4 terlihat dan tetap terpusat di awal.
- const fitZoom = Math.max(
-  ZOOM_MIN,
-  Math.min(1, (viewportW - FIT_PADDING) / sheetWidth),
- )
- const zoom = zoomOverride ?? fitZoom
+ // Preview selalu 100% (1:1 dengan A4 fisik 210mm × 297mm) — tanpa auto-fit
+ // responsif: ukuran lembar tidak pernah mengikuti lebar viewport. Zoom hanya
+ // berubah lewat kontrol eksplisit pengguna (tombol/roda/double-click).
+ const zoom = zoomOverride ?? 1
  const percent = Math.round(zoom * 100)
 
  // Klip ulang pan saat zoom/viewport berubah agar lembar tak keluar pandangan.
@@ -189,7 +186,7 @@ export function RaportZoomPan({ children, sheetWidth }: RaportZoomPanProps): Rea
    onPointerMove={handlePointerMove}
    onPointerUp={handlePointerEnd}
    onPointerCancel={handlePointerEnd}
-   onDoubleClick={() => setZoomOverride(Math.abs(zoom - 1) < 0.01 ? null : 1)}
+   onDoubleClick={() => setZoomOverride(1)}
   >
    {/* Lembar berlebar tetap — hanya transform (skala + geser), tanpa resize. */}
    <div

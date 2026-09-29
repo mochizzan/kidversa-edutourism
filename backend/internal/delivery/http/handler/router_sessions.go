@@ -18,11 +18,9 @@ func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecyc
 	roleMW := appmiddleware.RequireRole(entity.RoleFasilitator, entity.RoleAdmin, entity.RoleKoordinator, entity.RoleSuperAdmin)
 
 	g.GET("", h.List, authMW, roleMW, appmiddleware.TenantScope())
-	g.GET("/participants", ph.ListParticipantsGlobal, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("", h.Create, authMW, roleMW, appmiddleware.TenantScope())
 	g.GET("/:id", h.Get, authMW, roleMW, appmiddleware.TenantScope())
 	g.GET("/:id/kiosk", kioskH.KioskAccess)
-	g.PUT("/:id", h.Update, authMW, roleMW, appmiddleware.TenantScope())
 	g.DELETE("/:id", h.Delete, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("/:id/start", lh.Start, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("/:id/complete", lh.Complete, authMW, roleMW, appmiddleware.TenantScope())

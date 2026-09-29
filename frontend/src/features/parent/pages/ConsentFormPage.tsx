@@ -181,7 +181,7 @@ function ConsentForm() {
       setSuccess(true)
     } catch (err) {
       const code = err instanceof ApiError ? err.code : ''
-      if (code === 'token_consumed' || code === 'token_invalid') {
+      if (code === 'token_invalid') {
         setAlreadySubmitted(true)
         return
       }

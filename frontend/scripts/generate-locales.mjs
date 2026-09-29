@@ -4,8 +4,8 @@
  * every LANGUAGE_CODES target using Google AI Studio (Gemini).
  *
  * Usage (from the repo root):
- *   GEMINI_API_KEY=<key> node tmp/generate-locales.mjs          # incremental (keep existing, translate missing)
- *   GEMINI_API_KEY=<key> node tmp/generate-locales.mjs --all    # retranslate every key from scratch
+ *   GEMINI_API_KEY=<key> node frontend/scripts/generate-locales.mjs          # incremental (keep existing, translate missing)
+ *   GEMINI_API_KEY=<key> node frontend/scripts/generate-locales.mjs --all    # retranslate every key from scratch
  *
  * Env: GEMINI_API_KEY (required, read only from the environment — never written
  * to any file), GEMINI_MODEL (pin a single model; default rotates round-robin across gemini-3.6-flash, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.1-flash-lite — gemini-2.5-flash dropped 2026-09-24: generateContent answers 404 "no longer available to new users").
@@ -35,9 +35,9 @@ let modelCursor = 0
 const LANGUAGE_NAMES = { en: 'English', ms: 'Malay (Bahasa Melayu)', th: 'Thai (ภาษาไทย)', tl: 'Tagalog (Filipino)', ko: 'Korean (한국어)', zh: 'Chinese Simplified (简体中文)', ja: 'Japanese (日本語)', vi: 'Vietnamese (Tiếng Việt)' }
 const PLACEHOLDER_RE = /\{\{[^{}]+\}\}/g
 
-const LANG_DIR_URL = new URL('../frontend/src/locales/', import.meta.url)
+const LANG_DIR_URL = new URL('../src/locales/', import.meta.url)
 const ID_JSON_URL = new URL('id.json', LANG_DIR_URL)
-const LOCALES_TS_URL = new URL('../frontend/src/core/i18n/locales.ts', import.meta.url)
+const LOCALES_TS_URL = new URL('../src/core/i18n/locales.ts', import.meta.url)
 
 /** Splits `items` into consecutive batches of at most `size` elements. */
 export function splitBatches(items, size) {
@@ -301,7 +301,7 @@ function verifyParity(codes, idKeys) {
 
 async function main() {
  if (!API_KEY) {
-  console.error('GEMINI_API_KEY is required, e.g. GEMINI_API_KEY=<key> node tmp/generate-locales.mjs')
+  console.error('GEMINI_API_KEY is required, e.g. GEMINI_API_KEY=<key> node frontend/scripts/generate-locales.mjs')
   process.exit(1)
  }
  const all = process.argv.includes('--all')

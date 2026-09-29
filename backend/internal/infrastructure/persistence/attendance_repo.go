@@ -68,26 +68,3 @@ func (r *GormAttendanceRepository) Upsert(ctx context.Context, a *entity.Partici
 	*a = *m.ToEntity()
 	return nil
 }
-
-func (r *GormAttendanceRepository) BulkUpsert(ctx context.Context, items []entity.ParticipantAttendance) error {
-	if len(items) == 0 {
-		return nil
-	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		for _, item := range items {
-			m := attendanceModelFromEntity(&item)
-			err := tx.
-				Where("participant_id = ? AND session_id = ?", item.ParticipantID, item.SessionID).
-				Assign(map[string]interface{}{
-					"is_present": item.IsPresent,
-					"marked_at":  item.MarkedAt,
-					"marked_by":  item.MarkedBy,
-				}).
-				FirstOrCreate(m).Error
-			if err != nil {
-				return apperrors.Internal("internal_error", err)
-			}
-		}
-		return nil
-	})
-}

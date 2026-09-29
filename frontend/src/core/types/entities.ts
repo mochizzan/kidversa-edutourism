@@ -354,23 +354,6 @@ export interface AuditLog {
  created_at: string
 }
 
-export interface SyncQueue {
- id: string
- tenant_id: string | null
- resource_type: string
- resource_id: string
- action: 'create' | 'update' | 'delete' | 'upload'
- payload_json?: Record<string, unknown>
- file_url_local?: string
- media_blob_id?: string
- status: import('./enums').SyncQueueStatus
- retry_count: number
- error_message?: string
- created_at: string
- updated_at: string
- synced_at?: string
-}
-
 // Backend notification entity returned by GET /api/notifications.
 // unreadCount on the list is derived from the badge (`meta.total`).
 export interface Notification {

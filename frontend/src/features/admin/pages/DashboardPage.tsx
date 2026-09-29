@@ -5,7 +5,7 @@ import { FolderOpen, Calendar, Users, FileText, Play, BarChart3, Star } from 'lu
 import { Tabs } from '../../../shared/components/ui/Tabs'
 import { CategoryCard } from '../../../shared/components/ui/CategoryCard'
 import { SessionCarousel } from '../../../shared/components/data/SessionCarousel'
-import { DonutStat } from '../../../shared/components/charts/DonutStat'
+import { GreetingCard } from '../../../shared/components/dashboard/GreetingCard'
 import { TeamList } from '../../../shared/components/data/TeamList'
 import { KpiCard } from '../../../shared/components/charts/KpiCard'
 import { RatingDistribution } from '../../../shared/components/charts/RatingDistribution'
@@ -396,7 +396,7 @@ const DashboardPage = () => {
       {activeDashboardTab === 'summary' ? (
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 xl:col-span-3 xl:order-2 space-y-6">
-            <DonutStat />
+            <GreetingCard />
             <TeamList members={teamListMembers} />
           </div>
 

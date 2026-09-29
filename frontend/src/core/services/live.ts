@@ -2,7 +2,7 @@
 //
 // Replaces the old IndexedDB-backed `idb/live.ts`. The backend exposes
 // `/api/live/:sessionId/groups` (snapshot: groups + progress + timeline),
-// `/api/live/:sessionId/timeline`, facilitator overrides, jump/reset, and
+// `/api/live/:sessionId/timeline`, facilitator overrides, and
 // `/api/live/events` for publishing timeline events. Live deltas arrive via
 // SSE (see backendClient.openSSE) and are consumed by the monitor pages.
 //

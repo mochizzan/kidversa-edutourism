@@ -114,13 +114,13 @@ func (r *GormMissionBankRepository) List(ctx context.Context, f repository.Missi
 		q = q.Where("is_active = ?", *f.IsActive)
 	}
 	// Per-Topic scoping: only missions linked via mission_bank_stages to the
-	// given program_stage (Topic). DISTINCT avoids row multiplication when a
-	// mission links to multiple stages (and across the count + find).
+	// given program_stage (Topic). An IN-subquery over the junction dedupes
+	// rows without a JOIN (a mission may link to multiple stages) while the
+	// base table stays the sole selected row: JOIN + Distinct("mission_banks.id")
+	// is rendered by GORM as SELECT DISTINCT mission_banks.id — only the id
+	// column is scanned and Title/ProgramID/IsActive come back empty.
 	if f.TopicID != "" {
-		q = q.
-			Joins("JOIN mission_bank_stages mbs ON mbs.mission_bank_id = mission_banks.id").
-			Where("mbs.program_stage_id = ?", f.TopicID).
-			Distinct("mission_banks.id")
+		q = q.Where("id IN (SELECT mission_bank_id FROM mission_bank_stages WHERE program_stage_id = ?)", f.TopicID)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {

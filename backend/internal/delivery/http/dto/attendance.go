@@ -9,11 +9,6 @@ type AttendanceUpsertRequest struct {
 	IsPresent     bool   `json:"is_present"`
 }
 
-// AttendanceBulkUpsertRequest wraps a batch of upserts.
-type AttendanceBulkUpsertRequest struct {
-	Items []AttendanceUpsertRequest `json:"items" validate:"required,min=1,dive"`
-}
-
 // AttendanceResponse is the list/read representation.
 type AttendanceResponse struct {
 	*entity.ParticipantAttendance

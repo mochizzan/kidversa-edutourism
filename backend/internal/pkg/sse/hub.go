@@ -27,17 +27,6 @@ type ReplayGap struct{}
 
 func (ReplayGap) Error() string { return "replay gap: cursor outside buffered window" }
 
-// Backend is the realtime pub/sub abstraction. Use cases/handlers depend on this
-// interface, NOT on *Hub, so the in-memory implementation can later be swapped for
-// Redis without touching call sites (see RealtimeBackend flag in config).
-type Backend interface {
-	Subscribe(ctx context.Context, channel string) (<-chan Event, func(), error)
-	Publish(ctx context.Context, channel string, ev Event) error
-	ReplaySince(channel string, since uint64) ([]Event, error)
-	Shutdown(ctx context.Context) error
-	Metrics() (connected, published, dropped, slow int64)
-}
-
 // perChannelState holds the monotonic counter + bounded ring buffer + subscriber set per channel.
 type perChannelState struct {
 	counter uint64
@@ -178,12 +167,6 @@ func (h *Hub) ReplaySince(ch string, since uint64) ([]Event, error) {
 		}
 	}
 	return out, nil
-}
-
-// Metrics returns the live hub counters.
-func (h *Hub) Metrics() (connected, published, dropped, slow int64) {
-	return atomic.LoadInt64(&h.connected), atomic.LoadInt64(&h.published),
-		atomic.LoadInt64(&h.dropped), atomic.LoadInt64(&h.slow)
 }
 
 // Shutdown closes all subscriber channels, prompting connected EventSources to reconnect gracefully.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectParityViolations, isGlossaryTerm, splitBatches } from '../../../../tmp/generate-locales.mjs'
+import { collectParityViolations, isGlossaryTerm, splitBatches } from '../../../scripts/generate-locales.mjs'
 
 describe('generate-locales pure helpers', () => {
   it('splits 120 items into batches of 50', () => {

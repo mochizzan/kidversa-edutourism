@@ -224,13 +224,6 @@ func (r *GormAssessmentRepository) Revive(ctx context.Context, a *entity.Assessm
 	return nil
 }
 
-func (r *GormAssessmentRepository) Delete(ctx context.Context, id string) error {
-	if err := r.db.WithContext(ctx).Delete(&AssessmentModel{}, "id = ?", id).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
 // GetGroupFacilitatorIDByParticipant resolves the facilitator_id of the group a
 // participant belongs to (participants.group_id -> session_groups.facilitator_id).
 // Returns nil if the participant has no group or the group has no facilitator.

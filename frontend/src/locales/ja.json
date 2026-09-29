@@ -47,7 +47,6 @@
     },
     "connection": {
       "online": "サーバーに接続済み — すべてのデータが同期されています",
-      "degraded": "サーバーから切断されました — 接続が制限されています",
       "reconnecting": "サーバーから切断されました — 再接続を試みています…",
       "labelOnline": "サーバーに接続済み",
       "labelOffline": "サーバーから切断されました"
@@ -181,7 +180,6 @@
       "viewDetail": "詳細を見る",
       "start": "セッションを開始",
       "complete": "セッションを完了",
-      "cancel": "キャンセル",
       "delete": "セッションを削除",
       "loadProgramsError": "プログラムリストの読み込みに失敗しました。",
       "notFound": "セッションが見つかりません",
@@ -358,15 +356,8 @@
       "deactivate": "無効化",
       "activate": "有効化",
       "toggleStatus": "ステータス変更",
-      "description": "説明",
-      "programLine": "プログラム: {{name}}",
-      "pickProgram": "プログラムを選択",
-      "pickProgramFirst": "プログラムを先に選択してください",
       "allPrograms": "すべてのプログラム",
-      "programRequired": "プログラムを選択してください",
-      "topicRequired": "トピックを選択してください",
-      "fillRequired": "必須項目をすべて入力してください",
-      "pageLoading": "読み込み中..."
+      "fillRequired": "必須項目をすべて入力してください"
     },
     "badge": {
       "nameLabel": "バッジ名",
@@ -391,7 +382,6 @@
       "programName": "プログラム名",
       "sessionName": "セッション名",
       "participantName": "参加者名",
-      "activityName": "アクティビティ名",
       "assessed": "評価"
     },
     "dashboard": {
@@ -462,7 +452,6 @@
       "changePhoto": "プロフィール写真を変更",
       "changePhotoBtn": "写真を変更",
       "phoneLabel": "電話番号",
-      "roleKoordinator": "プログラムコーディネーター",
       "imageError": "画像の処理に失敗しました",
       "notFound": "ユーザーが見つかりません",
       "updatedToast": "ユーザーが正常に更新されました",
@@ -1101,7 +1090,6 @@
     "validation_error": "データが無効です。入力内容を確認してください。",
     "token_expired": "リンクの有効期限が切れています。コーディネーターに連絡してください。",
     "token_invalid": "リンクが無効です。",
-    "token_consumed": "このリンクは既に使用されています。",
     "tenant_required": "先にテナントを選択してください。",
     "internal_error": "サーバーエラーが発生しました。もう一度やり直してください。",
     "kiosk_invalid": "セッションが終了したか、リンクが無効です。",
@@ -1113,6 +1101,13 @@
     "session_not_deletable": "このセッションは削除できません。",
     "participant_not_deletable": "この参加者は削除できません。",
     "participant_duplicate_name": "参加者名はすでに存在します。",
+    "already_generating": "このセッションのレポートは既に生成中です。完了までお待ちください。",
+    "nothing_to_send": "同意リクエストを送信する必要がある参加者はいません。",
+    "already_sent": "同意リクエストは既に送信済みです。",
+    "already_consented": "この参加者は既に同意しています。",
+    "content_tenant_mismatch": "このコンテンツはアクティブなテナントのものではありません。",
+    "self_role_change_not_allowed": "自分の役割を変更することはできません。",
+    "participant_not_in_session": "この参加者はこのセッションに登録されていません。",
     "bad_request": "リクエストを処理できません。",
     "schema_drift": "データベース構造でエラーが発生しました。管理者に連絡してください。",
     "facilitator_required": "ファシリテーターが割り当てられていません。",

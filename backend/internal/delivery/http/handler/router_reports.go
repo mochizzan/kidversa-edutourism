@@ -10,13 +10,11 @@ import (
 
 // RegisterReportsRoutes mounts /api/reports/* on the given echo group.
 //   - GET  /api/reports/access?token=...   PUBLIC (anti-IDOR parent access)
-//   - POST /api/reports/:id/generate        (full AI narrative generation)
 //   - POST /api/reports/:id/generate/stream  (async AI narrative, 202 + SSE)
 //   - GET  /api/reports/:id/generate/stream  (SSE token stream)
 //   - POST /api/reports/:id/approve
 //   - POST /api/reports/:id/send            (mints parent token + delivers the
 //     link to the parent's WhatsApp; SENT only after the gateway confirms)
-//   - POST /api/reports/:id/revoke-token
 //
 // The public access endpoint is intentionally OUTSIDE JWTAuth; the token itself
 // is the authorization mechanism.
@@ -25,15 +23,14 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	streamAuth := appmiddleware.JWTAuth(jm, cfg.SSECookieName(), revoker)
 	scopeMW := appmiddleware.TenantScope()
 	// Public token access — intentionally outside JWTAuth (token is the authn).
-	// RateLimit(30) brute-force protection on the 64hex token space.
-	g.GET("/access", h.GetByAccessToken, appmiddleware.RateLimit(30))
+	// RateLimit(cfg.RateLimitPerMin) brute-force protection on the 64hex token space.
+	g.GET("/access", h.GetByAccessToken, appmiddleware.RateLimit(cfg.RateLimitPerMin))
 	// Token-validated photo bytes for the parent mini-raport <img>.
-	g.GET("/access/photo", h.GetAccessPhoto, appmiddleware.RateLimit(30))
+	g.GET("/access/photo", h.GetAccessPhoto, appmiddleware.RateLimit(cfg.RateLimitPerMin))
 	// Session-level generate: static route must precede /:id routes.
 	g.POST("/generate", h.GenerateForSession, authMW, scopeMW)
 	g.GET("", h.ListReports, authMW, scopeMW)
 	g.GET("/:id", h.GetReport, authMW, scopeMW)
-	g.POST("/:id/generate", h.Generate, authMW, scopeMW)
 	// Streaming AI narrative: POST triggers async generation (202), GET streams tokens via SSE.
 	g.POST("/:id/generate/stream", h.GenerateStream, authMW, scopeMW)
 	g.GET("/:id/generate/stream", h.GenerateStreamSSE, streamAuth, scopeMW)
@@ -45,5 +42,4 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	// HARD delete (db.Unscoped().Delete) — the soft-delete in GormReportRepository.Delete
 	// leaves the (session_id, participant_id) row in uq_reports_session_participant and
 	// would make a later GenerateForSession hit ER_DUP_ENTRY (409). See Task 7 invariant.
-	g.POST("/:id/revoke-token", h.RevokeToken, authMW, scopeMW)
 }

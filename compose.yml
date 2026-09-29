@@ -43,7 +43,6 @@ services:
     environment:
       # Override: in Docker, DB_HOST = service name (not localhost).
       DB_HOST: mariadb
-      TEST_DB_HOST: mariadb
     ports:
       - "127.0.0.1:8080:8080"
     # Relative bind mount for uploads (persisted on host).

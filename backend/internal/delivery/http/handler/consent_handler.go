@@ -43,21 +43,6 @@ func NewConsentHandler(
 	return &ConsentHandler{consent: consent, sessionRepo: sessionRepo, messaging: messaging, cfg: cfg, hub: hub}
 }
 
-// Respond handles POST /api/consent/respond (parent decision + audit row).
-func (h *ConsentHandler) Respond(c *echo.Context) error {
-	var req dto.ConsentRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	ip := (*c).RealIP()
-	ua := (*c).Request().UserAgent()
-	if err := h.consent.RespondConsent((*c).Request().Context(), req.ParticipantID, req.SessionID,
-		entity.ConsentType(req.ConsentType), req.Value, ip, ua, ""); err != nil {
-		return err
-	}
-	return appresp.OK(c, map[string]string{"status": "recorded"})
-}
-
 // SendWhatsApp handles POST /api/consent/send-whatsapp (JWT, tenant-scoped):
 // issues a combined consent token per eligible participant and asynchronously
 // delivers the consent link via WhatsApp. Returns 202 + batch_id immediately;

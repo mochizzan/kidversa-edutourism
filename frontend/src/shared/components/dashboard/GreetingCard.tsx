@@ -9,7 +9,7 @@ function getGreeting(): string {
   return i18n.t('common.greeting.evening')
 }
 
-export function DonutStat() {
+export function GreetingCard() {
   const { t } = useTranslation()
   const { user } = useAuth()
 

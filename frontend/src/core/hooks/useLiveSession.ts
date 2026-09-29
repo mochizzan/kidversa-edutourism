@@ -40,7 +40,6 @@ interface SnapshotData {
 // The backend SSE channel emits named events. `source.onmessage` only fires for
 // unnamed events, so we must register a listener per event type.
 const STAGE_EVENTS = ['stage:unlock', 'stage:complete', 'stage:lock'] as const
-const GROUP_EVENTS = [] as const
 const TIMELINE_EVENTS = ['timeline:override', 'timeline:group:progress', 'timeline:group:completed', 'timeline:stage:unlock'] as const
 
 // Best-effort per-group participant map (the SSE snapshot does not include
@@ -55,7 +54,7 @@ async function loadParticipantsByGroup(sessionId: string): Promise<Record<string
     for (const p of all) {
       const gid = p.group_id
       if (!gid) continue
-      ;(map[gid] ??= []).push(p)
+        ; (map[gid] ??= []).push(p)
     }
     return map
   } catch {
@@ -119,17 +118,6 @@ export function useLiveSession(sessionId: string | null | undefined) {
       return
     }
 
-    if ((GROUP_EVENTS as readonly string[]).includes(type)) {
-      // data is a SessionGroup row.
-      const g = data as SessionGroup
-      setState((prev) => {
-        const groups = prev.groups.map((x) => (x.id === g.id ? g : x))
-        if (!groups.some((x) => x.id === g.id)) groups.push(g)
-        return { ...prev, groups }
-      })
-      return
-    }
-
     if ((TIMELINE_EVENTS as readonly string[]).includes(type)) {
       // data is a TimelineEvent row.
       const t = data as TimelineEventRow
@@ -164,12 +152,6 @@ export function useLiveSession(sessionId: string | null | undefined) {
       handleEvent({ type: 'snapshot', data: parsed })
     })
     for (const t of STAGE_EVENTS) {
-      source.addEventListener(t, (e) => {
-        const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
-        handleEvent({ type: t, data: parsed })
-      })
-    }
-    for (const t of GROUP_EVENTS) {
       source.addEventListener(t, (e) => {
         const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
         handleEvent({ type: t, data: parsed })

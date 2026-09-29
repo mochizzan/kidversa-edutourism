@@ -293,8 +293,9 @@ const GroupPage = () => {
       addToast({ type: 'error', message: t('fasilitator.group.noActiveStage') })
       return
     }
-    // Edge case: kiosk token single-use. Jika sesi belum ACTIVE, konten mungkin
-    // kosong — beri peringatan, tapi tetap izinkan (backend tidak memblokir).
+    // Edge case: kiosk token multi-use dan tidak pernah dikonsumsi (berlaku
+    // sampai TTL-nya habis). Jika sesi belum ACTIVE, konten mungkin kosong —
+    // beri peringatan, tapi tetap izinkan (backend tidak memblokir).
     if (groupDetail.session.status !== 'ACTIVE') {
       addToast({ type: 'info', message: t('fasilitator.group.sessionInactiveKiosk') })
     }

@@ -13,7 +13,7 @@ export interface HeaderNotification {
   id: string
   tenant_id?: string | null
   tenant_name?: string
-  type: 'user_approval' | 'sync'
+  type: 'user_approval'
   title: string
   description: string
   route?: string
@@ -56,8 +56,8 @@ export function useHeaderNotifications() {
       setNotificationsState([...mapped])
       setRealUnread(unread)
     } catch {
-      // Offline / transient failure — keep the last known notices.
-      setNotificationsState((prev) => prev.filter((n) => n.type === 'user_approval'))
+      // Offline / transient failure — keep the last known notices; state is
+      // intentionally untouched (user_approval is the only member left).
     }
   }, [user])
 

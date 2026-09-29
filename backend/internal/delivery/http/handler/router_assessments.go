@@ -14,7 +14,5 @@ func RegisterAssessmentRoutes(g *echo.Group, h *AssessmentHandler, jm *auth.JWTM
 	scopeMW := appmiddleware.TenantScope()
 	roleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator, entity.RoleFasilitator)
 	g.POST("/upsert", h.Upsert, authMW, roleMW, scopeMW)
-	g.POST("/bulk-upsert", h.BulkUpsert, authMW, roleMW, scopeMW)
 	g.GET("", h.List, authMW, roleMW, scopeMW)
-	g.DELETE("/:id", h.Delete, authMW, roleMW, scopeMW)
 }

@@ -7,7 +7,6 @@ import type {
   Participant,
   CreateParticipantDTO,
   CreateSessionDTO,
-  UpdateSessionDTO,
   ParticipantSessionInfo,
   LinkParticipantResponse,
   ImportResult,
@@ -46,18 +45,6 @@ export const sessionService: SessionService = {
       end_time: data.end_time,
       location: data.location,
       notes: data.notes,
-    }),
-
-  update: (id, data: UpdateSessionDTO) =>
-    itemRequest<Session>('PUT', API_ROUTES.SESSIONS.DETAIL(id), {
-      program_id: data.program_id,
-      name: data.name,
-      session_date: data.session_date,
-      start_time: data.start_time,
-      end_time: data.end_time,
-      location: data.location,
-      notes: data.notes,
-      status: data.status,
     }),
 
   start: (id) => itemRequest<Session>('POST', API_ROUTES.SESSIONS.START(id)),

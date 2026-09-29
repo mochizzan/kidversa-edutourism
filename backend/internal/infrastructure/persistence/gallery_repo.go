@@ -55,13 +55,6 @@ func (r *GormGalleryTokenRepository) GetByReportID(ctx context.Context, reportID
 	return m.ToEntity(), nil
 }
 
-func (r *GormGalleryTokenRepository) RevokeByReportID(ctx context.Context, reportID string) error {
-	return r.db.WithContext(ctx).
-		Model(&GalleryTokenModel{}).
-		Where("report_id = ?", reportID).
-		Update("revoked", true).Error
-}
-
 func (r *GormGalleryTokenRepository) DeleteByReportID(ctx context.Context, reportID string) error {
 	return r.db.WithContext(ctx).
 		Where("report_id = ?", reportID).

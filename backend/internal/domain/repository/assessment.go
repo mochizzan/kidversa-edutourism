@@ -35,7 +35,6 @@ type AssessmentRepository interface {
 	// after a delete does not collide on the unique key (OQ3, Option A: keep
 	// soft-delete, no generated column).
 	Revive(ctx context.Context, a *entity.Assessment) error
-	Delete(ctx context.Context, id string) error
 	// GetGroupFacilitatorIDByParticipant resolves the facilitator_id of the group a
 	// participant belongs to (via participants.group_id -> session_groups.facilitator_id).
 	// Returns nil if the participant has no group or the group has no facilitator.

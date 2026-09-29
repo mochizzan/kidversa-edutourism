@@ -22,8 +22,6 @@ func RegisterConsentRoutes(g *echo.Group, h *ConsentHandler, jm *auth.JWTManager
 	g.POST("/respond-combined", h.RespondCombined)
 	// Public stripped consent-token info (no auth — token is the bearer).
 	g.GET("/info", h.Info)
-	// Record a consent decision (JWT, tenant-scoped) — kept for admin manual override.
-	g.POST("/respond", h.Respond, authMW, roleMW, scopeMW)
 	// Flat consent view: all participants across sessions (JWT, tenant-scoped).
 	g.GET("/flat", h.Flat, authMW, roleMW, scopeMW)
 	// Single-participant WhatsApp send (JWT, tenant-scoped).

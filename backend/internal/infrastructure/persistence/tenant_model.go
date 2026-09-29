@@ -35,8 +35,3 @@ func (m *TenantModel) ToEntity() *entity.Tenant {
 	e := m.Tenant
 	return &e
 }
-
-// tenantModelFromEntity builds a model from a domain entity.
-func tenantModelFromEntity(e *entity.Tenant) *TenantModel {
-	return &TenantModel{Tenant: *e}
-}

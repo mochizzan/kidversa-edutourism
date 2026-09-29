@@ -99,7 +99,6 @@ export const API_ROUTES = {
  TENANTS: {
   BASE: '/api/tenants',
   STATS: '/api/tenants/stats',
-  DETAIL: (id: string) => `/api/tenants/${encodeURIComponent(id)}`,
  },
 
  // Public tenant list — anonymous, used by the self-service register form to
@@ -131,9 +130,7 @@ export const API_ROUTES = {
   DETAIL: (id: string) => `/api/reports/${encodeURIComponent(id)}`,
   BY_SESSION: (sessionId: string) =>
    `/api/reports?session_id=${encodeURIComponent(sessionId)}`,
-  GENERATE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate`,
   GENERATE_STREAM: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
-  GENERATE_STREAM_SSE: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
   GENERATE_SESSION: '/api/reports/generate',
   SUGGEST_MISSIONS: (id: string) =>
    `/api/reports/${encodeURIComponent(id)}/suggest-missions`,
@@ -141,12 +138,9 @@ export const API_ROUTES = {
    `/api/reports/${encodeURIComponent(id)}/missions`,
   APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
   SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
-  REVOKE_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-token`,
   ACCESS: '/api/reports/access',
   ACCESS_PHOTO: '/api/reports/access/photo',
   GALLERY: '/api/reports/gallery',
-  GENERATE_GALLERY_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/gallery-token`,
-  REVOKE_GALLERY_TOKEN: (id: string) => `/api/reports/${encodeURIComponent(id)}/revoke-gallery-token`,
  },
 
  MISSIONS: {
@@ -157,7 +151,6 @@ export const API_ROUTES = {
 
  PARTICIPANT_MISSIONS: {
   BASE: '/api/participant-missions',
-  DETAIL: (id: string) => `/api/participant-missions/${encodeURIComponent(id)}`,
   TOGGLE: (id: string) => `/api/participant-missions/${encodeURIComponent(id)}/toggle`,
   BY_REPORT: (reportId: string) =>
    `/api/participant-missions?report_id=${encodeURIComponent(reportId)}`,
@@ -178,7 +171,6 @@ export const API_ROUTES = {
   BY_SESSION: (sessionId: string) =>
    `/api/attendance?session_id=${encodeURIComponent(sessionId)}`,
   UPSERT: '/api/attendance/upsert',
-  BULK_UPSERT: '/api/attendance/bulk-upsert',
  },
 
  // ProgramStage list/read endpoint.

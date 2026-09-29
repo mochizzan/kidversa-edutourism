@@ -14,11 +14,6 @@ type AssessmentUpsertRequest struct {
 	SyncStatus        string `json:"sync_status,omitempty"`
 }
 
-// AssessmentBulkUpsertRequest wraps a batch of upserts.
-type AssessmentBulkUpsertRequest struct {
-	Items []AssessmentUpsertRequest `json:"items" validate:"required,min=1,dive"`
-}
-
 // AssessmentResponse is the list/read representation.
 type AssessmentResponse struct {
 	*entity.Assessment

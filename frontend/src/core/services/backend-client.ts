@@ -21,7 +21,7 @@ import { getActiveTenantId } from '../utils/tenant'
 import { STORAGE_KEYS } from '../constants/storage'
 import { i18n } from '../i18n'
 
-export type ConnectionState = 'online' | 'degraded' | 'reconnecting'
+export type ConnectionState = 'online' | 'reconnecting'
 
 const AUTH_CHANNEL = 'kidversa-auth'
 
@@ -451,33 +451,6 @@ export function openSSE(
 }
 
 // ---------------------------------------------------------------------------
-// Connection watcher
-// ---------------------------------------------------------------------------
-
-let connectionTimer: ReturnType<typeof setInterval> | null = null
-
-export function stopConnectionWatcher(): void {
-  if (connectionTimer !== null) {
-    clearInterval(connectionTimer)
-    connectionTimer = null
-  }
-}
-
-export function startConnectionWatcher(intervalMs = 15000): () => void {
-  // Avoid duplicate watchers in the same tab.
-  if (connectionTimer !== null) {
-    return stopConnectionWatcher
-  }
-  const tick = async () => {
-    const ok = await healthCheck()
-    setConnection(ok ? 'online' : 'degraded')
-  }
-  void tick()
-  connectionTimer = setInterval(tick, intervalMs)
-  return stopConnectionWatcher
-}
-
-// ---------------------------------------------------------------------------
 // Public client object
 // ---------------------------------------------------------------------------
 
@@ -490,8 +463,6 @@ export const backendClient = {
   getTokens,
   setTokens,
   clearTokens,
-  startConnectionWatcher,
-  stopConnectionWatcher,
   getConnection,
   setConnection,
   subscribeConnection,

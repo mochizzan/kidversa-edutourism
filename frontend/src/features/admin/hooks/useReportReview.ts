@@ -375,7 +375,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     setNarrativeText('')
     try {
       const source = openSSE(
-        API_ROUTES.REPORTS.GENERATE_STREAM_SSE(report.id),
+        API_ROUTES.REPORTS.GENERATE_STREAM(report.id),
         () => { },
         {
           tenantId: saTenant,
@@ -510,10 +510,9 @@ export function useReportReview(sessionId: string | undefined, participantId: st
         (participant.group_id
           ? groups.find((g) => g.id === participant.group_id)?.facilitator_name
           : undefined)?.trim() || DEFAULT_FACILITATOR_NAME,
-      facilitatorPhotoUrl: user?.avatar_url,
       galleryUrl,
     })
-  }, [participant, session, report, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, user, programName, activeTopicId, topics])
+  }, [participant, session, report, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, programName, activeTopicId, topics])
 
   const handleCetak = useCallback(async () => {
     const html = await buildRaportHtml()

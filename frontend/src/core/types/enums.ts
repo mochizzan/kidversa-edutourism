@@ -65,27 +65,8 @@ export enum ReportStatus {
   SEND_FAILED = 'SEND_FAILED',
 }
 
-export enum SyncQueueDataType {
-  ASSESSMENT = 'ASSESSMENT',
-  PHOTO = 'PHOTO',
-  PROGRESS = 'PROGRESS',
-}
-
-export enum SyncQueueStatus {
-  PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
-  DONE = 'DONE',
-  FAILED = 'FAILED',
-}
-
 export enum ApprovalStatus {
   PENDING = 'pending',
   APPROVED = 'approved',
   REJECTED = 'rejected',
-}
-
-export enum ConnectionStatus {
-  CLOUD = 'CLOUD',
-  EDGE = 'EDGE',
-  OFFLINE = 'OFFLINE',
 }

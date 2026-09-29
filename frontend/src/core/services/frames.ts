@@ -60,20 +60,6 @@ const getById = async (id: string): Promise<PhotoFrame | null> => {
   return itemRequest<PhotoFrame>('GET', API_ROUTES.FRAMES.DETAIL(id))
 }
 
-const create = async (
-  data: Omit<PhotoFrame, 'id' | 'created_at'>,
-): Promise<PhotoFrame> => {
-  return itemRequest<PhotoFrame>('POST', API_ROUTES.FRAMES.BASE, {
-    tenant_id: data.tenant_id,
-    program_id: data.program_id ?? '',
-    name: data.name,
-    file_url: data.file_url,
-    thumbnail_url: data.thumbnail_url ?? '',
-    is_active: data.is_active,
-    sort_order: data.sort_order ?? 0,
-  })
-}
-
 const update = async (
   id: string,
   data: Partial<Omit<PhotoFrame, 'id' | 'created_at'>>,
@@ -116,7 +102,6 @@ const upload = async (data: {
 export const frameService: FrameService = {
   getAll,
   getById,
-  create,
   update,
   deactivate,
   activate,

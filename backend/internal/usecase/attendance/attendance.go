@@ -44,15 +44,3 @@ func (u *Usecase) Upsert(ctx context.Context, participantID, sessionID string, i
 	}
 	return a, nil
 }
-
-// BulkUpsert marks attendance for multiple participants.
-func (u *Usecase) BulkUpsert(ctx context.Context, items []entity.ParticipantAttendance, markedBy, tenantID string) error {
-	if len(items) == 0 {
-		return apperrors.BadRequest("validation_error", nil)
-	}
-	for i := range items {
-		items[i].MarkedAt = time.Now()
-		items[i].MarkedBy = &markedBy
-	}
-	return u.repo.BulkUpsert(ctx, items)
-}

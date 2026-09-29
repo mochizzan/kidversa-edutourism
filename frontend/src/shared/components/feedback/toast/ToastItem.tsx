@@ -53,7 +53,7 @@ export function ToastItem({
  const durationRef = useRef(toast.duration)
  onRemoveRef.current = onRemove
  durationRef.current = toast.duration
- const isPersistent = toast.duration === 0 || toast.duration == null
+ const isPersistent = toast.duration === 0
  const effectiveDuration = durationRef.current ?? DEFAULT_DURATION
  const config = TOAST_CONFIG[toast.type]
  const Icon = config.icon

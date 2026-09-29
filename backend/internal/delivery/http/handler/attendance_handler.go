@@ -5,7 +5,6 @@ import (
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
-	"kidversa-edutourism-backend/internal/domain/entity"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	attendanceuc "kidversa-edutourism-backend/internal/usecase/attendance"
 )
@@ -54,29 +53,4 @@ func (h *AttendanceHandler) Upsert(c *echo.Context) error {
 		return err
 	}
 	return appresp.Created(c, dto.NewAttendanceResponse(a))
-}
-
-// BulkUpsert handles POST /api/attendance/bulk-upsert.
-func (h *AttendanceHandler) BulkUpsert(c *echo.Context) error {
-	var req dto.AttendanceBulkUpsertRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
-	}
-	actorID := appmiddleware.GetUserID(c)
-	items := make([]entity.ParticipantAttendance, 0, len(req.Items))
-	for _, r := range req.Items {
-		items = append(items, entity.ParticipantAttendance{
-			ParticipantID: r.ParticipantID,
-			SessionID:     r.SessionID,
-			IsPresent:     r.IsPresent,
-		})
-	}
-	if err := h.uc.BulkUpsert((*c).Request().Context(), items, actorID, tenantID); err != nil {
-		return err
-	}
-	return appresp.OK(c, items)
 }

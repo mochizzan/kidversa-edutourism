@@ -47,7 +47,6 @@
     },
     "connection": {
       "online": "Disambungkan ke pelayan — Semua data disegerakkan",
-      "degraded": "Terputus daripada pelayan — Sambungan terhad",
       "reconnecting": "Terputus daripada pelayan — Cuba menyambung semula…",
       "labelOnline": "Disambungkan ke pelayan",
       "labelOffline": "Terputus daripada pelayan"
@@ -181,7 +180,6 @@
       "viewDetail": "Lihat Butiran",
       "start": "Mulakan Sesi",
       "complete": "Selesaikan Sesi",
-      "cancel": "Batal",
       "delete": "Padam Sesi",
       "loadProgramsError": "Gagal memuatkan senarai program.",
       "notFound": "Sesi tidak ditemui",
@@ -358,15 +356,8 @@
       "deactivate": "Nyahaktifkan",
       "activate": "Aktifkan",
       "toggleStatus": "Tukar Status",
-      "description": "Penerangan",
-      "programLine": "Program: {{name}}",
-      "pickProgram": "Pilih Program",
-      "pickProgramFirst": "Pilih Program Dahulu",
       "allPrograms": "Semua Program",
-      "programRequired": "Program wajib dipilih",
-      "topicRequired": "Topik wajib dipilih",
-      "fillRequired": "Lengkapkan semua medan yang wajib",
-      "pageLoading": "Sedang dimuatkan..."
+      "fillRequired": "Lengkapkan semua medan yang wajib"
     },
     "badge": {
       "nameLabel": "Nama Lencana",
@@ -391,7 +382,6 @@
       "programName": "Nama Program",
       "sessionName": "Nama Sesi",
       "participantName": "Nama Peserta",
-      "activityName": "Nama Aktiviti",
       "assessed": "Penilaian"
     },
     "dashboard": {
@@ -462,7 +452,6 @@
       "changePhoto": "Tukar foto profil",
       "changePhotoBtn": "Ganti Foto",
       "phoneLabel": "No. Telefon",
-      "roleKoordinator": "Penyelaras Program",
       "imageError": "Gagal memproses imej",
       "notFound": "Pengguna tidak ditemui",
       "updatedToast": "Pengguna berjaya dikemas kini",
@@ -1101,7 +1090,6 @@
     "validation_error": "Data tidak sah. Semak semula input anda.",
     "token_expired": "Pautan telah tamat tempoh. Sila hubungi penyelaras.",
     "token_invalid": "Pautan tidak sah.",
-    "token_consumed": "Pautan ini telah digunakan sebelum ini.",
     "tenant_required": "Sila pilih penyewa terlebih dahulu.",
     "internal_error": "Ralat berlaku pada pelayan. Sila cuba lagi.",
     "kiosk_invalid": "Sesi tamat atau pautan tidak sah.",
@@ -1113,6 +1101,13 @@
     "session_not_deletable": "Sesi ini tidak boleh dipadamkan.",
     "participant_not_deletable": "Peserta ini tidak boleh dipadamkan.",
     "participant_duplicate_name": "Nama peserta sudah wujud.",
+    "already_generating": "Laporan untuk sesi ini sedang dijana. Sila tunggu sehingga siap.",
+    "nothing_to_send": "Tiada peserta yang perlu dihantar permintaan persetujuan.",
+    "already_sent": "Permintaan persetujuan telah dihantar sebelum ini.",
+    "already_consented": "Peserta ini telah memberikan persetujuan.",
+    "content_tenant_mismatch": "Kandungan ini bukan milik penyewa aktif.",
+    "self_role_change_not_allowed": "Anda tidak boleh mengubah peranan anda sendiri.",
+    "participant_not_in_session": "Peserta ini tidak didaftarkan dalam sesi ini.",
     "bad_request": "Permintaan tidak dapat diproses.",
     "schema_drift": "Ralat berlaku pada struktur pangkalan data. Hubungi pentadbir.",
     "facilitator_required": "Belum ada fasilitator yang ditugaskan.",

@@ -42,12 +42,3 @@ export const useToastStore = create<ToastStore>((set, get) => ({
   removeToast: (id) => set((prev) => ({ toasts: prev.toasts.filter((t) => t.id !== id) })),
   dismissAll: () => set({ toasts: [] }),
 }))
-
-// Imperative escape hatch for non-component code (event handlers, utilities).
-// Kept minimal: delegates to the store so there is exactly one state source.
-export const toastRegistry = {
-  get current() {
-    const { addToast, removeToast, dismissAll, toasts } = useToastStore.getState()
-    return { addToast, removeToast, dismissAll, toasts }
-  },
-}

@@ -1,4 +1,4 @@
-import type { ContentType, SessionStatus, UserRole } from './enums'
+import type { ContentType, UserRole } from './enums'
 
 export interface PaginatedResponse<T> {
   data: T[]
@@ -54,10 +54,6 @@ export interface CreateSessionDTO {
   end_time?: string
   location: string
   notes?: string
-}
-
-export interface UpdateSessionDTO extends Partial<CreateSessionDTO> {
-  status?: SessionStatus
 }
 
 export interface CreateParticipantDTO {

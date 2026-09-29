@@ -50,6 +50,21 @@ async function waitForSVGConversion(doc: Document, timeout = 3000): Promise<void
  }
 }
 
+// Polls the dynamic-scaling sentinel set by __fitRaport in the generated
+// document (#raport-scale[data-fit="done"]) so capture never grabs the sheet
+// before the content scale is applied — otherwise PNG/PDF could capture the
+// unscaled layout. Non-fatal on timeout: capture proceeds with whatever state
+// exists (same policy as waitForSVGConversion).
+async function waitForFit(doc: Document, timeout = 3000): Promise<void> {
+ const start = Date.now()
+ while (Date.now() - start < timeout) {
+  if (doc.getElementById('raport-scale')?.getAttribute('data-fit') === 'done') return
+  const { promise, resolve } = Promise.withResolvers<void>()
+  setTimeout(resolve, 100)
+  await promise
+ }
+}
+
 // ─── Shared hidden iframe creation ───
 
 // Renders the given mini raport HTML off-screen in a hidden iframe (via srcDoc so
@@ -91,10 +106,14 @@ async function createRaportIframe(html: string): Promise<{
     // 3. Wait for the pre-compiled Tailwind CSS to be applied.
     await waitForStyles(doc)
 
-    // 4. Paint buffer — let the browser render all glyphs before capture.
+    // 4. Wait for the dynamic content scale (__fitRaport) so the capture sees
+    //    the fitted layout, not the pre-scale one.
+    await waitForFit(doc)
+
+    // 5. Paint buffer — let the browser render all glyphs before capture.
     await new Promise((r) => setTimeout(r, 500))
 
-    // 5. Capture-only overrides (NOT applied to the on-screen document or print):
+    // 6. Capture-only overrides (NOT applied to the on-screen document or print):
     // remove the outer sheet's rounded corners, shadow, ring, and body padding so
     // the A4 sheet fills the capture edge-to-edge with sharp corners. Inner cards
     // keep their decorative radius. !important beats the inline computed styles
@@ -113,13 +132,15 @@ async function createRaportIframe(html: string): Promise<{
             width: ${A4_SHEET_WIDTH}px !important;
             max-width: ${A4_SHEET_WIDTH}px !important;
             min-height: 1123px !important;
-            /* Floor A4 eksplisit untuk dokumen tangkapan: tinggi mengikuti
-               konten alami dengan floor 1123px. Lembar yang muat A4 tertangkap
-               tepat 794×1123px; lembar lebih tinggi ikut utuh dan tetap
-               menghasilkan halaman A4 karena captureElementAsPdf menskalakan
-               hasil ke 210×297mm. height:auto dipertahankan sebagai jaring
-               pengaman bila representasi layar kembali memakai tinggi tetap. */
-            height: auto !important;
+            /* Tinggi A4 eksplisit untuk dokumen tangkapan. Skala isi
+               (__fitRaport) menjamin tinggi cat <= ruang .raport-main, jadi
+               lembar selalu tertangkap tepat 794×1123px dan overflow-hidden
+               tidak membuang konten. height:auto sengaja tidak dipakai: tinggi
+               layout .raport-main mengikuti konten ALAMI (transform tidak
+               memengaruhi layout), sehingga tanpa tinggi tetap ini lembar bisa
+               ter-capture lebih tinggi dari A4 lalu PDF terkecilkan kembali
+               dengan margin putih. */
+            height: 1123px !important;
             display: flex !important;
             flex-direction: column !important;
           }

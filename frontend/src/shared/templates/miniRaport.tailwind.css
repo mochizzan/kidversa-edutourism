@@ -16,33 +16,51 @@
   --color-brand-text: #334155;
 }
 
-/* Representasi kertas A4 tetap di layar: lebar TETAP 210mm, tinggi
-   min-height 297mm (210mm @96dpi = 793,70px dan 297mm = 1122,52px). Lembar
-   yang muat selalu tepat A4; isi yang melampaui satu halaman MEMANJANG (bukan
-   terpotong) agar tidak ada data yang hilang di layar — cetak/PDF tetap
-   dikembalikan ke A4 penuh lewat mekanisme --print-scale / jsPDF. Nilai px
-   hanya dipakai di tempat yang mensyaratkan piksel — A4_SHEET_WIDTH (794,
-   pembulatan 793,70) untuk lebar iframe tersembunyi & input html2canvas/jsPDF
-   (core/constants/report.ts, core/utils/raportCapture.ts).
+/* Representasi kertas A4 TETAP (210mm × 297mm = 21cm × 29.7cm; 210mm @96dpi
+   = 793,70px dan 297mm = 1122,52px) di layar dan cetak — lebar dan tinggi
+   dikunci, tanpa unit relatif/%/vw/vh dan tanpa skala responsif. Skala
+   dinamis HANYA pada isi lembar (#raport-scale, transform:scale dihitung di
+   klien oleh __fitRaport di miniRaport.ts) — dimensi lembar ini tidak pernah
+   diskalakan. `flex-shrink:
+   0` menahan penyusutan flexbox: body dokumen memakai `flex justify-center`
+   dengan padding px-4, sehingga tanpa ini lembar menyusut ke (lebar viewport −
+   padding) dan tidak lagi 210mm fisik. Nilai px hanya dipakai di tempat yang
+   mensyaratkan piksel — A4_SHEET_WIDTH (794, pembulatan 793,70) untuk lebar
+   iframe tersembunyi & input html2canvas/jsPDF (core/constants/report.ts,
+   core/utils/raportCapture.ts).
 
    Ditulis sebagai CSS statis di sini (bukan utility `max-w-[…]` di class attr):
    aturan di lapisan @layer utilities kalah dari CSS biasa, jadi dimensi ini
    harus tetap statis agar terbaca @source (baris 2) dan menjadi satu-satunya
-   sumber dimensi lembar di layar. */
+   sumber dimensi lembar — layar maupun cetak (@page + @media print di bawah). */
 .a4-sheet {
   width: 210mm;
   max-width: 210mm;
+  height: 297mm;
   min-height: 297mm;
+  flex-shrink: 0;
 }
 
-@media (max-width: 480px) {
+/* Cetak mengikuti dimensi lembar di layar: kertas A4 tanpa margin bawaan
+   (lembar sudah full-bleed 210mm × 297mm). */
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
   .a4-sheet {
-    width: 100% !important;
-    max-width: 100% !important;
-    transform: none !important;
-    font-size: clamp(11px, 2.6vw, 13px);
+    width: 210mm !important;
+    max-width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
   }
-  .a4-sheet main.grid {
+}
+
+/* Override mode-card hanya untuk tata letak ISI di bawah 480px — dimensi
+   lembar TIDAK lagi dibuat responsif (width/height tetap 210mm/297mm). */
+@media (max-width: 480px) {
+  .a4-sheet .raport-scale {
     grid-template-columns: 1fr !important;
   }
   .a4-sheet [class*="col-span-"] {
@@ -58,7 +76,7 @@
     overflow: visible !important;
   }
   /* Blok berbagi baris grid tidak lagi perlu tinggi minimum A4. */
-  .a4-sheet main.grid > * {
+  .a4-sheet .raport-scale > * {
     min-height: 0 !important;
     grid-row: auto !important;
   }

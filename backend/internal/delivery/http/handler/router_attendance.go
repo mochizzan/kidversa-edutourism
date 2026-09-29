@@ -15,5 +15,4 @@ func RegisterAttendanceRoutes(g *echo.Group, h *AttendanceHandler, jm *auth.JWTM
 	roleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator, entity.RoleFasilitator)
 	g.GET("", h.List, authMW, roleMW, scopeMW)
 	g.POST("/upsert", h.Upsert, authMW, roleMW, scopeMW)
-	g.POST("/bulk-upsert", h.BulkUpsert, authMW, roleMW, scopeMW)
 }

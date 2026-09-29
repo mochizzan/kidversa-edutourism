@@ -51,20 +51,9 @@ type Config struct {
 	// SSE
 	SSEKeepaliveSec int
 
-	// Backends (single-instance in v1; memory is the only supported backend)
-	RealtimeBackend string
-	RevokerBackend  string
-
 	// Bootstrap
 	BootstrapSuperadminPassword string
 	SuperadminForceReset        bool
-
-	// Test database (separate from dev/prod)
-	TestDBHost     string
-	TestDBPort     string
-	TestDBUser     string
-	TestDBPassword string
-	TestDBName     string
 
 	// WhatsApp (OpenWA self-hosted gateway) — used by the consent and report
 	// delivery flows.
@@ -128,21 +117,12 @@ func Load() *Config {
 
 		CookieName: getEnv("COOKIE_NAME", "kidversa_session"),
 
-		RateLimitPerMin: getEnvInt("RATE_LIMIT_PER_MIN", 60),
+		RateLimitPerMin: getEnvInt("RATE_LIMIT_PER_MIN", 30),
 		SSEKeepaliveSec: getEnvInt("SSE_KEEPALIVE_SEC", 15),
 		UploadMaxMB:     getEnvInt("UPLOAD_MAX_MB", 25),
 
-		RealtimeBackend: getEnv("REALTIME_BACKEND", "memory"),
-		RevokerBackend:  getEnv("REVOKER_BACKEND", "memory"),
-
 		BootstrapSuperadminPassword: getEnv("BOOTSTRAP_SUPERADMIN_PASSWORD", ""),
 		SuperadminForceReset:        getEnvBool("SUPERADMIN_FORCE_RESET", false),
-
-		TestDBHost:     getEnv("TEST_DB_HOST", "127.0.0.1"),
-		TestDBPort:     getEnv("TEST_DB_PORT", "3306"),
-		TestDBUser:     getEnv("TEST_DB_USER", "root"),
-		TestDBPassword: getEnv("TEST_DB_PASSWORD", ""),
-		TestDBName:     getEnv("TEST_DB_NAME", "kidversa_test"),
 
 		WhatsAppGatewayURL:   getEnv("WHATSAPP_GATEWAY_URL", ""),
 		WhatsAppAPIKey:       getEnv("WHATSAPP_API_KEY", ""),
@@ -181,9 +161,6 @@ func Load() *Config {
 	if c.DBUser == "root" && c.DBPassword == "" {
 		log.Println("config: WARNING — DB_USER=root dengan DB_PASSWORD kosong, tidak aman untuk production")
 	}
-	if c.TestDBName == c.DBName && c.DBName != "" {
-		log.Println("config: WARNING — TestDBName sama dengan DBName, pastikan database terpisah")
-	}
 
 	return c
 }
@@ -212,12 +189,6 @@ func (c *Config) SSECookieName() string {
 // RefreshCookieName returns the configured refresh-token cookie name.
 func (c *Config) RefreshCookieName() string {
 	return getEnv("REFRESH_COOKIE_NAME", "kidversa_refresh")
-}
-
-// TestDSN returns the DSN for the isolated test database.
-func (c *Config) TestDSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&multiStatements=true&timeout=5s&readTimeout=10s&writeTimeout=10s",
-		c.TestDBUser, c.TestDBPassword, c.TestDBHost, c.TestDBPort, c.TestDBName)
 }
 
 // findAndLoadDotEnv locates the Go module root by walking upward for go.mod,

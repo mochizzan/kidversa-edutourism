@@ -13,18 +13,6 @@ type CreateSessionRequest struct {
 	Notes       string  `json:"notes,omitempty"`
 }
 
-// UpdateSessionRequest is the payload for PUT /api/sessions/:id.
-type UpdateSessionRequest struct {
-	ProgramID   string  `json:"program_id,omitempty"`
-	Name        string  `json:"name,omitempty"`
-	SessionDate string  `json:"session_date,omitempty"`
-	StartTime   *string `json:"start_time,omitempty"`
-	EndTime     *string `json:"end_time,omitempty"`
-	Location    string  `json:"location,omitempty"`
-	Notes       string  `json:"notes,omitempty"`
-	Status      string  `json:"status,omitempty"`
-}
-
 // CreateGroupRequest is the payload for POST /api/sessions/:id/groups.
 type CreateGroupRequest struct {
 	Name string `json:"name" validate:"required"`

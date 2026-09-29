@@ -1,14 +1,12 @@
 package ai
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"kidversa-edutourism-backend/internal/config"
@@ -25,14 +23,6 @@ type openRouterRequest struct {
 	Temperature float64             `json:"temperature"`
 	MaxTokens   int                 `json:"max_tokens"`
 	Stream      bool                `json:"stream"`
-}
-
-type openRouterStreamChunk struct {
-	Choices []openRouterStreamChoice `json:"choices"`
-}
-
-type openRouterStreamChoice struct {
-	Delta openRouterMessage `json:"delta"`
 }
 
 type openRouterMessage struct {
@@ -147,59 +137,6 @@ func (c *OpenRouterClient) ChatCompletion(ctx context.Context, systemPrompt, use
 		return content, nil
 	}
 	return "", lastErr
-}
-
-// StreamChatCompletion streams a chat completion, invoking onToken for each token delta.
-func (c *OpenRouterClient) StreamChatCompletion(ctx context.Context, systemPrompt, userPrompt string, onToken func(string) error) error {
-	req, err := c.buildRequest(ctx, systemPrompt, userPrompt, true)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("openrouter request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if err := mapStatusError(resp.StatusCode); err != nil {
-		return err
-	}
-
-	reader := bufio.NewReaderSize(resp.Body, 4096)
-	for {
-		line, readErr := reader.ReadString('\n')
-		if readErr != nil && readErr != io.EOF {
-			return fmt.Errorf("read stream: %w", readErr)
-		}
-
-		line = strings.TrimSpace(strings.TrimRight(line, "\r\n"))
-		if line != "" && strings.HasPrefix(line, "data:") {
-			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			if payload == "[DONE]" {
-				break
-			}
-
-			var chunk openRouterStreamChunk
-			if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
-				return fmt.Errorf("parse stream chunk: %w", err)
-			}
-
-			if len(chunk.Choices) > 0 {
-				if token := chunk.Choices[0].Delta.Content; token != "" && onToken != nil {
-					if err := onToken(token); err != nil {
-						return fmt.Errorf("token callback: %w", err)
-					}
-				}
-			}
-		}
-
-		if readErr == io.EOF {
-			break
-		}
-	}
-
-	return nil
 }
 
 // buildRequest constructs an OpenRouter chat-completions HTTP request with the

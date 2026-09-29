@@ -12,7 +12,7 @@ export interface Toast {
   id: string
   type: ToastType
   message: string
-  /** Duration in ms; 0 or undefined = persistent (no auto-dismiss, no progress bar). */
+  /** Duration in ms; 0 = persistent (no auto-dismiss, no progress bar). Omitted/null falls back to DEFAULT_DURATION (toastConfig). */
   duration?: number
   /** Optional action chip label. */
   actionLabel?: string

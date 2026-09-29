@@ -94,7 +94,7 @@ Aplikasi mengintegrasikan empat ekosistem pengguna yang saling terhubung dalam s
 
 ### Infrastruktur
 *   **Orchestration:** Docker Compose (profile `dev` & `prod`) — `mariadb:12`, `backend`, `frontend`.
-*   **CI:** GitHub Actions (`backend/.github/workflows/ci.yml`) — gofmt → go vet → go build → go test (backend); pnpm build (frontend).
+*   **CI/CD:** Tidak ada pipeline yang dikonfigurasi (GitHub Actions dihapus berdasarkan keputusan) — semua gate dijalankan lokal: gofmt → go vet → go build → go test (backend); pnpm build (frontend).
 
 ---
 
@@ -127,13 +127,13 @@ cd frontend
 pnpm install
 pnpm dev                      # http://localhost:5173 (Vite proxy /api → :8080)
 ```
-> `pnpm build` adalah satu-satunya verification setara-CI untuk frontend — jalankan
+> `pnpm build` adalah satu-satunya verification untuk frontend — jalankan
 > setelah perubahan. Tidak ada script test/lint/format di frontend.
 
 ### Perintah Backend (verification)
 ```bash
 cd backend
-gofmt -w .          # format (di-enforce di CI)
+gofmt -w .          # format (wajib sebelum commit)
 go vet ./...        # static analysis
 go build ./...      # compilation check
 go test ./...       # integration test (BUTUH MariaDB 12 jalan)

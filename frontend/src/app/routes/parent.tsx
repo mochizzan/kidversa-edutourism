@@ -5,7 +5,6 @@ import { RouteGuard } from '../../shared/components/auth/RouteGuard'
 import { lazyRoute, SuspenseWrapper } from './helpers'
 
 // Public, unauthenticated parent routes (token in the query string).
-const ParentReportAccessPage = lazy(() => import('../../features/parent/pages/ReportPage'))
 const ParentConsentFormPage = lazy(() => import('../../features/parent/pages/ConsentFormPage'))
 const ParentReportPage = lazy(() => import('../../features/parent/pages/ReportPage'))
 const ParentMissionsPage = lazy(() => import('../../features/parent/pages/MissionsPage'))
@@ -17,7 +16,7 @@ export const parentRoutes: RouteObject[] = [
     path: '/report/access',
     element: (
       <SuspenseWrapper>
-        <ParentReportAccessPage />
+        <ParentReportPage />
       </SuspenseWrapper>
     ),
   },

@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ChevronDown,
   Monitor,
-  Zap,
   RefreshCw,
   LayoutGrid,
   Image,
@@ -183,7 +182,6 @@ export const CameraViewport = ({
 
       {cameraState !== 'loading' && isMobile && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-4">
-          <CircleControlBtn icon={Zap} label={t('fasilitator.camera.flash')} onClick={() => { }} />
           <CircleControlBtn icon={RefreshCw} label={t('fasilitator.camera.flip')} onClick={onSwitchCamera} />
           <CircleControlBtn icon={LayoutGrid} label={t('fasilitator.camera.grid')} onClick={onToggleGrid} active={showGrid} />
         </div>

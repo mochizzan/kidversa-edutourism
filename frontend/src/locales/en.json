@@ -47,7 +47,6 @@
     },
     "connection": {
       "online": "Connected to server — All data synchronized",
-      "degraded": "Disconnected from server — Limited connection",
       "reconnecting": "Disconnected from server — Attempting to reconnect…",
       "labelOnline": "Connected to server",
       "labelOffline": "Disconnected from server"
@@ -181,7 +180,6 @@
       "viewDetail": "View Details",
       "start": "Start Session",
       "complete": "Complete Session",
-      "cancel": "Cancel",
       "delete": "Delete Session",
       "loadProgramsError": "Failed to load program list.",
       "notFound": "Session not found",
@@ -358,15 +356,8 @@
       "deactivate": "Deactivate",
       "activate": "Activate",
       "toggleStatus": "Change Status",
-      "description": "Description",
-      "programLine": "Program: {{name}}",
-      "pickProgram": "Select Program",
-      "pickProgramFirst": "Select Program First",
       "allPrograms": "All Programs",
-      "programRequired": "Program is required",
-      "topicRequired": "Topic is required",
-      "fillRequired": "Complete all required fields",
-      "pageLoading": "Loading..."
+      "fillRequired": "Complete all required fields"
     },
     "badge": {
       "nameLabel": "Badge Name",
@@ -391,7 +382,6 @@
       "programName": "Program Name",
       "sessionName": "Session Name",
       "participantName": "Participant Name",
-      "activityName": "Activity Name",
       "assessed": "Assessment"
     },
     "dashboard": {
@@ -462,7 +452,6 @@
       "changePhoto": "Change profile photo",
       "changePhotoBtn": "Change Photo",
       "phoneLabel": "Phone Number",
-      "roleKoordinator": "Program Coordinator",
       "imageError": "Failed to process image",
       "notFound": "User not found",
       "updatedToast": "User updated successfully",
@@ -1101,7 +1090,6 @@
     "validation_error": "Invalid data. Please check your input.",
     "token_expired": "Link has expired. Please contact the coordinator.",
     "token_invalid": "Invalid link.",
-    "token_consumed": "This link has already been used.",
     "tenant_required": "Please select a tenant first.",
     "internal_error": "A server error occurred. Please try again.",
     "kiosk_invalid": "Session expired or link is invalid.",
@@ -1113,6 +1101,13 @@
     "session_not_deletable": "This session cannot be deleted.",
     "participant_not_deletable": "This participant cannot be deleted.",
     "participant_duplicate_name": "Participant name already exists.",
+    "already_generating": "The report for this session is already being generated. Please wait for it to complete.",
+    "nothing_to_send": "There are no participants who need a consent request.",
+    "already_sent": "A consent request has already been sent.",
+    "already_consented": "This participant has already given consent.",
+    "content_tenant_mismatch": "This content does not belong to the active tenant.",
+    "self_role_change_not_allowed": "You cannot change your own role.",
+    "participant_not_in_session": "This participant is not registered in this session.",
     "bad_request": "Request could not be processed.",
     "schema_drift": "Database structure error. Contact the administrator.",
     "facilitator_required": "No facilitator assigned yet.",
