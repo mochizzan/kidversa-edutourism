@@ -127,6 +127,29 @@ const interruptedResponse: ConsentFlatResult = {
   extras: {},
 }
 
+// REAL backend contract for a finished batch: the registry RETAINS completed
+// batches in active_batches (newest ~20) with sent+failed === total, while
+// the rows carry the terminal delivery overlay. Presence alone must therefore
+// never keep the bulk button spinning — the counters decide.
+const retainedTerminalResponse: ConsentFlatResult = {
+  items: [
+    makeItem({ participant_id: 'p1', delivery_status: 'sent' }),
+    makeItem({ participant_id: 'p2', delivery_status: 'failed' }),
+  ],
+  extras: {
+    active_batches: [
+      {
+        batch_id: 'batch-1',
+        session_id: 'session-1',
+        started_at: '2026-09-30T00:00:00Z',
+        total: 2,
+        sent: 1,
+        failed: 1,
+      },
+    ],
+  },
+}
+
 describe('ConsentMonitorPage server delivery status', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -452,6 +475,195 @@ describe('ConsentMonitorPage server delivery status', () => {
         ).toHaveLength(0)
       } finally {
         warn.mockRestore()
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('SSE done + server-retained terminal batch → bulk button stops the spinner and returns to idle', async () => {
+    vi.mocked(consentService.getFlat)
+      .mockResolvedValueOnce(activeResponse)
+      .mockResolvedValue(retainedTerminalResponse)
+
+    render(<ConsentMonitorPage />)
+    await flush()
+
+    const sendAllLabel = i18n.t('admin.consent.sendAll')
+    const before = screen.getByRole('button', { name: sendAllLabel })
+    expect(before).toBeDisabled()
+    expect(before.querySelector('.animate-spin')).not.toBeNull()
+
+    // The server reports the batch finished over the existing SSE stream…
+    await act(async () => {
+      sse.opened[0].fire('done', { sent: 1, failed: 1, total: 2 })
+    })
+    await flush()
+
+    // …and the confirming refetch STILL carries the retained completed batch:
+    // the counters (sent+failed === total), not mere presence, stop the
+    // progress circular and return the button to its normal state.
+    expect(consentService.getFlat).toHaveBeenCalledTimes(2)
+    const after = screen.getByRole('button', { name: sendAllLabel })
+    expect(after).toBeEnabled()
+    expect(after.querySelector('.animate-spin')).toBeNull()
+    // Rows flip back to "Kirim Ulang" from the same retained server state.
+    expect(screen.getAllByRole('button', { name: i18n.t('admin.consent.resend') })).toHaveLength(2)
+    // No error surfaced — this was a clean terminal report.
+    expect(screen.queryByText(i18n.t('admin.consent.loadError'))).toBeNull()
+  })
+
+  it('reopening after completion renders an idle bulk button straight from retained terminal state', async () => {
+    vi.mocked(consentService.getFlat).mockResolvedValue(retainedTerminalResponse)
+
+    render(<ConsentMonitorPage />)
+    await flush()
+
+    const bulk = screen.getByRole('button', { name: i18n.t('admin.consent.sendAll') })
+    expect(bulk).toBeEnabled()
+    expect(bulk.querySelector('.animate-spin')).toBeNull()
+    // Server already says every batch is terminal — one clean check, no
+    // status-check retries or fallback polls fire.
+    expect(consentService.getFlat).toHaveBeenCalledTimes(1)
+    // Terminal rows offer "Kirim Ulang" immediately.
+    expect(screen.getAllByRole('button', { name: i18n.t('admin.consent.resend') })).toHaveLength(2)
+  })
+
+  it('failed final status checks: bounded retries with logs, surfaced stop, recovery only via server truth', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      vi.mocked(consentService.getFlat).mockImplementation(() => {
+        calls++
+        if (calls === 1) return Promise.resolve(activeResponse)
+        // The confirming check after SSE `done` and every retry keep failing…
+        if (calls <= 6) return Promise.reject(new Error('status check down'))
+        // …until the manual Retry gets a clean, terminal server response.
+        return Promise.resolve(retainedTerminalResponse)
+      })
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => { })
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => { })
+      try {
+        render(<ConsentMonitorPage />)
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+
+        const sendAllLabel = i18n.t('admin.consent.sendAll')
+        expect(screen.getByRole('button', { name: sendAllLabel })).toBeDisabled()
+
+        // Server reports done; the confirming status check FAILS.
+        await act(async () => {
+          sse.opened[0].fire('done', { sent: 1, failed: 1, total: 2 })
+        })
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+
+        // Failure surfaced with context — never silent.
+        expect(warn).toHaveBeenCalledWith(
+          '[useConsentMonitor] background flat refresh failed',
+          expect.any(Error),
+        )
+        // Spinner persists while retries run — a check result, not a timeout,
+        // decides the button state.
+        const during = screen.getByRole('button', { name: sendAllLabel })
+        expect(during).toBeDisabled()
+        expect(during.querySelector('.animate-spin')).not.toBeNull()
+        expect(
+          useToastStore.getState().toasts.filter((t) => t.type === 'error'),
+        ).toHaveLength(0)
+
+        // Four more failed checks → five consecutive failures hit the cap.
+        for (let i = 0; i < 4; i++) {
+          await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+        }
+        expect(consentService.getFlat).toHaveBeenCalledTimes(6)
+
+        // Cap: the progress circular STOPPED (never endless) and the failure
+        // is surfaced as message + log + error toast — but the button is NOT
+        // idle-normal: it waits for a server-confirmed state.
+        const capped = screen.getByRole('button', { name: sendAllLabel })
+        expect(capped.querySelector('.animate-spin')).toBeNull()
+        expect(capped).toBeDisabled()
+        expect(screen.getByText(i18n.t('admin.consent.loadError'))).toBeInTheDocument()
+        expect(errorLog).toHaveBeenCalledWith(
+          '[useConsentMonitor] consent status check failed repeatedly — stopping bulk-send progress until a clean server response arrives',
+        )
+        expect(
+          useToastStore.getState().toasts.filter(
+            (t) => t.type === 'error' && t.message === i18n.t('admin.consent.loadError'),
+          ),
+        ).toHaveLength(1)
+
+        // Auto-retries are BOUND at the cap — no endless polling either.
+        await act(async () => { await vi.advanceTimersByTimeAsync(9000) })
+        expect(consentService.getFlat).toHaveBeenCalledTimes(6)
+
+        // Manual Retry resumes the status check; a clean server response with
+        // the retained terminal batch restores the idle button — server-
+        // confirmed "done", not a timeout guess.
+        await act(async () => {
+          screen.getByRole('button', { name: i18n.t('common.error.retry') }).click()
+        })
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+        expect(consentService.getFlat).toHaveBeenCalledTimes(7)
+        const recovered = screen.getByRole('button', { name: sendAllLabel })
+        expect(recovered).toBeEnabled()
+        expect(recovered.querySelector('.animate-spin')).toBeNull()
+        expect(screen.queryByText(i18n.t('admin.consent.loadError'))).toBeNull()
+      } finally {
+        warn.mockRestore()
+        errorLog.mockRestore()
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('invalid status-check payload: logged, spinner bounded, capped into a surfaced error state', async () => {
+    vi.useFakeTimers()
+    try {
+      const malformedResponse = {
+        items: [makeItem({ participant_id: 'p1' }), makeItem({ participant_id: 'p2' })],
+        extras: { active_batches: 'bogus' },
+      } as unknown as ConsentFlatResult
+      vi.mocked(consentService.getFlat).mockResolvedValue(malformedResponse)
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => { })
+      try {
+        render(<ConsentMonitorPage />)
+        await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+
+        // Invalid server response is surfaced with a log and holds the
+        // spinner — it must never read as "semua selesai"…
+        expect(errorLog).toHaveBeenCalledWith(
+          '[useConsentMonitor] malformed active_batches payload in flat response',
+          'bogus',
+        )
+        const before = screen.getByRole('button', { name: i18n.t('admin.consent.sendAll') })
+        expect(before).toBeDisabled()
+        expect(before.querySelector('.animate-spin')).not.toBeNull()
+
+        // …and repeated invalid checks are BOUND: five total → capped state.
+        for (let i = 0; i < 4; i++) {
+          await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+        }
+        expect(consentService.getFlat).toHaveBeenCalledTimes(5)
+
+        const capped = screen.getByRole('button', { name: i18n.t('admin.consent.sendAll') })
+        expect(capped.querySelector('.animate-spin')).toBeNull()
+        expect(capped).toBeDisabled()
+        expect(screen.getByText(i18n.t('admin.consent.loadError'))).toBeInTheDocument()
+        expect(errorLog).toHaveBeenCalledWith(
+          '[useConsentMonitor] consent status check failed repeatedly — stopping bulk-send progress until a clean server response arrives',
+        )
+        expect(
+          useToastStore.getState().toasts.filter(
+            (t) => t.type === 'error' && t.message === i18n.t('admin.consent.loadError'),
+          ),
+        ).toHaveLength(1)
+
+        // No endless retries past the cap.
+        await act(async () => { await vi.advanceTimersByTimeAsync(9000) })
+        expect(consentService.getFlat).toHaveBeenCalledTimes(5)
+      } finally {
+        errorLog.mockRestore()
       }
     } finally {
       vi.useRealTimers()

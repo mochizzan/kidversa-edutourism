@@ -35,6 +35,7 @@ const ConsentMonitorPage = () => {
     refresh,
     sending,
     batchSending,
+    statusCheckFailed,
   } = useConsentMonitor()
 
   // Summary stats
@@ -81,6 +82,21 @@ const ConsentMonitorPage = () => {
       {/* Data */}
       {!loading && !error && items.length > 0 && (
         <>
+          {/* Status checks kept failing/returning invalid data: the bulk
+              button stopped its spinner into this surfaced, retryable state —
+              it never flips to idle without a clean server response. */}
+          {statusCheckFailed && (
+            <div className="flex items-center gap-3 bg-error-container/30 rounded-2xl px-4 py-3">
+              <AlertCircle className="w-5 h-5 shrink-0 text-on-error-container" />
+              <span className="flex-1 text-sm text-on-error-container">
+                {t('admin.consent.loadError')}
+              </span>
+              <Button variant="secondary" size="sm" onClick={refresh}>
+                {t('common.error.retry')}
+              </Button>
+            </div>
+          )}
+
           {/* Summary stats */}
           <div className="flex flex-wrap gap-3 text-sm">
             <span className="px-3 py-1 rounded-full bg-surface-container text-on-surface">
@@ -127,6 +143,7 @@ const ConsentMonitorPage = () => {
               icon={<Send />}
               onClick={sendAll}
               loading={batchSending}
+              disabled={statusCheckFailed}
             >
               {t('admin.consent.sendAll')}
             </Button>

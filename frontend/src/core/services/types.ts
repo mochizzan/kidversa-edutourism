@@ -239,9 +239,11 @@ export interface ConsentProgressEvent {
  }
 }
 
-// One running send-all batch reported by GET /api/consent/flat `active_batches`
-// (present only while server batches run; terminal batches are retained in the
-// registry only as per-row `delivery_status`).
+// One send-all batch reported by GET /api/consent/flat `active_batches`.
+// The server RETAINS completed batches in this list too (bounded in-memory
+// registry, newest ~20) alongside running ones — presence alone never means
+// "in progress": a batch is running only while sent+failed < total, and rows
+// keep their terminal delivery_status overlay from the same registry.
 export interface ConsentActiveBatch {
  batch_id: string
  session_id: string
