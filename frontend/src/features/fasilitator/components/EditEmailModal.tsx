@@ -7,6 +7,7 @@ import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
+import { ApiError } from '../../../core/services/backend-client'
 import { useAuthStore } from '../../../core/stores/authStore'
 import type { User } from '../../../core/types'
 import { i18n } from '../../../core/i18n'
@@ -25,9 +26,13 @@ interface EditEmailModalProps {
   onSaved?: (updated: User) => void
 }
 
+// Backend errors carry stable snake_case codes (MessageForCode maps them to
+// Indonesian strings, so matching on the message never fires). conflict is
+// the server-side uq_users_email authority — no client pre-check needed.
 const ERROR_MAP: Record<string, () => string> = {
-  EMAIL_EXISTS: () => i18n.t('fasilitator.edit.emailExists'),
-  'User not found': () => i18n.t('fasilitator.edit.userNotFound'),
+  forbidden: () => i18n.t('fasilitator.edit.noPermission'),
+  not_found: () => i18n.t('fasilitator.edit.userNotFound'),
+  conflict: () => i18n.t('fasilitator.edit.emailExists'),
 }
 
 const EditEmailModal = ({ open, onClose, user, onSaved }: EditEmailModalProps) => {
@@ -54,17 +59,9 @@ const EditEmailModal = ({ open, onClose, user, onSaved }: EditEmailModalProps) =
   const onSubmit = async (data: EditEmailFormData) => {
     try {
       const trimmedEmail = data.email.trim().toLowerCase()
-      if (trimmedEmail !== user.email.toLowerCase()) {
-        const existing = await userService.getAll({ search: trimmedEmail })
-        const duplicate = existing.data.find(
-          (u) => u.id !== user.id && u.email.toLowerCase() === trimmedEmail
-        )
-        if (duplicate) {
-          addToast({ type: 'error', message: t('fasilitator.edit.emailExists') })
-          return
-        }
-      }
-
+      // No client-side duplicate pre-check: GET /api/users is admin-only (the
+      // pre-check 403'd for fasilitator) and racy anyway. The server enforces
+      // uq_users_email and answers 409 conflict, mapped in ERROR_MAP below.
       const updated = await userService.update(user.id, { email: trimmedEmail })
       const { password_hash: _, ...cleanUser } = updated
       setUser(cleanUser as User)
@@ -72,8 +69,8 @@ const EditEmailModal = ({ open, onClose, user, onSaved }: EditEmailModalProps) =
       addToast({ type: 'success', message: t('fasilitator.edit.emailSaved') })
       onClose()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : ''
-      addToast({ type: 'error', message: ERROR_MAP[msg]?.() ?? t('fasilitator.edit.saveFailed') })
+      const code = err instanceof ApiError ? err.code : ''
+      addToast({ type: 'error', message: ERROR_MAP[code]?.() ?? t('fasilitator.edit.saveFailed') })
     }
   }
 

@@ -7,6 +7,7 @@ import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { userService } from '../../../core/services/users'
+import { ApiError } from '../../../core/services/backend-client'
 import { useAuthStore } from '../../../core/stores/authStore'
 import type { User } from '../../../core/types'
 import { useTranslation } from 'react-i18next'
@@ -30,8 +31,11 @@ interface EditNameModalProps {
   onSaved?: (updated: User) => void
 }
 
+// Backend errors carry stable snake_case codes (MessageForCode maps them to
+// Indonesian strings, so matching on the message never fires).
 const ERROR_MAP: Record<string, () => string> = {
-  'User not found': () => i18n.t('fasilitator.edit.userNotFound'),
+  forbidden: () => i18n.t('fasilitator.edit.noPermission'),
+  not_found: () => i18n.t('fasilitator.edit.userNotFound'),
 }
 
 const EditNameModal = ({ open, onClose, user, onSaved }: EditNameModalProps) => {
@@ -64,8 +68,8 @@ const EditNameModal = ({ open, onClose, user, onSaved }: EditNameModalProps) => 
       addToast({ type: 'success', message: t('fasilitator.edit.nameSaved') })
       onClose()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : ''
-      addToast({ type: 'error', message: ERROR_MAP[msg]?.() ?? t('fasilitator.edit.saveFailed') })
+      const code = err instanceof ApiError ? err.code : ''
+      addToast({ type: 'error', message: ERROR_MAP[code]?.() ?? t('fasilitator.edit.saveFailed') })
     }
   }
 

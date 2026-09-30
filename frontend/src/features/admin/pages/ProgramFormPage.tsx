@@ -1,5 +1,5 @@
-import { useState, useEffect, type FormEvent } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect, type SubmitEvent } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Card } from '../../../shared/components/ui/Card'
 import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
@@ -9,6 +9,7 @@ import { programService } from '../../../core/services/programs'
 import { BadgeEditor } from '../components/BadgeEditor'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { programListPath, programDetailPath } from '../../../core/constants/app'
+import { resolveCancelTarget } from '../../../core/utils/navigation'
 import { useTranslation } from 'react-i18next'
 import type { Program } from '../../../core/types'
 
@@ -16,6 +17,7 @@ const ProgramFormPage = () => {
   const { t } = useTranslation()
   const { programId } = useParams<{ programId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { addToast } = useGlobalToast()
   const isEdit = !!programId && programId !== 'new'
 
@@ -49,7 +51,7 @@ const ProgramFormPage = () => {
     return () => { cancelled = true }
   }, [programId, isEdit, addToast])
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault()
     const trimmedName = name.trim()
     if (!trimmedName) {
@@ -147,7 +149,7 @@ const ProgramFormPage = () => {
             <Button
               variant="secondary"
               type="button"
-              onClick={() => navigate(programListPath())}
+              onClick={() => navigate(resolveCancelTarget(location.search, programListPath()))}
               disabled={saving}
             >
               {t('common.cancel')}

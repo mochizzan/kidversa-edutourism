@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState, type SubmitEvent } from 'react'
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Input } from '../../../shared/components/ui/Input'
@@ -10,7 +10,8 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
 import { programStageService } from '../../../core/services/program-stages'
 import { programSubstageService } from '../../../core/services/program-substages'
-import { activityListPath, activityNewPath, activityDetailPath } from '../../../core/constants/app'
+import { activityListPath, activityDetailPath } from '../../../core/constants/app'
+import { resolveCancelTarget } from '../../../core/utils/navigation'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Program, ProgramStage, ProgramSubstage } from '../../../core/types'
 import { useTranslation } from 'react-i18next'
@@ -19,6 +20,7 @@ const ActivityFormPage = () => {
   const { t } = useTranslation()
   const { activityId } = useParams<{ activityId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { addToast } = useGlobalToast()
 
@@ -44,7 +46,7 @@ const ActivityFormPage = () => {
     programService
       .getAll({ limit: 1000 })
       .then((res) => setPrograms(res.data))
-      .catch(() => setPrograms([]))
+      .catch((err) => { console.error('[ActivityFormPage] programs load failed', err); setPrograms([]) })
       .finally(() => setProgramsLoading(false))
   }, [])
 
@@ -57,7 +59,7 @@ const ActivityFormPage = () => {
     programStageService
       .getAll({ programId, limit: 1000 })
       .then((res) => setStages(res.data))
-      .catch(() => setStages([]))
+      .catch((err) => { console.error('[ActivityFormPage] stages load failed', err); setStages([]) })
       .finally(() => setStagesLoading(false))
   }, [programId])
 
@@ -121,7 +123,7 @@ const ActivityFormPage = () => {
     setStageId('')
   }
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!programId) {
       addToast({ type: 'error', message: t('admin.topic.programRequired') })
@@ -165,11 +167,7 @@ const ActivityFormPage = () => {
   }
 
   const handleCancel = () => {
-    if (isNew) {
-      navigate(activityNewPath({ programId: queryProgramId || undefined, stageId: queryStageId || undefined }))
-      return
-    }
-    navigate(activityDetailPath(activityId!))
+    navigate(resolveCancelTarget(location.search, activityListPath()))
   }
 
   if (loading || programsLoading) {

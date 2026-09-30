@@ -37,8 +37,11 @@ type PhotoRepository interface {
 	DeleteReportPhotoPick(ctx context.Context, participantID, sessionID, programStageID string) error
 }
 
-// PhotoFilter narrows a photo list query.
+// PhotoFilter narrows a photo list query. TenantID scopes results to photos
+// whose owning session belongs to that tenant (empty = unscoped, e.g. internal
+// fallback reads).
 type PhotoFilter struct {
+	TenantID      string
 	ParticipantID string
 	SessionID     string
 	FrameID       *string

@@ -19,19 +19,6 @@ func NewFrameHandler(repo repository.FrameRepository) *FrameHandler {
 	return &FrameHandler{repo: repo}
 }
 
-// GetByID handles GET /api/frames/:id.
-func (h *FrameHandler) GetByID(c *echo.Context) error {
-	id, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
-	f, err := h.repo.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewFrameResponse(f))
-}
-
 // List handles GET /api/frames.
 func (h *FrameHandler) List(c *echo.Context) error {
 	// Tenant scope is read from the resolved context (X-Tenant-Id honored only for

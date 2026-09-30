@@ -95,7 +95,8 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
       ])
       setAvailableParticipants(allRes.data)
       setLinkableParticipantInfos(linkableRes)
-    } catch {
+    } catch (err) {
+      console.error('[SessionGroupsTab] loadAvailableParticipants failed', err)
       setAvailableParticipants([])
       setLinkableParticipantInfos([])
     }
@@ -246,7 +247,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
       }
     } catch (err) {
       for (const g of newGroups) {
-        await sessionService.deleteGroup(g.sessionId, g.groupId).catch(() => { })
+        await sessionService.deleteGroup(g.sessionId, g.groupId).catch((err) => { console.error('[SessionGroupsTab] rollback deleteGroup failed', err) })
       }
       throw err
     }

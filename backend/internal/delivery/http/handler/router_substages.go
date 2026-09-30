@@ -19,7 +19,6 @@ func RegisterProgramSubstagesRoutes(g *echo.Group, h *ProgramSubstageHandler, jm
 
 	g.GET("", h.List, authMW, roleMWRead, scopeMW)
 	g.POST("", h.Create, authMW, roleMWAdmin, scopeMW)
-	g.POST("/reorder", h.Reorder, authMW, roleMWAdmin, scopeMW)
 	g.GET("/:id", h.Get, authMW, roleMWRead, scopeMW)
 	g.PUT("/:id", h.Update, authMW, roleMWAdmin, scopeMW)
 	g.DELETE("/:id", h.Delete, authMW, roleMWAdmin, scopeMW)

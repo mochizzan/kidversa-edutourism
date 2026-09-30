@@ -55,9 +55,10 @@ export function useHeaderNotifications() {
       })
       setNotificationsState([...mapped])
       setRealUnread(unread)
-    } catch {
+    } catch (error) {
       // Offline / transient failure — keep the last known notices; state is
       // intentionally untouched (user_approval is the only member left).
+      console.warn('[Notifications] refresh failed; keeping last known notices', error)
     }
   }, [user])
 
@@ -118,8 +119,9 @@ export function useHeaderNotifications() {
             if (!wasHealthy) {
               try {
                 await refreshAccessToken()
-              } catch {
+              } catch (err) {
                 // token refresh failed; give up, connection watcher will retry.
+                console.warn('[Notifications] SSE token refresh failed', err)
                 return
               }
             }
@@ -146,8 +148,10 @@ export function useHeaderNotifications() {
 
   const acknowledge = useCallback(() => {
     setAcknowledged(true)
-    void notifications.markAllRead().catch(() => {
-      // Best-effort: SSE notif:update will confirm via refetch.
+    void notifications.markAllRead().catch((error) => {
+      // Best-effort: SSE notif:update will confirm via refetch (log it so a
+      // persistent failure is still traceable).
+      console.warn('[Notifications] markAllRead failed', error)
     })
   }, [])
 

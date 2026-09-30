@@ -2,7 +2,7 @@
 //
 // Mirrors the backend /api/program-stages contract where it exists
 // (GET /api/program-stages paginated list). Detail/mutation endpoints are not
-// exposed standalone, so create/update/delete/getById fall back to the nested
+// exposed standalone, so create/update/delete fall back to the nested
 // /api/programs/:programId/stages routes.
 // Uses the shared apiEnvelope helpers (tenant header + envelope unwrap) so
 // auth/tenant scoping is identical to every other service.
@@ -32,7 +32,6 @@ export type UpdateProgramStageDTO = Partial<CreateProgramStageDTO>
 
 export interface ProgramStageService {
   getAll(params?: GetStagesParams): Promise<PaginatedResponse<ProgramStage>>
-  getById(id: string): Promise<ProgramStage | null>
   create(data: CreateProgramStageDTO): Promise<ProgramStage>
   update(id: string, data: UpdateProgramStageDTO): Promise<ProgramStage>
   delete(id: string): Promise<void>
@@ -71,16 +70,6 @@ async function resolveProgramId(stageId: string): Promise<string | null> {
 
 export const programStageService: ProgramStageService = {
   getAll: (params) => listRequest<ProgramStage>(buildProgramStagesPath(params)),
-
-  getById: async (id) => {
-    const programId = await resolveProgramId(id)
-    if (!programId) return null
-    const stage = await itemRequest<ProgramStage>(
-      'GET',
-      API_ROUTES.PROGRAMS.STAGE_DETAIL(programId, id),
-    )
-    return stage
-  },
 
   create: (data) =>
     itemRequest<ProgramStage>('POST', API_ROUTES.PROGRAMS.STAGES(data.program_id), {

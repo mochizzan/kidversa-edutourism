@@ -59,7 +59,8 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
     }
     try {
       setSessionSubstages(await sessionService.getSubstages(activeSession.id))
-    } catch {
+    } catch (err) {
+      console.error('[useLiveMonitor] getSubstages failed', err)
       setSessionSubstages([])
     }
   }, [activeSession])
@@ -206,6 +207,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
           user.id,
         )
       } catch (err) {
+        console.error('[useLiveMonitor] unlockStage failed', err)
         if (err instanceof ApiError && err.status === 401) redirectToLogin()
       }
     },
@@ -227,6 +229,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
           user.id,
         )
       } catch (err) {
+        console.error('[useLiveMonitor] lockStage failed', err)
         if (err instanceof ApiError && err.status === 401) redirectToLogin()
       }
     },
@@ -249,6 +252,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
           user.id,
         )
       } catch (err) {
+        console.error('[useLiveMonitor] completeStage failed', err)
         if (err instanceof ApiError && err.status === 401) redirectToLogin()
       }
     },
@@ -269,6 +273,7 @@ export function useLiveMonitor(urlSessionId: string | undefined) {
           user.id,
         )
       } catch (err) {
+        console.error('[useLiveMonitor] completeSessionSubstage failed', err)
         if (err instanceof ApiError && err.status === 401) redirectToLogin()
       }
     },

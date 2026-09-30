@@ -33,7 +33,7 @@ export function ChildListItem({
   return (
     <div
       className={cn(
-        'flex items-center gap-4 bg-surface rounded-2xl p-4 shadow-sm border border-outline-variant/50',
+        'flex flex-wrap items-center gap-4 bg-surface rounded-2xl p-4 shadow-sm border border-outline-variant/50',
         'min-h-[56px]',
         className,
       )}
@@ -74,13 +74,13 @@ export function ChildListItem({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
         {onToggleAttendance && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleAttendance() }}
             disabled={attendanceLoading}
             className={cn(
-              'flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors min-h-[40px] min-w-[48px]',
+              'flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors min-h-[44px] whitespace-nowrap',
               isPresent
                 ? 'bg-green-100 text-green-700 border border-green-300 hover:bg-green-200'
                 : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200',
@@ -88,21 +88,21 @@ export function ChildListItem({
             )}
           >
             {isPresent ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-            <span className="hidden sm:inline">{isPresent ? t('fasilitator.child.present') : t('fasilitator.child.notPresent')}</span>
+            <span>{isPresent ? t('fasilitator.child.present') : t('fasilitator.child.notPresent')}</span>
           </button>
         )}
         {onAssess && (
           <button
             onClick={(e) => { e.stopPropagation(); onAssess() }}
             className={cn(
-              'flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-colors min-h-[40px] min-w-[48px]',
+              'flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors min-h-[44px] whitespace-nowrap',
               isAssessed
                 ? 'bg-primary-container text-on-primary-container hover:bg-primary-container/80'
                 : 'bg-primary text-white hover:bg-primary-dark',
             )}
           >
             <Star className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('fasilitator.child.rate')}</span>
+            <span>{t('fasilitator.child.rate')}</span>
           </button>
         )}
         {showPhoto && onPhoto && (

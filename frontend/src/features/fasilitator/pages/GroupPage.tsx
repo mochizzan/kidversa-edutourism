@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, Target, Monitor, User } from 'lucide-react'
+import { Users, Monitor, User } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
 import { SessionStatus } from '../../../core/types/enums'
 import { liveService } from '../../../core/services/live'
@@ -173,8 +173,10 @@ const GroupPage = () => {
           attMap.set(a.participant_id, a.is_present)
         }
         setAttendanceMap(attMap)
-      } catch {
-        // Non-fatal: attendance defaults to not-present
+      } catch (error) {
+        // Non-fatal: attendance defaults to not-present — log so the default
+        // is traceable to a fetch failure, not real absence.
+        console.error('[GroupPage] attendance fetch failed', error)
       }
 
       setGroupDetail({
@@ -418,22 +420,17 @@ const GroupPage = () => {
           { label: group.name },
         ]}
         actions={
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 text-sm text-on-surface-variant">
-              <Target className="w-4 h-4" />
-              <span>{programStageName ?? t('fasilitator.topicFallback')}</span>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleOpenKiosk}
-              loading={kioskLoading}
-              disabled={!openableStageId || !isMine}
-              icon={<Monitor className="w-4 h-4" />}
-            >
-              {t('fasilitator.group.openKiosk')}
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleOpenKiosk}
+            loading={kioskLoading}
+            disabled={!openableStageId || !isMine}
+            icon={<Monitor className="w-4 h-4" />}
+            className="shrink-0 whitespace-nowrap"
+          >
+            {t('fasilitator.group.openKiosk')}
+          </Button>
         }
       />
 

@@ -49,7 +49,5 @@ type ParticipantMissionRepository interface {
 	// ReplaceByReport atomically replaces all participant missions for a report
 	// within a single transaction (delete existing, insert the given items).
 	ReplaceByReport(ctx context.Context, tenantID, reportID string, items []entity.ParticipantMission) error
-	// ListByParticipant returns all participant missions for a participant.
-	ListByParticipant(ctx context.Context, tenantID, participantID string) ([]entity.ParticipantMission, error)
 	Delete(ctx context.Context, tenantID, id string) error
 }

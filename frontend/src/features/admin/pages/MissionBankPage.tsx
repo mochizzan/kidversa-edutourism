@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { Plus, Pencil, Power, PowerOff, Trash2, FileText } from 'lucide-react'
+import { Plus, Pencil, Trash2, FileText } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
+import { StatusToggle } from '../../../shared/components/ui/StatusToggle'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Select } from '../../../shared/components/ui/Select'
@@ -114,23 +115,7 @@ const MissionBankPage = () => {
               tooltip={t('admin.common.edit')}
             />
           </Link>
-          {item.is_active ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<PowerOff className="w-4 h-4 text-warning" />}
-              tooltip={t('admin.common.deactivate')}
-              onClick={() => handleToggleActive(item)}
-            />
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Power className="w-4 h-4 text-green-600" />}
-              tooltip={t('admin.common.activate')}
-              onClick={() => setDeactivateTarget(item)}
-            />
-          )}
+          <StatusToggle isActive={item.is_active} onClick={() => handleToggleActive(item)} />
           <Button
             variant="ghost"
             size="sm"

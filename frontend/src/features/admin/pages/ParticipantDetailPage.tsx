@@ -38,7 +38,8 @@ const ParticipantDetailPage = () => {
       try {
         const result = await participantService.getById(participantId)
         if (!cancelled) setParticipant(result)
-      } catch {
+      } catch (err) {
+        console.error('[ParticipantDetailPage] getById failed', err)
         if (!cancelled) setParticipant(null)
       } finally {
         if (!cancelled) setLoading(false)

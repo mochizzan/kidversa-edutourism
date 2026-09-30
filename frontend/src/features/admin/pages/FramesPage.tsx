@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES, imageFallbackSrc } from '../../../core/constants/app'
-import { Upload, Image, Pencil, Trash2, ToggleLeft, ToggleRight, AlertCircle } from 'lucide-react'
+import { Upload, Image, Pencil, Trash2, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
+import { StatusToggle } from '../../../shared/components/ui/StatusToggle'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Select } from '../../../shared/components/ui/Select'
@@ -168,13 +169,7 @@ const FramesPage = () => {
             tooltip={t('admin.common.edit')}
             onClick={() => navigate('/admin/frames/' + item.id + '/edit')}
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={item.is_active ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
-            tooltip={item.is_active ? t('admin.common.deactivate') : t('admin.common.activate')}
-            onClick={() => handleToggle(item)}
-          />
+          <StatusToggle isActive={item.is_active} onClick={() => handleToggle(item)} />
           <Button
             variant="ghost"
             size="sm"

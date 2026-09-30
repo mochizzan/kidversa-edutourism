@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { consentService } from '../../../core/services/consent'
+import { ApiError } from '../../../core/services/backend-client'
 import { i18n } from '../../../core/i18n'
 import { useConsentProgress } from '../../../shared/hooks/useConsentProgress'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { ConsentFlatItem } from '../../../core/types'
+import type { ConsentActiveBatch } from '../../../core/services/types'
 
 export type ConsentStatus = 'not_sent' | 'pending' | 'granted' | 'denied'
 
 const PAGE_SIZE = DEFAULT_CLIENT_PAGE_SIZE
+const FALLBACK_POLL_MS = 3000
 
 export interface ConsentFlatData {
   items: ConsentFlatItem[]
@@ -29,24 +32,43 @@ export interface ConsentFlatData {
   sendAll: () => Promise<void>
   refresh: () => Promise<void>
   sending: Record<string, boolean>
+  // True while server batches are active (server-derived via active_batches)
+  // or between our own POST 202 and the next flat refetch (optimistic overlay).
   batchSending: boolean
-  activeBatch: string | null
-  progress: { sent: number; failed: number; total: number }
 }
 
+// Server-driven consent monitor. All delivery state (per-row delivery_status
+// and active_batches) is refetched from the flat endpoint on every mount and
+// refresh — nothing is persisted locally, so navigation/logout/browser restart
+// all land on honest server truth.
 export function useConsentMonitor(): ConsentFlatData {
   const { addToast } = useGlobalToast()
 
   const [items, setItems] = useState<ConsentFlatItem[]>([])
+  const [activeBatches, setActiveBatches] = useState<ConsentActiveBatch[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<ConsentStatus | 'all'>('all')
   const [page, setPage] = useState(1)
   const [sending, setSending] = useState<Record<string, boolean>>({})
-  const [activeBatch, setActiveBatch] = useState<string | null>(null)
+  const [batchOptimistic, setBatchOptimistic] = useState(false)
+  const fallbackWarnedRef = useRef(false)
+  const batchDoneHandledRef = useRef(false)
+  // Batch ids seen by the last successful flat fetch. active_batches going
+  // from watched-non-empty to empty WITHOUT observed completion (SSE `done`
+  // for every watched batch, or terminal delivery rows) means the server-side
+  // operation stopped (restart / registry eviction) — never a silent "done".
+  const prevActiveIdsRef = useRef<string[]>([])
+  // Mirrors `allDone` for use inside the stable loadData callback.
+  const allDoneRef = useRef(false)
 
-  const { progress, connected } = useConsentProgress(activeBatch)
+  const batchIds = useMemo(() => activeBatches.map((b) => b.batch_id), [activeBatches])
+  const { progressCount, summary, allDone, failed: sseFailed } = useConsentProgress(batchIds)
+
+  useEffect(() => {
+    allDoneRef.current = allDone
+  }, [allDone])
 
   // Reset page when search or filter changes
   useEffect(() => {
@@ -77,42 +99,98 @@ export function useConsentMonitor(): ConsentFlatData {
 
   const totalPages = useMemo(() => Math.ceil(filtered.length / PAGE_SIZE), [filtered])
 
-  // Load data
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await consentService.getFlat()
-      setItems(data)
-    } catch {
-      setError(i18n.t('admin.consent.loadError'))
-    } finally {
-      setLoading(false)
+  // Load data. Foreground (default) shows the full loading state and surfaces
+  // errors; background refreshes keep the last known UI and warn instead.
+  const loadData = useCallback(async (opts?: { background?: boolean }): Promise<void> => {
+    const background = opts?.background === true
+    if (!background) {
+      setLoading(true)
+      setError(null)
     }
-  }, [])
+    try {
+      const { items: flatItems, extras } = await consentService.getFlat()
+      setItems(flatItems)
+      const nextBatches = extras.active_batches ?? []
+      setActiveBatches(nextBatches)
+
+      // Server restart / registry loss mid-watch: active_batches vanished
+      // before completion was observed (no SSE `done` for every watched batch
+      // and no terminal delivery rows). One-shot warning toast + refetch —
+      // refs are updated FIRST so the transition can only fire once.
+      const watched = prevActiveIdsRef.current
+      const vanished = watched.length > 0 && nextBatches.length === 0
+      prevActiveIdsRef.current = nextBatches.map((b) => b.batch_id)
+      const completionObserved =
+        allDoneRef.current ||
+        flatItems.some((i) => i.delivery_status === 'sent' || i.delivery_status === 'failed')
+      if (vanished && !completionObserved) {
+        addToast({ type: 'warning', message: i18n.t('admin.status.operationInterrupted') })
+        void loadData({ background: true }) // confirm against a fresh fetch (no loop: refs already advanced)
+      }
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 404) {
+        // Endpoint gone: surface through the existing error UI (with Retry)
+        // and stop the SSE fallback poll — never loop against a dead route.
+        console.warn('[useConsentMonitor] flat endpoint returned 404; halting fallback polling', err)
+        setError(i18n.t('admin.consent.loadError'))
+      } else if (background) {
+        console.warn('[useConsentMonitor] background flat refresh failed', err)
+      } else {
+        setError(i18n.t('admin.consent.loadError'))
+      }
+    } finally {
+      // Server state (or its absence) wins over the optimistic overlay.
+      setBatchOptimistic(false)
+      if (!background) setLoading(false)
+    }
+  }, [addToast])
 
   useEffect(() => {
-    loadData()
+    void loadData()
   }, [loadData])
 
-  // Handle SSE completion
+  // SSE: every active batch emitted `done` → toast + refetch; the terminal
+  // delivery_status (sent|failed) then renders rows back as "Kirim Ulang".
   useEffect(() => {
-    if (progress?.type === 'done') {
-      addToast({
-        type: 'success',
-        message: i18n.t('admin.consent.batchDone', { sent: progress.data.sent ?? 0, total: progress.data.total ?? 0 }),
-      })
-      setActiveBatch(null)
-      loadData()
+    if (!allDone) {
+      batchDoneHandledRef.current = false
+      return
     }
-  }, [progress, addToast, loadData])
+    if (batchDoneHandledRef.current) return
+    batchDoneHandledRef.current = true
+    addToast({
+      type: 'success',
+      message: i18n.t('admin.consent.batchDone', { sent: summary.sent, total: summary.total }),
+    })
+    void loadData({ background: true })
+  }, [allDone, summary, addToast, loadData])
 
-  // Handle SSE disconnection
+  // SSE: each progress event → refresh so per-row delivery_status transitions
+  // (queued → processing → sent/failed) track the server as the batch runs.
   useEffect(() => {
-    if (activeBatch && !connected && progress?.type !== 'done') {
-      // Connection lost but we still have an active batch — let the progress handle it
+    if (progressCount > 0 && activeBatches.length > 0) {
+      void loadData({ background: true })
     }
-  }, [connected, activeBatch, progress])
+  }, [progressCount, activeBatches.length, loadData])
+
+  // Fallback: SSE errored or never opened while batches are still active →
+  // poll the flat endpoint until the server reports no active batches. Gated
+  // on `error === null` so a dead endpoint (404) halts the poll instead of
+  // error-looping; a successful Retry re-arms it.
+  const sseFallback = sseFailed && activeBatches.length > 0 && error === null
+  useEffect(() => {
+    if (!sseFallback) return
+    if (!fallbackWarnedRef.current) {
+      fallbackWarnedRef.current = true
+      console.warn(
+        '[useConsentMonitor] SSE progress stream unavailable — polling /api/consent/flat every 3s while batches are active',
+      )
+    }
+    const timer = window.setInterval(() => {
+      void loadData({ background: true })
+    }, FALLBACK_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [sseFallback, loadData])
 
   const refresh = useCallback(async () => {
     await loadData()
@@ -124,7 +202,7 @@ export function useConsentMonitor(): ConsentFlatData {
       try {
         await consentService.sendSingle(participantId, force)
         addToast({ type: 'success', message: i18n.t('admin.consent.sendOkToast') })
-        await loadData()
+        await loadData({ background: true })
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : i18n.t('admin.consent.sendErrorToast')
@@ -172,18 +250,24 @@ export function useConsentMonitor(): ConsentFlatData {
       message: i18n.t('admin.consent.sendingCount', { count: eligibleCount }),
     })
 
+    // Optimistic overlay: progress mode between the 202s and the refetch.
+    setBatchOptimistic(true)
+
     // Send batch for each session
     for (const sessionId of eligibleSessionIds) {
       try {
-        const res = await consentService.sendViaWhatsApp(sessionId, true)
-        if (!activeBatch) {
-          setActiveBatch(res.batch_id)
-        }
-      } catch {
+        await consentService.sendViaWhatsApp(sessionId, true)
+      } catch (err) {
         // Individual session failures are logged but don't stop the loop
+        console.warn('[useConsentMonitor] sendViaWhatsApp failed', err)
       }
     }
-  }, [filtered, addToast, activeBatch])
+
+    // Server registers batches synchronously before the 202 returns, so this
+    // refetch picks up active_batches + per-row delivery_status; from there
+    // batchSending is server-derived and the optimistic flag is cleared.
+    await loadData({ background: true })
+  }, [filtered, addToast, loadData])
 
   return {
     items,
@@ -204,12 +288,6 @@ export function useConsentMonitor(): ConsentFlatData {
     sendAll,
     refresh,
     sending,
-    batchSending: activeBatch !== null && progress?.type !== 'done',
-    activeBatch,
-    progress: progress?.type === 'done'
-      ? { sent: progress.data.sent ?? 0, failed: progress.data.failed ?? 0, total: progress.data.total ?? 0 }
-      : progress?.type === 'progress'
-        ? { sent: 0, failed: 0, total: 0 }
-        : { sent: 0, failed: 0, total: 0 },
+    batchSending: batchOptimistic || activeBatches.length > 0,
   }
 }

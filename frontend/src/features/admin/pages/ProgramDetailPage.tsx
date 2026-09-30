@@ -9,7 +9,8 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
 import type { Program } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
-import { ROUTES, topicListPath, topicNewPath, programListPath } from '../../../core/constants/app'
+import { topicListPath, topicNewPath, programListPath, programEditPath } from '../../../core/constants/app'
+import { withOrigin } from '../../../core/utils/navigation'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { ProgramInfoTab } from '../components/ProgramInfoTab'
 import { useTranslation } from 'react-i18next'
@@ -65,7 +66,9 @@ const ProgramDetailPage = () => {
               variant="secondary"
               size="sm"
               icon={<Pencil className="w-4 h-4" />}
-              onClick={() => navigate(`${ROUTES.ADMIN.PROGRAMS}/${program.id}/edit`)}
+              onClick={() =>
+                navigate(withOrigin(programEditPath(program.id), `${location.pathname}${location.search}`))
+              }
             >
               {t('admin.programs.editTitle')}
             </Button>
@@ -99,7 +102,9 @@ const ProgramDetailPage = () => {
             </div>
             <Button
               icon={<Plus className="w-4 h-4" />}
-              onClick={() => navigate(topicNewPath({ programId: program.id }))}
+              onClick={() =>
+                navigate(withOrigin(topicNewPath({ programId: program.id }), `${location.pathname}${location.search}`))
+              }
             >
               {t('admin.topic.add')}
             </Button>
@@ -107,7 +112,7 @@ const ProgramDetailPage = () => {
         </Card>
       )}
 
-      <ProgramInfoTab program={program} onSaved={setProgram} />
+      <ProgramInfoTab program={program} />
     </div>
   )
 }

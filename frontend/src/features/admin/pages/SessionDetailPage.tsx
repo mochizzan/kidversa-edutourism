@@ -58,7 +58,8 @@ const SessionDetailPage = () => {
       try {
         const users = await userService.getAll({ filters: { role: UserRole.FASILITATOR } })
         setFacilitators(users.data)
-      } catch {
+      } catch (err) {
+        console.error('[SessionDetailPage] facilitators load failed', err)
         setFacilitators([])
       }
     } finally {
@@ -182,7 +183,7 @@ const SessionDetailPage = () => {
         actions={<Badge variant={session.status === 'ACTIVE' ? 'success' : session.status === 'COMPLETED' ? 'primary' : 'neutral'}>{session.status}</Badge>}
       />
 
-      <Tabs tabs={[{ key: 'info', label: t('admin.common.info') }, { key: 'stages', label: t('admin.topic.pageTitle') }, { key: 'groups', label: t('admin.sessions.groupsTab') }]}
+      <Tabs tabs={[{ key: 'info', label: t('admin.common.detail') }, { key: 'stages', label: t('admin.topic.pageTitle') }, { key: 'groups', label: t('admin.sessions.groupsTab') }]}
         activeKey={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'info' && <SessionInfoTab session={session} programName={programMap.get(session.program_id) || session.program_id} />}

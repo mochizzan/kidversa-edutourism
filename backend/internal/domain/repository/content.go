@@ -29,11 +29,9 @@ type ContentRepository interface {
 	// returns the stored file_url so the handler can remove the orphan file (D10a/E24).
 	DeleteContent(ctx context.Context, id string) (string, error)
 
-	// Junction (content <-> stage).
-	AssignContentToStage(ctx context.Context, stageID, contentID string) error
-	UnassignContentFromStage(ctx context.Context, stageID, contentID string) error
+	// Junction (content <-> stage) — read-only: assignment/reorder moved out
+	// with the dead admin routes; content is still listed per Kegiatan.
 	ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error)
 	GetContentUsage(ctx context.Context, contentID string) ([]entity.ContentUsage, error)
 	GetContentProgramTenant(ctx context.Context, contentID string) (string, error)
-	ReorderStageContents(ctx context.Context, stageID string, orderedContentIDs []string) error
 }

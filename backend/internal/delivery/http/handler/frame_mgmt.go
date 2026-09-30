@@ -40,6 +40,11 @@ func (h *FrameHandler) Delete(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
+	// Existence + tenant check BEFORE the write: a cross-tenant or missing
+	// frame 404s without ever issuing the delete (§5.A).
+	if _, err := h.repo.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c)); err != nil {
+		return err
+	}
 	if err := h.repo.Delete((*c).Request().Context(), id); err != nil {
 		return err
 	}
@@ -57,11 +62,18 @@ func (h *FrameHandler) setActive(c *echo.Context, active bool) error {
 	if !ok {
 		return nil
 	}
-	fields := map[string]interface{}{"is_active": active}
-	if err := h.repo.UpdateFields((*c).Request().Context(), id, fields); err != nil {
+	ctx := (*c).Request().Context()
+	tenantID := appmiddleware.GetTenantID(c)
+	// Existence + tenant check BEFORE the write: a cross-tenant or missing
+	// frame 404s without ever issuing the update (§5.A).
+	if _, err := h.repo.GetByID(ctx, id, tenantID); err != nil {
 		return err
 	}
-	updated, err := h.repo.GetByID((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
+	fields := map[string]interface{}{"is_active": active}
+	if err := h.repo.UpdateFields(ctx, id, fields); err != nil {
+		return err
+	}
+	updated, err := h.repo.GetByID(ctx, id, tenantID)
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/labstack/echo/v5"
 
-	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -112,21 +111,6 @@ func (h *ProgramSubstageHandler) Delete(c *echo.Context) error {
 		return nil
 	}
 	if err := h.repo.DeleteSubstage((*c).Request().Context(), id); err != nil {
-		return err
-	}
-	return appresp.NoContent(c)
-}
-
-// Reorder handles POST /api/program-substages/reorder.
-func (h *ProgramSubstageHandler) Reorder(c *echo.Context) error {
-	var req dto.ReorderRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	// programStageID is not required by the contract here; the ordering is
-	// applied by id across the provided ordered list (ReorderSubstages ignores
-	// it and renumbers by id). Pass empty to keep the interface uniform.
-	if err := h.repo.ReorderSubstages((*c).Request().Context(), "", req.OrderedIDs); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)

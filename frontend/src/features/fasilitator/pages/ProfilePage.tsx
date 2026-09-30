@@ -1,24 +1,18 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import {
   User,
   Mail,
   Phone,
   Shield,
   LogOut,
-  LayoutDashboard,
-  Users,
   Camera,
   ChevronRight,
   Pencil,
   Globe,
-  Smartphone,
-  Layers,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Card } from '../../../shared/components/ui/Card'
-import { ROUTES } from '../../../core/constants/app'
 import { Button } from '../../../shared/components/ui/Button'
 import { useFacilitatorProfile } from '../hooks/useFacilitatorProfile'
 import EditNameModal from '../components/EditNameModal'
@@ -40,7 +34,6 @@ const roleLabel: Record<string, string> = {
 }
 
 const ProfilePage = () => {
-  const navigate = useNavigate()
   const { user, handleLogout, handleAvatarUpload } = useFacilitatorProfile()
   const [editField, setEditField] = useState<'name' | 'email' | 'phone' | null>(null)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
@@ -210,70 +203,32 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* ── Aplikasi ── */}
+      {/* ── Bahasa ── */}
       <div className='space-y-3'>
         <div className='flex items-center gap-2.5 px-1 mb-3'>
           <div className='w-9 h-9 rounded-xl bg-[#F1EAFE] flex items-center justify-center'>
-            <Smartphone className='w-4 h-4 text-[#6D28D9]' />
+            <Globe className='w-4 h-4 text-[#6D28D9]' />
           </div>
           <div>
-            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>{t('fasilitator.profile.appSection')}</h4>
-            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>{t('fasilitator.profile.appDesc')}</p>
+            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>{t('common.language.menuLabel')}</h4>
+            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>{t('common.language.buttonAria')}</p>
           </div>
         </div>
-        <Card
-          padding='none'
-          className='p-5 md:p-6 border border-[#ECECEC] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.04)] rounded-[18px]'
+        <button
+          type='button'
+          aria-label={t('common.language.buttonAria')}
+          onClick={() => setLangOpen(true)}
+          className='w-full bg-white border border-[#ECECEC] rounded-[14px] p-4 shadow-[0_2px_6px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.05)] hover:border-[#E5E5E5] transition-all group active:scale-[0.98] text-left flex items-center gap-3 md:gap-4'
         >
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-slate-100'>
-            <div className='flex items-center justify-between pr-0 md:pr-4 py-2 md:py-0'>
-              <span className='text-sm font-semibold text-slate-500'>{t('fasilitator.profile.version')}</span>
-              <span className='text-sm font-bold text-slate-800'>1.0.0</span>
-            </div>
-            <div className='flex items-center justify-between pl-0 md:pl-4 pt-3 md:pt-0 pb-2 md:pb-0'>
-              <span className='text-sm font-semibold text-slate-500'>{t('fasilitator.profile.mode')}</span>
-              {import.meta.env.VITE_DEMO_MODE === 'true' && (
-                <span className='inline-flex px-3 py-1 rounded-full bg-[#F4EBFF] text-[#6D28D9] text-[11px] font-bold border border-purple-100'>
-                  {t('fasilitator.profile.demoMode')}
-                </span>
-              )}
-            </div>
+          <div className='w-10 h-10 md:w-11 md:h-11 rounded-[12px] bg-[#F1EAFE] flex items-center justify-center shrink-0'>
+            <Globe className='w-5 h-5 text-[#6D28D9]' />
           </div>
-        </Card>
-      </div>
-
-      {/* ── Menu Cepat ── */}
-      <div className='space-y-3'>
-        <div className='flex items-center gap-2.5 px-1 mb-3'>
-          <div className='w-9 h-9 rounded-xl bg-[#F1EAFE] flex items-center justify-center'>
-            <Layers className='w-4 h-4 text-[#6D28D9]' />
+          <div className='min-w-0 flex-1'>
+            <p className='text-[10px] md:text-[11px] text-slate-400 font-semibold uppercase tracking-wider'>{t('common.language.menuLabel')}</p>
+            <p className='text-sm md:text-[15px] font-bold text-slate-800 truncate mt-0.5'>{activeEndonym}</p>
           </div>
-          <div>
-            <h4 className='text-sm md:text-[15px] font-bold text-slate-900 leading-none'>{t('fasilitator.profile.quickMenuHeader')}</h4>
-            <p className='text-[11px] md:text-xs text-slate-500 mt-0.5'>{t('fasilitator.profile.quickMenuHeaderDesc')}</p>
-          </div>
-        </div>
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4'>
-          <QuickMenuItem
-            icon={LayoutDashboard}
-            title={t('fasilitator.profile.quickMenu.dashboard.title')}
-            desc={t('fasilitator.profile.quickMenu.dashboard.desc')}
-            onClick={() => navigate(ROUTES.FASILITATOR.DASHBOARD)}
-          />
-          <QuickMenuItem
-            icon={Users}
-            title={t('fasilitator.profile.quickMenu.groups.title')}
-            desc={t('fasilitator.profile.quickMenu.groups.desc')}
-            onClick={() => navigate(ROUTES.FASILITATOR.GROUPS)}
-          />
-          <QuickMenuItem
-            icon={Camera}
-            title={t('fasilitator.profile.quickMenu.camera.title')}
-            desc={t('fasilitator.profile.quickMenu.camera.desc')}
-            onClick={() => navigate(ROUTES.FASILITATOR.CAMERA)}
-          />
-          <QuickMenuItem icon={Globe} title={t('common.language.menuLabel')} desc={activeEndonym} onClick={() => setLangOpen(true)} />
-        </div>
+          <ChevronRight className='w-5 h-5 text-slate-300 group-hover:text-[#6D28D9] group-hover:translate-x-1 transition-all shrink-0' />
+        </button>
       </div>
 
       {/* ── Logout ── */}
@@ -298,7 +253,7 @@ const ProfilePage = () => {
       <AvatarUploadModal
         open={showAvatarModal}
         onClose={() => { setShowAvatarModal(false); setPendingDragFile(null) }}
-        currentAvatarUrl={getMediaUrl('avatar', user.id)}
+        currentAvatarUrl={user.avatar_url ? getMediaUrl('avatar', user.id) : undefined}
         initialFile={pendingDragFile}
         onUpload={handleAvatarUpload}
       />
@@ -363,34 +318,5 @@ const InfoItem = ({
     </div>
   )
 }
-
-const QuickMenuItem = ({
-  icon: Icon,
-  title,
-  desc,
-  onClick,
-}: {
-  icon: LucideIcon
-  title: string
-  desc: string
-  onClick: () => void
-}) => (
-  <button
-    type='button'
-    onClick={onClick}
-    className='bg-white border border-[#ECECEC] rounded-[14px] p-4 shadow-[0_2px_6px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.05)] hover:border-[#E5E5E5] transition-all group active:scale-[0.98] text-left flex items-center justify-between'
-  >
-    <div className='flex items-center gap-3 md:gap-4 min-w-0 flex-1'>
-      <div className='w-10 h-10 md:w-11 md:h-11 rounded-[12px] bg-[#F1EAFE] flex items-center justify-center shrink-0'>
-        <Icon className='w-5 h-5 text-[#6D28D9]' />
-      </div>
-      <div className='min-w-0 flex-1'>
-        <p className='text-sm font-bold text-slate-800 truncate'>{title}</p>
-        <p className='text-[11px] md:text-xs text-slate-400 mt-0.5 truncate'>{desc}</p>
-      </div>
-    </div>
-    <ChevronRight className='w-5 h-5 text-slate-300 group-hover:text-[#6D28D9] group-hover:translate-x-1 transition-all ml-2 shrink-0' />
-  </button>
-)
 
 export default ProfilePage

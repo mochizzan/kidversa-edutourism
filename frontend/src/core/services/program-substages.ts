@@ -1,7 +1,7 @@
 // program-substages.ts — backend-backed Kegiatan (ProgramSubstage) service.
 //
 // Mirrors the backend /api/program-substages contract: paginated list, detail,
-// list by stage, create/update/reorder/delete, and the per-leaf badge image
+// list by stage, create/update/delete, and the per-leaf badge image
 // upload. Uses the shared apiEnvelope helpers (tenant header + envelope unwrap)
 // so auth/tenant scoping is identical to every other service.
 
@@ -32,7 +32,6 @@ export interface ProgramSubstageService {
   listByStage(programStageId: string): Promise<ProgramSubstage[]>
   create(data: CreateProgramSubstageDTO): Promise<ProgramSubstage>
   update(id: string, data: UpdateProgramSubstageDTO): Promise<ProgramSubstage>
-  reorder(orderedIds: string[]): Promise<void>
   remove(id: string): Promise<void>
 }
 
@@ -82,8 +81,6 @@ export const programSubstageService: ProgramSubstageService = {
     if (data.description !== undefined) body.description = data.description
     return itemRequest<ProgramSubstage>('PUT', API_ROUTES.PROGRAM_SUBSTAGES.DETAIL(id), body)
   },
-
-  reorder: (orderedIds) => voidRequest('POST', API_ROUTES.PROGRAM_SUBSTAGES.REORDER, { ordered_ids: orderedIds }),
 
   remove: (id) => voidRequest('DELETE', API_ROUTES.PROGRAM_SUBSTAGES.DETAIL(id)),
 }

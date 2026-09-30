@@ -142,7 +142,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
         return
       }
 
-      const partReports = sessionReports.filter((r) => r.participant_id === participantId)
+      const partReports = sessionReports.items.filter((r) => r.participant_id === participantId)
       if (partReports.length === 0) {
         setError(i18n.t('admin.reportReview.noReportsError'))
         setLoading(false)
@@ -188,7 +188,8 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
       try {
         setBadges(await badgeService.listByParticipant(part.id))
-      } catch {
+      } catch (err) {
+        console.error('[useReportReview] listByParticipant failed', err)
         setBadges([])
       }
 
@@ -251,8 +252,9 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     clearTimeout(saveTimerRef.current ?? undefined)
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null
-      reportService.saveMissions(report.id, assignedMissionIds, saTenant).catch(() => {
+      reportService.saveMissions(report.id, assignedMissionIds, saTenant).catch((err) => {
         // Silent — auto-save is best-effort; Approve is the authoritative save.
+        console.error('[useReportReview] auto-save missions failed', err)
       })
     }, 300)
     return () => {
@@ -266,8 +268,9 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     try {
       const list = await missionService.getByTopic(topicId, { limit: 100 })
       setMissions(list)
-    } catch {
+    } catch (err) {
       /* keep existing program-wide list as fallback */
+      console.error('[useReportReview] loadTopicMissions failed', err)
     }
   }, [])
 
@@ -393,7 +396,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
           if (typeof parsed.delta === 'string') {
             setNarrativeText((t) => t + parsed.delta)
           }
-        } catch { /* ignore malformed */ }
+        } catch (err) { /* ignore malformed */ console.warn('[useReportReview] malformed narrative event', err) }
       })
       source.addEventListener('done', (ev: MessageEvent) => {
         try {
@@ -401,7 +404,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
           if (typeof parsed.full === 'string' && parsed.full) {
             setNarrativeText(parsed.full)
           }
-        } catch { /* ignore */ }
+        } catch (err) { /* ignore */ console.warn('[useReportReview] malformed done event', err) }
         source.close()
         setStreaming(false)
         addToast({ type: 'success', message: i18n.t('admin.reportReview.narrativeDone') })
@@ -416,7 +419,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
             type: 'error',
             message: localised,
           })
-        } catch { /* ignore */ }
+        } catch (err) { /* ignore */ console.warn('[useReportReview] malformed error event', err) }
         setNarrativeText(prevTextRef.current)
         source.close()
         setStreaming(false)

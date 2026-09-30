@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Plus,
   Pencil,
   Trash2,
-  ToggleLeft,
-  ToggleRight,
   FolderOpen,
   AlertCircle,
-  Eye,
+  Info,
   PlusCircle,
   Layers,
   Award,
 } from 'lucide-react'
-import { ROUTES, programDetailPath, topicListPath, topicNewPath, topicDetailPath, topicEditPath } from '../../../core/constants/app'
+import { ROUTES, programDetailPath, programEditPath, topicListPath, topicNewPath, topicDetailPath, topicEditPath } from '../../../core/constants/app'
+import { withOrigin } from '../../../core/utils/navigation'
 import { Button } from '../../../shared/components/ui/Button'
+import { StatusToggle } from '../../../shared/components/ui/StatusToggle'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { DataTable } from '../../../shared/components/data/DataTable'
@@ -38,6 +38,7 @@ interface ExpandedTopicsPanelProps {
 function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const [stages, setStages] = useState<ProgramStage[]>([])
   const [loading, setLoading] = useState(true)
   const [counts, setCounts] = useState<Record<string, number>>({})
@@ -57,13 +58,15 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
               try {
                 const substages = await programSubstageService.listByStage(stage.id)
                 countsMap[stage.id] = substages.length
-              } catch {
+              } catch (err) {
+                console.warn('[ProgramsPage] listByStage failed', err)
                 countsMap[stage.id] = 0
               }
             }),
           )
           if (!cancelled) setCounts(countsMap)
-        } catch {
+        } catch (err) {
+          console.error('[ProgramsPage] getStages failed', err)
           if (!cancelled) setStages([])
         } finally {
           if (!cancelled) setLoading(false)
@@ -83,8 +86,9 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
         return next
       })
       setDeleteStage(null)
-    } catch {
+    } catch (err) {
       // swallow
+      console.error('[ProgramsPage] deleteStage failed', err)
     }
   }
 
@@ -97,7 +101,9 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
             variant="secondary"
             size="sm"
             icon={<PlusCircle className="w-4 h-4" />}
-            onClick={() => navigate(topicNewPath({ programId }))}
+            onClick={() =>
+              navigate(withOrigin(topicNewPath({ programId }), `${location.pathname}${location.search}`))
+            }
           >
             {t('admin.topic.add')}
           </Button>
@@ -150,8 +156,8 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  icon={<Eye className="w-4 h-4" />}
-                  tooltip={t('admin.common.info')}
+                  icon={<Info className="w-4 h-4" />}
+                  tooltip={t('admin.common.detail')}
                   onClick={() => navigate(topicDetailPath(stage.id))}
                 />
                 <Button
@@ -159,7 +165,9 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
                   size="sm"
                   icon={<Pencil className="w-4 h-4" />}
                   tooltip={t('admin.common.edit')}
-                  onClick={() => navigate(topicEditPath(stage.id))}
+                  onClick={() =>
+                    navigate(withOrigin(topicEditPath(stage.id), `${location.pathname}${location.search}`))
+                  }
                 />
                 <Button
                   variant="ghost"
@@ -196,6 +204,7 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
 const ProgramsPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const { tenantId } = useTenantScope()
   const { data: programs, loading, error, page, totalItems, setPage, setSearch, refresh } = useClientList<Program>({
     fetchFn: () => programService.getAll({ limit: 1000 }).then((r) => r.data),
@@ -247,14 +256,17 @@ const ProgramsPage = () => {
       align: 'right',
       render: (item: Program) => (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" icon={<Pencil className="w-4 h-4" />} tooltip={t('admin.common.edit')} onClick={() => navigate(programDetailPath(item.id))} />
+          <Button variant="ghost" size="sm" icon={<Info className="w-4 h-4" />} tooltip={t('admin.common.detail')} onClick={() => navigate(programDetailPath(item.id))} />
           <Button
             variant="ghost"
             size="sm"
-            icon={item.is_active ? <ToggleLeft className="w-4 h-4" /> : <ToggleRight className="w-4 h-4" />}
-            tooltip={t('admin.common.toggleStatus')}
-            onClick={() => handleToggle(item.id)}
+            icon={<Pencil className="w-4 h-4" />}
+            tooltip={t('admin.common.edit')}
+            onClick={() =>
+              navigate(withOrigin(programEditPath(item.id), `${location.pathname}${location.search}`))
+            }
           />
+          <StatusToggle isActive={item.is_active} onClick={() => handleToggle(item.id)} />
           <Button variant="ghost" size="sm" icon={<Trash2 className="w-4 h-4 text-error" />} tooltip={t('common.delete')} onClick={() => setDeleteId(item.id)} />
         </div>
       ),
@@ -267,7 +279,10 @@ const ProgramsPage = () => {
         title={t('admin.programs.pageTitle')}
         subtitle={t('admin.programs.pageSubtitle')}
         actions={
-          <Button icon={<Plus className="w-4 h-4" />} onClick={() => navigate(ROUTES.ADMIN.PROGRAM_NEW)}>{t('admin.programs.add')}</Button>
+          <Button
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => navigate(withOrigin(ROUTES.ADMIN.PROGRAM_NEW, `${location.pathname}${location.search}`))}
+          >{t('admin.programs.add')}</Button>
         }
       />
 

@@ -127,36 +127,7 @@ func (r *GormContentRepository) DeleteContent(ctx context.Context, id string) (s
 
 // --- Junction (content <-> stage) ---
 
-func (r *GormContentRepository) AssignContentToStage(ctx context.Context, stageID, contentID string) error {
-	ref := &entity.StageContentRef{
-		ContentID:      contentID,
-		ProgramStageID: stageID,
-		SortOrder:      0,
-		IsActive:       true,
-	}
-	m := stageContentRefModelFromEntity(ref)
-	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
-		if isDuplicate(err) {
-			// A6a: one content at most once per stage. Idempotent: already added.
-			return apperrors.Conflict("content_already_assigned", err)
-		}
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
-}
-
-func (r *GormContentRepository) UnassignContentFromStage(ctx context.Context, stageID, contentID string) error {
-	res := r.db.WithContext(ctx).
-		Where("content_id = ? AND program_substage_id = ?", contentID, stageID).
-		Delete(&StageContentRefModel{})
-	if res.Error != nil {
-		return apperrors.Internal("internal_error", res.Error)
-	}
-	// E12: idempotent — no-op if nothing matched.
-	return nil
-}
-
-// ListStageContents returns the JOIN-shaped StageContent list for a program
+// ListStageContents returns the StageContent list for a program
 // substage (Kegiatan), ordered by sort_order, filtering soft-deleted junctions.
 // Content now belongs to the Kegiatan leaf (program_substages), so the filter
 // is on sc.program_substage_id (v4 column rename). stageID is the
@@ -254,18 +225,4 @@ func (r *GormContentRepository) GetContentProgramTenant(ctx context.Context, con
 		return "", apperrors.Internal("internal_error", err)
 	}
 	return tenantID, nil
-}
-
-// ReorderStageContents renumbers sort_order 1..n for the given content ids,
-// matching on content_id (the junction PK — CRIT-11), not a separate id column.
-func (r *GormContentRepository) ReorderStageContents(ctx context.Context, _ string, orderedContentIDs []string) error {
-	return r.reorderByContentID(ctx, orderedContentIDs)
-}
-
-// reorderByContentID updates sort_order of junction rows to match orderedContentIDs
-// (1-based sequence), keyed on content_id (the PK).
-func (r *GormContentRepository) reorderByContentID(ctx context.Context, orderedContentIDs []string) error {
-	return InTx(ctx, r.db, func(tx *gorm.DB) error {
-		return reorderByIDs(tx, &StageContentRefModel{}, orderedContentIDs, "content_id", "sort_order")
-	})
 }

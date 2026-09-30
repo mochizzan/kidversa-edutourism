@@ -213,10 +213,6 @@ func (r *GormProgramRepository) DeleteStage(ctx context.Context, id string) erro
 	return nil
 }
 
-func (r *GormProgramRepository) ReorderStages(ctx context.Context, _ string, orderedIDs []string) error {
-	return r.reorder(ctx, &ProgramStageModel{}, "sequence_order", orderedIDs)
-}
-
 // ListStageContents returns the JOIN-shaped StageContent list for a program
 // Kegiatan. Content ownership lives in ContentRepository; this
 // reuses the stage_contents + contents JOIN logic against the v4 column
@@ -260,20 +256,4 @@ func (r *GormProgramRepository) ListStageContents(ctx context.Context, substageI
 		})
 	}
 	return items, nil
-}
-func (r *GormProgramRepository) reorder(ctx context.Context, model interface{}, column string, orderedIDs []string) error {
-	tx := r.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		return apperrors.Internal("internal_error", tx.Error)
-	}
-	for i, id := range orderedIDs {
-		if err := tx.Model(model).Where("id = ?", id).Update(column, i+1).Error; err != nil {
-			tx.Rollback()
-			return apperrors.Internal("internal_error", err)
-		}
-	}
-	if err := tx.Commit().Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
 }

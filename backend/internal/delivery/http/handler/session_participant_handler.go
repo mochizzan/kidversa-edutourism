@@ -28,24 +28,6 @@ func (h *SessionParticipantHandler) ListParticipants(c *echo.Context) error {
 	return appresp.OK(c, ps)
 }
 
-func (h *SessionParticipantHandler) CreateParticipant(c *echo.Context) error {
-	id, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
-	var req dto.CreateParticipantRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	p, err := h.uc.CreateParticipant((*c).Request().Context(),
-		appmiddleware.GetTenantID(c), id, req.GroupID, req.ChildName, req.ChildAge,
-		req.SchoolName, req.ParentName, req.ParentPhone, req.ParentEmail, req.ConsentPhoto)
-	if err != nil {
-		return err
-	}
-	return appresp.Created(c, p)
-}
-
 // CreateParticipantGlobal handles the global POST /api/participants (tenant-scoped
 // via TenantScope middleware; SUPER_ADMIN may pass X-Tenant-Id to scope to a tenant).
 // Creates a standalone participant not yet attached to a session.
@@ -53,6 +35,12 @@ func (h *SessionParticipantHandler) CreateParticipantGlobal(c *echo.Context) err
 	var req dto.CreateParticipantRequest
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
+	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal, and without
+	// this check an invalid body would still reach CreateParticipant.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
 	}
 	p, err := h.uc.CreateParticipant((*c).Request().Context(),
 		appmiddleware.GetTenantID(c), "", req.GroupID, req.ChildName, req.ChildAge,
@@ -71,6 +59,12 @@ func (h *SessionParticipantHandler) LinkParticipant(c *echo.Context) error {
 	var req dto.LinkParticipantRequest
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
+	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal, and without
+	// this check an invalid body would still reach LinkParticipant.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
 	}
 	result, err := h.uc.LinkParticipant((*c).Request().Context(), id, req.ParticipantID, req.GroupID, appmiddleware.GetTenantID(c))
 	if err != nil {
@@ -93,18 +87,6 @@ func (h *SessionParticipantHandler) GetParticipantGlobal(c *echo.Context) error 
 		return nil
 	}
 	p, err := h.uc.GetParticipantGlobal((*c).Request().Context(), id, tenantID)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, p)
-}
-
-func (h *SessionParticipantHandler) GetParticipant(c *echo.Context) error {
-	pid, ok := bindUUID(c, "participantId")
-	if !ok {
-		return nil
-	}
-	p, err := h.uc.GetParticipant((*c).Request().Context(), pid, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

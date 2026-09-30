@@ -382,8 +382,12 @@ func (u *SessionUsecase) DeleteSession(ctx context.Context, id, tenantID string)
 	return u.sessionRepo.DeleteSession(ctx, id)
 }
 
-// GetStages lists the session Topik.
-func (u *SessionUsecase) GetStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
+// GetStages lists the session Topik. The owning session is verified against
+// tenantID first so cross-tenant session IDs surface as 404 (§5.A).
+func (u *SessionUsecase) GetStages(ctx context.Context, sessionID, tenantID string) ([]entity.SessionStage, error) {
+	if _, err := u.sessionRepo.GetSessionByID(ctx, sessionID, tenantID); err != nil {
+		return nil, err
+	}
 	return u.sessionRepo.ListSessionStages(ctx, sessionID)
 }
 
@@ -429,9 +433,19 @@ func (u *SessionUsecase) DeleteGroup(ctx context.Context, groupID, tenantID stri
 	return u.sessionRepo.DeleteSessionGroup(ctx, groupID)
 }
 
-// GetGroups lists the session groups.
-func (u *SessionUsecase) GetGroups(ctx context.Context, sessionID string) ([]entity.SessionGroup, error) {
+// GetGroups lists the session groups. The owning session is verified against
+// tenantID first so cross-tenant session IDs surface as 404 (§5.A).
+func (u *SessionUsecase) GetGroups(ctx context.Context, sessionID, tenantID string) ([]entity.SessionGroup, error) {
+	if _, err := u.sessionRepo.GetSessionByID(ctx, sessionID, tenantID); err != nil {
+		return nil, err
+	}
 	return u.sessionRepo.ListSessionGroups(ctx, sessionID)
+}
+
+// GetGroupByID returns one session group, tenant-scoped — used by handlers for
+// the existence + tenant + facilitator-ownership pre-check before a mutation.
+func (u *SessionUsecase) GetGroupByID(ctx context.Context, groupID, tenantID string) (*entity.SessionGroup, error) {
+	return u.sessionRepo.GetSessionGroupByID(ctx, groupID, tenantID)
 }
 
 // CreateParticipant adds a participant to a session (and optional group).
@@ -696,11 +710,6 @@ func (u *SessionUsecase) GetParticipants(ctx context.Context, sessionID, groupID
 // only when sessionID/groupID narrow the query).
 func (u *SessionUsecase) ListParticipantsGlobal(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*repository.Paginated[entity.Participant], error) {
 	return u.sessionRepo.ListParticipantsPaginated(ctx, tenantID, sessionID, groupID, search, page, limit)
-}
-
-// GetParticipant returns a single participant, tenant-scoped.
-func (u *SessionUsecase) GetParticipant(ctx context.Context, participantID, tenantID string) (*entity.Participant, error) {
-	return u.sessionRepo.GetParticipantByID(ctx, participantID, tenantID)
 }
 
 // GetParticipantGlobal returns a single participant by id, tenant-scoped.

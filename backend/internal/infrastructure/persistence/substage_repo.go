@@ -110,12 +110,6 @@ func (r *GormProgramSubstageRepository) DeleteSubstage(ctx context.Context, id s
 	return nil
 }
 
-func (r *GormProgramSubstageRepository) ReorderSubstages(ctx context.Context, _ string, orderedIDs []string) error {
-	return InTx(ctx, r.db, func(tx *gorm.DB) error {
-		return reorderByIDs(tx, &ProgramSubstageModel{}, orderedIDs, "id", "sequence_order")
-	})
-}
-
 // GormSessionSubstageRepository implements repository.SessionSubstageRepository.
 type GormSessionSubstageRepository struct {
 	db *gorm.DB

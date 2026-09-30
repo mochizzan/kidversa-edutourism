@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -132,17 +133,25 @@ func (u *UserUsecase) GetUser(ctx context.Context, id, actorRole, actorTenantID 
 
 // UpdateUser updates mutable user fields, enforcing tenant scope for ADMIN.
 //
-// Self-role-change guard: a user may never reassign their own role. This
-// closes a self-lockout vector where a SUPER_ADMIN could demote themselves to
-// a non-SUPER_ADMIN role, leaving the tenant (and the whole platform) with
-// zero SUPER_ADMIN accounts. It also blocks any actor from a self-demotion /
-// privilege-reduction trick. Only the role field is gated — name, phone and
-// is_active remain freely editable on oneself.
-func (u *UserUsecase) UpdateUser(ctx context.Context, id, name, phone string, role entity.UserRole, isActive *bool, actorID, actorRole, actorTenantID string) (*entity.User, error) {
+// Self-change guards (the usecase is the authority; the handler rejects early):
+// a user may never reassign their own role — this closes a self-lockout vector
+// where a SUPER_ADMIN could demote themselves, leaving the platform with zero
+// SUPER_ADMIN accounts, and blocks any self-demotion / privilege-reduction
+// trick — nor flip their own is_active (self-deactivation lockout). Name,
+// email and phone remain freely editable on oneself.
+//
+// email follows the partial-update convention: "" means skip. A non-empty
+// email is normalized to lower case (the same normalization GetByEmail/login
+// apply) and must not collide with ANOTHER row of uq_users_email — the row
+// itself is excluded so re-sending one's own email is a no-op.
+func (u *UserUsecase) UpdateUser(ctx context.Context, id, name, email, phone string, role entity.UserRole, isActive *bool, actorID, actorRole, actorTenantID string) (*entity.User, error) {
 	// Reject self role-change before touching storage so the failure leaks
 	// nothing about the target user's existence.
 	if id == actorID && role != "" {
 		return nil, apperrors.Forbidden("self_role_change_not_allowed", errors.New("tidak dapat mengubah role diri sendiri"))
+	}
+	if id == actorID && isActive != nil {
+		return nil, apperrors.Forbidden("forbidden", errors.New("tidak dapat mengubah status aktif diri sendiri"))
 	}
 	user, err := u.users.GetByID(ctx, id)
 	if err != nil {
@@ -153,6 +162,25 @@ func (u *UserUsecase) UpdateUser(ctx context.Context, id, name, phone string, ro
 	}
 	if name != "" {
 		user.Name = name
+	}
+	if email != "" {
+		normalized := strings.ToLower(email)
+		if normalized != strings.ToLower(user.Email) {
+			existing, err := u.users.GetByEmail(ctx, normalized)
+			switch {
+			case err == nil:
+				if existing.ID != id {
+					return nil, apperrors.Conflict("conflict", errors.New("email sudah digunakan"))
+				}
+			default:
+				// Only "not found" means the address is free; anything else
+				// (DB failure) must not silently allow the write.
+				if _, code, ok := apperrors.AsAppError(err); !ok || code != "not_found" {
+					return nil, err
+				}
+			}
+			user.Email = normalized
+		}
 	}
 	if phone != "" {
 		user.Phone = phone

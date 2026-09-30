@@ -20,6 +20,12 @@ func (h *SessionHandler) Create(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal, and without
+	// this check an invalid body would still reach CreateSession.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
+	}
 	s, err := h.uc.CreateSession((*c).Request().Context(),
 		appmiddleware.GetTenantID(c), appmiddleware.GetUserID(c),
 		req.ProgramID, req.Name, req.SessionDate,

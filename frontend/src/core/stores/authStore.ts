@@ -110,8 +110,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (getTokens().accessToken || get().isAuthenticated) {
       try {
         await apiRequest('POST', API_ROUTES.AUTH.LOGOUT)
-      } catch {
-        // Ignore network/401 — local cleanup still happens.
+      } catch (error) {
+        // Ignore network/401 — local cleanup still happens (but log it).
+        console.warn('[Auth] Backend logout failed; clearing local session anyway', error)
       }
     }
     clearTokens()
@@ -176,8 +177,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               fireUnauthorized()
               return
             }
-          } catch {
+          } catch (error) {
             // Decode/compare errors must never break the otherwise-valid session.
+            console.warn('[Auth] Failed to verify stored session claims', error)
           }
         } catch {
           console.error('[Auth] Refresh failed, logging out')

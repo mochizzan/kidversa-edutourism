@@ -171,7 +171,6 @@
       "checkError": "Failed to check facilitator assignments",
       "startedToast": "Session successfully started",
       "completedToast": "Session successfully completed",
-      "viewDetail": "View Details",
       "start": "Start Session",
       "complete": "Complete Session",
       "delete": "Delete Session",
@@ -198,6 +197,7 @@
       "allDay": "All day",
       "infoLocation": "Location",
       "infoTimeLabel": "Time",
+      "durationShort": "{{h}}h {{m}}m",
       "stageLocked": "Locked",
       "stageInProgress": "Ongoing",
       "noFacilitator": "No facilitator yet",
@@ -315,7 +315,10 @@
       "cancelled": "Cancelled",
       "waiting": "Pending",
       "approved": "Approved",
-      "rejected": "Rejected"
+      "rejected": "Rejected",
+      "queued": "Queued",
+      "processing": "Processing",
+      "operationInterrupted": "The server process was interrupted"
     },
     "reportStatus": {
       "draft": "Draft",
@@ -342,14 +345,12 @@
       "all": "All",
       "edit": "Edit",
       "detail": "Details",
-      "info": "Info",
       "approve": "Approve",
       "reject": "Reject",
       "add": "Add",
       "createNew": "Create New",
       "deactivate": "Deactivate",
       "activate": "Activate",
-      "toggleStatus": "Change Status",
       "allPrograms": "All Programs",
       "fillRequired": "Complete all required fields"
     },
@@ -689,8 +690,6 @@
       "pickTopic": "Select Topic",
       "pickProgramDulu": "Select Program First",
       "nameLabel": "Activity Name",
-      "tipDetail": "Details",
-      "infoTitle": "Activity Information",
       "contentTitle": "Assigned Content",
       "deleteTitle": "Delete Activity",
       "deleteMsgList": "Are you sure you want to delete the activity \"{{name}}\"? Content assigned to this activity will be unassigned. This action cannot be undone.",
@@ -1147,6 +1146,7 @@
       "dashboard": "Dashboard",
       "groups": "Groups",
       "camera": "Camera",
+      "galeri": "Gallery",
       "profile": "Profile"
     },
     "hello": "Hi, {{name}}",
@@ -1205,6 +1205,7 @@
     "edit": {
       "userNotFound": "User data not found. Please log in again.",
       "saveFailed": "Failed to update data. Please try again.",
+      "noPermission": "You don't have permission to edit this data.",
       "nameSaved": "Name updated successfully",
       "nameTitle": "Edit Name",
       "nameLabel": "Full Name",
@@ -1237,8 +1238,23 @@
       "quickActions": "Quick Action",
       "noConsentMsg": "No photo permission"
     },
+    "galeri": {
+      "pageTitle": "Photo Gallery",
+      "pageSubtitle": "View and manage participant photos for each session.",
+      "emptySessionsTitle": "No active sessions yet",
+      "emptySessionsDesc": "Active sessions will appear here to open their galleries.",
+      "ownedBadge": "Your Groups",
+      "lockedSessionDesc": "This session is not your responsibility — view only.",
+      "groupsSubtitle": "Choose a group to view its participant gallery.",
+      "participantsSubtitle": "Choose a participant to open their photo gallery.",
+      "lockedGroupDesc": "Only this group's facilitator can open its participant gallery.",
+      "addPhoto": "Add Photo",
+      "noActiveTopic": "No active topic to pick a report photo for.",
+      "topicLoadError": "Failed to load the topic list. Topic names may be incomplete.",
+      "picksLoadError": "Failed to load report photo picks.",
+      "groupGoneDesc": "The group was not found in this session. It may have been deleted."
+    },
     "photos": {
-      "reloadError": "Failed to reload photo.",
       "emptyFor": "No photos for {{name}} yet",
       "frameLoadError": "Failed to load frame data. Check your connection and try again.",
       "photoLoadError": "Failed to load photo data. Check your connection and try again.",
@@ -1246,7 +1262,6 @@
       "notInSession": "Participant has not joined the session",
       "maxPhotos": "Maximum {{max}} photos per child",
       "consentRequired": "Photo permission not granted",
-      "saveError": "Failed to save photo",
       "loadingParticipant": "Loading participant data...",
       "childMissingTitle": "Child Not Found",
       "childMissingDesc": "Child data is unavailable or has been deleted.",
@@ -1268,7 +1283,6 @@
       "deleteError": "Failed to delete photo",
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
-      "pickFooter": "Report photo for: {{topic}}",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo"
     },
@@ -1281,7 +1295,6 @@
       "deviceFallback": "Camera",
       "back": "Rear Camera",
       "front": "Front Camera",
-      "flash": "Flash",
       "flip": "Flip",
       "grid": "Grid",
       "emptyDesc": "No active groups with participants to photograph.",
@@ -1325,10 +1338,13 @@
       "remainingCount": "{{count}} remaining",
       "complete": "Complete Group",
       "rateAllFirst": "Assess All Participants First",
-      "completeHint": "All participants must be assessed before the group can be completed"
+      "completeHint": "All participants must be assessed before the group can be completed",
+      "fallbackName": "Unnamed group"
     },
     "session": {
-      "allDay": "All day"
+      "allDay": "All day",
+      "notMine": "This session is not your responsibility.",
+      "noLocation": "Location not set"
     },
     "child": {
       "years": "{{age}} years old",
@@ -1348,13 +1364,23 @@
       "allSessions": "All Sessions",
       "emptyTitle": "No sessions yet",
       "emptyAll": "You have not been assigned to any sessions.",
-      "emptyFiltered": "No sessions for filter \"{{filter}}\"."
+      "emptyFiltered": "No sessions for filter \"{{filter}}\".",
+      "sessionCompletedTitle": "Session has ended",
+      "sessionCompletedDesc": "This session has ended and can no longer be opened.",
+      "sessionDraftTitle": "Session is still a draft",
+      "sessionDraftDesc": "This session is still a draft and has no groups yet, so it cannot be opened.",
+      "sessionUnknownTitle": "Unknown session status",
+      "sessionUnknownDesc": "This session has status \"{{status}}\" which is not supported yet, so it cannot be opened.",
+      "noUserTitle": "Not signed in",
+      "noUserDesc": "Your session could not be found. Please sign in again and retry."
     },
     "groups": {
       "pageTitle": "All Groups",
       "emptyTitle": "No groups yet",
       "emptyDesc": "No active sessions with available groups.",
-      "emptySession": "No groups for this session."
+      "emptySession": "No groups for this session.",
+      "sessionNotFoundTitle": "Session not found",
+      "sessionNotFoundDesc": "The session was not found or is no longer active. It may have ended or the link has expired."
     },
     "activities": {
       "pageTitle": "My Activities",

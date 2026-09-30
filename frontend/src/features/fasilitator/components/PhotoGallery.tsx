@@ -11,6 +11,10 @@ interface PhotoGridProps {
   pickPhotoId: string | null
   onTogglePick: (photo: SmartPhoto) => void
   onDelete: (photo: SmartPhoto) => void
+  /** When set, the pick buttons are disabled and this becomes their visible title/aria reason. */
+  pickDisabledReason?: string
+  /** When set, the delete buttons are disabled and this becomes their visible title/aria reason. */
+  deleteDisabledReason?: string
 }
 
 export const PhotoGallery = ({
@@ -21,9 +25,11 @@ export const PhotoGallery = ({
   pickPhotoId,
   onTogglePick,
   onDelete,
+  pickDisabledReason,
+  deleteDisabledReason,
 }: PhotoGridProps) => {
   const { t } = useTranslation()
-  const canPick = !!participant?.consent_photo && !!activeStageId
+  const canPick = !!participant?.consent_photo && !!activeStageId && !pickDisabledReason
   return (
     <div className="w-full h-full overflow-y-auto bg-white rounded-3xl p-4 md:p-6">
       {photos.length === 0 ? (
@@ -45,8 +51,8 @@ export const PhotoGallery = ({
                   (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onPhotoClick(photo))
                 }
                 className={`group relative block aspect-[3/4] cursor-pointer overflow-hidden rounded-2xl bg-surface-container-low shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected
-                    ? 'border-2 border-primary ring-2 ring-primary/40'
-                    : 'border border-surface-container-highest'
+                  ? 'border-2 border-primary ring-2 ring-primary/40'
+                  : 'border border-surface-container-highest'
                   }`}
               >
                 <img
@@ -69,10 +75,18 @@ export const PhotoGallery = ({
                     type="button"
                     disabled={!canPick}
                     title={
-                      selected ? t('fasilitator.photos.unpickPhoto') : t('fasilitator.photos.pickPhoto')
+                      !canPick && pickDisabledReason
+                        ? pickDisabledReason
+                        : selected
+                          ? t('fasilitator.photos.unpickPhoto')
+                          : t('fasilitator.photos.pickPhoto')
                     }
                     aria-label={
-                      selected ? t('fasilitator.photos.unpickPhoto') : t('fasilitator.photos.pickPhoto')
+                      !canPick && pickDisabledReason
+                        ? pickDisabledReason
+                        : selected
+                          ? t('fasilitator.photos.unpickPhoto')
+                          : t('fasilitator.photos.pickPhoto')
                     }
                     onClick={(e) => {
                       e.stopPropagation()
@@ -85,13 +99,14 @@ export const PhotoGallery = ({
                   </button>
                   <button
                     type="button"
-                    title={t('fasilitator.photos.deletePhoto')}
-                    aria-label={t('fasilitator.photos.deletePhoto')}
+                    disabled={!!deleteDisabledReason}
+                    title={deleteDisabledReason ?? t('fasilitator.photos.deletePhoto')}
+                    aria-label={deleteDisabledReason ?? t('fasilitator.photos.deletePhoto')}
                     onClick={(e) => {
                       e.stopPropagation()
                       onDelete(photo)
                     }}
-                    className="rounded-full bg-black/50 p-1.5 text-white shadow-md hover:bg-black/70"
+                    className="rounded-full bg-black/50 p-1.5 text-white shadow-md hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>

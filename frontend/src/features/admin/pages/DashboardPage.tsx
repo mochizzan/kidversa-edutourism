@@ -113,30 +113,30 @@ const DashboardPage = () => {
         const active = sessions.filter((s) => s.status === SessionStatus.ACTIVE)
 
         const [participantLists, reportLists] = await Promise.all([
-          Promise.all(sessions.map((s) => sessionService.getParticipants(s.id).catch(() => []))),
-          Promise.all(sessions.map((s) => reportService.getBySession(s.id).catch(() => []))),
+          Promise.all(sessions.map((s) => sessionService.getParticipants(s.id).catch((err) => { console.error('[DashboardPage] getParticipants failed', err); return [] }))),
+          Promise.all(sessions.map((s) => reportService.getBySession(s.id).catch((err) => { console.error('[DashboardPage] getBySession reports failed', err); return { items: [] } }))),
         ])
 
         if (cancelled) return
 
         const assessmentLists = await Promise.all(
-          sessions.map((s) => assessmentService.getBySession(s.id).catch(() => [])),
+          sessions.map((s) => assessmentService.getBySession(s.id).catch((err) => { console.error('[DashboardPage] getBySession assessments failed', err); return [] })),
         )
         if (cancelled) return
 
-        const participantList = await participantService.getAll({ limit: 1000 }).catch(() => ({ data: [] as Participant[] }))
+        const participantList = await participantService.getAll({ limit: 1000 }).catch((err) => { console.error('[DashboardPage] getAll participants failed', err); return { data: [] as Participant[] } })
         setParticipants(participantList.data)
 
         const totalParticipants = participantsRes.total
 
         let pendingReportsCount = 0
         for (const reports of reportLists) {
-          pendingReportsCount += reports.filter((r) => r.status === ReportStatus.PENDING_REVIEW).length
+          pendingReportsCount += reports.items.filter((r) => r.status === ReportStatus.PENDING_REVIEW).length
         }
         const reportsFlat = reportLists.flatMap((reports, index) => {
           const sessionId = sessions[index]?.id
           return sessionId
-            ? reports.map((r) => ({ status: r.status, session_id: r.session_id || sessionId }))
+            ? reports.items.map((r) => ({ status: r.status, session_id: r.session_id || sessionId }))
             : []
         })
         const assessmentsFlat = assessmentLists.flatMap((list, index) => {
@@ -235,7 +235,8 @@ const DashboardPage = () => {
 
         activityList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         setActivities(activityList.slice(0, 8))
-      } catch {
+      } catch (err) {
+        console.error('[DashboardPage] load failed', err)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -260,7 +261,7 @@ const DashboardPage = () => {
     id: user.id,
     name: user.name,
     role: roleLabels[user.role] || user.role,
-    avatar: user.avatar_url,
+    avatar_url: user.avatar_url,
   }))
 
   const rangeText = dateRange === 'all' ? t('admin.dashboard.rangeAll') : t('admin.dashboard.rangeDays', { count: Number(dateRange) })

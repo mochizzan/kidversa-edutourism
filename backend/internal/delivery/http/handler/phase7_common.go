@@ -17,6 +17,59 @@ import (
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
+// sessionScope provides the session/participant/group reads used by the tenant
+// and facilitator-ownership checks on the photo, upload, and session-group
+// endpoints. It is a subset of repository.SessionRepository, satisfied by
+// persistence.GormSessionRepository.
+type sessionScope interface {
+	GetSessionByID(ctx context.Context, id, tenantID string) (*entity.Session, error)
+	GetParticipantByID(ctx context.Context, id, tenantID string) (*entity.Participant, error)
+	GetGroupFacilitatorID(ctx context.Context, groupID string) (*string, error)
+}
+
+// consentScope provides the fresh consent read used by the consent gates
+// (subset of repository.ConsentRepository, satisfied by
+// persistence.GormConsentRepository).
+type consentScope interface {
+	GetConsentValue(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) (bool, error)
+}
+
+// assertFacilitatorOwnership mirrors live_usecase.assertOwnership for handler
+// checks: a FASILITATOR may mutate only the group they own; ADMIN/KOORDINATOR/
+// SUPER_ADMIN bypass. An unassigned group (nil owner) denies every facilitator
+// — an admin must assign it first.
+func assertFacilitatorOwnership(actorRole, actorID string, groupFacilitatorID *string) error {
+	if entity.UserRole(actorRole) != entity.RoleFasilitator {
+		return nil
+	}
+	if groupFacilitatorID == nil || *groupFacilitatorID != actorID {
+		return apperrors.Forbidden("not_group_owner", errors.New("facilitator does not own this group"))
+	}
+	return nil
+}
+
+// assertParticipantGroupOwnership denies a FASILITATOR any mutation on a
+// participant outside their own groups (photo upload/mutations); non-
+// facilitator roles bypass. The participant is read tenant-scoped, so a
+// cross-tenant or missing participant surfaces as 404 not_found.
+func assertParticipantGroupOwnership(ctx context.Context, sessions sessionScope, tenantID, actorRole, actorID, participantID string) error {
+	if entity.UserRole(actorRole) != entity.RoleFasilitator {
+		return nil
+	}
+	p, err := sessions.GetParticipantByID(ctx, participantID, tenantID)
+	if err != nil {
+		return err
+	}
+	var owner *string
+	if p.GroupID != nil {
+		owner, err = sessions.GetGroupFacilitatorID(ctx, *p.GroupID)
+		if err != nil {
+			return err
+		}
+	}
+	return assertFacilitatorOwnership(actorRole, actorID, owner)
+}
+
 // resolveReportPhoto returns the photo backing a report for one participant,
 // session and topic (program stage). An explicit report_photo_picks row wins;
 // when no pick row exists the session's exclusive is_report_photo default is

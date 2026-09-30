@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -36,6 +37,7 @@ type UploadHandler struct {
 	contentRepo repository.ContentRepository
 	users       repository.UserRepository
 	consent     repository.ConsentRepository
+	sessions    sessionScope
 }
 
 // NewUploadHandler builds the upload handler.
@@ -46,8 +48,9 @@ func NewUploadHandler(
 	contentRepo repository.ContentRepository,
 	users repository.UserRepository,
 	consent repository.ConsentRepository,
+	sessions sessionScope,
 ) *UploadHandler {
-	return &UploadHandler{cfg: cfg, photos: photos, frames: frames, contentRepo: contentRepo, users: users, consent: consent}
+	return &UploadHandler{cfg: cfg, photos: photos, frames: frames, contentRepo: contentRepo, users: users, consent: consent, sessions: sessions}
 }
 
 const uploadFieldName = "file"
@@ -58,18 +61,53 @@ const uploadFieldName = "file"
 //   - creates a SmartPhoto row referencing the stored file,
 //   - returns the created record.
 func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
-	// Read IDs first; participant_id is required and must be present before any
-	// consent lookup or file persist.
+	// Validate every form ID BEFORE any consent lookup or file persist so a
+	// rejected upload never writes an orphan to disk (E3.4). participant_id and
+	// session_id are required: a photo without a session has no tenant (§5.A/§5.D).
 	participantID := (*c).FormValue("participant_id")
 	if participantID == "" {
 		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "participant_id wajib diisi")
 	}
 	sessionID := (*c).FormValue("session_id")
+	if sessionID == "" {
+		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "session_id wajib diisi")
+	}
+	if uuid.Validate(participantID) != nil || uuid.Validate(sessionID) != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
+	frameID := strings.TrimSpace((*c).FormValue("frame_id"))
+	if frameID != "" && uuid.Validate(frameID) != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
+
+	ctx := (*c).Request().Context()
+	tenantID := appmiddleware.GetTenantID(c)
+
+	// Referential checks: the participant must exist in the caller's tenant —
+	// a bad participant_id is request input, so it fails 400 (not 500) — and the
+	// session must belong to the caller's tenant (404 otherwise) so a photo can
+	// never be injected cross-tenant.
+	if _, err := h.sessions.GetParticipantByID(ctx, participantID, tenantID); err != nil {
+		var ae *apperrors.AppError
+		if errors.As(err, &ae) && ae.Status == http.StatusNotFound {
+			return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+		}
+		return err
+	}
+	if _, err := h.sessions.GetSessionByID(ctx, sessionID, tenantID); err != nil {
+		return err // missing/cross-tenant session -> 404 not_found
+	}
+
+	// Facilitator ownership (§5.B): a FASILITATOR may only upload photos for
+	// participants inside their own group; ADMIN/KOORDINATOR/SUPER_ADMIN bypass.
+	if err := assertParticipantGroupOwnership(ctx, h.sessions, tenantID,
+		appmiddleware.GetRole(c), appmiddleware.GetUserID(c), participantID); err != nil {
+		return err
+	}
 
 	// Consent gate: check BEFORE persisting the file so a denied upload never
 	// writes an orphan to disk (E3.4). Consent is read fresh from the DB per
 	// request (E3.7); a client flag is NEVER trusted (E3.1).
-	ctx := (*c).Request().Context()
 	granted, cerr := h.consent.GetConsentValue(ctx, participantID, sessionID, entity.ConsentPhoto)
 	if cerr != nil {
 		return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
@@ -95,19 +133,17 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 	} else {
 		takenAt = apputil.Now()
 	}
-	isReport := (*c).FormValue("is_report_photo") == "true" || (*c).FormValue("is_report_photo") == "1"
 
 	rec := &entity.SmartPhoto{
 		BaseModel:       entity.BaseModel{ID: uuid.NewString()},
-		ParticipantID:   (*c).FormValue("participant_id"),
-		SessionID:       (*c).FormValue("session_id"),
+		ParticipantID:   participantID,
+		SessionID:       sessionID,
 		OriginalFileURL: storedRel,
-		IsReportPhoto:   isReport,
 		TakenBy:         takenBy,
 		TakenAt:         takenAt,
 	}
-	if fid := strings.TrimSpace((*c).FormValue("frame_id")); fid != "" {
-		rec.FrameID = &fid
+	if frameID != "" {
+		rec.FrameID = &frameID
 	}
 	if err := h.photos.CreatePhoto((*c).Request().Context(), rec); err != nil {
 		// Roll back the stored file so we don't leave orphans.
@@ -326,6 +362,7 @@ func (h *UploadHandler) UploadAvatar(c *echo.Context) error {
 		}
 		return err
 	}
+	oldAvatar := user.AvatarURL
 	user.AvatarURL = storedRel
 	if err := h.users.Update((*c).Request().Context(), user); err != nil {
 		// Roll back the stored file so we don't leave orphans.
@@ -333,6 +370,13 @@ func (h *UploadHandler) UploadAvatar(c *echo.Context) error {
 			log.Printf("upload: failed to remove orphan file %s: %v", storedRel, rmErr)
 		}
 		return err
+	}
+	// Replacing an avatar orphans the previous file — clean it up best-effort.
+	// Cleanup must never fail the request that already succeeded.
+	if oldAvatar != "" && oldAvatar != storedRel {
+		if rmErr := h.removeStored(h.cfg.UploadDir, oldAvatar); rmErr != nil {
+			log.Printf("upload: failed to remove replaced avatar %s: %v", oldAvatar, rmErr)
+		}
 	}
 	return appresp.OK(c, user)
 }
@@ -344,7 +388,11 @@ func (h *UploadHandler) UploadAvatar(c *echo.Context) error {
 func (h *UploadHandler) persistFile(c *echo.Context, subdir string) (int64, string, error) {
 	fh, err := (*c).FormFile(uploadFieldName)
 	if err != nil {
-		return 0, "", appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+		// Return the AppError WITHOUT writing: echo's Response.Write appends to an
+		// already-committed body, so a helper that wrote via appresp.Fail and then
+		// returned nil would let the caller continue after the 400 (or corrupt the
+		// body with a second write). ErrorHandler renders the identical envelope.
+		return 0, "", apperrors.BadRequest("invalid_body", nil)
 	}
 	src, err := fh.Open()
 	if err != nil {
@@ -357,7 +405,7 @@ func (h *UploadHandler) persistFile(c *echo.Context, subdir string) (int64, stri
 	n, err := io.ReadFull(src, head)
 	if err != nil && err != io.ErrUnexpectedEOF {
 		if err == io.EOF {
-			return 0, "", appresp.FailMsg(c, http.StatusBadRequest, "invalid_file", "file kosong")
+			return 0, "", apperrors.New(http.StatusBadRequest, "invalid_file", nil)
 		}
 		return 0, "", apperrors.Internal("internal_error", err)
 	}
@@ -365,7 +413,7 @@ func (h *UploadHandler) persistFile(c *echo.Context, subdir string) (int64, stri
 
 	detected, ok := detectAllowedMedia(head)
 	if !ok {
-		return 0, "", appresp.FailMsg(c, http.StatusUnsupportedMediaType, "file_type_unsupported", "Tipe berkas tidak diizinkan")
+		return 0, "", apperrors.New(http.StatusUnsupportedMediaType, "file_type_unsupported", nil)
 	}
 
 	// Compose the random destination name (uuid + detected extension).

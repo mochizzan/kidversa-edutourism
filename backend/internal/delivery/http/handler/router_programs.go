@@ -12,7 +12,6 @@ import (
 // Write operations require SUPER_ADMINISTRATOR, ADMIN, or KOORDINATOR; read-only GETs on a program
 // (detail and Topik) also allow FASILITATOR. Tenant scope is enforced
 // by TenantScope (programs filtered by GetTenantID; Topik/contents scoped through their program).
-// Kegiatan-content assign/unassign live here (under /api/programs) alongside list/reorder.
 func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMWAdmin := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator)
@@ -32,13 +31,8 @@ func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManage
 	g.POST("/:id/stages", h.CreateStage, authMW, roleMWAdmin, scopeMW)
 	g.PUT("/:id/stages/:stageId", h.UpdateStage, authMW, roleMWAdmin, scopeMW)
 	g.DELETE("/:id/stages/:stageId", h.DeleteStage, authMW, roleMWAdmin, scopeMW)
-	g.POST("/:id/stages/reorder", h.ReorderStages, authMW, roleMWAdmin, scopeMW)
 
-	// Contents keyed directly by Kegiatan. list for kiosk/learner;
-	// reorder + assign/unassign are admin write operations. All four share the
-	// /programs prefix. A missing Kegiatan returns 404 (substage_not_found).
+	// Contents keyed directly by Kegiatan. Read-only: list for kiosk/learner
+	// (also admin). A missing Kegiatan returns 404 (substage_not_found).
 	g.GET("/program-substages/:substageId/contents", h.ListContents, authMW, roleMWAdmin, scopeMW)
-	g.POST("/program-substages/:substageId/contents/reorder", h.ReorderContents, authMW, roleMWAdmin, scopeMW)
-	g.POST("/program-substages/:substageId/contents/assign", h.AssignContent, authMW, roleMWAdmin, scopeMW)
-	g.DELETE("/program-substages/:substageId/contents/:contentId", h.UnassignContent, authMW, roleMWAdmin, scopeMW)
 }

@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand/v2"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -30,6 +29,9 @@ type ConsentHandler struct {
 	messaging   repository.MessagingService
 	cfg         *config.Config
 	hub         *sse.Hub
+	// batches is the in-memory delivery registry backing flat's
+	// delivery_status/active_batches overlays (server source of truth).
+	batches *ConsentBatchRegistry
 }
 
 // NewConsentHandler builds the consent handler.
@@ -40,8 +42,19 @@ func NewConsentHandler(
 	cfg *config.Config,
 	hub *sse.Hub,
 ) *ConsentHandler {
-	return &ConsentHandler{consent: consent, sessionRepo: sessionRepo, messaging: messaging, cfg: cfg, hub: hub}
+	return &ConsentHandler{
+		consent:     consent,
+		sessionRepo: sessionRepo,
+		messaging:   messaging,
+		cfg:         cfg,
+		hub:         hub,
+		batches:     NewConsentBatchRegistry(),
+	}
 }
+
+// BatchRegistry exposes the in-memory consent delivery registry (used by
+// tests and diagnostics; reads/writes are mutex-guarded).
+func (h *ConsentHandler) BatchRegistry() *ConsentBatchRegistry { return h.batches }
 
 // SendWhatsApp handles POST /api/consent/send-whatsapp (JWT, tenant-scoped):
 // issues a combined consent token per eligible participant and asynchronously
@@ -136,6 +149,15 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 		return appresp.FailMsg(c, http.StatusConflict, "nothing_to_send", "Tidak ada peserta yang perlu dikirimi permintaan consent — semua sudah memiliki token aktif")
 	}
 
+	// Register the batch synchronously BEFORE the 202 returns: every member is
+	// "queued" in the in-memory registry, so the client's first flat fetch
+	// already sees the batch (server = source of truth for delivery status).
+	batchParticipants := make([]string, len(active))
+	for i := range active {
+		batchParticipants[i] = active[i].ID
+	}
+	h.batches.Register(batchID, req.SessionID, tenantID, batchParticipants)
+
 	// Fire-and-forget batch worker. Use a detached context so the outbound
 	// WhatsApp calls are not cancelled when this request returns the 202.
 	go h.processWhatsAppBatch(context.WithoutCancel((*c).Request().Context()), active, *session, batchID)
@@ -162,11 +184,16 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 		} else {
 			digits, derr := phoneutil.WhatsAppDigits(p.ParentPhone)
 			if derr != nil {
+				// Eligibility pre-validates phones, so this is a defensive path —
+				// still mark the row failed so it never sticks at queued after "done".
+				h.batches.SetStatus(batchID, p.ID, ConsentStatusFailed, "nomor WhatsApp tidak valid")
 				continue
 			}
 			chatID := digits + "@c.us"
 			url := fmt.Sprintf("%s?token=%s", h.cfg.ParentConsentBaseURL, *p.ConsentCombinedToken)
 			msg := buildConsentMessage(p.ParentName, p.ChildName, session.Name, formatSessionDateID(session.SessionDate), session.Location, url)
+			// Registry: mark processing immediately before the gateway send.
+			h.batches.SetStatus(batchID, p.ID, ConsentStatusProcessing, "")
 			if serr := h.messaging.SendTextMessage(ctx, chatID, msg); serr != nil {
 				status = "failed"
 				errMsg = "Gagal mengirim WhatsApp"
@@ -186,6 +213,10 @@ func (h *ConsentHandler) processWhatsAppBatch(ctx context.Context, participants 
 				}
 			}
 		}
+
+		// Registry: terminal state for this attempt (sent/failed), published
+		// alongside — not instead of — the existing SSE progress event below.
+		h.batches.SetStatus(batchID, p.ID, status, errMsg)
 
 		h.hub.Publish(ctx, sse.ConsentChannel(batchID), sse.Event{
 			Type: "progress",
@@ -312,53 +343,6 @@ func (h *ConsentHandler) Info(c *echo.Context) error {
 	return appresp.OK(c, res)
 }
 
-// Summary handles GET /api/consent/summary (JWT): returns consent logs for
-// multiple sessions in one call, grouped by session_id.
-func (h *ConsentHandler) Summary(c *echo.Context) error {
-	idsRaw := (*c).QueryParam("session_ids")
-	if idsRaw == "" {
-		return appresp.OK(c, dto.ConsentSummaryResponse{Sessions: []dto.ConsentSummaryItem{}})
-	}
-	ids := strings.Split(idsRaw, ",")
-	grouped, err := h.consent.ListConsentsBySessionIDs((*c).Request().Context(), ids)
-	if err != nil {
-		return err
-	}
-	result := make([]dto.ConsentSummaryItem, 0, len(ids))
-	for _, sid := range ids {
-		logs := grouped[sid]
-		if logs == nil {
-			logs = []entity.ConsentLog{}
-		}
-		result = append(result, dto.ConsentSummaryItem{
-			SessionID: sid,
-			Items:     dto.NewConsentListResponse(logs).Items,
-		})
-	}
-	return appresp.OK(c, dto.ConsentSummaryResponse{Sessions: result})
-}
-
-// List handles GET /api/consent (JWT): ?session_id= → by session, otherwise ?participant_id= → by participant.
-func (h *ConsentHandler) List(c *echo.Context) error {
-	sid := (*c).QueryParam("session_id")
-	if sid != "" {
-		items, err := h.consent.ListConsentsBySession((*c).Request().Context(), sid)
-		if err != nil {
-			return err
-		}
-		return appresp.OK(c, dto.NewConsentListResponse(items))
-	}
-	pid := (*c).QueryParam("participant_id")
-	if pid == "" {
-		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
-	}
-	items, err := h.consent.ListConsentsByParticipant((*c).Request().Context(), pid)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewConsentListResponse(items))
-}
-
 // Flat handles GET /api/consent/flat (JWT, tenant-scoped): returns a flat
 // projection of all participants across sessions with their consent status.
 func (h *ConsentHandler) Flat(c *echo.Context) error {
@@ -368,6 +352,10 @@ func (h *ConsentHandler) Flat(c *echo.Context) error {
 		return err
 	}
 	items := make([]dto.ConsentFlatItem, len(rows))
+	// Tenant-filtered overlays from the in-memory batch registry: per-participant
+	// delivery_status plus the active_batches summary. Both are empty (and thus
+	// omitted by omitempty) on a fresh process — persisted state stays the truth.
+	overlay := h.batches.Overlay(tenantID)
 	for i, r := range rows {
 		items[i] = dto.ConsentFlatItem{
 			ParticipantID: r.ParticipantID,
@@ -387,8 +375,14 @@ func (h *ConsentHandler) Flat(c *echo.Context) error {
 			ts := r.RespondedAt.Format(time.RFC3339)
 			items[i].RespondedAt = &ts
 		}
+		if st, ok := overlay[r.ParticipantID]; ok {
+			items[i].DeliveryStatus = st
+		}
 	}
-	return appresp.OK(c, dto.ConsentFlatResponse{Items: items})
+	return appresp.OK(c, dto.ConsentFlatResponse{
+		Items:         items,
+		ActiveBatches: h.batches.ActiveBatches(tenantID),
+	})
 }
 
 // SendSingle handles POST /api/consent/send-whatsapp/single (JWT, tenant-scoped):

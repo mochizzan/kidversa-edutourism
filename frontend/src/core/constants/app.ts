@@ -51,6 +51,11 @@ export const ROUTES = {
     GROUPS: '/fasilitator/groups',
     CAMERA: '/fasilitator/camera',
     PROFILE: '/fasilitator/profile',
+    // Galeri navigation flow (camera ≠ galeri).
+    GALERI: '/fasilitator/galeri',
+    GALERI_SESSION: (sessionId: string) => `/fasilitator/galeri/sesi/${sessionId}`,
+    GALERI_GROUP: (groupId: string) => `/fasilitator/galeri/kelompok/${groupId}`,
+    GALERI_CHILD: (childId: string) => `/fasilitator/galeri/peserta/${childId}`,
   },
   PARENT: {
     REPORT: '/parent/report',
@@ -76,6 +81,7 @@ const withSearch = (base: string, params: Record<string, string | number | undef
 
 export const programListPath = () => ROUTES.ADMIN.PROGRAMS
 export const programDetailPath = (id: string) => `${ROUTES.ADMIN.PROGRAMS}/${id}`
+export const programEditPath = (id: string) => `${ROUTES.ADMIN.PROGRAMS}/${id}/edit`
 export const programStagePath = (programId: string, stageId: string) =>
   `${ROUTES.ADMIN.PROGRAMS}/${programId}/stages/${stageId}`
 

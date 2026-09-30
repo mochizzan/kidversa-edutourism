@@ -53,8 +53,8 @@ export function useCamera({ enabled }: UseCameraOptions) {
         const availableDevices = allDevices.filter((d) => d.kind === 'videoinput')
         if (!mountedRef.current) return
         setDevices(availableDevices)
-      } catch {
-        // ignore
+      } catch (error) {
+        console.error('[useCamera] enumerateDevices failed while handling a camera error', error)
       }
 
       let toastMessage = ''
@@ -107,8 +107,9 @@ export function useCamera({ enabled }: UseCameraOptions) {
           const allDevices = await navigator.mediaDevices.enumerateDevices()
           if (!mountedRef.current) return
           setDevices(allDevices.filter((d) => d.kind === 'videoinput'))
-        } catch {
-          // fallback
+        } catch (error) {
+          // Fallback: start anyway with the facingMode constraints.
+          console.warn('[useCamera] enumerateDevices failed before start', error)
         }
 
         const idealRes = { width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -156,8 +157,8 @@ export function useCamera({ enabled }: UseCameraOptions) {
             if (!mountedRef.current) return
             const updatedInputs = allDevices.filter((d) => d.kind === 'videoinput')
             if (updatedInputs.length > 0) setDevices(updatedInputs)
-          } catch {
-            // ignore
+          } catch (error) {
+            console.warn('[useCamera] post-start device refresh failed', error)
           }
         } else if (lastError) {
           await handleCameraError(lastError)
@@ -187,7 +188,10 @@ export function useCamera({ enabled }: UseCameraOptions) {
     if (cameraState !== 'active' || !enabled) return
     if (streamRef.current && videoRef.current) {
       videoRef.current.srcObject = streamRef.current
-      videoRef.current.play().catch(() => { })
+      videoRef.current.play().catch((error) => {
+        // Autoplay rejection leaves the preview frozen — log it for diagnosis.
+        console.warn('[useCamera] preview play() rejected', error)
+      })
     }
   }, [cameraState, enabled])
 

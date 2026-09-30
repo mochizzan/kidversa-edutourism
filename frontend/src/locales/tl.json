@@ -171,7 +171,6 @@
       "checkError": "Nabigong suriin ang pagtatalaga ng tagapadali",
       "startedToast": "Matagumpay na nasimulan ang sesyon",
       "completedToast": "Matagumpay na natapos ang sesyon",
-      "viewDetail": "Tingnan ang mga Detalye",
       "start": "Simulan ang Sesyon",
       "complete": "Tapusin ang Sesyon",
       "delete": "Burahin ang Sesyon",
@@ -198,6 +197,7 @@
       "allDay": "Buong araw",
       "infoLocation": "Lokasyon",
       "infoTimeLabel": "Oras",
+      "durationShort": "{{h}}h {{m}}m",
       "stageLocked": "Naka-lock",
       "stageInProgress": "Kasalukuyang nagaganap",
       "noFacilitator": "Wala pang tagapadali",
@@ -315,7 +315,10 @@
       "cancelled": "Kinansela",
       "waiting": "Naghihintay",
       "approved": "Inaprubahan",
-      "rejected": "Tinanggihan"
+      "rejected": "Tinanggihan",
+      "queued": "Nasa Pila",
+      "processing": "Pinoproseso",
+      "operationInterrupted": "Naputol ang proseso sa server"
     },
     "reportStatus": {
       "draft": "Draft",
@@ -342,14 +345,12 @@
       "all": "Lahat",
       "edit": "I-edit",
       "detail": "Detalye",
-      "info": "Impormasyon",
       "approve": "Aprubahan",
       "reject": "Tanggihan",
       "add": "Idagdag",
       "createNew": "Gumawa ng Bago",
       "deactivate": "I-deactivate",
       "activate": "I-activate",
-      "toggleStatus": "Baguhin ang Status",
       "allPrograms": "Lahat ng Programa",
       "fillRequired": "Kumpletuhin ang lahat ng kinakailangang field"
     },
@@ -689,8 +690,6 @@
       "pickTopic": "Pumili ng Paksa",
       "pickProgramDulu": "Pumili Muna ng Programa",
       "nameLabel": "Pangalan ng Gawain",
-      "tipDetail": "Detalye",
-      "infoTitle": "Impormasyon ng Gawain",
       "contentTitle": "Itinalagang Nilalaman",
       "deleteTitle": "Burahin ang Gawain",
       "deleteMsgList": "Sigurado ka bang nais mong burahin ang gawaing \"{{name}}\"? Ang mga nilalamang itinalaga sa gawaing ito ay aalisin. Hindi na mababawi ang aksyong ito.",
@@ -1147,6 +1146,7 @@
       "dashboard": "Dashboard",
       "groups": "Mga Grupo",
       "camera": "Camera",
+      "galeri": "Gallery",
       "profile": "Profile"
     },
     "hello": "Kumusta, {{name}}",
@@ -1205,6 +1205,7 @@
     "edit": {
       "userNotFound": "Hindi nahanap ang data ng user. Mangyaring mag-login muli.",
       "saveFailed": "Nabigong i-update ang data. Mangyaring subukan muli.",
+      "noPermission": "Wala kang pahintulot na i-edit ang data na ito.",
       "nameSaved": "Matagumpay na na-update ang pangalan",
       "nameTitle": "I-edit ang Pangalan",
       "nameLabel": "Buong Pangalan",
@@ -1237,8 +1238,23 @@
       "quickActions": "Mabilis na Aksyon",
       "noConsentMsg": "Walang pahintulot sa larawan"
     },
+    "galeri": {
+      "pageTitle": "Gallery ng Larawan",
+      "pageSubtitle": "Tingnan at pamahalaan ang mga larawan ng kalahok sa bawat sesyon.",
+      "emptySessionsTitle": "Wala pang aktibong sesyon",
+      "emptySessionsDesc": "Lilitaw dito ang mga aktibong sesyon para buksan ang kanilang gallery.",
+      "ownedBadge": "Ang Iyong mga Grupo",
+      "lockedSessionDesc": "Ang sesyong ito ay hindi sa iyo — tingin lamang.",
+      "groupsSubtitle": "Piliin ang grupo para tingnan ang gallery ng mga kalahok.",
+      "participantsSubtitle": "Piliin ang kalahok para buksan ang gallery ng larawan.",
+      "lockedGroupDesc": "Tanging ang facilitator ng grupong ito ang makakabukas ng gallery ng mga kalahok.",
+      "addPhoto": "Magdagdag ng Larawan",
+      "noActiveTopic": "Walang aktibong paksa para pumili ng larawan ng ulat.",
+      "topicLoadError": "Nabigong i-load ang listahan ng paksa. Maaaring hindi kumpleto ang mga pangalan ng paksa.",
+      "picksLoadError": "Nabigong i-load ang mga napiling larawan ng ulat.",
+      "groupGoneDesc": "Hindi mahanap ang grupo sa sesyong ito. Maaaring natanggal na."
+    },
     "photos": {
-      "reloadError": "Nabigong i-reload ang larawan.",
       "emptyFor": "Wala pang larawan para kay {{name}}",
       "frameLoadError": "Nabigong i-load ang data ng frame. Suriin ang koneksyon at subukan muli.",
       "photoLoadError": "Nabigong i-load ang data ng larawan. Suriin ang koneksyon at subukan muli.",
@@ -1246,7 +1262,6 @@
       "notInSession": "Hindi pa nakakapasok ang kalahok sa session",
       "maxPhotos": "Maximum na {{max}} na larawan bawat bata",
       "consentRequired": "Hindi pa naibibigay ang pahintulot sa larawan",
-      "saveError": "Nabigong i-save ang larawan",
       "loadingParticipant": "Naglo-load ng data ng kalahok...",
       "childMissingTitle": "Hindi Nahanap ang Bata",
       "childMissingDesc": "Hindi available ang data ng bata o ito ay nabura na.",
@@ -1268,7 +1283,6 @@
       "deleteError": "Nabigong burahin ang larawan",
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
-      "pickFooter": "Report photo for: {{topic}}",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo"
     },
@@ -1281,7 +1295,6 @@
       "deviceFallback": "Camera",
       "back": "Rear Camera",
       "front": "Front Camera",
-      "flash": "Flash",
       "flip": "I-flip",
       "grid": "Grid",
       "emptyDesc": "Walang aktibong grupo na may mga kalahok na kukunan ng larawan.",
@@ -1325,10 +1338,13 @@
       "remainingCount": "{{count}} ang natitira",
       "complete": "Tapusin ang Grupo",
       "rateAllFirst": "Tasahin Muna ang Lahat ng Kalahok",
-      "completeHint": "Dapat matasa ang lahat ng kalahok bago matapos ang grupo"
+      "completeHint": "Dapat matasa ang lahat ng kalahok bago matapos ang grupo",
+      "fallbackName": "Grupo na walang pangalan"
     },
     "session": {
-      "allDay": "Buong araw"
+      "allDay": "Buong araw",
+      "notMine": "Ang sesyong ito ay hindi sa iyong responsibilidad.",
+      "noLocation": "Hindi natukoy ang lokasyon"
     },
     "child": {
       "years": "{{age}} taong gulang",
@@ -1348,13 +1364,23 @@
       "allSessions": "Lahat ng Sesyon",
       "emptyTitle": "Wala pang sesyon",
       "emptyAll": "Wala ka pang nakatalagang sesyon.",
-      "emptyFiltered": "Walang sesyon para sa filter na \"{{filter}}\"."
+      "emptyFiltered": "Walang sesyon para sa filter na \"{{filter}}\".",
+      "sessionCompletedTitle": "Tapos na ang sesyon",
+      "sessionCompletedDesc": "Natapos na ang sesyon na ito at hindi na ito mabubuksan pa.",
+      "sessionDraftTitle": "Draft pa ang sesyon",
+      "sessionDraftDesc": "Draft pa ang sesyon na ito at wala pang mga grupo, kaya hindi ito mabubuksan.",
+      "sessionUnknownTitle": "Hindi kilalang status ng sesyon",
+      "sessionUnknownDesc": "Ang sesyong ito ay may status na \"{{status}}\" na hindi pa suportado, kaya hindi ito mabubuksan.",
+      "noUserTitle": "Walang naka-sign in",
+      "noUserDesc": "Hindi mahanap ang iyong session. Mag-sign in ulang at subukan muli."
     },
     "groups": {
       "pageTitle": "Lahat ng Grupo",
       "emptyTitle": "Wala pang grupo",
       "emptyDesc": "Wala pang aktibong sesyon na may mga available na grupo.",
-      "emptySession": "Walang grupo para sa sesyong ito."
+      "emptySession": "Walang grupo para sa sesyong ito.",
+      "sessionNotFoundTitle": "Hindi mahanap ang sesyon",
+      "sessionNotFoundDesc": "Hindi mahanap ang sesyon o hindi na aktibo. Maaaring tapos na ito o expired na ang link."
     },
     "activities": {
       "pageTitle": "Aking mga Aktibidad",

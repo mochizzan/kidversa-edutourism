@@ -19,6 +19,7 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
   const { t } = useTranslation()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -28,11 +29,22 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
     if (!open) return
 
     if (initialFile) {
-      setSelectedFile(initialFile)
-      setPreviewUrl(URL.createObjectURL(initialFile))
+      // Drag-and-drop files arrive here too — reject invalid ones with the
+      // same feedback as the file picker instead of silently ignoring them.
+      const error = validateImageFile(initialFile)
+      if (error) {
+        setSelectedFile(null)
+        setPreviewUrl(null)
+        setFileError(error)
+      } else {
+        setSelectedFile(initialFile)
+        setPreviewUrl(URL.createObjectURL(initialFile))
+        setFileError(null)
+      }
     } else {
       setSelectedFile(null)
       setPreviewUrl(null)
+      setFileError(null)
     }
     setDragOver(false)
     setUploading(false)
@@ -48,7 +60,14 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
   const handleFile = (file: File | undefined) => {
     if (!file) return
     const error = validateImageFile(file)
-    if (error) return
+    if (error) {
+      // Surface WHY the file was rejected — dropping it silently looks broken.
+      setSelectedFile(null)
+      setPreviewUrl(null)
+      setFileError(error)
+      return
+    }
+    setFileError(null)
     setSelectedFile(file)
     setPreviewUrl(URL.createObjectURL(file))
   }
@@ -82,8 +101,10 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
     try {
       await onUpload(selectedFile)
       onClose()
-    } catch {
-      // consumer handles toast; stay in preview for retry
+    } catch (err) {
+      // The consumer (onUpload) owns the user-facing toast and keeps the
+      // modal open for retry — but never swallow silently: always log.
+      console.error('AvatarUploadModal: upload failed', err)
     } finally {
       setUploading(false)
     }
@@ -131,6 +152,9 @@ export function AvatarUploadModal({ open, onClose, currentAvatarUrl, initialFile
             {t('common.avatar.dropHint')}
           </p>
           <p className="text-xs text-on-surface-variant">{t('common.avatar.limits')}</p>
+          {fileError && (
+            <p role="alert" className="mt-2 text-sm font-medium text-error">{fileError}</p>
+          )}
           <input
             ref={fileInputRef}
             type="file"

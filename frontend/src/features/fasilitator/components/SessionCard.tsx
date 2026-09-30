@@ -32,7 +32,8 @@ export function SessionCard({ session, onClick, forceClickable = false, classNam
  const { t } = useTranslation()
  const isMySession = session.is_my_session === true
  const clickable = isMySession || forceClickable
- const hasTime = session.start_time != null && session.end_time != null
+ // Empty-string times count as missing: fall back to "all day" instead of " – ".
+ const hasTime = Boolean(session.start_time) && Boolean(session.end_time)
  const statusKey = statusLabel[session.status as keyof typeof statusLabel]
  const timeDisplay = hasTime
   ? `${session.start_time!.slice(0, 5)} – ${session.end_time!.slice(0, 5)}`
@@ -42,6 +43,7 @@ export function SessionCard({ session, onClick, forceClickable = false, classNam
   <button
    onClick={clickable ? onClick : undefined}
    disabled={!clickable}
+   title={clickable ? undefined : t('fasilitator.session.notMine')}
    className={cn(
     'w-full text-left bg-surface rounded-2xl p-5 shadow-sm border',
     clickable
@@ -92,13 +94,21 @@ export function SessionCard({ session, onClick, forceClickable = false, classNam
     </div>
     <div className="flex items-center gap-1.5">
      <MapPin className="w-4 h-4 shrink-0" />
-     <span>{session.location}</span>
+     <span>{session.location || t('fasilitator.session.noLocation')}</span>
     </div>
    </div>
 
-   <p className="mt-1.5 text-xs text-on-surface-variant/60">
-    {formatDate(session.session_date)}
-   </p>
+   {session.session_date && (
+    <p className="mt-1.5 text-xs text-on-surface-variant/60">
+     {formatDate(session.session_date)}
+    </p>
+   )}
+
+   {!clickable && (
+    <span className="sr-only">
+     {t('fasilitator.session.notMine')}
+    </span>
+   )}
   </button>
  )
 }

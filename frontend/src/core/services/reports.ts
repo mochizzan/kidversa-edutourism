@@ -1,7 +1,7 @@
 import type { PublicReport, Report } from '../types'
-import type { ReportService, ReportTokenResponse } from './types'
+import type { ReportService, ReportSessionResult, ReportTokenResponse } from './types'
 import { apiRequest } from './backend-client'
-import { itemRequest, itemsRequest, nullableItemRequest, listRequest } from './api-envelope'
+import { itemRequest, itemsRequest, itemsWithExtrasRequest } from './api-envelope'
 import { useAuthStore } from '../stores/authStore'
 import { API_ROUTES } from '../constants/apiRoutes'
 
@@ -9,19 +9,14 @@ interface SuggestMissionsResponse {
   mission_ids: string[]
 }
 
-const getBySession = async (sessionId: string): Promise<Report[]> => {
-  return itemsRequest<Report>('GET', API_ROUTES.REPORTS.BY_SESSION(sessionId))
-}
-
-const getBySessionPaginated = async (
-  sessionId: string,
-  params?: { page?: number; limit?: number },
-): Promise<{ data: Report[]; total: number }> => {
-  return listRequest<Report>(API_ROUTES.REPORTS.BY_SESSION(sessionId), params)
-}
-
-const getById = async (id: string): Promise<Report | null> => {
-  return nullableItemRequest<Report>('GET', API_ROUTES.REPORTS.DETAIL(id))
+// Fetches the session's reports PLUS the sibling operation registries
+// (active_generate / active_send) through itemsWithExtrasRequest — a plain
+// itemsRequest/listRequest would drop them and lose per-row delivery state.
+const getBySession = async (sessionId: string): Promise<ReportSessionResult> => {
+  return itemsWithExtrasRequest<Report, ReportSessionResult['extras']>(
+    'GET',
+    API_ROUTES.REPORTS.BY_SESSION(sessionId),
+  )
 }
 
 const generate = async (sessionId: string): Promise<Report[]> => {
@@ -49,10 +44,21 @@ const approve = async (
   }, tenantId)
 }
 
-const send = async (reportId: string, tenantId?: string | null): Promise<ReportTokenResponse> => {
+const send = async (
+  reportId: string,
+  tenantId?: string | null,
+  queue?: string[],
+): Promise<ReportTokenResponse> => {
   // /send returns the freshly minted parent token (ReportTokenResponse), not a
   // full Report — type it precisely instead of faking a Report merge.
-  return itemRequest<ReportTokenResponse>('POST', API_ROUTES.REPORTS.SEND(reportId), undefined, tenantId)
+  // `queue` (optional) declares every report id this run still intends to send,
+  // including the target below, so the server can track/409 in-flight targets.
+  return itemRequest<ReportTokenResponse>(
+    'POST',
+    API_ROUTES.REPORTS.SEND(reportId),
+    queue ? { queue } : undefined,
+    tenantId,
+  )
 }
 
 // saveMissions persists the selected mission IDs without changing report status.
@@ -110,8 +116,6 @@ const getPublicReport = async (token: string): Promise<PublicReport | null> => {
 
 export const reportService: ReportService = {
   getBySession,
-  getBySessionPaginated,
-  getById,
   generate,
   generateOne,
   approve,

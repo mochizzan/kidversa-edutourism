@@ -14,12 +14,6 @@ type ConsentRepository interface {
 	GetConsentValue(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) (bool, error)
 	// RespondConsent records a parent's consent decision, upserting the latest value.
 	RespondConsent(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType, value bool, ip, ua, responderName string) error
-	// ListConsentsByParticipant returns all consent rows for a participant.
-	ListConsentsByParticipant(ctx context.Context, participantID string) ([]entity.ConsentLog, error)
-	// ListConsentsBySession returns all consent rows for a session.
-	ListConsentsBySession(ctx context.Context, sessionID string) ([]entity.ConsentLog, error)
-	// ListConsentsBySessionIDs returns all consent rows for multiple sessions in a single query, grouped by session_id.
-	ListConsentsBySessionIDs(ctx context.Context, sessionIDs []string) (map[string][]entity.ConsentLog, error)
 	// GetParticipantByConsentToken resolves a participant by their active combined consent
 	// token (WhatsApp delivery flow). Returns nil when not found.
 	GetParticipantByConsentToken(ctx context.Context, token string) (*entity.Participant, error)

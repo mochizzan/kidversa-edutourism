@@ -97,6 +97,8 @@ func MessageForCode(code string) string {
 		return "Nama peserta sudah digunakan"
 	case "already_generating":
 		return "Laporan untuk sesi ini sedang dibuat. Tunggu hingga proses selesai."
+	case "send_in_progress":
+		return "Laporan ini sedang dikirim. Tunggu hingga proses pengiriman selesai."
 	case "already_sent":
 		return "Permintaan consent sudah dikirimkan sebelumnya."
 	case "already_consented":
@@ -107,6 +109,10 @@ func MessageForCode(code string) string {
 		return "Anda tidak dapat mengubah peran Anda sendiri."
 	case "file_type_blocked":
 		return "Tipe berkas diblokir"
+	case "invalid_file":
+		return "file kosong"
+	case "file_type_unsupported":
+		return "Tipe berkas tidak diizinkan"
 	case "consent_required":
 		return "Persetujuan orang tua diperlukan"
 	case "token_revoked":

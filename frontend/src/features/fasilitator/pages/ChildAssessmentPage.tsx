@@ -6,6 +6,8 @@ import { ROUTES } from '../../../core/constants/app'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Button } from '../../../shared/components/ui/Button'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
+import { friendlyError } from '../../../core/utils/errorMessages'
 import { useChildAssessment } from '../hooks/useChildAssessment'
 import { KegiatanCard } from '../components/KegiatanCard'
 import { assessmentService } from '../../../core/services/assessments'
@@ -31,6 +33,7 @@ const ChildAssessmentPage = () => {
   } = useChildAssessment(childId, sessionId)
 
   const [savingAny, setSavingAny] = useState(false)
+  const { addToast } = useGlobalToast()
 
   const handleSaveForKegiatan = useCallback(
     (_kegiatan: { id: string; session_id: string }) => {
@@ -39,12 +42,15 @@ const ChildAssessmentPage = () => {
         try {
           await assessmentService.upsert(data)
           await refreshAssessments()
+        } catch (err) {
+          // KegiatanCard's catch only logs — the user needs the failure here.
+          addToast({ type: 'error', message: friendlyError(err) })
         } finally {
           setSavingAny(false)
         }
       }
     },
-    [refreshAssessments],
+    [refreshAssessments, addToast],
   )
 
   const handleBack = () => {

@@ -76,8 +76,9 @@ export function useMissionBank() {
           try {
             const stages = await programService.getStages(pid)
             stages.forEach((s) => { stageLookup[s.id] = s })
-          } catch {
+          } catch (err) {
             /* ignore per-program stage fetch errors */
+            console.warn('[useMissionBank] getStages failed', err)
           }
         }),
       )

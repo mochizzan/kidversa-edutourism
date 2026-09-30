@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import {
   Plus,
   Pencil,
@@ -22,6 +22,7 @@ import { programService } from '../../../core/services/programs'
 import { programSubstageService } from '../../../core/services/program-substages'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import { topicNewPath, topicDetailPath, topicEditPath } from '../../../core/constants/app'
+import { withOrigin } from '../../../core/utils/navigation'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { ProgramStage, ProgramSubstage } from '../../../core/types'
@@ -44,7 +45,8 @@ function CountCell({ stageId }: { stageId: string }) {
       .then((list) => {
         if (!cancelled) setCount(list.length)
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[TopicsPage] listByStage count failed', err)
         if (!cancelled) setCount(null)
       })
       .finally(() => {
@@ -72,7 +74,8 @@ function ActivityPreview({ stageId }: { stageId: string }) {
       .then((list) => {
         if (!cancelled) setItems(list)
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[TopicsPage] listByStage activities failed', err)
         if (!cancelled) setItems([])
       })
       .finally(() => {
@@ -101,6 +104,7 @@ function ActivityPreview({ stageId }: { stageId: string }) {
 const TopicsPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const { tenantId } = useTenantScope()
   const { addToast } = useGlobalToast()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -207,7 +211,7 @@ const TopicsPage = () => {
             variant="ghost"
             size="sm"
             icon={<Info className="w-4 h-4" />}
-            tooltip={t('admin.common.info')}
+            tooltip={t('admin.common.detail')}
             onClick={() => navigate(topicDetailPath(item.id))}
           />
           <Button
@@ -215,7 +219,9 @@ const TopicsPage = () => {
             size="sm"
             icon={<Pencil className="w-4 h-4" />}
             tooltip={t('admin.common.edit')}
-            onClick={() => navigate(topicEditPath(item.id))}
+            onClick={() =>
+              navigate(withOrigin(topicEditPath(item.id), `${location.pathname}${location.search}`))
+            }
           />
           <Button
             variant="ghost"
@@ -252,7 +258,14 @@ const TopicsPage = () => {
         actions={
           <Button
             icon={<Plus className="w-4 h-4" />}
-            onClick={() => navigate(topicNewPath({ programId: programFilter || undefined }))}
+            onClick={() =>
+              navigate(
+                withOrigin(
+                  topicNewPath({ programId: programFilter || undefined }),
+                  `${location.pathname}${location.search}`,
+                ),
+              )
+            }
           >
             {t('admin.topic.add')}
           </Button>

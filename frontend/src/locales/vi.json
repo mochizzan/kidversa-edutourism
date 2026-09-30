@@ -171,7 +171,6 @@
       "checkError": "Không thể kiểm tra việc phân công người hướng dẫn",
       "startedToast": "Phiên đã bắt đầu thành công",
       "completedToast": "Phiên đã hoàn thành thành công",
-      "viewDetail": "Xem chi tiết",
       "start": "Bắt đầu phiên",
       "complete": "Hoàn thành phiên",
       "delete": "Xóa phiên",
@@ -198,6 +197,7 @@
       "allDay": "Cả ngày",
       "infoLocation": "Địa điểm",
       "infoTimeLabel": "Thời gian",
+      "durationShort": "{{h}}g {{m}}ph",
       "stageLocked": "Đã khóa",
       "stageInProgress": "Đang diễn ra",
       "noFacilitator": "Chưa có người hướng dẫn",
@@ -315,7 +315,10 @@
       "cancelled": "Đã hủy",
       "waiting": "Đang chờ",
       "approved": "Đã phê duyệt",
-      "rejected": "Đã từ chối"
+      "rejected": "Đã từ chối",
+      "queued": "Trong hàng đợi",
+      "processing": "Đang xử lý",
+      "operationInterrupted": "Quá trình trên máy chủ đã bị gián đoạn"
     },
     "reportStatus": {
       "draft": "Bản nháp",
@@ -342,14 +345,12 @@
       "all": "Tất cả",
       "edit": "Chỉnh sửa",
       "detail": "Chi tiết",
-      "info": "Thông tin",
       "approve": "Phê duyệt",
       "reject": "Từ chối",
       "add": "Thêm",
       "createNew": "Tạo mới",
       "deactivate": "Vô hiệu hóa",
       "activate": "Kích hoạt",
-      "toggleStatus": "Thay đổi trạng thái",
       "allPrograms": "Tất cả chương trình",
       "fillRequired": "Vui lòng điền đầy đủ các trường bắt buộc"
     },
@@ -689,8 +690,6 @@
       "pickTopic": "Chọn chủ đề",
       "pickProgramDulu": "Chọn chương trình trước",
       "nameLabel": "Tên hoạt động",
-      "tipDetail": "Chi tiết",
-      "infoTitle": "Thông tin hoạt động",
       "contentTitle": "Nội dung được giao",
       "deleteTitle": "Xóa hoạt động",
       "deleteMsgList": "Bạn có chắc chắn muốn xóa hoạt động \"{{name}}\" không? Nội dung được giao cho hoạt động này sẽ bị gỡ bỏ. Hành động này không thể hoàn tác.",
@@ -1147,6 +1146,7 @@
       "dashboard": "Bảng điều khiển",
       "groups": "Nhóm",
       "camera": "Máy ảnh",
+      "galeri": "Thư viện ảnh",
       "profile": "Hồ sơ"
     },
     "hello": "Xin chào, {{name}}",
@@ -1205,6 +1205,7 @@
     "edit": {
       "userNotFound": "Không tìm thấy dữ liệu người dùng. Vui lòng đăng nhập lại.",
       "saveFailed": "Cập nhật dữ liệu thất bại. Vui lòng thử lại.",
+      "noPermission": "Bạn không có quyền chỉnh sửa dữ liệu này.",
       "nameSaved": "Cập nhật tên thành công",
       "nameTitle": "Chỉnh sửa tên",
       "nameLabel": "Họ và tên",
@@ -1237,8 +1238,23 @@
       "quickActions": "Thao tác nhanh",
       "noConsentMsg": "Không có quyền chụp ảnh"
     },
+    "galeri": {
+      "pageTitle": "Thư viện ảnh",
+      "pageSubtitle": "Xem và quản lý ảnh của học viên theo từng phiên.",
+      "emptySessionsTitle": "Chưa có phiên đang hoạt động",
+      "emptySessionsDesc": "Các phiên đang hoạt động sẽ hiển thị tại đây để mở thư viện.",
+      "ownedBadge": "Nhóm của bạn",
+      "lockedSessionDesc": "Phiên này không thuộc trách nhiệm của bạn — chỉ xem được.",
+      "groupsSubtitle": "Chọn nhóm để xem thư viện của học viên.",
+      "participantsSubtitle": "Chọn học viên để mở thư viện ảnh.",
+      "lockedGroupDesc": "Chỉ điều phối viên của nhóm này mới mở được thư viện học viên.",
+      "addPhoto": "Thêm ảnh",
+      "noActiveTopic": "Không có chủ đề đang hoạt động để chọn ảnh báo cáo.",
+      "topicLoadError": "Không tải được danh sách chủ đề. Tên chủ đề có thể chưa đầy đủ.",
+      "picksLoadError": "Không tải được lựa chọn ảnh báo cáo.",
+      "groupGoneDesc": "Không tìm thấy nhóm trong phiên này. Có thể đã bị xóa."
+    },
     "photos": {
-      "reloadError": "Tải lại ảnh thất bại.",
       "emptyFor": "Chưa có ảnh cho {{name}}",
       "frameLoadError": "Tải dữ liệu khung hình thất bại. Kiểm tra kết nối và thử lại.",
       "photoLoadError": "Tải dữ liệu ảnh thất bại. Kiểm tra kết nối và thử lại.",
@@ -1246,7 +1262,6 @@
       "notInSession": "Người tham gia chưa vào phiên",
       "maxPhotos": "Tối đa {{max}} ảnh mỗi trẻ",
       "consentRequired": "Chưa cấp quyền chụp ảnh",
-      "saveError": "Lưu ảnh thất bại",
       "loadingParticipant": "Đang tải dữ liệu người tham gia...",
       "childMissingTitle": "Không tìm thấy trẻ",
       "childMissingDesc": "Dữ liệu trẻ không khả dụng hoặc đã bị xóa.",
@@ -1268,7 +1283,6 @@
       "deleteError": "Gagal menghapus foto",
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
-      "pickFooter": "Report photo for: {{topic}}",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo"
     },
@@ -1281,7 +1295,6 @@
       "deviceFallback": "Kamera",
       "back": "Kamera Belakang",
       "front": "Kamera Depan",
-      "flash": "Flash",
       "flip": "Balik",
       "grid": "Grid",
       "emptyDesc": "Tidak ada kelompok aktif dengan peserta untuk difoto.",
@@ -1325,10 +1338,13 @@
       "remainingCount": "Còn lại {{count}}",
       "complete": "Hoàn thành nhóm",
       "rateAllFirst": "Vui lòng đánh giá tất cả người tham gia trước",
-      "completeHint": "Tất cả người tham gia phải được đánh giá trước khi nhóm có thể được hoàn thành"
+      "completeHint": "Tất cả người tham gia phải được đánh giá trước khi nhóm có thể được hoàn thành",
+      "fallbackName": "Nhóm chưa đặt tên"
     },
     "session": {
-      "allDay": "Cả ngày"
+      "allDay": "Cả ngày",
+      "notMine": "Phiên này không thuộc trách nhiệm của bạn.",
+      "noLocation": "Chưa xác định địa điểm"
     },
     "child": {
       "years": "{{age}} tuổi",
@@ -1348,13 +1364,23 @@
       "allSessions": "Tất cả các phiên",
       "emptyTitle": "Chưa có phiên nào",
       "emptyAll": "Bạn chưa được phân công vào bất kỳ phiên nào.",
-      "emptyFiltered": "Không có phiên nào cho bộ lọc \"{{filter}}\"."
+      "emptyFiltered": "Không có phiên nào cho bộ lọc \"{{filter}}\".",
+      "sessionCompletedTitle": "Phiên đã kết thúc",
+      "sessionCompletedDesc": "Phiên này đã kết thúc và không thể mở lại.",
+      "sessionDraftTitle": "Phiên vẫn là bản nháp",
+      "sessionDraftDesc": "Phiên này vẫn là bản nháp và chưa có nhóm, nên chưa thể mở.",
+      "sessionUnknownTitle": "Trạng thái phiên không xác định",
+      "sessionUnknownDesc": "Phiên này có trạng thái \"{{status}}\" chưa được hỗ trợ, nên chưa thể mở.",
+      "noUserTitle": "Chưa đăng nhập",
+      "noUserDesc": "Không tìm thấy phiên đăng nhập. Vui lòng đăng nhập lại rồi thử lại."
     },
     "groups": {
       "pageTitle": "Tất cả các nhóm",
       "emptyTitle": "Chưa có nhóm nào",
       "emptyDesc": "Chưa có phiên hoạt động nào với các nhóm khả dụng.",
-      "emptySession": "Chưa có nhóm nào cho phiên này."
+      "emptySession": "Chưa có nhóm nào cho phiên này.",
+      "sessionNotFoundTitle": "Không tìm thấy phiên",
+      "sessionNotFoundDesc": "Không tìm thấy phiên hoặc phiên không còn hoạt động. Phiên có thể đã kết thúc hoặc liên kết đã hết hạn."
     },
     "activities": {
       "pageTitle": "Hoạt động của tôi",

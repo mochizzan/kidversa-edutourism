@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Pencil, Trash2, Plus, Play, Image, Gamepad2, Loader2 } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Card } from '../../../shared/components/ui/Card'
@@ -17,6 +17,7 @@ import {
   contentNewPath,
   contentEditPath,
 } from '../../../core/constants/app'
+import { withOrigin } from '../../../core/utils/navigation'
 import { STAGE_CONTENT_FILE_TYPE_LABELS, YOUTUBE_LABEL } from '../../../core/constants/labels'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Program, ProgramStage, ProgramSubstage, StageContent } from '../../../core/types'
@@ -33,6 +34,7 @@ const ActivityDetailPage = () => {
   const { t } = useTranslation()
   const { activityId } = useParams<{ activityId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { addToast } = useGlobalToast()
 
   const [activity, setActivity] = useState<ProgramSubstage | null>(null)
@@ -144,7 +146,9 @@ const ActivityDetailPage = () => {
             <Button
               variant="secondary"
               icon={<Pencil className="w-4 h-4" />}
-              onClick={() => navigate(activityEditPath(activity.id))}
+              onClick={() =>
+                navigate(withOrigin(activityEditPath(activity.id), `${location.pathname}${location.search}`))
+              }
             >
               {t('admin.common.edit')}
             </Button>
@@ -155,7 +159,7 @@ const ActivityDetailPage = () => {
         }
       />
 
-      <Card title={t('admin.activities.infoTitle')}>
+      <Card title={t('admin.common.detail')}>
         <div className="space-y-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{t('admin.col.program')}</p>

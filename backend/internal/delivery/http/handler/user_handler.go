@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -9,8 +10,10 @@ import (
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/usecase/live"
 )
@@ -81,6 +84,12 @@ func (h *UserHandler) Create(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal, and without
+	// this check an invalid body would still reach CreateUser.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
+	}
 	role, tid := actor(c)
 	user, err := h.userUC.CreateUser((*c).Request().Context(), req.Email, req.Password, req.Name, req.Phone, req.TenantID, req.Role, role, tid)
 	if err != nil {
@@ -104,18 +113,38 @@ func (h *UserHandler) Get(c *echo.Context) error {
 }
 
 // Update handles PUT /api/users/:id.
+//
+// The route carries no role gate so the profile page can self-service edits:
+// an actor may update THEMSELVES (any role) or — as SUPER_ADMIN/ADMIN — any
+// user. A self-update may never change role or is_active (privilege
+// escalation is impossible from the profile page).
 func (h *UserHandler) Update(c *echo.Context) error {
 	id, ok := validateID(c)
 	if !ok {
 		return nil
 	}
 	var req dto.UpdateUserRequest
-	if err := (*c).Bind(&req); err != nil {
-		return appresp.Fail(c, http.StatusBadRequest, "invalid_body")
+	if err := bindAndValidate(c, &req); err != nil {
+		return err
+	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal, and without
+	// this check an invalid body would still reach UpdateUser.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
 	}
 	role, tid := actor(c)
 	actorID := appmiddleware.GetUserID(c)
-	user, err := h.userUC.UpdateUser((*c).Request().Context(), id, req.Name, req.Phone, req.Role, req.IsActive, actorID, role, tid)
+	if id != actorID && role != string(entity.RoleSuperAdmin) && role != string(entity.RoleAdmin) {
+		return apperrors.Forbidden("forbidden", errors.New("hanya SUPER_ADMIN/ADMIN yang dapat mengubah pengguna lain"))
+	}
+	if id == actorID && req.Role != "" {
+		return apperrors.Forbidden("self_role_change_not_allowed", errors.New("tidak dapat mengubah role diri sendiri"))
+	}
+	if id == actorID && req.IsActive != nil {
+		return apperrors.Forbidden("forbidden", errors.New("tidak dapat mengubah status aktif diri sendiri"))
+	}
+	user, err := h.userUC.UpdateUser((*c).Request().Context(), id, req.Name, req.Email, req.Phone, req.Role, req.IsActive, actorID, role, tid)
 	if err != nil {
 		return err
 	}

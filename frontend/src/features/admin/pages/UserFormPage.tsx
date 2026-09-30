@@ -112,6 +112,8 @@ const UserFormPage = () => {
           navigate(ROUTES.ADMIN.USERS)
         }
         setLoading(false)
+      }).catch((err) => {
+        console.error('[UserFormPage] getById failed', err)
       })
     }
   }, [isEdit, userId, addToast, navigate, reset, t])

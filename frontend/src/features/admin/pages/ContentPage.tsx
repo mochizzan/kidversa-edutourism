@@ -98,7 +98,8 @@ const ContentPage = () => {
     try {
       const u = await contentService.getUsage(item.id)
       setUsage(u)
-    } catch {
+    } catch (err) {
+      console.error('[ContentPage] getUsage failed', err)
       setUsage([])
     }
   }

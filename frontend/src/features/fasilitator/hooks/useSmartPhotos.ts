@@ -32,15 +32,13 @@ export function useSmartPhotos(
   participantRef.current = participant
   const getParticipant = useCallback(() => participantRef.current, [])
 
+  // Rejects on failure so callers render their own ErrorState/retry (the
+  // photo grid must never present a failed fetch as an empty list).
   const loadPhotos = useCallback(async () => {
     if (!childId) return
-    try {
-      const updated = await photoService.getByParticipant(childId)
-      setPhotos(updated)
-    } catch {
-      addToast({ type: 'error', message: i18n.t('fasilitator.photos.reloadError') })
-    }
-  }, [childId, addToast])
+    const updated = await photoService.getByParticipant(childId)
+    setPhotos(updated)
+  }, [childId])
 
   const setPhotosDirect = useCallback((next: SmartPhoto[]) => {
     setPhotos(next)
@@ -54,8 +52,9 @@ export function useSmartPhotos(
       setPicks(data)
     } catch (error) {
       logError('useSmartPhotos.loadPicks', error)
+      addToast({ type: 'error', message: i18n.t('fasilitator.galeri.picksLoadError') })
     }
-  }, [getParticipant])
+  }, [getParticipant, addToast])
 
   const setPick = useCallback(
     async (programStageId: string, photoId: string): Promise<boolean> => {
@@ -102,7 +101,14 @@ export function useSmartPhotos(
   const deletePhoto = useCallback(
     async (photoId: string) => {
       await photoService.delete(photoId)
-      await loadPhotos()
+      try {
+        await loadPhotos()
+      } catch (error) {
+        // The delete itself succeeded — log the stale-grid refresh failure
+        // instead of surfacing a misleading "delete failed" toast; the page's
+        // focus refetch converges the grid.
+        logError('useSmartPhotos.deletePhoto refresh', error)
+      }
     },
     [loadPhotos],
   )

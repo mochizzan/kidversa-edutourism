@@ -146,6 +146,8 @@ export interface Session {
  tenant_id: string
  program_id: string
  program_name?: string  // populated by backend JOIN with programs
+ topics?: string[]  // topic names instantiated in this session (list endpoint only)
+ activity_count?: number  // kegiatan count (list endpoint only; may be absent on older/partial responses)
  name: string
  session_date: string
  start_time?: string
@@ -333,6 +335,9 @@ export interface ConsentFlatItem {
  location: string
  program_name: string
  consent_status: 'granted' | 'pending' | 'not_sent' | 'denied'
+ // Per-participant delivery overlay from the server's in-memory consent batch
+ // registry (omitempty — absent when no batch has touched this participant).
+ delivery_status?: 'queued' | 'processing' | 'sent' | 'failed'
  responded_at?: string
  responder_name?: string
  has_token: boolean

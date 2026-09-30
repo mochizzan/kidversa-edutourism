@@ -171,7 +171,6 @@
       "checkError": "Gagal memeriksa tugasan fasilitator",
       "startedToast": "Sesi berjaya dimulakan",
       "completedToast": "Sesi berjaya diselesaikan",
-      "viewDetail": "Lihat Butiran",
       "start": "Mulakan Sesi",
       "complete": "Selesaikan Sesi",
       "delete": "Padam Sesi",
@@ -198,6 +197,7 @@
       "allDay": "Sepanjang hari",
       "infoLocation": "Lokasi",
       "infoTimeLabel": "Masa",
+      "durationShort": "{{h}}jam {{m}}min",
       "stageLocked": "Dikunci",
       "stageInProgress": "Sedang berlangsung",
       "noFacilitator": "Tiada fasilitator lagi",
@@ -315,7 +315,10 @@
       "cancelled": "Dibatalkan",
       "waiting": "Menunggu",
       "approved": "Diluluskan",
-      "rejected": "Ditolak"
+      "rejected": "Ditolak",
+      "queued": "Dalam Barisan",
+      "processing": "Memproses",
+      "operationInterrupted": "Proses di pelayan telah terhenti"
     },
     "reportStatus": {
       "draft": "Draf",
@@ -342,14 +345,12 @@
       "all": "Semua",
       "edit": "Edit",
       "detail": "Perincian",
-      "info": "Info",
       "approve": "Luluskan",
       "reject": "Tolak",
       "add": "Tambah",
       "createNew": "Buat Baharu",
       "deactivate": "Nyahaktifkan",
       "activate": "Aktifkan",
-      "toggleStatus": "Tukar Status",
       "allPrograms": "Semua Program",
       "fillRequired": "Lengkapkan semua medan yang wajib"
     },
@@ -689,8 +690,6 @@
       "pickTopic": "Pilih Topik",
       "pickProgramDulu": "Pilih Program Dahulu",
       "nameLabel": "Nama Aktiviti",
-      "tipDetail": "Perincian",
-      "infoTitle": "Maklumat Aktiviti",
       "contentTitle": "Kandungan yang Ditugaskan",
       "deleteTitle": "Padam Aktiviti",
       "deleteMsgList": "Adakah anda pasti ingin memadamkan aktiviti \"{{name}}\"? Kandungan yang ditugaskan kepada aktiviti ini akan dilepaskan. Tindakan ini tidak boleh dibatalkan.",
@@ -1147,6 +1146,7 @@
       "dashboard": "Papan Pemuka",
       "groups": "Kumpulan",
       "camera": "Kamera",
+      "galeri": "Galeri",
       "profile": "Profil"
     },
     "hello": "Hai, {{name}}",
@@ -1205,6 +1205,7 @@
     "edit": {
       "userNotFound": "Data pengguna tidak ditemui. Sila log masuk semula.",
       "saveFailed": "Gagal mengemas kini data. Sila cuba lagi.",
+      "noPermission": "Anda tidak mempunyai kebenaran untuk mengedit data ini.",
       "nameSaved": "Nama berjaya dikemas kini",
       "nameTitle": "Edit Nama",
       "nameLabel": "Nama Penuh",
@@ -1237,8 +1238,23 @@
       "quickActions": "Tindakan Pantas",
       "noConsentMsg": "Tiada kebenaran foto"
     },
+    "galeri": {
+      "pageTitle": "Galeri Foto",
+      "pageSubtitle": "Lihat dan urus foto peserta bagi setiap sesi.",
+      "emptySessionsTitle": "Tiada sesi aktif lagi",
+      "emptySessionsDesc": "Sesi aktif akan dipaparkan di sini untuk membuka galerinya.",
+      "ownedBadge": "Kelompok Anda",
+      "lockedSessionDesc": "Sesi ini bukan tanggungjawab anda — paparan sahaja.",
+      "groupsSubtitle": "Pilih kelompok untuk melihat galeri pesertanya.",
+      "participantsSubtitle": "Pilih peserta untuk membuka galeri fotonya.",
+      "lockedGroupDesc": "Hanya fasilitator kelompok ini boleh membuka galeri pesertanya.",
+      "addPhoto": "Tambah Foto",
+      "noActiveTopic": "Tiada topik aktif untuk memilih foto laporan.",
+      "topicLoadError": "Gagal memuat senarai topik. Nama topik mungkin tidak lengkap.",
+      "picksLoadError": "Gagal memuat pilihan foto laporan.",
+      "groupGoneDesc": "Kelompok tidak ditemui dalam sesi ini. Mungkin telah dipadam."
+    },
     "photos": {
-      "reloadError": "Gagal memuat semula foto.",
       "emptyFor": "Belum ada foto untuk {{name}}",
       "frameLoadError": "Gagal memuatkan data bingkai. Periksa sambungan kemudian cuba lagi.",
       "photoLoadError": "Gagal memuatkan data foto. Periksa sambungan kemudian cuba lagi.",
@@ -1246,7 +1262,6 @@
       "notInSession": "Peserta belum masuk sesi",
       "maxPhotos": "Maksimum {{max}} foto bagi setiap kanak-kanak",
       "consentRequired": "Kebenaran foto belum diberikan",
-      "saveError": "Gagal menyimpan foto",
       "loadingParticipant": "Memuatkan data peserta...",
       "childMissingTitle": "Kanak-kanak Tidak Ditemui",
       "childMissingDesc": "Data kanak-kanak tidak tersedia atau telah dipadam.",
@@ -1268,7 +1283,6 @@
       "deleteError": "Gagal memadam foto",
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
-      "pickFooter": "Report photo for: {{topic}}",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo"
     },
@@ -1281,7 +1295,6 @@
       "deviceFallback": "Kamera",
       "back": "Kamera Belakang",
       "front": "Kamera Depan",
-      "flash": "Denyar",
       "flip": "Balik",
       "grid": "Grid",
       "emptyDesc": "Tiada kumpulan aktif dengan peserta untuk difoto.",
@@ -1325,10 +1338,13 @@
       "remainingCount": "{{count}} berbaki",
       "complete": "Selesaikan Kumpulan",
       "rateAllFirst": "Nilai Semua Peserta Terlebih Dahulu",
-      "completeHint": "Semua peserta perlu dinilai sebelum kumpulan boleh diselesaikan"
+      "completeHint": "Semua peserta perlu dinilai sebelum kumpulan boleh diselesaikan",
+      "fallbackName": "Kumpulan tanpa nama"
     },
     "session": {
-      "allDay": "Sepanjang hari"
+      "allDay": "Sepanjang hari",
+      "notMine": "Sesi ini bukan tanggungjawab anda.",
+      "noLocation": "Lokasi belum ditetapkan"
     },
     "child": {
       "years": "{{age}} tahun",
@@ -1348,13 +1364,23 @@
       "allSessions": "Semua Sesi",
       "emptyTitle": "Belum ada sesi",
       "emptyAll": "Anda belum ditugaskan dalam mana-mana sesi.",
-      "emptyFiltered": "Tiada sesi untuk penapis \"{{filter}}\"."
+      "emptyFiltered": "Tiada sesi untuk penapis \"{{filter}}\".",
+      "sessionCompletedTitle": "Sesi sudah tamat",
+      "sessionCompletedDesc": "Sesi ini telah tamat dan tidak dapat dibuka lagi.",
+      "sessionDraftTitle": "Sesi masih draf",
+      "sessionDraftDesc": "Sesi ini masih berupa draf dan belum mempunyai kumpulan, sehingga belum dapat dibuka.",
+      "sessionUnknownTitle": "Status sesi tidak dikenali",
+      "sessionUnknownDesc": "Sesi ini berstatus \"{{status}}\" yang belum disokong, sehingga belum dapat dibuka.",
+      "noUserTitle": "Belum log masuk",
+      "noUserDesc": "Sesi log masuk tidak dijumpai. Silakan log masuk semula dan cuba lagi."
     },
     "groups": {
       "pageTitle": "Semua Kumpulan",
       "emptyTitle": "Belum ada kumpulan",
       "emptyDesc": "Belum ada sesi aktif dengan kumpulan yang tersedia.",
-      "emptySession": "Belum ada kumpulan untuk sesi ini."
+      "emptySession": "Belum ada kumpulan untuk sesi ini.",
+      "sessionNotFoundTitle": "Sesi tidak dijumpai",
+      "sessionNotFoundDesc": "Sesi tidak dijumpai atau tidak lagi aktif. Sesi mungkin telah tamat atau pautan telah luput."
     },
     "activities": {
       "pageTitle": "Aktiviti Saya",

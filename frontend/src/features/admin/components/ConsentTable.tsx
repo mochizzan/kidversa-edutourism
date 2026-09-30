@@ -1,9 +1,10 @@
-import { Send, RefreshCw } from 'lucide-react'
+import { Send, RefreshCw, Clock } from 'lucide-react'
 import type { ConsentFlatItem } from '../../../core/types'
 import { ConsentStatusBadge } from './ConsentStatusBadge'
 import { formatDate, formatDateTime } from '../../../shared/utils'
 import { Button } from '../../../shared/components/ui/Button'
 import { CompactPagination } from '../../../shared/components/data/CompactPagination'
+import { getConsentRowAction } from '../utils/consentRowAction'
 import { useTranslation } from 'react-i18next'
 
 interface ConsentTableProps {
@@ -52,79 +53,98 @@ export function ConsentTable({
             {t('admin.consent.emptyTable')}
           </div>
         ) : (
-          items.map((item) => (
-            <div
-              key={item.participant_id}
-              className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 px-4 py-3 border-b border-outline/5 last:border-b-0 hover:bg-surface-container/50 transition-colors"
-            >
-              {/* Program — hidden on mobile */}
-              <span className="hidden md:block flex-1 min-w-0 text-sm text-on-surface truncate">
-                {item.program_name}
-              </span>
-
-              {/* Session — hidden on mobile */}
-              <span className="hidden md:block flex-[1.2] min-w-0">
-                <span className="text-sm text-on-surface truncate block">{item.session_name}</span>
-                <span className="text-xs text-on-surface-variant">{formatDate(item.session_date)}</span>
-              </span>
-
-              {/* Child name — always visible, bold */}
-              <span className="flex-1 min-w-0 text-sm font-medium text-on-surface">
-                {item.child_name}
-                {/* Mobile: show session name inline */}
-                <span className="md:hidden text-xs font-normal text-on-surface-variant block">
-                  {item.session_name} · {item.program_name}
+          items.map((item) => {
+            const action = getConsentRowAction(item)
+            const rowSending = sending[item.participant_id]
+            return (
+              <div
+                key={item.participant_id}
+                className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 px-4 py-3 border-b border-outline/5 last:border-b-0 hover:bg-surface-container/50 transition-colors"
+              >
+                {/* Program — hidden on mobile */}
+                <span className="hidden md:block flex-1 min-w-0 text-sm text-on-surface truncate">
+                  {item.program_name}
                 </span>
-              </span>
 
-              {/* Phone — hidden on small screens */}
-              <span className="hidden lg:block w-28 text-sm text-on-surface-variant truncate">
-                {item.parent_phone}
-              </span>
+                {/* Session — hidden on mobile */}
+                <span className="hidden md:block flex-[1.2] min-w-0">
+                  <span className="text-sm text-on-surface truncate block">{item.session_name}</span>
+                  <span className="text-xs text-on-surface-variant">{formatDate(item.session_date)}</span>
+                </span>
 
-              {/* Consent status */}
-              <span className="w-24">
-                <ConsentStatusBadge status={item.consent_status} />
-              </span>
+                {/* Child name — always visible, bold */}
+                <span className="flex-1 min-w-0 text-sm font-medium text-on-surface">
+                  {item.child_name}
+                  {/* Mobile: show session name inline */}
+                  <span className="md:hidden text-xs font-normal text-on-surface-variant block">
+                    {item.session_name} · {item.program_name}
+                  </span>
+                </span>
 
-              {/* Responded at — hidden on small screens */}
-              <span className="hidden lg:block w-36 text-xs text-on-surface-variant">
-                {item.responded_at ? formatDateTime(item.responded_at) : '-'}
-              </span>
+                {/* Phone — hidden on small screens */}
+                <span className="hidden lg:block w-28 text-sm text-on-surface-variant truncate">
+                  {item.parent_phone}
+                </span>
 
-              {/* Responder name — hidden on small screens */}
-              <span className="hidden xl:block w-32 text-xs text-on-surface-variant truncate">
-                {item.responder_name || '-'}
-              </span>
+                {/* Consent status */}
+                <span className="w-24">
+                  <ConsentStatusBadge status={item.consent_status} />
+                </span>
 
-              {/* Action */}
-              <span className="w-24 flex justify-end">
-                {item.consent_status === 'not_sent' ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<Send />}
-                    onClick={() => onSend(item.participant_id)}
-                    loading={sending[item.participant_id]}
-                  >
-                    {t('admin.consent.send')}
-                  </Button>
-                ) : item.consent_status === 'pending' || item.consent_status === 'denied' ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={<RefreshCw />}
-                    onClick={() => onResend(item.participant_id)}
-                    loading={sending[item.participant_id]}
-                  >
-                    {t('admin.consent.resend')}
-                  </Button>
-                ) : (
-                  <span className="text-xs text-on-surface-variant">-</span>
-                )}
-              </span>
-            </div>
-          ))
+                {/* Responded at — hidden on small screens */}
+                <span className="hidden lg:block w-36 text-xs text-on-surface-variant">
+                  {item.responded_at ? formatDateTime(item.responded_at) : '-'}
+                </span>
+
+                {/* Responder name — hidden on small screens */}
+                <span className="hidden xl:block w-32 text-xs text-on-surface-variant truncate">
+                  {item.responder_name || '-'}
+                </span>
+
+                {/* Action — server delivery state (queued/processing/sent/failed)
+                  wins; absent delivery_status falls back to consent rules. */}
+                <span className="w-24 flex justify-end">
+                  {action === 'queued' ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<Clock />}
+                      disabled
+                      loading={rowSending}
+                    >
+                      {t('admin.status.queued')}
+                    </Button>
+                  ) : action === 'processing' ? (
+                    <Button variant="secondary" size="sm" disabled loading>
+                      {t('admin.status.processing')}
+                    </Button>
+                  ) : action === 'resend' ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={<RefreshCw />}
+                      onClick={() => onResend(item.participant_id)}
+                      loading={rowSending}
+                    >
+                      {t('admin.consent.resend')}
+                    </Button>
+                  ) : action === 'send' ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<Send />}
+                      onClick={() => onSend(item.participant_id)}
+                      loading={rowSending}
+                    >
+                      {t('admin.consent.send')}
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-on-surface-variant">-</span>
+                  )}
+                </span>
+              </div>
+            )
+          })
         )}
       </div>
 

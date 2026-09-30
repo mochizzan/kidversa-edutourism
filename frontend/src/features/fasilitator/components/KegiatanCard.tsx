@@ -105,8 +105,10 @@ export function KegiatanCard({
       initialComment.current = comment
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
-    } catch {
-      // Error is handled by parent via toast
+    } catch (error) {
+      // Surfaced by ChildAssessmentPage as a toast (its onSave contract) —
+      // log here too so a swallowed rejection is never fully silent.
+      console.error('[KegiatanCard] assessment save failed', error)
     } finally {
       setSaving(false)
     }

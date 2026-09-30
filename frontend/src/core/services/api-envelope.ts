@@ -14,6 +14,15 @@
 import { ApiError, apiRequest } from './backend-client'
 import type { ListParams, PaginatedResponse } from '../types'
 import { PAGE_SIZE } from '../constants/api'
+import { i18n } from '../i18n'
+
+// A 2xx body that is not the documented envelope is a server/proxy fault:
+// reject with a user-facing error instead of unwrapping junk, so a malformed
+// response never renders as an empty list or a fake not-found.
+function unexpectedEnvelope(path: string): ApiError {
+  console.error(`[api-envelope] unexpected response envelope for ${path}`)
+  return new ApiError(i18n.t('errors.default'), 'unexpected_response', 502)
+}
 
 interface ListEnvelope<T> {
   data: T[]
@@ -105,15 +114,19 @@ export async function listRequest<T>(
   const url = buildQuery(path, params)
 
   const first = await apiRequest<ListEnvelope<T>>('GET', url, undefined)
+  if (!Array.isArray(first?.data)) throw unexpectedEnvelope(url)
 
   if (limit >= 100 && first.meta && first.meta.total > first.data.length) {
     const rest = await fetchAllPages<T>(
-      (p) =>
-        apiRequest<ListEnvelope<T>>(
+      async (p) => {
+        const res = await apiRequest<ListEnvelope<T>>(
           'GET',
           buildQuery(path, { ...params, page: p }),
           undefined,
-        ),
+        )
+        if (!Array.isArray(res?.data)) throw unexpectedEnvelope(url)
+        return res
+      },
       page + 1,
     )
     const all = [...first.data, ...rest].map(normalizeTenantId)
@@ -132,7 +145,13 @@ export async function listRequest<T>(
 // GET an array (sub-resource list, e.g. stages/contents/groups/participants).
 export async function arrayRequest<T>(method: string, path: string, body?: unknown): Promise<T[]> {
   const res = await apiRequest<ItemEnvelope<T[]>>(method, path, body)
-  return (res.data ?? []).map(normalizeTenantId)
+  if (res === undefined || res === null || typeof res !== 'object' || !('data' in res)) {
+    throw unexpectedEnvelope(path)
+  }
+  const data = res.data
+  if (data === null || data === undefined) return [] // nil slice marshals to null
+  if (!Array.isArray(data)) throw unexpectedEnvelope(path)
+  return data.map(normalizeTenantId)
 }
 
 // GET/POST a list wrapped as `{ data: { items: [] } }` (reports, consent,
@@ -141,7 +160,42 @@ export async function arrayRequest<T>(method: string, path: string, body?: unkno
 // injection (SUPER_ADMIN), so no header plumbing is needed here.
 export async function itemsRequest<T>(method: string, path: string, body?: unknown): Promise<T[]> {
   const res = await apiRequest<ItemsEnvelope<T>>(method, path, body)
-  return (res.data?.items ?? []).map(normalizeTenantId)
+  if (res === undefined || res === null || typeof res !== 'object' || !('data' in res)) {
+    throw unexpectedEnvelope(path)
+  }
+  const inner: unknown = res.data
+  if (inner === null || inner === undefined) return [] // nil data marshals to null
+  if (typeof inner !== 'object' || !('items' in inner)) throw unexpectedEnvelope(path)
+  const items: unknown = inner.items
+  if (items === null || items === undefined) return [] // nil slice marshals to null
+  if (!Array.isArray(items)) throw unexpectedEnvelope(path)
+  return items.map(normalizeTenantId)
+}
+
+// GET/POST a list wrapped as `{ data: { items: [], ...extras } }`, preserving
+// sibling top-level fields (operation state such as active_batches/active_send).
+// Malformed envelopes throw the same `unexpectedEnvelope` error as itemsRequest.
+export async function itemsWithExtrasRequest<T, E extends Record<string, unknown> = Record<string, unknown>>(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<{ items: T[]; extras: E }> {
+  const res = await apiRequest<ItemsEnvelope<T>>(method, path, body)
+  if (res === undefined || res === null || typeof res !== 'object' || !('data' in res)) {
+    throw unexpectedEnvelope(path)
+  }
+  const inner: unknown = res.data
+  if (inner === null || inner === undefined) return { items: [], extras: {} as E } // nil data marshals to null
+  if (typeof inner !== 'object' || !('items' in inner)) throw unexpectedEnvelope(path)
+  const record = inner as Record<string, unknown>
+  const extras: Record<string, unknown> = {}
+  for (const key of Object.keys(record)) {
+    if (key !== 'items') extras[key] = record[key]
+  }
+  const items: unknown = record.items
+  if (items === null || items === undefined) return { items: [], extras: extras as E } // nil slice marshals to null
+  if (!Array.isArray(items)) throw unexpectedEnvelope(path)
+  return { items: items.map(normalizeTenantId), extras: extras as E }
 }
 
 // GET/POST/PUT a single item; returns the unwrapped `data` (tenant_id normalized).
@@ -155,7 +209,12 @@ export async function itemRequest<T>(
   const res = await apiRequest<ItemEnvelope<T>>(method, path, body, {
     tenantId: tenantId ?? undefined,
   })
-  return normalizeTenantId(res.data)
+  // 204 (undefined body) is legitimate for mutations; any other body must be
+  // an envelope — a `{}`/garbage body is a fault, not a missing record.
+  if (res !== undefined && (typeof res !== 'object' || res === null || !('data' in res))) {
+    throw unexpectedEnvelope(path)
+  }
+  return normalizeTenantId(res?.data)
 }
 
 // GET a single item that may not exist; returns the unwrapped `data` or null on 404.

@@ -22,8 +22,6 @@ type ProgramSubstageRepository interface {
 	ListPaginatedSubstages(ctx context.Context, filter SubstageFilter, page, limit int) (*Paginated[entity.ProgramSubstage], error)
 	UpdateSubstage(ctx context.Context, s *entity.ProgramSubstage) error
 	DeleteSubstage(ctx context.Context, id string) error
-	// ReorderSubstages renumbers sequence_order 1..n to match orderedIDs.
-	ReorderSubstages(ctx context.Context, programStageID string, orderedIDs []string) error
 }
 
 // SessionSubstageRepository is the persistence contract for session Kegiatan

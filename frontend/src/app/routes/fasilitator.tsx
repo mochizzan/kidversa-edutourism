@@ -13,6 +13,10 @@ const FasilitatorChildAssessmentPage = lazy(() => import('../../features/fasilit
 const FasilitatorCameraPage = lazy(() => import('../../features/fasilitator/pages/CameraPage'))
 const FasilitatorSmartPhotoPage = lazy(() => import('../../features/fasilitator/pages/SmartPhotoPage'))
 const FasilitatorProfilePage = lazy(() => import('../../features/fasilitator/pages/ProfilePage'))
+const FasilitatorGaleriSessionsPage = lazy(() => import('../../features/fasilitator/pages/galeri/GaleriSessionsPage'))
+const FasilitatorGaleriSessionPage = lazy(() => import('../../features/fasilitator/pages/galeri/GaleriSessionPage'))
+const FasilitatorGaleriGroupPage = lazy(() => import('../../features/fasilitator/pages/galeri/GaleriGroupPage'))
+const FasilitatorGaleriChildPage = lazy(() => import('../../features/fasilitator/pages/galeri/GaleriChildPage'))
 
 export const fasilitatorRoutes: RouteObject[] = [
   {
@@ -30,6 +34,10 @@ export const fasilitatorRoutes: RouteObject[] = [
           lazyRoute('groups/:groupId/children/:childId', FasilitatorChildAssessmentPage),
           lazyRoute('groups/:groupId/children/:childId/photo', FasilitatorSmartPhotoPage),
           lazyRoute('camera', FasilitatorCameraPage),
+          lazyRoute('galeri', FasilitatorGaleriSessionsPage),
+          lazyRoute('galeri/sesi/:sessionId', FasilitatorGaleriSessionPage),
+          lazyRoute('galeri/kelompok/:groupId', FasilitatorGaleriGroupPage),
+          lazyRoute('galeri/peserta/:childId', FasilitatorGaleriChildPage),
           lazyRoute('profile', FasilitatorProfilePage),
         ],
       },

@@ -7,8 +7,7 @@ import { ROUTES } from '../../core/constants/app'
 import { Logo } from '../components/ui/Logo'
 import {
   LayoutDashboard,
-  Users,
-  Camera,
+  Images,
   User,
 } from 'lucide-react'
 
@@ -20,14 +19,9 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    labelKey: 'fasilitator.nav.groups',
-    path: ROUTES.FASILITATOR.GROUPS,
-    icon: Users,
-  },
-  {
-    labelKey: 'fasilitator.nav.camera',
-    path: ROUTES.FASILITATOR.CAMERA,
-    icon: Camera,
+    labelKey: 'fasilitator.nav.galeri',
+    path: ROUTES.FASILITATOR.GALERI,
+    icon: Images,
   },
   {
     labelKey: 'fasilitator.nav.profile',
@@ -85,7 +79,9 @@ const FasilitatorLayout = () => {
                 to={item.path}
                 className={cn(
                   'relative flex flex-col items-center justify-center gap-0.5',
-                  'min-w-[80px] min-h-[64px] py-2 px-3',
+                  // 3 entries: flex-1 + min-w-0 lets each item shrink so the row
+                  // fits 320px-wide phones without wrapping (was min-w-[80px] = 400px).
+                  'flex-1 min-w-0 min-h-[64px] py-2 px-1',
                   'transition-colors duration-200',
                   isActive
                     ? 'text-primary'
@@ -106,7 +102,7 @@ const FasilitatorLayout = () => {
 
                 <span
                   className={cn(
-                    'text-[10px] font-medium leading-tight',
+                    'text-[10px] font-medium leading-tight text-center',
                     isActive
                       ? 'text-primary font-bold'
                       : 'text-outline-variant'

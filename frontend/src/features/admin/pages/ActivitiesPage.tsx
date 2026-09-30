@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Info, FolderOpen, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Select } from '../../../shared/components/ui/Select'
@@ -15,6 +15,7 @@ import { programStageService } from '../../../core/services/program-stages'
 import { programSubstageService } from '../../../core/services/program-substages'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import { activityNewPath, activityDetailPath, activityEditPath } from '../../../core/constants/app'
+import { withOrigin } from '../../../core/utils/navigation'
 import { formatDate } from '../../../shared/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Column } from '../../../shared/components/data/DataTable'
@@ -30,6 +31,7 @@ interface ActivityRow extends ProgramSubstage {
 const ActivitiesPage = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const { tenantId } = useTenantScope()
   const { addToast } = useGlobalToast()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -98,7 +100,7 @@ const ActivitiesPage = () => {
     programService
       .getAll({ limit: 1000 })
       .then((res) => setPrograms(res.data))
-      .catch(() => setPrograms([]))
+      .catch((err) => { console.error('[ActivitiesPage] programs load failed', err); setPrograms([]) })
       .finally(() => setProgramsLoading(false))
   }, [tenantId])
 
@@ -111,7 +113,7 @@ const ActivitiesPage = () => {
     programStageService
       .getAll({ programId: programFilter, limit: 1000 })
       .then((res) => setStages(res.data))
-      .catch(() => setStages([]))
+      .catch((err) => { console.error('[ActivitiesPage] stages load failed', err); setStages([]) })
       .finally(() => setStagesLoading(false))
   }, [programFilter])
 
@@ -206,7 +208,7 @@ const ActivitiesPage = () => {
             variant="ghost"
             size="sm"
             icon={<Info className="w-4 h-4" />}
-            tooltip={t('admin.activities.tipDetail')}
+            tooltip={t('admin.common.detail')}
             onClick={() => navigate(activityDetailPath(item.id))}
           />
           <Button
@@ -214,7 +216,9 @@ const ActivitiesPage = () => {
             size="sm"
             icon={<Pencil className="w-4 h-4" />}
             tooltip={t('admin.common.edit')}
-            onClick={() => navigate(activityEditPath(item.id))}
+            onClick={() =>
+              navigate(withOrigin(activityEditPath(item.id), `${location.pathname}${location.search}`))
+            }
           />
           <Button
             variant="ghost"
@@ -239,7 +243,12 @@ const ActivitiesPage = () => {
           <Button
             icon={<Plus className="w-4 h-4" />}
             onClick={() =>
-              navigate(activityNewPath({ programId: programFilter || undefined, stageId: stageFilter || undefined }))
+              navigate(
+                withOrigin(
+                  activityNewPath({ programId: programFilter || undefined, stageId: stageFilter || undefined }),
+                  `${location.pathname}${location.search}`,
+                ),
+              )
             }
           >
             {t('admin.activities.add')}

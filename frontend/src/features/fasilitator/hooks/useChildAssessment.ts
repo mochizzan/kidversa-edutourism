@@ -59,7 +59,8 @@ async function findChildInSessions(childId: string): Promise<{ detail: ChildDeta
       try {
         const all = await sessionService.getSubstages(session.id)
         sessionSubstages = substagesOfStage(all, currentStage.id)
-      } catch {
+      } catch (error) {
+        console.error('[useChildAssessment] getSubstages failed; kegiatan list falls back to empty', error)
         sessionSubstages = []
       }
     }
@@ -83,8 +84,9 @@ async function findChildInSessions(childId: string): Promise<{ detail: ChildDeta
         for (const sub of allSubs) {
           programSubstageNameMap[sub.id] = sub.name
         }
-      } catch {
+      } catch (error) {
         // Leave the map empty; the page falls back to the Kegiatan index.
+        console.error('[useChildAssessment] kegiatan titles lookup failed', error)
       }
     }
 
@@ -122,8 +124,10 @@ export function useChildAssessment(childId: string | undefined, sessionId?: stri
         map.set(a.session_substage_id, a)
       }
       setAssessmentMap(map)
-    } catch {
-      // Non-fatal: leave map empty
+    } catch (error) {
+      // Non-fatal: leave map empty (log — otherwise saved scores would
+      // silently look unsaved).
+      console.error('[useChildAssessment] assessments fetch failed', error)
     }
   }, [childId])
 
@@ -156,7 +160,8 @@ export function useChildAssessment(childId: string | undefined, sessionId?: stri
               try {
                 const all = await sessionService.getSubstages(sessionId)
                 sessionSubstages = substagesOfStage(all, currentStage.id)
-              } catch {
+              } catch (error) {
+                console.error('[useChildAssessment] getSubstages failed; kegiatan list falls back to empty', error)
                 sessionSubstages = []
               }
             }
@@ -175,8 +180,9 @@ export function useChildAssessment(childId: string | undefined, sessionId?: stri
                 for (const sub of allSubs) {
                   programSubstageNameMap[sub.id] = sub.name
                 }
-              } catch {
+              } catch (error) {
                 // Leave empty
+                console.error('[useChildAssessment] kegiatan titles lookup failed', error)
               }
             }
 
@@ -210,7 +216,10 @@ export function useChildAssessment(childId: string | undefined, sessionId?: stri
           const attRes = await attendanceService.getBySession(resolvedSessionId)
           const att = attRes.find(a => a.participant_id === childId)
           setIsPresent(att?.is_present ?? false)
-        } catch {
+        } catch (error) {
+          // Attendance defaults to absent (fail closed) — log the failure so
+          // the banner is traceable to a fetch error, not real absence.
+          console.error('[useChildAssessment] attendance fetch failed', error)
           setIsPresent(false)
         }
       }

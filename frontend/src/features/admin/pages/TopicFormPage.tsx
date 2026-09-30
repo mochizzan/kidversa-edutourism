@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type SubmitEvent } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Card } from '../../../shared/components/ui/Card'
@@ -12,8 +12,8 @@ import { BadgeEditor } from '../components/BadgeEditor'
 import {
   topicListPath,
   topicDetailPath,
-  programDetailPath,
 } from '../../../core/constants/app'
+import { resolveCancelTarget } from '../../../core/utils/navigation'
 import { ContentType } from '../../../core/types/enums'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Program, ProgramStage } from '../../../core/types'
@@ -51,7 +51,7 @@ const TopicFormPage = () => {
     programService
       .getAll({ limit: 1000 })
       .then((res) => setPrograms(res.data))
-      .catch(() => setPrograms([]))
+      .catch((err) => { console.error('[TopicFormPage] programs load failed', err); setPrograms([]) })
       .finally(() => setProgramsLoading(false))
   }, [])
 
@@ -83,7 +83,8 @@ const TopicFormPage = () => {
               break
             }
           }
-        } catch {
+        } catch (err) {
+          console.error('[TopicFormPage] stage lookup failed', err)
           setStage(null)
         } finally {
           setLoading(false)
@@ -105,7 +106,7 @@ const TopicFormPage = () => {
     [programs],
   )
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!programId) {
       addToast({ type: 'error', message: t('admin.topic.programRequired') })
@@ -258,11 +259,7 @@ const TopicFormPage = () => {
             <Button
               variant="secondary"
               type="button"
-              onClick={() =>
-                selectedProgram && !isNew
-                  ? navigate(programDetailPath(selectedProgram.id))
-                  : navigate(topicListPath())
-              }
+              onClick={() => navigate(resolveCancelTarget(location.search, topicListPath()))}
             >
               {t('common.cancel')}
             </Button>

@@ -171,7 +171,6 @@
       "checkError": "ファシリテーターの割り当て確認に失敗しました",
       "startedToast": "セッションを開始しました",
       "completedToast": "セッションを完了しました",
-      "viewDetail": "詳細を見る",
       "start": "セッションを開始",
       "complete": "セッションを完了",
       "delete": "セッションを削除",
@@ -198,6 +197,7 @@
       "allDay": "終日",
       "infoLocation": "場所",
       "infoTimeLabel": "時間",
+      "durationShort": "{{h}}時間{{m}}分",
       "stageLocked": "ロック済み",
       "stageInProgress": "進行中",
       "noFacilitator": "ファシリテーターがいません",
@@ -315,7 +315,10 @@
       "cancelled": "キャンセル済み",
       "waiting": "保留中",
       "approved": "承認済み",
-      "rejected": "却下済み"
+      "rejected": "却下済み",
+      "queued": "キュー待ち",
+      "processing": "処理中",
+      "operationInterrupted": "サーバー側のプロセスが中断されました"
     },
     "reportStatus": {
       "draft": "下書き",
@@ -342,14 +345,12 @@
       "all": "すべて",
       "edit": "編集",
       "detail": "詳細",
-      "info": "情報",
       "approve": "承認",
       "reject": "却下",
       "add": "追加",
       "createNew": "新規作成",
       "deactivate": "無効化",
       "activate": "有効化",
-      "toggleStatus": "ステータス変更",
       "allPrograms": "すべてのプログラム",
       "fillRequired": "必須項目をすべて入力してください"
     },
@@ -689,8 +690,6 @@
       "pickTopic": "トピックを選択",
       "pickProgramDulu": "先にプログラムを選択",
       "nameLabel": "アクティビティ名",
-      "tipDetail": "詳細",
-      "infoTitle": "アクティビティ情報",
       "contentTitle": "割り当てられたコンテンツ",
       "deleteTitle": "アクティビティを削除",
       "deleteMsgList": "アクティビティ「{{name}}」を削除してもよろしいですか？このアクティビティに割り当てられたコンテンツの割り当てが解除されます。この操作は取り消せません。",
@@ -1147,6 +1146,7 @@
       "dashboard": "ダッシュボード",
       "groups": "グループ",
       "camera": "カメラ",
+      "galeri": "ギャラリー",
       "profile": "プロフィール"
     },
     "hello": "こんにちは、{{name}}さん",
@@ -1205,6 +1205,7 @@
     "edit": {
       "userNotFound": "ユーザーデータが見つかりません。再ログインしてください。",
       "saveFailed": "データの更新に失敗しました。もう一度お試しください。",
+      "noPermission": "このデータを編集する権限がありません。",
       "nameSaved": "名前が正常に更新されました",
       "nameTitle": "名前を編集",
       "nameLabel": "氏名",
@@ -1237,8 +1238,23 @@
       "quickActions": "クイックアクション",
       "noConsentMsg": "写真の許可がありません"
     },
+    "galeri": {
+      "pageTitle": "写真ギャラリー",
+      "pageSubtitle": "各セッションの参加者の写真を表示・管理します。",
+      "emptySessionsTitle": "アクティブなセッションはありません",
+      "emptySessionsDesc": "アクティブなセッションがここに表示され、ギャラリーを開けます。",
+      "ownedBadge": "あなたのグループ",
+      "lockedSessionDesc": "このセッションはあなたの担当ではありません —閲覧のみ可能です。",
+      "groupsSubtitle": "グループを選択して参加者のギャラリーを表示します。",
+      "participantsSubtitle": "参加者を選択して写真ギャラリーを開きます。",
+      "lockedGroupDesc": "このグループの担当ファシリテーターのみが参加者のギャラリーを開けます。",
+      "addPhoto": "写真を追加",
+      "noActiveTopic": "報告写真を選択できるアクティブなトピックがありません。",
+      "topicLoadError": "トピック一覧の読み込みに失敗しました。トピック名が不完全な可能性があります。",
+      "picksLoadError": "報告写真の選択状況の読み込みに失敗しました。",
+      "groupGoneDesc": "このセッションにグループが見つかりません。削除された可能性があります。"
+    },
     "photos": {
-      "reloadError": "写真の再読み込みに失敗しました。",
       "emptyFor": "{{name}}の写真はまだありません",
       "frameLoadError": "フレームデータの読み込みに失敗しました。接続を確認してから再試行してください。",
       "photoLoadError": "写真データの読み込みに失敗しました。接続を確認してから再試行してください。",
@@ -1246,7 +1262,6 @@
       "notInSession": "参加者がまだセッションに入っていません",
       "maxPhotos": "お子様1人につき最大{{max}}枚まで",
       "consentRequired": "写真の許可がまだ与えられていません",
-      "saveError": "写真の保存に失敗しました",
       "loadingParticipant": "参加者データを読み込み中...",
       "childMissingTitle": "お子様が見つかりません",
       "childMissingDesc": "お子様のデータは利用できないか、削除されています。",
@@ -1268,7 +1283,6 @@
       "deleteError": "写真の削除に失敗しました",
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
-      "pickFooter": "Report photo for: {{topic}}",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo"
     },
@@ -1281,7 +1295,6 @@
       "deviceFallback": "カメラ",
       "back": "背面カメラ",
       "front": "前面カメラ",
-      "flash": "フラッシュ",
       "flip": "反転",
       "grid": "グリッド",
       "emptyDesc": "撮影対象の参加者がいるアクティブなグループがありません。",
@@ -1325,10 +1338,13 @@
       "remainingCount": "残り{{count}}名",
       "complete": "グループを完了する",
       "rateAllFirst": "先にすべての参加者を評価してください",
-      "completeHint": "グループを完了するには、すべての参加者を評価する必要があります"
+      "completeHint": "グループを完了するには、すべての参加者を評価する必要があります",
+      "fallbackName": "名前のないグループ"
     },
     "session": {
-      "allDay": "終日"
+      "allDay": "終日",
+      "notMine": "このセッションはあなたの担当ではありません。",
+      "noLocation": "場所が設定されていません"
     },
     "child": {
       "years": "{{age}}歳",
@@ -1348,13 +1364,23 @@
       "allSessions": "すべてのセッション",
       "emptyTitle": "セッションはありません",
       "emptyAll": "現在、どのセッションにも割り当てられていません。",
-      "emptyFiltered": "フィルター「{{filter}}」に該当するセッションはありません。"
+      "emptyFiltered": "フィルター「{{filter}}」に該当するセッションはありません。",
+      "sessionCompletedTitle": "セッションは終了しています",
+      "sessionCompletedDesc": "このセッションは終了したため、もう開くことはできません。",
+      "sessionDraftTitle": "セッションはまだドラフトです",
+      "sessionDraftDesc": "このセッションはまだドラフトでグループが存在しないため、開くことはできません。",
+      "sessionUnknownTitle": "不明なセッションステータス",
+      "sessionUnknownDesc": "このセッションのステータスは「{{status}}」で未対応のため、開くことはできません。",
+      "noUserTitle": "未ログインです",
+      "noUserDesc": "ログインセッションが見つかりません。再度ログインしてからやり直してください。"
     },
     "groups": {
       "pageTitle": "すべてのグループ",
       "emptyTitle": "グループはありません",
       "emptyDesc": "利用可能なグループがあるアクティブなセッションはありません。",
-      "emptySession": "このセッションにはグループがありません。"
+      "emptySession": "このセッションにはグループがありません。",
+      "sessionNotFoundTitle": "セッションが見つかりません",
+      "sessionNotFoundDesc": "セッションが見つからないか、現在アクティブではありません。終了済みか、リンクが期限切れの可能性があります。"
     },
     "activities": {
       "pageTitle": "マイアクティビティ",

@@ -30,7 +30,6 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	// Session-level generate: static route must precede /:id routes.
 	g.POST("/generate", h.GenerateForSession, authMW, scopeMW)
 	g.GET("", h.ListReports, authMW, scopeMW)
-	g.GET("/:id", h.GetReport, authMW, scopeMW)
 	// Streaming AI narrative: POST triggers async generation (202), GET streams tokens via SSE.
 	g.POST("/:id/generate/stream", h.GenerateStream, authMW, scopeMW)
 	g.GET("/:id/generate/stream", h.GenerateStreamSSE, streamAuth, scopeMW)

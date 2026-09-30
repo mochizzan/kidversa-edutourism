@@ -29,6 +29,9 @@ export const userService: UserService = {
   update: (id, data: UpdateUserDTO) =>
     itemRequest<User>('PUT', API_ROUTES.USERS.DETAIL(id), {
       name: data.name,
+      // undefined keys are dropped by JSON.stringify — the backend treats
+      // absent fields as "skip" (partial update), never as clear.
+      email: data.email,
       phone: normalizePhone(data.phone),
       role: data.role,
       is_active: data.is_active,

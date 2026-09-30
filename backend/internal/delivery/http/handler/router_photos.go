@@ -17,7 +17,6 @@ func RegisterPhotosRoutes(g *echo.Group, h *PhotoHandler, jm *auth.JWTManager, r
 	g.GET("/report-picks", h.ListReportPicks, authMW, scopeMW)
 	g.PUT("/report-pick", h.SetReportPick, authMW, scopeMW)
 	g.DELETE("/report-pick", h.DeleteReportPick, authMW, scopeMW)
-	g.GET("/:id", h.GetByID, authMW, scopeMW)
 	g.GET("", h.List, authMW, scopeMW)
 	g.PUT("/:id", h.Update, authMW, scopeMW)
 	g.POST("/:id/set-report-photo", h.SetReportPhoto, authMW, scopeMW)

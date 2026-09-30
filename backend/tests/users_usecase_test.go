@@ -109,7 +109,7 @@ func TestUpdateUser_SuperAdmin_CannotChangeOwnRole(t *testing.T) {
 	}
 	uc := newUserUsecase(repo)
 
-	_, err := uc.UpdateUser(context.Background(), saID, "Super Admin", "",
+	_, err := uc.UpdateUser(context.Background(), saID, "Super Admin", "", "",
 		entity.RoleAdmin, nil,
 		saID, string(entity.RoleSuperAdmin), "")
 
@@ -140,7 +140,7 @@ func TestUpdateUser_Admin_CannotChangeOwnRole(t *testing.T) {
 	}
 	uc := newUserUsecase(repo)
 
-	_, err := uc.UpdateUser(context.Background(), adminID, "Admin", "",
+	_, err := uc.UpdateUser(context.Background(), adminID, "Admin", "", "",
 		entity.RoleKoordinator, nil,
 		adminID, string(entity.RoleAdmin), tenantID)
 
@@ -163,7 +163,7 @@ func TestUpdateUser_SuperAdmin_CanChangeOtherUserRole(t *testing.T) {
 	}
 	uc := newUserUsecase(repo)
 
-	_, err := uc.UpdateUser(context.Background(), targetID, "Fasilitator", "",
+	_, err := uc.UpdateUser(context.Background(), targetID, "Fasilitator", "", "",
 		entity.RoleKoordinator, nil,
 		saID, string(entity.RoleSuperAdmin), "")
 	if err != nil {
@@ -194,7 +194,7 @@ func TestUpdateUser_Admin_CanUpdateOwnNameWithoutRole(t *testing.T) {
 	}
 	uc := newUserUsecase(repo)
 
-	_, err := uc.UpdateUser(context.Background(), adminID, "New Name", "",
+	_, err := uc.UpdateUser(context.Background(), adminID, "New Name", "", "",
 		"", nil, // role empty -> not a role change
 		adminID, string(entity.RoleAdmin), tenantID)
 	if err != nil {

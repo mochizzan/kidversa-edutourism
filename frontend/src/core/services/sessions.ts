@@ -81,18 +81,6 @@ export const sessionService: SessionService = {
     return nullableItemRequest<Participant>('GET', API_ROUTES.PARTICIPANTS.DETAIL(participantId))
   },
 
-  addParticipant: (sessionId, groupId, data: CreateParticipantDTO) =>
-    itemRequest<Participant>('POST', API_ROUTES.SESSIONS.PARTICIPANTS(sessionId), {
-      child_name: data.child_name,
-      child_age: data.child_age,
-      school_name: data.school_name,
-      parent_name: data.parent_name,
-      parent_phone: data.parent_phone,
-      parent_email: data.parent_email,
-      group_id: data.group_id ?? groupId,
-      consent_photo: false,
-    }),
-
   linkParticipant: (sessionId, groupId, participantId) =>
     itemRequest<LinkParticipantResponse>('POST', API_ROUTES.SESSIONS.LINK_PARTICIPANT(sessionId), {
       participant_id: participantId,

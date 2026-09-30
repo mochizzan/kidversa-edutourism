@@ -29,7 +29,10 @@ export function useGroupOwnership(childId: string | undefined) {
         if (cancelled) return
         setGroup(detail?.groups.find((g) => g.id === part.group_id))
       })
-      .catch(() => {
+      .catch((error) => {
+        // Fail closed (no group → read-only) but never silently: log the fetch
+        // failure that forced the ownership lookup down.
+        console.error('[useGroupOwnership] ownership lookup failed', error)
         if (!cancelled) setGroup(undefined)
       })
       .finally(() => {

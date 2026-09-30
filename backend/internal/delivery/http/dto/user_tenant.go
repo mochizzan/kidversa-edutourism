@@ -13,8 +13,11 @@ type CreateUserRequest struct {
 }
 
 // UpdateUserRequest is the payload for PUT /api/users/:id.
+// Partial update: empty values mean "skip" (mirrored by GORM struct Updates,
+// which also skips zero values — see AGENTS.md partial-update convention).
 type UpdateUserRequest struct {
-	Name     string          `json:"name,omitempty"`
+	Name     string          `json:"name,omitempty" validate:"omitempty,min=2,max=50"`
+	Email    string          `json:"email,omitempty" validate:"omitempty,email"`
 	Phone    string          `json:"phone,omitempty" validate:"omitempty,phone"`
 	Role     entity.UserRole `json:"role,omitempty"`
 	IsActive *bool           `json:"is_active,omitempty"`

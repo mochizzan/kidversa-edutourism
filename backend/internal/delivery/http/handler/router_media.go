@@ -20,10 +20,3 @@ func RegisterMediaRoutes(g *echo.Group, h *MediaHandler, jm *auth.JWTManager, cf
 		appmiddleware.TenantScope(),
 	)
 }
-
-// RegisterKioskMediaRoutes mounts a PUBLIC content-serving endpoint for the
-// learner kiosk — no JWT or session cookie required. Only stage content files
-// are served; photos/frames/avatars remain authenticated.
-func RegisterKioskMediaRoutes(g *echo.Group, h *MediaHandler) {
-	g.GET("/content/:id", h.GetContent)
-}

@@ -21,6 +21,10 @@ const statusConfig = {
   COMPLETED: { labelKey: 'fasilitator.status.completed', variant: 'success' },
 } as const
 
+// Unknown/legacy status values from the API must never crash the card
+// (statusConfig[status] would otherwise be undefined → config.x throws).
+const unknownStatusConfig = { labelKey: null, variant: 'neutral' } as const
+
 export function GroupCard({
   name,
   childCount,
@@ -32,8 +36,13 @@ export function GroupCard({
   className,
 }: GroupCardProps) {
   const { t } = useTranslation()
-  const config = statusConfig[status]
+  const config = statusConfig[status] ?? unknownStatusConfig
   const isMine = !!currentUserId && facilitatorId === currentUserId
+  const safeChildCount =
+    typeof childCount === 'number' && Number.isFinite(childCount) && childCount > 0
+      ? Math.floor(childCount)
+      : 0
+  const displayName = typeof name === 'string' && name.trim() !== '' ? name : t('fasilitator.group.fallbackName')
 
   const handleClick = () => {
     if (!isMine) return
@@ -59,7 +68,7 @@ export function GroupCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold text-on-surface text-base group-hover:text-primary transition-colors">
-              {name}
+              {displayName}
             </h3>
             {isMine ? (
               <Badge variant="accent" size="sm" className="shrink-0">
@@ -78,13 +87,15 @@ export function GroupCard({
             </p>
           )}
         </div>
-        <Badge variant={config.variant}>{t(config.labelKey)}</Badge>
+        <Badge variant={config.variant}>
+          {config.labelKey ? t(config.labelKey) : String(status ?? '')}
+        </Badge>
       </div>
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-sm text-on-surface-variant">
           <Users className="w-4 h-4 shrink-0" />
-          <span>{t('fasilitator.group.participantCount', { count: childCount })}</span>
+          <span>{t('fasilitator.group.participantCount', { count: safeChildCount })}</span>
         </div>
         {isMine && (
           <div className="flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">

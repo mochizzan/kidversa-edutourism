@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/labstack/echo/v5"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/usecase"
 )
@@ -17,12 +18,13 @@ func NewSessionStageHandler(uc *usecase.SessionUsecase) *SessionStageHandler {
 }
 
 // GetStages handles GET /api/sessions/:id/stages.
+// The owning session is verified against the caller's tenant first (§5.A).
 func (h *SessionStageHandler) GetStages(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
 		return nil
 	}
-	stages, err := h.uc.GetStages((*c).Request().Context(), id)
+	stages, err := h.uc.GetStages((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}

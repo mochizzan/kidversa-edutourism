@@ -103,6 +103,69 @@ func (r *GormSessionRepository) ListSessions(ctx context.Context, f repository.S
 	for i := range models {
 		items = append(items, *models[i].ToEntity())
 	}
+	// Batched enrichment of the page (2 extra queries total, never N+1):
+	// ordered Topik names and the Kegiatan count per session. Both queries run
+	// on raw table names, so GORM's automatic deleted_at scope does NOT apply —
+	// soft-deleted rows are filtered explicitly below.
+	if len(models) > 0 {
+		ids := make([]string, 0, len(models))
+		index := make(map[string]int, len(models))
+		for i := range items {
+			ids = append(ids, items[i].ID)
+			index[items[i].ID] = i
+		}
+
+		// Query 1: topics in clone order (st.created_at ASC, st.id tiebreak).
+		// program_stage_name is the denormalized authority; older rows may have
+		// it empty, so fall back to the joined program_stages.name.
+		type topicRow struct {
+			SessionID string `gorm:"column:session_id"`
+			Name      string `gorm:"column:name"`
+		}
+		var topicRows []topicRow
+		if err := r.db.WithContext(ctx).
+			Table("session_stages AS st").
+			Select("st.session_id, COALESCE(NULLIF(st.program_stage_name, ''), ps.name) AS name").
+			Joins("LEFT JOIN program_stages AS ps ON ps.id = st.program_stage_id").
+			Where("st.session_id IN ?", ids).
+			Where("st.deleted_at IS NULL").
+			Order("st.created_at ASC, st.id ASC").
+			Find(&topicRows).Error; err != nil {
+			return nil, apperrors.Internal("internal_error", err)
+		}
+		for _, tr := range topicRows {
+			if i, ok := index[tr.SessionID]; ok {
+				items[i].Topics = append(items[i].Topics, tr.Name)
+			}
+		}
+
+		// Query 2: Kegiatan count per session, grouped; sessions absent from the
+		// result have zero live substages.
+		type countRow struct {
+			SessionID string `gorm:"column:session_id"`
+			Cnt       int    `gorm:"column:cnt"`
+		}
+		var countRows []countRow
+		if err := r.db.WithContext(ctx).
+			Table("session_substages").
+			Select("session_id, COUNT(*) AS cnt").
+			Where("session_id IN ?", ids).
+			Where("deleted_at IS NULL").
+			Group("session_id").
+			Find(&countRows).Error; err != nil {
+			return nil, apperrors.Internal("internal_error", err)
+		}
+		for i := range items {
+			n := 0
+			items[i].ActivityCount = &n
+		}
+		for _, cr := range countRows {
+			if i, ok := index[cr.SessionID]; ok {
+				n := cr.Cnt
+				items[i].ActivityCount = &n
+			}
+		}
+	}
 	return &repository.Paginated[entity.Session]{Items: items, Total: int(total)}, nil
 }
 

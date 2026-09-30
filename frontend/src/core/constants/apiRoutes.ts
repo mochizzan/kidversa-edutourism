@@ -7,8 +7,6 @@
  */
 
 export const API_ROUTES = {
- HEALTH: '/health',
-
  AUTH: {
   LOGIN: '/api/auth/login',
   REGISTER: '/api/auth/register',
@@ -20,17 +18,11 @@ export const API_ROUTES = {
  },
 
  CONSENT: {
-  LIST: '/api/consent',
-  BY_SESSION: (sessionId: string) =>
-   `/api/consent?session_id=${encodeURIComponent(sessionId)}`,
-  BY_PARTICIPANT: (participantId: string) =>
-   `/api/consent?participant_id=${encodeURIComponent(participantId)}`,
   SEND_WHATSAPP: '/api/consent/send-whatsapp',
   SEND_WHATSAPP_STREAM: (batchId: string) =>
    `/api/consent/send-whatsapp/stream?batch_id=${encodeURIComponent(batchId)}`,
   RESPOND_COMBINED: '/api/consent/respond-combined',
   INFO: (token: string) => `/api/consent/info?token=${encodeURIComponent(token)}`,
-  SUMMARY: '/api/consent/summary',
   FLAT: '/api/consent/flat',
   SEND_SINGLE: '/api/consent/send-whatsapp/single',
  },
@@ -75,16 +67,10 @@ export const API_ROUTES = {
    `/api/programs/${encodeURIComponent(programId)}/stages`,
   STAGE_DETAIL: (programId: string, stageId: string) =>
    `/api/programs/${encodeURIComponent(programId)}/stages/${encodeURIComponent(stageId)}`,
-  REORDER_STAGES: (programId: string) =>
-   `/api/programs/${encodeURIComponent(programId)}/stages/reorder`,
   TOGGLE_ACTIVE: (id: string) =>
    `/api/programs/${encodeURIComponent(id)}/toggle-active`,
   CONTENTS: (substageId: string) =>
    `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents`,
-  CONTENT_DETAIL: (substageId: string, contentId: string) =>
-   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/${encodeURIComponent(contentId)}`,
-  REORDER_CONTENTS: (substageId: string) =>
-   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/reorder`,
  },
 
  USERS: {
@@ -127,7 +113,6 @@ export const API_ROUTES = {
 
  REPORTS: {
   BASE: '/api/reports',
-  DETAIL: (id: string) => `/api/reports/${encodeURIComponent(id)}`,
   BY_SESSION: (sessionId: string) =>
    `/api/reports?session_id=${encodeURIComponent(sessionId)}`,
   GENERATE_STREAM: (id: string) => `/api/reports/${encodeURIComponent(id)}/generate/stream`,
@@ -154,8 +139,6 @@ export const API_ROUTES = {
   TOGGLE: (id: string) => `/api/participant-missions/${encodeURIComponent(id)}/toggle`,
   BY_REPORT: (reportId: string) =>
    `/api/participant-missions?report_id=${encodeURIComponent(reportId)}`,
-  BY_PARTICIPANT: (participantId: string) =>
-   `/api/participant-missions?participant_id=${encodeURIComponent(participantId)}`,
  },
 
  ASSESSMENTS: {
@@ -171,11 +154,6 @@ export const API_ROUTES = {
   BY_SESSION: (sessionId: string) =>
    `/api/attendance?session_id=${encodeURIComponent(sessionId)}`,
   UPSERT: '/api/attendance/upsert',
- },
-
- // ProgramStage list/read endpoint.
- PROGRAM_STAGES: {
-  BASE: '/api/program-stages',
  },
 
  // Kegiatan (ProgramSubstage) CRUD + reorder, scoped to a SubTopik.
@@ -209,7 +187,6 @@ export const API_ROUTES = {
    return q.toString() ? `/api/program-substages?${q.toString()}` : '/api/program-substages'
   },
   DETAIL: (id: string) => `/api/program-substages/${encodeURIComponent(id)}`,
-  REORDER: '/api/program-substages/reorder',
  },
 
  // Participant badges (read-only; SUBTOPIK + FINAL awards).
@@ -247,21 +224,11 @@ export const API_ROUTES = {
   EVENTS: '/api/live/events',
  },
 
- MEDIA: {
-  BASE: '/api/media',
- },
-
  CONTENTS: {
   BASE: '/api/contents',
   DETAIL: (id: string) => `/api/contents/${encodeURIComponent(id)}`,
   UPLOAD: '/api/contents/upload',
   REPLACE_FILE: (id: string) => `/api/contents/${encodeURIComponent(id)}/replace-file`,
   USAGE: (id: string) => `/api/contents/${encodeURIComponent(id)}/usage`,
-  ASSIGN: (substageId: string) =>
-   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/assign`,
-  UNASSIGN: (substageId: string, contentId: string) =>
-   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/${encodeURIComponent(contentId)}`,
-  REORDER_CONTENTS: (substageId: string) =>
-   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents/reorder`,
  },
 } as const

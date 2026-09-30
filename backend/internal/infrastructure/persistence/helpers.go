@@ -32,27 +32,6 @@ func InTx(ctx context.Context, db *gorm.DB, fn func(tx *gorm.DB) error) error {
 	return db.WithContext(ctx).Transaction(fn)
 }
 
-// reorderByIDs renumbers orderCol to 1..n for the given ids in a single
-// CASE WHEN batch update (instead of one UPDATE per id). model selects the
-// table; keyCol is the column matched against ids (e.g. "id" or "content_id").
-// Rows whose keyCol is in ids get their 1-based position; all others are left
-// untouched (the WHERE restricts the update set to ids).
-func reorderByIDs(tx *gorm.DB, model interface{}, ids []string, keyCol, orderCol string) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	var b strings.Builder
-	args := make([]interface{}, 0, len(ids)*2)
-	b.WriteString("CASE")
-	for i, id := range ids {
-		b.WriteString(" WHEN " + keyCol + " = ? THEN ?")
-		args = append(args, id, i+1)
-	}
-	b.WriteString(" ELSE " + orderCol + " END")
-	return tx.Model(model).Where(keyCol+" IN ?", ids).
-		Updates(map[string]interface{}{orderCol: gorm.Expr(b.String(), args...)}).Error
-}
-
 // newUUID returns a random UUID v4 string (used for CHAR(36) primary keys).
 // Package-local shorthand for the shared util.NewUUID, kept because the model
 // files call it on nearly every Create.

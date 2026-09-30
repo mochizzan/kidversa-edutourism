@@ -22,15 +22,11 @@ func NewParticipantMissionHandler(repo repository.ParticipantMissionRepository) 
 	return &ParticipantMissionHandler{repo: repo}
 }
 
-// List handles GET /api/participant-missions (GET ""). It dispatches on the
-// query param: ?report_id= → missions for a report; ?participant_id= → missions
-// for a participant. report_id takes precedence.
+// List handles GET /api/participant-missions (GET ""). Dispatches on the
+// query param: ?report_id= → missions for a report.
 func (h *ParticipantMissionHandler) List(c *echo.Context) error {
 	if reportID := (*c).QueryParam("report_id"); reportID != "" {
 		return h.ListByReport(c)
-	}
-	if participantID := (*c).QueryParam("participant_id"); participantID != "" {
-		return h.ListByParticipant(c)
 	}
 	return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 }
@@ -46,23 +42,6 @@ func (h *ParticipantMissionHandler) ListByReport(c *echo.Context) error {
 		return err
 	}
 	items, err := h.repo.GetByReport((*c).Request().Context(), tenantID, reportID)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewParticipantMissionListResponse(items))
-}
-
-// ListByParticipant handles GET /api/participant-missions?participant_id=.
-func (h *ParticipantMissionHandler) ListByParticipant(c *echo.Context) error {
-	participantID := (*c).QueryParam("participant_id")
-	if participantID == "" {
-		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
-	}
-	items, err := h.repo.ListByParticipant((*c).Request().Context(), tenantID, participantID)
 	if err != nil {
 		return err
 	}

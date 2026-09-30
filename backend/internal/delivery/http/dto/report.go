@@ -17,9 +17,32 @@ func NewReportResponse(r *entity.Report) *ReportResponse {
 	return &ReportResponse{Report: r}
 }
 
-// ReportListResponse carries a page of reports with pagination meta.
+// ReportListResponse carries a page of reports with pagination meta plus the
+// optional top-level delivery/generation flags of the delivery-status design.
 type ReportListResponse struct {
 	Items []ReportResponse `json:"items"`
+	// ActiveGenerate is present only while a session-level narrative generate
+	// (POST /api/reports/generate) is running for the queried session+tenant.
+	ActiveGenerate *ReportActiveGenerate `json:"active_generate,omitempty"`
+	// ActiveSend is present only while a declared send queue for the queried
+	// session+tenant has unsent rows or an in-flight send.
+	ActiveSend *ReportActiveSend `json:"active_send,omitempty"`
+}
+
+// ReportActiveGenerate snapshots an in-flight session generate run.
+type ReportActiveGenerate struct {
+	SessionID     string   `json:"session_id"`
+	StartedAt     string   `json:"started_at"` // RFC3339
+	QueuedIDs     []string `json:"queued_ids"`
+	ProcessingIDs []string `json:"processing_ids"`
+}
+
+// ReportActiveSend snapshots the declared send run for a session.
+type ReportActiveSend struct {
+	SessionID  string   `json:"session_id"`
+	UpdatedAt  string   `json:"updated_at"` // RFC3339
+	QueuedIDs  []string `json:"queued_ids"`
+	SendingIDs []string `json:"sending_ids"`
 }
 
 // NewReportListResponse wraps a slice of reports.
@@ -94,8 +117,12 @@ func NewPublicReportDTO(r *entity.Report, view *reportsuc.PublicReportView, phot
 }
 
 // ReportSendRequest carries the token TTL in hours when sending a report.
+// Queue optionally declares ALL report IDs the client still intends to send in
+// this run (including the target of this request); the server tracks them in
+// an in-memory run so GET /api/reports can expose active_send.
 type ReportSendRequest struct {
-	TTLHours int `json:"ttl_hours"`
+	TTLHours int      `json:"ttl_hours"`
+	Queue    []string `json:"queue,omitempty"`
 }
 
 // ReportTokenResponse is returned by /send so the caller (authenticated staff)

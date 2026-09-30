@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
-import { Plus, Eye, Play, X, Calendar, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Plus, Info, Play, X, Calendar, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
@@ -21,6 +21,27 @@ import type { SessionSubstage } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { useTranslation } from 'react-i18next'
+
+// Parse "HH:MM" (first 5 chars) → minutes since midnight; null on malformed/missing input.
+const parseTimeToMinutes = (value?: string): number | null => {
+  if (!value) return null
+  const match = /^(\d{1,2}):(\d{2})/.exec(value.slice(0, 5))
+  if (!match) return null
+  const h = Number(match[1])
+  const m = Number(match[2])
+  if (h > 23 || m > 59) return null
+  return h * 60 + m
+}
+
+// Duration in minutes between two HH:MM times (negative → overnight wrap +1440).
+// Returns null when either component is malformed/missing so callers can skip the line.
+const sessionDurationMinutes = (start?: string, end?: string): number | null => {
+  const startMin = parseTimeToMinutes(start)
+  const endMin = parseTimeToMinutes(end)
+  if (startMin === null || endMin === null) return null
+  const dur = endMin - startMin
+  return dur < 0 ? dur + 1440 : dur
+}
 
 const SessionsPage = () => {
   const { t } = useTranslation()
@@ -157,6 +178,49 @@ const SessionsPage = () => {
       ),
     },
     {
+      key: 'program_name',
+      header: t('admin.col.program'),
+      render: (item: Session) => (
+        <p className="text-sm text-on-surface-variant">{item.program_name || '—'}</p>
+      ),
+    },
+    {
+      key: 'topics',
+      header: t('admin.col.topic'),
+      render: (item: Session) => (
+        <p className="text-sm text-on-surface-variant break-words">
+          {item.topics && item.topics.length > 0 ? item.topics.join(', ') : '—'}
+        </p>
+      ),
+    },
+    {
+      key: 'activity_count',
+      header: t('admin.topic.colCount'),
+      render: (item: Session) => (typeof item.activity_count === 'number' ? item.activity_count : '—'),
+    },
+    {
+      key: 'start_time',
+      header: t('admin.sessions.infoTimeLabel'),
+      render: (item: Session) => {
+        if (item.start_time && item.end_time) {
+          const dur = sessionDurationMinutes(item.start_time, item.end_time)
+          return (
+            <div>
+              <p className="text-on-surface">
+                {item.start_time.slice(0, 5)} – {item.end_time.slice(0, 5)}
+              </p>
+              {dur !== null && (
+                <p className="text-sm text-on-surface-variant">
+                  {t('admin.sessions.durationShort', { h: Math.floor(dur / 60), m: dur % 60 })}
+                </p>
+              )}
+            </div>
+          )
+        }
+        return <p>{t('admin.sessions.allDay')}</p>
+      },
+    },
+    {
       key: 'session_date',
       header: t('admin.col.date'),
       render: (item: Session) => formatDate(item.session_date),
@@ -180,7 +244,7 @@ const SessionsPage = () => {
       align: 'right',
       render: (item: Session) => (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" icon={<Eye className="w-4 h-4" />} tooltip={t('admin.sessions.viewDetail')} onClick={() => navigate(`/admin/sessions/${item.id}`)} />
+          <Button variant="ghost" size="sm" icon={<Info className="w-4 h-4" />} tooltip={t('admin.common.detail')} onClick={() => navigate(`/admin/sessions/${item.id}`)} />
           {item.status === 'DRAFT' && (
             <Button
               variant="ghost"

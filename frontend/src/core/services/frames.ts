@@ -56,10 +56,6 @@ const getAll = async (
   }
 }
 
-const getById = async (id: string): Promise<PhotoFrame | null> => {
-  return itemRequest<PhotoFrame>('GET', API_ROUTES.FRAMES.DETAIL(id))
-}
-
 const update = async (
   id: string,
   data: Partial<Omit<PhotoFrame, 'id' | 'created_at'>>,
@@ -101,7 +97,6 @@ const upload = async (data: {
 
 export const frameService: FrameService = {
   getAll,
-  getById,
   update,
   deactivate,
   activate,

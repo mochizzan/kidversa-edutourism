@@ -26,6 +26,12 @@ func (h *SessionParticipantBulkHandler) ImportParticipants(c *echo.Context) erro
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal, and without
+	// this check an invalid body would still reach ImportParticipants.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
+	}
 	rows := make([]repository.ParticipantInput, 0, len(req.Rows))
 	for i := range req.Rows {
 		r := req.Rows[i]
@@ -50,6 +56,12 @@ func (h *SessionParticipantBulkHandler) UpdateParticipant(c *echo.Context) error
 	var req dto.UpdateParticipantRequest
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
+	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal, and without
+	// this check an invalid body would still reach UpdateParticipant.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
 	}
 	p, err := h.uc.UpdateParticipant((*c).Request().Context(), pid,
 		req.ChildName, req.ChildAge, req.SchoolName, req.ParentName, req.ParentPhone,

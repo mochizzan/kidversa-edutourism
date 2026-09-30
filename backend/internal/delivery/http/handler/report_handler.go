@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -38,11 +39,14 @@ type ReportHandler struct {
 	consent     repository.ConsentRepository
 	photos      repository.PhotoRepository
 	genMu       sync.Map
+	// sendQueue tracks in-flight POST /:id/send attempts per (tenant, session),
+	// backing the active_send envelope and the send_in_progress 409 guard.
+	sendQueue *ReportSendQueue
 }
 
 // NewReportHandler builds the report handler.
 func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository, hub *sse.Hub, consent repository.ConsentRepository, photos repository.PhotoRepository) *ReportHandler {
-	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo, hub: hub, consent: consent, photos: photos}
+	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo, hub: hub, consent: consent, photos: photos, sendQueue: NewReportSendQueue()}
 }
 
 // tenantGuard rejects an empty tenant ID with 400 "tenant_required" before any
@@ -346,6 +350,22 @@ func (h *ReportHandler) Send(c *echo.Context) error {
 	if err := tenantGuard(c, tenantID); err != nil {
 		return err
 	}
+	// Optional delivery-run tracking: the client declares every report id it
+	// still intends to send in this run (including this target). No queue in
+	// the body → legacy behavior, no run is touched. With a queue: resolve the
+	// report's session, guard against a concurrent in-flight attempt for the
+	// same target (409 send_in_progress), register the attempt, and finish it
+	// on the way out — success OR error (persisted SENT/SEND_FAILED unchanged).
+	if len(req.Queue) > 0 {
+		rep, gerr := h.uc.Repo().GetByID((*c).Request().Context(), id, tenantID)
+		if gerr != nil {
+			return gerr
+		}
+		if qerr := h.sendQueue.Begin(tenantID, rep.SessionID, id, req.Queue); qerr != nil {
+			return qerr
+		}
+		defer h.sendQueue.Finish(tenantID, rep.SessionID, id)
+	}
 	r, err := h.uc.Send((*c).Request().Context(), id, tenantID, ttl)
 	if err != nil {
 		return err
@@ -398,32 +418,35 @@ func (h *ReportHandler) SaveMissions(c *echo.Context) error {
 
 // ListReports handles GET /api/reports?session_id= (tenant-scoped via TenantScope).
 // Returns an empty list (not an error) when no reports match (EC4).
+// While a session generate runs (handler genMu guard + usecase registry) or a
+// declared send queue has unsent/in-flight rows, the response carries the
+// omitempty top-level active_generate / active_send flags; both are
+// tenant-filtered like the items query scope and absent on a fresh process.
 func (h *ReportHandler) ListReports(c *echo.Context) error {
+	sessionID := (*c).QueryParam("session_id")
 	f := repository.ReportFilter{
-		SessionID: (*c).QueryParam("session_id"),
+		SessionID: sessionID,
 	}
 	page, limit := pagination(c)
 	res, err := h.uc.Repo().List((*c).Request().Context(), f, page, limit)
 	if err != nil {
 		return err
 	}
-	meta := &appresp.Meta{Page: page, Limit: limit, Total: res.Total}
-	return appresp.OKWithMeta(c, dto.NewReportListResponse(res.Items), meta)
-}
-
-// GetReport handles GET /api/reports/:id (tenant-scoped via TenantScope).
-func (h *ReportHandler) GetReport(c *echo.Context) error {
-	id, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
 	tenantID := appmiddleware.GetTenantID(c)
-	if err := tenantGuard(c, tenantID); err != nil {
-		return err
+	resp := dto.NewReportListResponse(res.Items)
+	if sessionID != "" {
+		if _, generating := h.genMu.Load(sessionID); generating {
+			if gs, ok := h.uc.GenerateStatus(sessionID, tenantID); ok {
+				resp.ActiveGenerate = &dto.ReportActiveGenerate{
+					SessionID:     gs.SessionID,
+					StartedAt:     gs.StartedAt.Format(time.RFC3339),
+					QueuedIDs:     gs.QueuedIDs,
+					ProcessingIDs: gs.ProcessingIDs,
+				}
+			}
+		}
+		resp.ActiveSend = h.sendQueue.ActiveSend(tenantID, sessionID)
 	}
-	r, err := h.uc.Repo().GetByID((*c).Request().Context(), id, tenantID)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewReportResponse(r))
+	meta := &appresp.Meta{Page: page, Limit: limit, Total: res.Total}
+	return appresp.OKWithMeta(c, resp, meta)
 }

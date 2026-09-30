@@ -16,6 +16,15 @@ type Session struct {
 	Status      SessionStatus `json:"status"`
 	Notes       string        `json:"notes,omitempty"`
 	CreatedBy   *string       `json:"created_by,omitempty"`
+	// Topics is the ordered list of Topik names instantiated in this session.
+	// List-endpoint-only display field, populated by ListSessions; the gorm:"-"
+	// tag keeps it out of INSERT/UPDATE so it never becomes a phantom column.
+	Topics []string `gorm:"-" json:"topics,omitempty"`
+	// ActivityCount is the number of session Kegiatan (session_substages).
+	// List-endpoint-only display field, populated by ListSessions (non-nil,
+	// including 0); the gorm:"-" tag keeps it out of INSERT/UPDATE so it never
+	// becomes a phantom column.
+	ActivityCount *int `gorm:"-" json:"activity_count,omitempty"`
 }
 
 // SessionStage is an instantiation of a Topik within a session.

@@ -28,6 +28,8 @@ import {
   reportStatusBadge,
   reportStatusLabel,
   isSendableReportStatus,
+  getReportDeliveryState,
+  REPORT_DELIVERY_LABEL,
   NO_ASSESSMENT_LABEL,
   NO_REPORT_LABEL,
 } from '../../../core/constants/reportStatus'
@@ -58,6 +60,8 @@ const ReportSessionPage = () => {
     sending,
     genError,
     sendError,
+    activeGenerate,
+    activeSend,
     filteredReports,
     loadData,
     handleGenerateAll,
@@ -94,6 +98,15 @@ const ReportSessionPage = () => {
         (isSendableReportStatus(r.report.status) || r.report.status === ReportStatus.SENT),
     )
   const topicAllHaveReport = topicReports.length > 0 && topicReports.every((r) => r.report)
+
+  // Bulk progress derives from the SERVER flags; the local `generating`/
+  // `sending` booleans only bridge the gap between the click and the first
+  // server observation of the run (server wins on every fetch).
+  const generateInProgress = generating || activeGenerate !== null
+  const sendInProgress = sending || activeSend !== null
+  const sendRemaining = activeSend
+    ? activeSend.queued_ids.length + activeSend.sending_ids.length
+    : 0
 
   const [generateResult, setGenerateResult] = useState<{
     generatedCount: number
@@ -232,9 +245,9 @@ const ReportSessionPage = () => {
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={onGenerate}
-          disabled={generating || topicAllFinalized || topicReports.length === 0}
+          disabled={generateInProgress || topicAllFinalized || topicReports.length === 0}
         >
-          {generating ? (
+          {generateInProgress ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('admin.reports.generating')}
             </>
@@ -252,12 +265,21 @@ const ReportSessionPage = () => {
         <Button
           variant="secondary"
           onClick={() => setShowConfirmSend(true)}
-          disabled={sendTargetCount === 0 || sending}
+          disabled={sendTargetCount === 0 || sendInProgress}
         >
-          {sending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('admin.reports.sending')}
-            </>
+          {sendInProgress ? (
+            activeSend ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {t(isResendMode ? 'admin.reports.resendAllCount' : 'admin.reports.sendAllCount', {
+                  count: sendRemaining,
+                })}
+              </>
+            ) : (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('admin.reports.sending')}
+              </>
+            )
           ) : (
             <>
               <Send className="w-4 h-4 mr-2" />
@@ -316,6 +338,12 @@ const ReportSessionPage = () => {
             const showGenerateBtn = item.status === 'ready_to_generate'
             const isIncomplete = item.status === 'incomplete'
             const isNoAssessment = item.status === 'no_assessment'
+            // Server operation overlay — identical mapping and labels for the
+            // generate-driven and send-driven flows (see reportStatus.ts).
+            const deliveryState = getReportDeliveryState(item.report?.id ?? null, {
+              activeGenerate,
+              activeSend,
+            })
 
             const cardContent = (
               <div
@@ -383,30 +411,44 @@ const ReportSessionPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {showGenerateBtn && (
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        disabled={generating || item.status !== 'ready_to_generate' || topicAllFinalized}
-                        onClick={(e) => {
-                          e?.preventDefault()
-                          e?.stopPropagation()
-                          onGenerateOne(item.participant.id)
-                        }}
+                    {deliveryState ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-on-surface-variant"
+                        data-testid="report-delivery-state"
                       >
-                        <FileText className="w-3.5 h-3.5 mr-1" /> {t('admin.reports.generate')}
-                      </Button>
+                        {deliveryState === 'processing' && (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        )}
+                        {t(REPORT_DELIVERY_LABEL[deliveryState])}
+                      </span>
+                    ) : (
+                      <>
+                        {showGenerateBtn && (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            disabled={generateInProgress || item.status !== 'ready_to_generate' || topicAllFinalized}
+                            onClick={(e) => {
+                              e?.preventDefault()
+                              e?.stopPropagation()
+                              onGenerateOne(item.participant.id)
+                            }}
+                          >
+                            <FileText className="w-3.5 h-3.5 mr-1" /> {t('admin.reports.generate')}
+                          </Button>
+                        )}
+                        {item.report?.status === ReportStatus.APPROVED && (
+                          <span className="text-xs text-green-600 font-medium">{t('admin.reports.readySend')}</span>
+                        )}
+                        {isClickable && <ChevronRight className="w-4 h-4 text-on-surface-variant" />}
+                      </>
                     )}
-                    {item.report?.status === ReportStatus.APPROVED && (
-                      <span className="text-xs text-green-600 font-medium">{t('admin.reports.readySend')}</span>
-                    )}
-                    {isClickable && <ChevronRight className="w-4 h-4 text-on-surface-variant" />}
                   </div>
                 </div>
               </div>
             )
 
-            if (isClickable && item.report) {
+            if (isClickable && item.report && !deliveryState) {
               return (
                 <Link
                   key={item.participant.id}
@@ -501,8 +543,8 @@ const ReportSessionPage = () => {
             <Button variant="secondary" onClick={() => setShowConfirmSend(false)}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={onSend} disabled={sending}>
-              {sending
+            <Button onClick={onSend} disabled={sendInProgress}>
+              {sendInProgress
                 ? t('admin.reports.sending')
                 : t(isResendMode ? 'admin.reports.resendCount' : 'admin.reports.sendCount', {
                   count: sendTargetCount,

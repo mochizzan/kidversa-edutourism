@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
 import { Plus, Pencil, Check, X as XIcon, Ban, Trash2, AlertCircle } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
+import { Avatar } from '../../../shared/components/ui/Avatar'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Tabs } from '../../../shared/components/ui/Tabs'
@@ -72,7 +73,7 @@ const UsersPage = () => {
 
   useEffect(() => {
     if (!isSuperAdminView) return
-    tenantService.getAll().then(setTenants).catch(() => setTenants([]))
+    tenantService.getAll().then(setTenants).catch((err) => { console.error('[UsersPage] tenants load failed', err); setTenants([]) })
   }, [isSuperAdminView])
 
   const tenantMap = new Map(tenants.map((t) => [t.id, t]))
@@ -180,13 +181,11 @@ const UsersPage = () => {
       header: t('admin.col.name'),
       render: (item: User) => (
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0">
-            {item.avatar_url ? (
-              <img src={item.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
-            ) : (
-              <span className="text-xs font-bold text-primary">{item.name.charAt(0).toUpperCase()}</span>
-            )}
-          </div>
+          <Avatar
+            user={item}
+            className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden shrink-0"
+            fallbackClassName="text-xs font-bold text-primary"
+          />
           <div>
             <p className="font-medium text-on-surface">{item.name}</p>
             <p className="text-sm text-on-surface-variant">{item.email}</p>

@@ -1,42 +1,5 @@
 package dto
 
-import "kidversa-edutourism-backend/internal/domain/entity"
-
-// ConsentResponse is the read representation of a consent log.
-type ConsentResponse struct {
-	*entity.ConsentLog
-}
-
-// NewConsentResponse wraps a consent-log entity.
-func NewConsentResponse(c *entity.ConsentLog) *ConsentResponse {
-	return &ConsentResponse{ConsentLog: c}
-}
-
-// ConsentListResponse carries a list of consent logs.
-type ConsentListResponse struct {
-	Items []ConsentResponse `json:"items"`
-}
-
-// NewConsentListResponse wraps a slice of consent logs.
-func NewConsentListResponse(items []entity.ConsentLog) *ConsentListResponse {
-	out := make([]ConsentResponse, 0, len(items))
-	for i := range items {
-		out = append(out, ConsentResponse{ConsentLog: &items[i]})
-	}
-	return &ConsentListResponse{Items: out}
-}
-
-// ConsentSummaryItem carries consent logs for a single session.
-type ConsentSummaryItem struct {
-	SessionID string            `json:"session_id"`
-	Items     []ConsentResponse `json:"items"`
-}
-
-// ConsentSummaryResponse carries consent logs for multiple sessions.
-type ConsentSummaryResponse struct {
-	Sessions []ConsentSummaryItem `json:"sessions"`
-}
-
 // ConsentSendWhatsAppRequest is the payload for POST /api/consent/send-whatsapp.
 type ConsentSendWhatsAppRequest struct {
 	SessionID string `json:"session_id" validate:"required"`
@@ -87,11 +50,30 @@ type ConsentFlatItem struct {
 	RespondedAt   *string `json:"responded_at,omitempty"`
 	ResponderName string  `json:"responder_name,omitempty"`
 	HasToken      bool    `json:"has_token"`
+	// DeliveryStatus is the per-participant overlay from the server's in-memory
+	// consent batch registry: "queued" | "processing" | "sent" | "failed".
+	// Absent (omitempty) when the participant is not part of a retained batch —
+	// e.g. right after a server restart, persisted consent_status is the truth.
+	DeliveryStatus string `json:"delivery_status,omitempty"`
+}
+
+// ConsentActiveBatch is one entry of the flat response's active_batches array:
+// a consent WhatsApp batch registered server-side (running or retained).
+type ConsentActiveBatch struct {
+	BatchID   string `json:"batch_id"`
+	SessionID string `json:"session_id"`
+	StartedAt string `json:"started_at"` // RFC3339
+	Total     int    `json:"total"`
+	Sent      int    `json:"sent"`
+	Failed    int    `json:"failed"`
 }
 
 // ConsentFlatResponse wraps the flat consent list.
 type ConsentFlatResponse struct {
 	Items []ConsentFlatItem `json:"items"`
+	// ActiveBatches is the tenant-filtered list of retained consent batches
+	// (newest ~20, oldest evicted). Omitted entirely when idle/restarted.
+	ActiveBatches []ConsentActiveBatch `json:"active_batches,omitempty"`
 }
 
 // ConsentSendSingleRequest is the payload for POST /api/consent/send-whatsapp/single.

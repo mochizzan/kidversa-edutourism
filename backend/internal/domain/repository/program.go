@@ -34,7 +34,6 @@ type ProgramRepository interface {
 	ListPaginatedStages(ctx context.Context, filter StageFilter, page, limit int) (*Paginated[entity.ProgramStage], error)
 	UpdateStage(ctx context.Context, s *entity.ProgramStage) error
 	DeleteStage(ctx context.Context, id string) error
-	ReorderStages(ctx context.Context, programID string, orderedIDs []string) error
 
 	// ListStageContents returns the JOIN-shaped StageContent list for a stage
 	// (kiosk/learner path, E22/CRIT-7). Content ownership now lives in

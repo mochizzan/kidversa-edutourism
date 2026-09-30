@@ -151,8 +151,10 @@ function App() {
         const status = (err as { status?: number })?.status
         if (status === 401) {
           redirectToLogin()
+        } else {
+          // kegagalan lain bersifat opsional; abaikan (tetap di-log).
+          console.warn('[App] optional tenants fetch failed', err)
         }
-        // kegagalan lain bersifat opsional; abaikan.
       }
     }
     // SA auto-select: pastikan tenant terpilih setelah fetchTenants selesai

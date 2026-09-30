@@ -23,12 +23,14 @@ func NewSessionGroupHandler(uc *usecase.SessionUsecase, badgeUC *badgeuc.Usecase
 }
 
 // ListGroups handles GET /api/sessions/:id/groups.
+// The owning session is verified against the caller's tenant first (§5.A) so
+// groups (incl. facilitator_id) never leak across tenants.
 func (h *SessionGroupHandler) ListGroups(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
 		return nil
 	}
-	gs, err := h.uc.GetGroups((*c).Request().Context(), id)
+	gs, err := h.uc.GetGroups((*c).Request().Context(), id, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
@@ -44,6 +46,12 @@ func (h *SessionGroupHandler) CreateGroup(c *echo.Context) error {
 	var req dto.CreateGroupRequest
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
+	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal, and without
+	// this check an invalid body would still reach CreateGroup.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
 	}
 	g, err := h.uc.CreateGroup((*c).Request().Context(), id, req.Name)
 	if err != nil {
@@ -64,6 +72,17 @@ func (h *SessionGroupHandler) UpdateGroup(c *echo.Context) error {
 	}
 	tenantID := appmiddleware.GetTenantID(c)
 
+	// Load first: existence + tenant check AND the facilitator-ownership gate
+	// (§5.B) run BEFORE any write — previously any facilitator could rename or
+	// reassign any group in the tenant.
+	g, err := h.uc.GetGroupByID((*c).Request().Context(), groupID, tenantID)
+	if err != nil {
+		return err
+	}
+	if err := assertFacilitatorOwnership(appmiddleware.GetRole(c), appmiddleware.GetUserID(c), g.FacilitatorID); err != nil {
+		return err
+	}
+
 	// When setting status to COMPLETED, validate all progress rows first.
 	if req.Status == "COMPLETED" {
 		sessionID, ok := bindUUID(c, "id")
@@ -75,7 +94,7 @@ func (h *SessionGroupHandler) UpdateGroup(c *echo.Context) error {
 		}
 	}
 
-	g, err := h.uc.UpdateGroup((*c).Request().Context(), groupID, req.Name, req.Status, tenantID, req.FacilitatorID)
+	g, err = h.uc.UpdateGroup((*c).Request().Context(), groupID, req.Name, req.Status, tenantID, req.FacilitatorID)
 	if err != nil {
 		return err
 	}

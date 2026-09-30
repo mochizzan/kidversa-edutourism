@@ -57,7 +57,8 @@ async function loadParticipantsByGroup(sessionId: string): Promise<Record<string
         ; (map[gid] ??= []).push(p)
     }
     return map
-  } catch {
+  } catch (err) {
+    console.warn('[useLiveSession] participants map load failed', err)
     return {}
   }
 }
@@ -148,18 +149,18 @@ export function useLiveSession(sessionId: string | null | undefined) {
     })
 
     source.addEventListener('snapshot', (e) => {
-      const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
+      const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch (err) { console.warn('[useLiveSession] malformed SSE event', err); return null } })()
       handleEvent({ type: 'snapshot', data: parsed })
     })
     for (const t of STAGE_EVENTS) {
       source.addEventListener(t, (e) => {
-        const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
+        const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch (err) { console.warn('[useLiveSession] malformed SSE event', err); return null } })()
         handleEvent({ type: t, data: parsed })
       })
     }
     for (const t of TIMELINE_EVENTS) {
       source.addEventListener(t, (e) => {
-        const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch { return null } })()
+        const parsed = (() => { try { return JSON.parse((e as MessageEvent).data) } catch (err) { console.warn('[useLiveSession] malformed SSE event', err); return null } })()
         handleEvent({ type: t, data: parsed })
       })
     }

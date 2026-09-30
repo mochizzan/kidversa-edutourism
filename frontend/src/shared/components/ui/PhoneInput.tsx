@@ -146,7 +146,7 @@ export function PhoneInput({
     if (open && !flagsReady) {
       loadFlagRegistry()
         .then(() => setFlagsReady(true))
-        .catch(() => { })
+        .catch((err) => { console.error('[PhoneInput] flag registry load failed', err) })
     }
   }, [open, flagsReady])
 

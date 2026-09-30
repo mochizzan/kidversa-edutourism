@@ -100,19 +100,3 @@ func (h *ProgramHandler) DeleteStage(c *echo.Context) error {
 	}
 	return appresp.NoContent(c)
 }
-
-// ReorderStages handles POST /api/programs/:id/stages/reorder.
-func (h *ProgramHandler) ReorderStages(c *echo.Context) error {
-	programID, ok := bindUUID(c, "id")
-	if !ok {
-		return nil
-	}
-	var req dto.ReorderRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	if err := h.repo.ReorderStages((*c).Request().Context(), programID, req.OrderedIDs); err != nil {
-		return err
-	}
-	return appresp.NoContent(c)
-}

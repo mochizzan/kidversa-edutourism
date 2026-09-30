@@ -75,7 +75,7 @@ const RegisterPage = () => {
   useEffect(() => {
     apiRequest<{ data: Tenant[] }>('GET', API_ROUTES.PUBLIC.TENANTS)
       .then((res) => setTenants(res.data))
-      .catch(() => setTenants([]))
+      .catch((err) => { console.error('[RegisterPage] tenants load failed', err); setTenants([]) })
   }, [])
 
   const passwordValue = watch('password', '')

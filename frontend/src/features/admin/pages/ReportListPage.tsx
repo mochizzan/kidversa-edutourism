@@ -53,7 +53,7 @@ const ReportListPage = () => {
       const sessionWithReports: SessionWithReports[] = []
 
       for (const session of result.data) {
-        const reports = await reportService.getBySession(session.id)
+        const { items: reports } = await reportService.getBySession(session.id)
         const sentCount = reports.filter((r) => r.status === ReportStatus.SENT).length
         const draftCount = reports.filter(
           (r) => r.status === ReportStatus.DRAFT || r.status === ReportStatus.PENDING_REVIEW

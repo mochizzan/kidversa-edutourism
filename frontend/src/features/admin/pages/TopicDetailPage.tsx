@@ -11,6 +11,7 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
 import { programSubstageService } from '../../../core/services/program-substages'
 import { topicListPath, topicEditPath, activityNewPath } from '../../../core/constants/app'
+import { withOrigin } from '../../../core/utils/navigation'
 import { getMediaUrl } from '../../../core/utils/media'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Program, ProgramStage, ProgramSubstage } from '../../../core/types'
@@ -33,13 +34,21 @@ const TopicDetailPage = () => {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'detail' | 'kegiatan'>('detail')
   const [kegiatan, setKegiatan] = useState<ProgramSubstage[]>([])
-  const [kegiatanLoading, setKegiatanLoading] = useState(false)
   const [showCta, setShowCta] = useState(state.showAddActivityCta ?? false)
 
   useEffect(() => {
     if (!topicId) return
     setLoading(true)
       ; (async () => {
+        // Kegiatan list loads with the page (not gated on activeTab) so the
+        // tab count is correct on first render; its completion gates `loading`.
+        const kegiatanPromise = programSubstageService
+          .listByStage(topicId)
+          .then((list) => setKegiatan(list))
+          .catch((err) => {
+            addToast({ type: 'error', message: friendlyError(err) })
+            setKegiatan([])
+          })
         try {
           const res = await programService.getAll({ limit: 1000 })
           for (const program of res.data) {
@@ -54,23 +63,11 @@ const TopicDetailPage = () => {
         } catch (err) {
           addToast({ type: 'error', message: friendlyError(err) })
         } finally {
+          await kegiatanPromise
           setLoading(false)
         }
       })()
   }, [topicId, addToast])
-
-  useEffect(() => {
-    if (!topicId || activeTab !== 'kegiatan') return
-    setKegiatanLoading(true)
-    programSubstageService
-      .listByStage(topicId)
-      .then((list) => setKegiatan(list))
-      .catch((err) => {
-        addToast({ type: 'error', message: friendlyError(err) })
-        setKegiatan([])
-      })
-      .finally(() => setKegiatanLoading(false))
-  }, [topicId, activeTab, addToast])
 
   const activityPath = useMemo(() => {
     if (!program || !stage) return activityNewPath()
@@ -105,7 +102,11 @@ const TopicDetailPage = () => {
             <Button
               variant="secondary"
               icon={<Pencil className="w-4 h-4" />}
-              onClick={() => navigate(topicEditPath(stage.id), { state: { programId: program.id } })}
+              onClick={() =>
+                navigate(withOrigin(topicEditPath(stage.id), `${location.pathname}${location.search}`), {
+                  state: { programId: program.id },
+                })
+              }
             >
               {t('admin.topic.editBtn')}
             </Button>
@@ -197,7 +198,7 @@ const TopicDetailPage = () => {
               icon={<Plus className="w-4 h-4" />}
               onClick={() => {
                 setShowCta(false)
-                navigate(activityPath)
+                navigate(withOrigin(activityPath, `${location.pathname}${location.search}`))
               }}
             >
               {t('admin.activities.add')}
@@ -207,15 +208,13 @@ const TopicDetailPage = () => {
           {showCta && (
             <div className="mb-4 p-3 rounded-xl bg-primary-container text-on-primary-container text-sm flex items-center justify-between gap-3">
               <span>{t('admin.topic.ctaMsg')}</span>
-              <Button size="sm" onClick={() => navigate(activityPath)}>
+              <Button size="sm" onClick={() => navigate(withOrigin(activityPath, `${location.pathname}${location.search}`))}>
                 {t('admin.activities.add')}
               </Button>
             </div>
           )}
 
-          {kegiatanLoading ? (
-            <p className="text-sm text-on-surface-variant py-4">{t('admin.topic.loadingActivities')}</p>
-          ) : kegiatan.length === 0 ? (
+          {kegiatan.length === 0 ? (
             <ListEmptyState
               icon={<FolderOpen className="w-10 h-10" />}
               title={t('admin.activities.emptyTitle')}

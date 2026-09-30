@@ -64,12 +64,24 @@ function sendMultipart<T>(
 
   xhr.onload = () => {
    let parsed: { data?: T; error?: string | { code?: string; message?: string }; code?: string } = {}
+   let bodyInvalid = false
    try {
-    parsed = JSON.parse(xhr.responseText)
+    const value: unknown = JSON.parse(xhr.responseText)
+    if (value !== null && typeof value === 'object') {
+     parsed = value as typeof parsed
+    } else {
+     bodyInvalid = true
+    }
    } catch {
-    // keep defaults
+    // keep defaults — the error path below builds a status-based message
    }
    if (xhr.status >= 200 && xhr.status < 300) {
+    if (bodyInvalid) {
+     // A 2xx with a non-JSON body is a malformed envelope: reject loudly so
+     // the caller shows an error instead of treating junk as a success.
+     reject(new ApiError(`Upload failed with status ${xhr.status}`, 'unexpected_response', xhr.status))
+     return
+    }
     resolve((parsed.data ?? parsed) as T)
     return
    }

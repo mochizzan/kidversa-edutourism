@@ -21,7 +21,12 @@ export function useFacilitatorProfile() {
 
   const handleAvatarUpload = useCallback(
     async (file: File) => {
-      if (!user) return
+      if (!user) {
+        // The store's user is gone (session torn down) — surface the relogin
+        // copy instead of no-op'ing like ProfilePage's load-error card does.
+        addToast({ type: 'error', message: i18n.t('fasilitator.edit.userNotFound') })
+        return
+      }
       try {
         const updated = await userService.uploadAvatar(user.id, file)
         const { password_hash: _password, ...cleanUser } = updated

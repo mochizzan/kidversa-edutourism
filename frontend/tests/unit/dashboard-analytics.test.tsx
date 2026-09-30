@@ -52,7 +52,7 @@ vi.mock('@/core/services/users', () => ({
 }))
 
 vi.mock('@/core/services/reports', () => ({
-  reportService: { getBySession: vi.fn(async () => []) },
+  reportService: { getBySession: vi.fn(async () => ({ items: [] })) },
 }))
 
 vi.mock('@/core/services/assessments', () => ({

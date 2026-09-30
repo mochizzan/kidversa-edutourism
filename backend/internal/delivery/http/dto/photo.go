@@ -26,13 +26,14 @@ func NewPhotoListResponse(items []entity.SmartPhoto) *PhotoListResponse {
 	return &PhotoListResponse{Items: out}
 }
 
-// PhotoRequest is the update payload for PUT /api/photos/:id.
+// PhotoRequest is the update payload for PUT /api/photos/:id. The exclusive
+// report-photo flag is intentionally NOT part of this payload: it is set via
+// POST /:id/set-report-photo.
 type PhotoRequest struct {
 	FramedFileURL string `json:"framed_file_url,omitempty"`
-	IsReportPhoto bool   `json:"is_report_photo"`
 	TakenBy       string `json:"taken_by,omitempty"`
 	TakenAt       string `json:"taken_at,omitempty"`
-	FrameID       string `json:"frame_id,omitempty"`
+	FrameID       string `json:"frame_id,omitempty" validate:"omitempty,uuid"`
 }
 
 // ReportPhotoPickRequest is the body for PUT /api/photos/report-pick.
@@ -48,7 +49,3 @@ type ReportPhotoPickResponse struct {
 	ProgramStageID string `json:"program_stage_id"`
 	PhotoID        string `json:"photo_id"`
 }
-
-// SetReportPhotoRequest is the body for POST /api/photos/:id/set-report-photo.
-// It currently carries no fields; the photo id in the path is the target.
-type SetReportPhotoRequest struct{}

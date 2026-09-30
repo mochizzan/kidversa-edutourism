@@ -171,7 +171,6 @@
       "checkError": "检查辅导员分配失败",
       "startedToast": "课程开始成功",
       "completedToast": "课程完成成功",
-      "viewDetail": "查看详情",
       "start": "开始课程",
       "complete": "完成课程",
       "delete": "删除课程",
@@ -198,6 +197,7 @@
       "allDay": "全天",
       "infoLocation": "地点",
       "infoTimeLabel": "时间",
+      "durationShort": "{{h}}小时{{m}}分",
       "stageLocked": "已锁定",
       "stageInProgress": "进行中",
       "noFacilitator": "暂无辅导员",
@@ -315,7 +315,10 @@
       "cancelled": "已取消",
       "waiting": "待处理",
       "approved": "已批准",
-      "rejected": "已拒绝"
+      "rejected": "已拒绝",
+      "queued": "排队中",
+      "processing": "处理中",
+      "operationInterrupted": "服务器上的进程已中断"
     },
     "reportStatus": {
       "draft": "草稿",
@@ -342,14 +345,12 @@
       "all": "全部",
       "edit": "编辑",
       "detail": "详情",
-      "info": "信息",
       "approve": "批准",
       "reject": "拒绝",
       "add": "添加",
       "createNew": "新建",
       "deactivate": "禁用",
       "activate": "激活",
-      "toggleStatus": "更改状态",
       "allPrograms": "所有项目",
       "fillRequired": "请填写所有必填字段"
     },
@@ -689,8 +690,6 @@
       "pickTopic": "选择主题",
       "pickProgramDulu": "请先选择项目",
       "nameLabel": "活动名称",
-      "tipDetail": "详情",
-      "infoTitle": "活动信息",
       "contentTitle": "已分配内容",
       "deleteTitle": "删除活动",
       "deleteMsgList": "确定要删除活动“{{name}}”吗？分配给此活动的内容将被移除。此操作无法撤销。",
@@ -1147,6 +1146,7 @@
       "dashboard": "仪表盘",
       "groups": "小组",
       "camera": "相机",
+      "galeri": "图库",
       "profile": "个人资料"
     },
     "hello": "你好，{{name}}",
@@ -1205,6 +1205,7 @@
     "edit": {
       "userNotFound": "未找到用户数据。请重新登录。",
       "saveFailed": "更新数据失败。请重试。",
+      "noPermission": "您没有编辑此数据的权限。",
       "nameSaved": "姓名更新成功",
       "nameTitle": "编辑姓名",
       "nameLabel": "全名",
@@ -1237,8 +1238,23 @@
       "quickActions": "快速操作",
       "noConsentMsg": "无照片权限"
     },
+    "galeri": {
+      "pageTitle": "照片图库",
+      "pageSubtitle": "查看和管理每个活动的学员照片。",
+      "emptySessionsTitle": "暂无进行中的活动",
+      "emptySessionsDesc": "进行中的活动将显示在这里，可打开其图库。",
+      "ownedBadge": "您的小组",
+      "lockedSessionDesc": "该活动不归您负责 — 仅可查看。",
+      "groupsSubtitle": "选择小组以查看学员图库。",
+      "participantsSubtitle": "选择学员以打开照片图库。",
+      "lockedGroupDesc": "仅该小组的引导员可以打开学员图库。",
+      "addPhoto": "添加照片",
+      "noActiveTopic": "没有可用于选择报告照片的进行中主题。",
+      "topicLoadError": "加载主题列表失败。主题名称可能不完整。",
+      "picksLoadError": "加载报告照片选择失败。",
+      "groupGoneDesc": "在此活动中未找到该小组，可能已被删除。"
+    },
     "photos": {
-      "reloadError": "重新加载照片失败。",
       "emptyFor": "{{name}} 暂无照片",
       "frameLoadError": "加载相框数据失败。请检查网络后重试。",
       "photoLoadError": "加载照片数据失败。请检查网络后重试。",
@@ -1246,7 +1262,6 @@
       "notInSession": "参与者尚未进入课程",
       "maxPhotos": "每位儿童最多 {{max}} 张照片",
       "consentRequired": "尚未授予照片权限",
-      "saveError": "保存照片失败",
       "loadingParticipant": "正在加载参与者数据...",
       "childMissingTitle": "未找到儿童",
       "childMissingDesc": "儿童数据不可用或已被删除。",
@@ -1268,7 +1283,6 @@
       "deleteError": "删除照片失败",
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
-      "pickFooter": "Report photo for: {{topic}}",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo"
     },
@@ -1281,7 +1295,6 @@
       "deviceFallback": "相机",
       "back": "后置摄像头",
       "front": "前置摄像头",
-      "flash": "闪光灯",
       "flip": "翻转",
       "grid": "网格",
       "emptyDesc": "没有可供拍照的活跃群组。",
@@ -1325,10 +1338,13 @@
       "remainingCount": "剩余 {{count}} 名",
       "complete": "完成小组",
       "rateAllFirst": "请先评估所有参与者",
-      "completeHint": "在完成小组前，必须评估所有参与者"
+      "completeHint": "在完成小组前，必须评估所有参与者",
+      "fallbackName": "未命名小组"
     },
     "session": {
-      "allDay": "全天"
+      "allDay": "全天",
+      "notMine": "此会话不归您负责。",
+      "noLocation": "未设置地点"
     },
     "child": {
       "years": "{{age}} 岁",
@@ -1348,13 +1364,23 @@
       "allSessions": "所有课程",
       "emptyTitle": "暂无课程",
       "emptyAll": "您尚未被分配到任何课程。",
-      "emptyFiltered": "筛选条件“{{filter}}”下没有课程。"
+      "emptyFiltered": "筛选条件“{{filter}}”下没有课程。",
+      "sessionCompletedTitle": "课程已结束",
+      "sessionCompletedDesc": "该课程已结束，无法再次打开。",
+      "sessionDraftTitle": "课程仍是草稿",
+      "sessionDraftDesc": "该课程仍为草稿且尚未有小组，因此无法打开。",
+      "sessionUnknownTitle": "未知的课程状态",
+      "sessionUnknownDesc": "该课程状态为\"{{status}}\"，尚未支持，因此无法打开。",
+      "noUserTitle": "尚未登录",
+      "noUserDesc": "未找到登录会话，请重新登录后重试。"
     },
     "groups": {
       "pageTitle": "所有小组",
       "emptyTitle": "暂无小组",
       "emptyDesc": "当前没有可供小组使用的活跃课程。",
-      "emptySession": "该课程下暂无小组。"
+      "emptySession": "该课程下暂无小组。",
+      "sessionNotFoundTitle": "未找到会话",
+      "sessionNotFoundDesc": "未找到该会话或会话已不再活跃。会话可能已结束，或链接已失效。"
     },
     "activities": {
       "pageTitle": "我的活动",

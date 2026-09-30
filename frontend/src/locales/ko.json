@@ -171,7 +171,6 @@
       "checkError": "진행자 배정 확인에 실패했습니다",
       "startedToast": "세션이 성공적으로 시작되었습니다",
       "completedToast": "세션이 성공적으로 완료되었습니다",
-      "viewDetail": "상세 보기",
       "start": "세션 시작",
       "complete": "세션 완료",
       "delete": "세션 삭제",
@@ -198,6 +197,7 @@
       "allDay": "하루 종일",
       "infoLocation": "위치",
       "infoTimeLabel": "시간",
+      "durationShort": "{{h}}시간 {{m}}분",
       "stageLocked": "잠김",
       "stageInProgress": "진행 중",
       "noFacilitator": "진행자가 없습니다",
@@ -315,7 +315,10 @@
       "cancelled": "취소됨",
       "waiting": "대기 중",
       "approved": "승인됨",
-      "rejected": "거부됨"
+      "rejected": "거부됨",
+      "queued": "대기 중",
+      "processing": "처리 중",
+      "operationInterrupted": "서버에서 실행 중이던 작업이 중단되었습니다"
     },
     "reportStatus": {
       "draft": "초안",
@@ -342,14 +345,12 @@
       "all": "전체",
       "edit": "편집",
       "detail": "상세 정보",
-      "info": "정보",
       "approve": "승인",
       "reject": "거부",
       "add": "추가",
       "createNew": "새로 만들기",
       "deactivate": "비활성화",
       "activate": "활성화",
-      "toggleStatus": "상태 변경",
       "allPrograms": "모든 프로그램",
       "fillRequired": "필수 항목을 모두 입력하세요"
     },
@@ -689,8 +690,6 @@
       "pickTopic": "주제 선택",
       "pickProgramDulu": "먼저 프로그램을 선택하세요",
       "nameLabel": "활동 이름",
-      "tipDetail": "상세 정보",
-      "infoTitle": "활동 정보",
       "contentTitle": "할당된 콘텐츠",
       "deleteTitle": "활동 삭제",
       "deleteMsgList": "\"{{name}}\" 활동을 삭제하시겠습니까? 이 활동에 할당된 콘텐츠는 해제됩니다. 이 작업은 취소할 수 없습니다.",
@@ -1147,6 +1146,7 @@
       "dashboard": "대시보드",
       "groups": "그룹",
       "camera": "카메라",
+      "galeri": "갤러리",
       "profile": "프로필"
     },
     "hello": "안녕하세요, {{name}}님",
@@ -1205,6 +1205,7 @@
     "edit": {
       "userNotFound": "사용자 데이터를 찾을 수 없습니다. 다시 로그인해 주세요.",
       "saveFailed": "데이터 업데이트에 실패했습니다. 다시 시도해 주세요.",
+      "noPermission": "이 데이터를 편집할 권한이 없습니다.",
       "nameSaved": "이름이 성공적으로 업데이트되었습니다.",
       "nameTitle": "이름 수정",
       "nameLabel": "성명",
@@ -1237,8 +1238,23 @@
       "quickActions": "빠른 작업",
       "noConsentMsg": "사진 권한 없음"
     },
+    "galeri": {
+      "pageTitle": "사진 갤러리",
+      "pageSubtitle": "각 세션의 참가자 사진을 보고 관리합니다.",
+      "emptySessionsTitle": "진행 중인 세션이 없습니다",
+      "emptySessionsDesc": "진행 중인 세션이 여기에 표시되어 갤러리를 열 수 있습니다.",
+      "ownedBadge": "내 그룹",
+      "lockedSessionDesc": "이 세션은 담당하지 않습니다 — 보기 전용입니다.",
+      "groupsSubtitle": "그룹을 선택하여 참가자 갤러리를 보세요.",
+      "participantsSubtitle": "참가자를 선택하여 사진 갤러리를 엽니다.",
+      "lockedGroupDesc": "이 그룹의 담당 퍼실리테이터만 참가자 갤러리를 열 수 있습니다.",
+      "addPhoto": "사진 추가",
+      "noActiveTopic": "보고서 사진을 선택할 활성 주제가 없습니다.",
+      "topicLoadError": "주제 목록을 불러오지 못했습니다. 주제 이름이 불완전할 수 있습니다.",
+      "picksLoadError": "보고서 사진 선택을 불러오지 못했습니다.",
+      "groupGoneDesc": "이 세션에서 그룹을 찾을 수 없습니다. 삭제되었을 수 있습니다."
+    },
     "photos": {
-      "reloadError": "사진을 다시 불러오는 데 실패했습니다.",
       "emptyFor": "{{name}}에 대한 사진이 없습니다.",
       "frameLoadError": "프레임 데이터를 불러오는 데 실패했습니다. 연결 상태를 확인하고 다시 시도하세요.",
       "photoLoadError": "사진 데이터를 불러오는 데 실패했습니다. 연결 상태를 확인하고 다시 시도하세요.",
@@ -1246,7 +1262,6 @@
       "notInSession": "참가자가 세션에 입장하지 않았습니다.",
       "maxPhotos": "아동당 최대 {{max}}장의 사진",
       "consentRequired": "사진 권한이 부여되지 않았습니다.",
-      "saveError": "사진 저장에 실패했습니다.",
       "loadingParticipant": "참가자 데이터를 불러오는 중...",
       "childMissingTitle": "아동을 찾을 수 없음",
       "childMissingDesc": "아동 데이터를 사용할 수 없거나 삭제되었습니다.",
@@ -1268,7 +1283,6 @@
       "deleteError": "사진 삭제 실패",
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
-      "pickFooter": "Report photo for: {{topic}}",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo"
     },
@@ -1281,7 +1295,6 @@
       "deviceFallback": "카메라",
       "back": "후면 카메라",
       "front": "전면 카메라",
-      "flash": "플래시",
       "flip": "반전",
       "grid": "그리드",
       "emptyDesc": "촬영할 참가자가 있는 활성 그룹이 없습니다.",
@@ -1325,10 +1338,13 @@
       "remainingCount": "{{count}}명 남음",
       "complete": "그룹 완료",
       "rateAllFirst": "먼저 모든 참가자를 평가하세요",
-      "completeHint": "그룹을 완료하려면 모든 참가자를 평가해야 합니다"
+      "completeHint": "그룹을 완료하려면 모든 참가자를 평가해야 합니다",
+      "fallbackName": "이름 없는 그룹"
     },
     "session": {
-      "allDay": "하루 종일"
+      "allDay": "하루 종일",
+      "notMine": "이 세션은 당신의 담당이 아닙니다.",
+      "noLocation": "위치가 설정되지 않았습니다"
     },
     "child": {
       "years": "{{age}}세",
@@ -1348,13 +1364,23 @@
       "allSessions": "모든 세션",
       "emptyTitle": "세션이 없습니다",
       "emptyAll": "배정된 세션이 없습니다.",
-      "emptyFiltered": "\"{{filter}}\" 필터에 해당하는 세션이 없습니다."
+      "emptyFiltered": "\"{{filter}}\" 필터에 해당하는 세션이 없습니다.",
+      "sessionCompletedTitle": "세션이 종료되었습니다",
+      "sessionCompletedDesc": "이 세션은 종료되어 더 이상 열 수 없습니다.",
+      "sessionDraftTitle": "세션이 아직 초안 상태입니다",
+      "sessionDraftDesc": "이 세션은 아직 초안 상태여서 그룹이 없으므로 열 수 없습니다.",
+      "sessionUnknownTitle": "알 수 없는 세션 상태",
+      "sessionUnknownDesc": "이 세션의 상태는 \"{{status}}\"로 아직 지원되지 않아 열 수 없습니다.",
+      "noUserTitle": "로그인되지 않았습니다",
+      "noUserDesc": "로그인 세션을 찾을 수 없습니다. 다시 로그인한 후 재시도하세요."
     },
     "groups": {
       "pageTitle": "모든 그룹",
       "emptyTitle": "그룹이 없습니다",
       "emptyDesc": "사용 가능한 그룹이 있는 활성 세션이 없습니다.",
-      "emptySession": "이 세션에 그룹이 없습니다."
+      "emptySession": "이 세션에 그룹이 없습니다.",
+      "sessionNotFoundTitle": "세션을 찾을 수 없습니다",
+      "sessionNotFoundDesc": "세션이 없거나 더 이상 활성화되어 있지 않습니다. 세션이 종료되었거나 링크가 만료되었을 수 있습니다."
     },
     "activities": {
       "pageTitle": "내 활동",

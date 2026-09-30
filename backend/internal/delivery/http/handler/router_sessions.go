@@ -34,10 +34,8 @@ func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecyc
 	g.DELETE("/:id/groups/:groupId", gh.DeleteGroup, authMW, roleMW, appmiddleware.TenantScope())
 
 	g.GET("/:id/participants", ph.ListParticipants, authMW, roleMW, appmiddleware.TenantScope())
-	g.POST("/:id/participants", ph.CreateParticipant, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("/:id/participants/link", ph.LinkParticipant, authMW, roleMW, appmiddleware.TenantScope())
 	g.GET("/:id/participants/linkable", ph.ListLinkableParticipants, authMW, roleMW, appmiddleware.TenantScope())
-	g.GET("/:id/participants/:participantId", ph.GetParticipant, authMW, roleMW, appmiddleware.TenantScope())
 	g.DELETE("/:id/participants/:participantId", ph.DeleteParticipant, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("/:id/participants/import", bh.ImportParticipants, authMW, roleMW, appmiddleware.TenantScope())
 	g.PUT("/:id/participants/:participantId", bh.UpdateParticipant, authMW, roleMW, appmiddleware.TenantScope())

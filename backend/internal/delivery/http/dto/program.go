@@ -30,16 +30,6 @@ type ContentRequest struct {
 	DurationSeconds int                         `json:"duration_seconds,omitempty"`
 }
 
-// AssignContentRequest carries the content_id to assign to a Kegiatan.
-type AssignContentRequest struct {
-	ContentID string `json:"content_id" validate:"required,uuid"`
-}
-
-// ReorderRequest carries an ordered list of IDs to re-sequence.
-type ReorderRequest struct {
-	OrderedIDs []string `json:"ordered_ids" validate:"required"`
-}
-
 // ToggleActiveResponse is returned by the toggle-active endpoint.
 type ToggleActiveResponse struct {
 	ID       string `json:"id"`

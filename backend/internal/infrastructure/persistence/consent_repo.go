@@ -99,58 +99,6 @@ func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantI
 	return nil
 }
 
-// ListConsentsByParticipant returns all consent rows for a participant.
-func (r *GormConsentRepository) ListConsentsByParticipant(ctx context.Context, participantID string) ([]entity.ConsentLog, error) {
-	var models []ConsentLogModel
-	if err := r.db.WithContext(ctx).
-		Where("participant_id = ?", participantID).
-		Order("created_at DESC").
-		Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	out := make([]entity.ConsentLog, 0, len(models))
-	for i := range models {
-		out = append(out, *models[i].ToEntity())
-	}
-	return out, nil
-}
-
-// ListConsentsBySession returns all consent rows for a session.
-func (r *GormConsentRepository) ListConsentsBySession(ctx context.Context, sessionID string) ([]entity.ConsentLog, error) {
-	var models []ConsentLogModel
-	if err := r.db.WithContext(ctx).
-		Where("session_id = ?", sessionID).
-		Order("created_at DESC").
-		Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	out := make([]entity.ConsentLog, 0, len(models))
-	for i := range models {
-		out = append(out, *models[i].ToEntity())
-	}
-	return out, nil
-}
-
-// ListConsentsBySessionIDs returns all consent rows for multiple sessions in one query.
-func (r *GormConsentRepository) ListConsentsBySessionIDs(ctx context.Context, sessionIDs []string) (map[string][]entity.ConsentLog, error) {
-	if len(sessionIDs) == 0 {
-		return make(map[string][]entity.ConsentLog), nil
-	}
-	var models []ConsentLogModel
-	if err := r.db.WithContext(ctx).
-		Where("session_id IN ?", sessionIDs).
-		Order("created_at DESC").
-		Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	grouped := make(map[string][]entity.ConsentLog)
-	for i := range models {
-		e := models[i].ToEntity()
-		grouped[e.SessionID] = append(grouped[e.SessionID], *e)
-	}
-	return grouped, nil
-}
-
 // SendConsentRequest records that a consent request was sent. It upserts the
 // (participant, session, type) row: if a row already exists, updates sent_at
 // and clears responded_at (re-send scenario). Otherwise creates a new row.

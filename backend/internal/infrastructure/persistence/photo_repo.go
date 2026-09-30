@@ -157,6 +157,9 @@ func (r *GormPhotoRepository) DeleteReportPhotoPick(ctx context.Context, partici
 // ListPhotos returns photos matching the filter (paginated).
 func (r *GormPhotoRepository) ListPhotos(ctx context.Context, f repository.PhotoFilter, page, limit int) (*repository.Paginated[entity.SmartPhoto], error) {
 	q := r.db.WithContext(ctx).Model(&SmartPhotoModel{})
+	// Tenant scoping: photos inherit their owning session's tenant (same
+	// session_id IN (…) clause used by GetPhotoByID and scopeByTenant).
+	q = scopeByTenant(q, f.TenantID)
 	if f.ParticipantID != "" {
 		q = q.Where("participant_id = ?", f.ParticipantID)
 	}

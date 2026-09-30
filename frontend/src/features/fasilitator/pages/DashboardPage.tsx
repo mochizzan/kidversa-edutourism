@@ -3,16 +3,26 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Calendar } from 'lucide-react'
 import { useAuth } from '../../../core/hooks/useAuth'
+import { useAuthStore } from '../../../core/stores/authStore'
 import { sessionService } from '../../../core/services/sessions'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
-import { Badge } from '../../../shared/components/ui/Badge'
+import { Modal } from '../../../shared/components/ui/Modal'
 import { SessionCard } from '../components/SessionCard'
 import { cn } from '../../../core/utils'
+import { SessionStatus } from '../../../core/types/enums'
 import type { Session } from '../../../core/types'
 import { friendlyError } from '../../../core/utils/errorMessages'
 
 type FilterKey = 'all' | 'today' | 'completed' | 'cancelled'
+
+// Single notice modal shown instead of navigating: completed sessions, draft
+// sessions (no groups yet), or an unknown/missing status at runtime.
+type SessionNotice =
+  | { kind: 'completed' }
+  | { kind: 'draft' }
+  | { kind: 'unknown'; status: string }
+  | null
 
 const filterLabels = {
   all: 'fasilitator.dashboard.filterAll',
@@ -21,16 +31,9 @@ const filterLabels = {
   cancelled: 'fasilitator.dashboard.filterCancelled',
 } as const
 
-const roleLabel: Record<string, string> = {
-  SUPER_ADMIN: 'Super Admin',
-  ADMIN: 'Admin',
-  KOORDINATOR: 'Koordinator',
-  FASILITATOR: 'Fasilitator',
-}
-
 const DashboardPage = () => {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   const [sessions, setSessions] = useState<Session[]>([])
@@ -38,6 +41,10 @@ const DashboardPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [activeFilter, setActiveFilter] = useState<FilterKey>('today')
   const [switching, setSwitching] = useState(false)
+  const [sessionNotice, setSessionNotice] = useState<SessionNotice>(null)
+  // True only after auth has settled with no user — renders an explicit error
+  // state instead of leaving the page on an infinite loading skeleton.
+  const [noUser, setNoUser] = useState(false)
 
   const fetchSessions = useCallback(async (filter: FilterKey, isInitial = false) => {
     if (!user?.id) return
@@ -60,7 +67,21 @@ const DashboardPage = () => {
   }, [user?.id])
 
   useEffect(() => {
-    if (!user?.id) return
+    // Auth still settling (checkSession refresh/GET /me in flight) → keep the
+    // bounded skeleton; the effect re-runs once isLoading flips.
+    if (authLoading) {
+      setLoading(true)
+      return
+    }
+    // Auth settled without a user (session lost / auth fetch failed): never
+    // leave the page on a permanent skeleton — show an explicit error state.
+    if (!user?.id) {
+      setError(null)
+      setNoUser(true)
+      setLoading(false)
+      return
+    }
+    setNoUser(false)
     let cancelled = false
     const init = async () => {
       // Try today first
@@ -87,7 +108,7 @@ const DashboardPage = () => {
     init().catch((err) => { if (!cancelled) setError(friendlyError(err)) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [user?.id])
+  }, [user?.id, authLoading])
 
   const handleFilterChange = useCallback(async (filter: FilterKey) => {
     if (filter === activeFilter) return
@@ -95,6 +116,31 @@ const DashboardPage = () => {
     await fetchSessions(filter)
     setSwitching(false)
   }, [activeFilter, fetchSessions])
+
+  // Explicit branch per session status: only ACTIVE/CANCELLED open the groups
+  // page; COMPLETED/DRAFT/unknown show the notice modal and never navigate.
+  const handleSessionClick = useCallback((session: Session) => {
+    if (!session.is_my_session) return
+    switch (session.status) {
+      case SessionStatus.ACTIVE:
+        navigate(`/fasilitator/groups?sessionId=${session.id}`)
+        return
+      case SessionStatus.CANCELLED:
+        // Deliberately preserved: cancelled sessions still open the groups page.
+        navigate(`/fasilitator/groups?sessionId=${session.id}`)
+        return
+      case SessionStatus.COMPLETED:
+        setSessionNotice({ kind: 'completed' })
+        return
+      case SessionStatus.DRAFT:
+        // Draft has no groups yet → explain instead of an empty groups page.
+        setSessionNotice({ kind: 'draft' })
+        return
+      default:
+        // Unknown/missing status: surface it, never navigate silently.
+        setSessionNotice({ kind: 'unknown', status: String(session.status ?? 'UNKNOWN') })
+    }
+  }, [navigate])
 
   // ── Loading skeleton ──
   if (loading) {
@@ -110,36 +156,27 @@ const DashboardPage = () => {
     )
   }
 
+  // ── No logged-in user after auth settled: explicit message, never a
+  //    permanent skeleton. Retry re-runs the session check. ──
+  if (noUser) {
+    return (
+      <ErrorState
+        title={t('fasilitator.dashboard.noUserTitle')}
+        message={t('fasilitator.dashboard.noUserDesc')}
+        onRetry={() => { void useAuthStore.getState().checkSession() }}
+      />
+    )
+  }
+
   // ── Error state ──
   if (error) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-on-surface">
-            {t('fasilitator.dashboard.greeting', { name: user?.name ?? 'Fasilitator' })}
-          </h1>
-        </div>
-        <ErrorState message={error} onRetry={() => fetchSessions(activeFilter)} />
-      </div>
+      <ErrorState message={error} onRetry={() => fetchSessions(activeFilter)} />
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* Greeting */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-on-surface">
-            {t('fasilitator.dashboard.greeting', { name: user?.name ?? 'Fasilitator' })}
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="primary" size="sm">
-              {roleLabel[user?.role ?? ''] ?? 'Fasilitator'}
-            </Badge>
-          </div>
-        </div>
-      </div>
-
       {/* Semua Sesi */}
       <section>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -180,16 +217,44 @@ const DashboardPage = () => {
               <SessionCard
                 key={session.id}
                 session={session}
-                onClick={() => {
-                  if (session.is_my_session) {
-                    navigate(`/fasilitator/groups?sessionId=${session.id}`)
-                  }
-                }}
+                onClick={() => handleSessionClick(session)}
               />
             ))}
           </div>
         )}
       </section>
+
+      {/* Notice modal — completed / draft / unknown status: buka modal, jangan navigasi */}
+      <Modal
+        open={sessionNotice !== null}
+        onClose={() => setSessionNotice(null)}
+        title={
+          sessionNotice?.kind === 'draft'
+            ? t('fasilitator.dashboard.sessionDraftTitle')
+            : sessionNotice?.kind === 'unknown'
+              ? t('fasilitator.dashboard.sessionUnknownTitle')
+              : t('fasilitator.dashboard.sessionCompletedTitle')
+        }
+        size="sm"
+        footer={
+          <div className="flex justify-end">
+            <button
+              onClick={() => setSessionNotice(null)}
+              className="px-4 py-2 text-sm font-medium rounded-xl bg-primary text-on-primary hover:bg-primary/90 transition-colors"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm text-on-surface-variant">
+          {sessionNotice?.kind === 'draft'
+            ? t('fasilitator.dashboard.sessionDraftDesc')
+            : sessionNotice?.kind === 'unknown'
+              ? t('fasilitator.dashboard.sessionUnknownDesc', { status: sessionNotice.status })
+              : t('fasilitator.dashboard.sessionCompletedDesc')}
+        </p>
+      </Modal>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { Search, Bell, Menu, X, Users, FolderOpen, Calendar, Image, Loader2, Che
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../core/hooks/useAuth'
 import { Tooltip } from '../ui/Tooltip'
+import { Avatar } from '../ui/Avatar'
 import { useGlobalSearch } from '../../hooks/useGlobalSearch'
 import { useHeaderNotifications } from '../../hooks/useHeaderNotifications'
 import { useTenantStore } from '../../../core/stores/tenantStore'
@@ -281,13 +282,10 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
           </div>
           {user && (
             <div className="flex items-center gap-3 ml-2">
-              <div className="w-9 h-9 lg:w-10 lg:h-10 rounded-full border border-outline-variant overflow-hidden flex items-center justify-center bg-primary-container text-on-primary-container font-bold text-sm">
-                {user.avatar_url ? (
-                  <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover rounded-full" />
-                ) : (
-                  user.name.charAt(0).toUpperCase()
-                )}
-              </div>
+              <Avatar
+                user={user}
+                className="w-9 h-9 lg:w-10 lg:h-10 rounded-full border border-outline-variant overflow-hidden flex items-center justify-center bg-primary-container text-on-primary-container font-bold text-sm"
+              />
               <span className="text-sm font-medium text-on-surface hidden md:block">{user.name}</span>
             </div>
           )}

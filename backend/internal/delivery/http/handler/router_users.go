@@ -18,7 +18,9 @@ func RegisterUsersRoutes(g *echo.Group, h *UserHandler, jm *auth.JWTManager, rev
 	g.GET("", h.List, authMW, roleMW, scopeMW)
 	g.POST("", h.Create, authMW, roleMW, scopeMW)
 	g.GET("/:id", h.Get, authMW, roleMW, scopeMW)
-	g.PUT("/:id", h.Update, authMW, roleMW, scopeMW)
+	// PUT has NO role gate: self-service profile updates (any role editing own
+	// name/email/phone) are authorized inside h.Update — self vs SUPER_ADMIN/ADMIN.
+	g.PUT("/:id", h.Update, authMW, scopeMW)
 	g.DELETE("/:id", h.Delete, authMW, appmiddleware.RequireRole(entity.RoleSuperAdmin), scopeMW)
 	g.POST("/:id/approve", h.Approve, authMW, appmiddleware.RequireRole(entity.RoleSuperAdmin), scopeMW)
 	g.POST("/:id/reject", h.Reject, authMW, appmiddleware.RequireRole(entity.RoleSuperAdmin), scopeMW)

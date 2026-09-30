@@ -135,27 +135,3 @@ func (r *GormParticipantMissionRepository) ReplaceByReport(ctx context.Context, 
 		return nil
 	})
 }
-
-// ListByParticipant returns all participant missions for the given participant.
-// participant_id is no longer stored on participant_missions (3NF); it is derived
-// via the parent report (report_id -> reports.participant_id). Tenant scoping is
-// enforced via the reports join (reports.session_id -> sessions.tenant_id),
-// mirroring the ownership assertion used elsewhere.
-func (r *GormParticipantMissionRepository) ListByParticipant(ctx context.Context, tenantID, participantID string) ([]entity.ParticipantMission, error) {
-	if tenantID == "" {
-		return nil, apperrors.BadRequest("tenant_required", errors.New("tenant ID is required"))
-	}
-	var models []ParticipantMissionModel
-	if err := r.db.WithContext(ctx).
-		Joins("JOIN reports r ON r.id = participant_missions.report_id").
-		Where("r.participant_id = ? AND r.session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", participantID, tenantID).
-		Order("participant_missions.created_at DESC").
-		Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	out := make([]entity.ParticipantMission, 0, len(models))
-	for i := range models {
-		out = append(out, *models[i].ToEntity())
-	}
-	return out, nil
-}

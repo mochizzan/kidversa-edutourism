@@ -57,6 +57,9 @@ type Usecase struct {
 	// (fallback when the read-time join in GetByToken came back empty).
 	userRepo repository.UserRepository
 	cfg      *config.Config
+	// genReg is the in-memory per-report generation registry backing the
+	// active_generate envelope of GET /api/reports.
+	genReg *generateRegistry
 }
 
 // NewUsecase builds the reports usecase.
@@ -91,6 +94,7 @@ func NewUsecase(
 		messaging:              messaging,
 		userRepo:               userRepo,
 		cfg:                    cfg,
+		genReg:                 newGenerateRegistry(),
 	}
 }
 
@@ -350,6 +354,10 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 	var mu sync.Mutex
 	var errs []error
 
+	// Build the worklist up front so every row is registered as "queued" in the
+	// in-memory generation registry BEFORE the first worker spawns (the filter
+	// conditions are exactly the ones the spawn loop used before).
+	work := make([]entity.Report, 0, len(all.Items))
 	for _, r := range all.Items {
 		if r.AINarrativeDraft != "" {
 			continue
@@ -357,11 +365,27 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 		if !targetIDs[r.ParticipantID] {
 			continue
 		}
+		work = append(work, r)
+	}
+	workIDs := make([]string, len(work))
+	for i := range work {
+		workIDs[i] = work[i].ID
+	}
+	u.genReg.begin(sessionID, tenantID, workIDs)
+	// Guaranteed cleanup on every return path below, success or error.
+	defer u.genReg.end(sessionID)
+
+	for _, r := range work {
 		wg.Add(1)
 		go func(report entity.Report) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
+
+			// Semaphore acquired → processing; removal is deferred so every exit
+			// path (draft persisted, generation error, update error) cleans up.
+			u.genReg.markProcessing(sessionID, report.ID)
+			defer u.genReg.remove(sessionID, report.ID)
 
 			genCtx, cancel := context.WithTimeout(ctx, ai.OpenRouterRequestTimeout)
 			defer cancel()

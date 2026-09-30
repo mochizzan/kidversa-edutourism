@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v5"
 
+	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	"kidversa-edutourism-backend/internal/delivery/http/handler"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
@@ -64,6 +66,9 @@ func (f *fakePhotoRepo) GetPhotoByID(_ context.Context, id, tenantID string) (*e
 func (f *fakePhotoRepo) ListPhotos(_ context.Context, filt repository.PhotoFilter, _, _ int) (*repository.Paginated[entity.SmartPhoto], error) {
 	out := make([]entity.SmartPhoto, 0, len(f.photos))
 	for _, p := range f.photos {
+		if filt.TenantID != "" && f.tenantOf[p.ID] != filt.TenantID {
+			continue
+		}
 		if filt.ParticipantID != "" && p.ParticipantID != filt.ParticipantID {
 			continue
 		}
@@ -160,12 +165,145 @@ func newPhoto(id string) *entity.SmartPhoto {
 	return p
 }
 
-// newPickHandler builds an in-process echo + PhotoHandler over the fake repo
-// (httptest, no DB/network — same pattern as tests/frame).
-func newPickHandler(fake *fakePhotoRepo) (*handler.PhotoHandler, *echo.Echo) {
+// ---------------------------------------------------------------------------
+// fakeSessionRepo is an in-memory sessionScope: the session/participant/group
+// reads behind the tenant and facilitator-ownership checks (§5.A/§5.B).
+// ---------------------------------------------------------------------------
+
+type fakeSessionRepo struct {
+	sessions     map[string]*entity.Session     // sessionID -> session
+	sessionTen   map[string]string              // sessionID -> owning tenant ("" = unscoped)
+	participants map[string]*entity.Participant // participantID -> participant
+	groupOwners  map[string]*string             // groupID -> facilitatorID (nil = unassigned)
+}
+
+func newFakeSessionRepo() *fakeSessionRepo {
+	return &fakeSessionRepo{
+		sessions:     map[string]*entity.Session{},
+		sessionTen:   map[string]string{},
+		participants: map[string]*entity.Participant{},
+		groupOwners:  map[string]*string{},
+	}
+}
+
+func (f *fakeSessionRepo) GetSessionByID(_ context.Context, id, tenantID string) (*entity.Session, error) {
+	s, ok := f.sessions[id]
+	if !ok || (tenantID != "" && f.sessionTen[id] != tenantID) {
+		return nil, apperrors.NotFound("not_found", nil)
+	}
+	return s, nil
+}
+
+func (f *fakeSessionRepo) GetParticipantByID(_ context.Context, id, tenantID string) (*entity.Participant, error) {
+	p, ok := f.participants[id]
+	if !ok {
+		return nil, apperrors.NotFound("not_found", nil)
+	}
+	if tenantID != "" && (p.TenantID == nil || *p.TenantID != tenantID) {
+		return nil, apperrors.NotFound("not_found", nil)
+	}
+	return p, nil
+}
+
+func (f *fakeSessionRepo) GetGroupFacilitatorID(_ context.Context, groupID string) (*string, error) {
+	owner, ok := f.groupOwners[groupID]
+	if !ok {
+		return nil, apperrors.NotFound("not_found", nil)
+	}
+	return owner, nil
+}
+
+// fakeConsentRepo is an in-memory consentScope (§5.C gates).
+type fakeConsentRepo struct{ granted bool }
+
+func (f *fakeConsentRepo) GetConsentValue(context.Context, string, string, entity.ConsentType) (bool, error) {
+	return f.granted, nil
+}
+
+// fakeProgramRepo is an in-memory programScope: stage -> program tenant chain
+// used to validate a report pick's program_stage_id (§5.D).
+type fakeProgramRepo struct {
+	stages   map[string]*entity.ProgramStage
+	programs map[string]*entity.Program
+}
+
+func newFakeProgramRepo() *fakeProgramRepo {
+	return &fakeProgramRepo{
+		stages:   map[string]*entity.ProgramStage{},
+		programs: map[string]*entity.Program{},
+	}
+}
+
+func (f *fakeProgramRepo) GetStageByID(_ context.Context, id string) (*entity.ProgramStage, error) {
+	s, ok := f.stages[id]
+	if !ok {
+		return nil, apperrors.NotFound("not_found", nil)
+	}
+	return s, nil
+}
+
+func (f *fakeProgramRepo) GetProgramByID(_ context.Context, id string) (*entity.Program, error) {
+	p, ok := f.programs[id]
+	if !ok {
+		return nil, apperrors.NotFound("not_found", nil)
+	}
+	return p, nil
+}
+
+// defaultSessions seeds the passing path: the test session is unscoped, the
+// test participant sits in group-1 owned by facilitator "fac-1".
+func defaultSessions() *fakeSessionRepo {
+	s := newFakeSessionRepo()
+	sess := &entity.Session{}
+	sess.ID = testSessionID
+	s.sessions[testSessionID] = sess
+
+	part := &entity.Participant{}
+	part.ID = testParticipantID
+	tenant := testTenantID
+	part.TenantID = &tenant
+	gid := "group-1"
+	part.GroupID = &gid
+	s.participants[testParticipantID] = part
+
+	owner := "fac-1"
+	s.groupOwners[gid] = &owner
+	return s
+}
+
+// defaultPrograms seeds both test stages under program-1 (no tenant -> the
+// stage check passes whenever the caller tenant is unset).
+func defaultPrograms() *fakeProgramRepo {
+	p := newFakeProgramRepo()
+	for _, sid := range []string{testStageID, testStageID2} {
+		st := &entity.ProgramStage{ProgramID: "program-1"}
+		st.ID = sid
+		p.stages[sid] = st
+	}
+	p.programs["program-1"] = &entity.Program{}
+	return p
+}
+
+// newPickHandlerWith builds the handler over explicit fakes plus an in-process
+// echo (httptest, no DB/network).
+func newPickHandlerWith(
+	fake *fakePhotoRepo,
+	sessions *fakeSessionRepo,
+	consent *fakeConsentRepo,
+	programs *fakeProgramRepo,
+	uploadDir string,
+) (*handler.PhotoHandler, *echo.Echo) {
 	e := echo.New()
 	e.Validator = appmiddleware.NewValidator() // same validator the router installs
-	return handler.NewPhotoHandler(fake), e
+	h := handler.NewPhotoHandler(fake, sessions, consent, programs, &config.Config{UploadDir: uploadDir})
+	return h, e
+}
+
+// newPickHandler builds an in-process echo + PhotoHandler over the fake repo
+// with passing tenant/ownership/consent/stage defaults (the scenario tests
+// below override the context or fakes where they exercise a specific gate).
+func newPickHandler(fake *fakePhotoRepo) (*handler.PhotoHandler, *echo.Echo) {
+	return newPickHandlerWith(fake, defaultSessions(), &fakeConsentRepo{granted: true}, defaultPrograms(), os.TempDir())
 }
 
 // TestSetReportPick_ScopeValidation: a body whose participant/session does not

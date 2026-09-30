@@ -58,8 +58,11 @@ export function clearTokens(): void {
 export function setStoredUser(user: unknown): void {
   try {
     sessionStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user))
-  } catch {
-    // sessionStorage may be unavailable (e.g. private mode); ignore.
+  } catch (err) {
+    // sessionStorage may be unavailable (e.g. private mode). Return semantics
+    // stay void, but the failure must be recorded — a dropped write means the
+    // session vanishes on reload, which is otherwise impossible to diagnose.
+    console.error('setStoredUser: failed to persist user to sessionStorage', err)
   }
 }
 
@@ -67,7 +70,8 @@ export function getStoredUser<T = unknown>(): T | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEYS.USER)
     return raw ? (JSON.parse(raw) as T) : null
-  } catch {
+  } catch (err) {
+    console.warn('getStoredUser: failed to read user from sessionStorage', err)
     return null
   }
 }
