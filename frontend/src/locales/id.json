@@ -1244,6 +1244,7 @@
       "frameLoadError": "Gagal memuat data frame. Periksa koneksi lalu coba lagi.",
       "photoLoadError": "Gagal memuat data foto. Periksa koneksi lalu coba lagi.",
       "frameFallbackToast": "Gagal memuat frame. Foto ditampilkan tanpa frame.",
+      "composeError": "Gagal memproses foto hasil jepretan. Silakan ambil foto lagi.",
       "notInSession": "Peserta belum masuk sesi",
       "maxPhotos": "Maksimal {{max}} foto per anak",
       "consentRequired": "Izin foto belum diberikan",
@@ -1282,6 +1283,7 @@
       "front": "Kamera Depan",
       "flip": "Balik",
       "grid": "Grid",
+      "mirror": "Cermin",
       "emptyDesc": "Tidak ada kelompok aktif dengan peserta untuk difoto.",
       "noConsentBadge": "Tidak ada izin",
       "errDenied": "Izin kamera ditolak. Izinkan akses kamera di pengaturan browser.",
@@ -1289,7 +1291,8 @@
       "errNotFound": "Tidak ada kamera yang terdeteksi. Pasang webcam lalu coba lagi.",
       "errResolution": "Kamera tidak mendukung resolusi yang diminta. Coba pilih kamera lain.",
       "errAborted": "Akses kamera dibatalkan. Coba lagi.",
-      "errGeneric": "Gagal mengakses kamera. Periksa koneksi webcam atau berikan izin."
+      "errGeneric": "Gagal mengakses kamera. Periksa koneksi webcam atau berikan izin.",
+      "errStreamEnded": "Kamera berhenti secara tak terduga. Periksa sambungan kamera, lalu coba lagi."
     },
     "frame": { "none": "Tanpa Frame", "frameWord": "Frame" },
     "group": {

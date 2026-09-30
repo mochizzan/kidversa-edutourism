@@ -14,24 +14,76 @@ export function useCamera({ enabled }: UseCameraOptions) {
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  // 'ended' listeners attached to the tracks of the CURRENT stream, so they
+  // can be detached explicitly on any intentional stop/teardown (no leaks).
+  const trackListenersRef = useRef<Array<{ track: MediaStreamTrack; handler: () => void }>>([])
   const mountedRef = useRef(true)
   const cancelledRef = useRef(false)
 
   const [cameraState, setCameraState] = useState<CameraState>('loading')
+  // Human-readable reason for the current 'denied'/'error' state — shown in
+  // the viewport overlay (the toast alone disappears; the state must not).
+  const [cameraErrorMessage, setCameraErrorMessage] = useState<string | null>(null)
   const [facingMode, setFacingMode] = useState<FacingMode>('environment')
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
-  const [needsCameraRestart, setNeedsCameraRestart] = useState(false)
+  // Monotonic counter: every restartCamera() bumps it, so the start effect
+  // re-runs once per click — even when a previous restart failed and the
+  // camera never reaches 'active' again (a boolean flag would stick at true).
+  const [restartTick, setRestartTick] = useState(0)
 
+  const clearTrackListeners = useCallback(() => {
+    for (const { track, handler } of trackListenersRef.current) {
+      track.removeEventListener('ended', handler)
+    }
+    trackListenersRef.current = []
+  }, [])
+
+  // Intentional stop (capture, retake, restart, disable, unmount): detach the
+  // 'ended' listeners and null the stream BEFORE stopping the tracks, so
+  // neither a synchronously dispatched nor an async 'ended' from a stopped
+  // track can be mistaken for a live stream failure.
   const stopStream = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
+    clearTrackListeners()
+    const stream = streamRef.current
+    streamRef.current = null
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop())
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
-  }, [])
+  }, [clearTrackListeners])
+
+  // Live-stream death (device unplugged, OS revoked access, source stalled):
+  // a track ends while WE still own the stream. The identity check keeps
+  // intentional stops (which null streamRef first) out of this path.
+  const handleStreamEnded = useCallback(
+    (stream: MediaStream) => {
+      if (streamRef.current !== stream) return
+      clearTrackListeners()
+      streamRef.current = null
+      if (videoRef.current) {
+        videoRef.current.srcObject = null
+      }
+      const message = i18n.t('fasilitator.camera.errStreamEnded')
+      setCameraState('error')
+      setCameraErrorMessage(message)
+      addToast({ type: 'error', message, duration: 6000 })
+    },
+    [addToast, clearTrackListeners],
+  )
+
+  const attachStream = useCallback(
+    (stream: MediaStream) => {
+      stream.getTracks().forEach((track) => {
+        const handler = () => handleStreamEnded(stream)
+        track.addEventListener('ended', handler)
+        trackListenersRef.current.push({ track, handler })
+      })
+    },
+    [handleStreamEnded],
+  )
 
   useEffect(() => {
     mountedRef.current = true
@@ -39,13 +91,7 @@ export function useCamera({ enabled }: UseCameraOptions) {
 
     if (!enabled) return
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
+    stopStream()
 
     const handleCameraError = async (e: DOMException) => {
       try {
@@ -88,6 +134,7 @@ export function useCamera({ enabled }: UseCameraOptions) {
       }
 
       if (toastMessage) {
+        setCameraErrorMessage(toastMessage)
         addToast({
           type:
             e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError'
@@ -101,6 +148,7 @@ export function useCamera({ enabled }: UseCameraOptions) {
 
     const start = async () => {
       setCameraState('loading')
+      setCameraErrorMessage(null)
 
       try {
         try {
@@ -142,16 +190,22 @@ export function useCamera({ enabled }: UseCameraOptions) {
           }
         }
 
+        if (gotStream && streamRef.current) {
+          attachStream(streamRef.current)
+        }
+
         if (!mountedRef.current) {
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach((t) => t.stop())
-            streamRef.current = null
-          }
+          stopStream()
           return
         }
 
         if (gotStream) {
-          setCameraState('active')
+          // A live-stream 'ended' during the awaits above nulls streamRef —
+          // don't clobber its 'error' state with a late 'active'.
+          if (streamRef.current) {
+            setCameraState('active')
+            setCameraErrorMessage(null)
+          }
           try {
             const allDevices = await navigator.mediaDevices.enumerateDevices()
             if (!mountedRef.current) return
@@ -174,15 +228,9 @@ export function useCamera({ enabled }: UseCameraOptions) {
     return () => {
       mountedRef.current = false
       cancelledRef.current = true
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop())
-        streamRef.current = null
-      }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null
-      }
+      stopStream()
     }
-  }, [enabled, facingMode, selectedDeviceId, needsCameraRestart, addToast])
+  }, [enabled, facingMode, selectedDeviceId, restartTick, addToast, stopStream, attachStream])
 
   useEffect(() => {
     if (cameraState !== 'active' || !enabled) return
@@ -195,12 +243,6 @@ export function useCamera({ enabled }: UseCameraOptions) {
     }
   }, [cameraState, enabled])
 
-  useEffect(() => {
-    if (needsCameraRestart && cameraState === 'active') {
-      setNeedsCameraRestart(false)
-    }
-  }, [needsCameraRestart, cameraState])
-
   const switchCamera = useCallback(() => {
     setSelectedDeviceId('')
     setFacingMode((f) => (f === 'environment' ? 'user' : 'environment'))
@@ -211,13 +253,14 @@ export function useCamera({ enabled }: UseCameraOptions) {
   }, [])
 
   const restartCamera = useCallback(() => {
-    setNeedsCameraRestart(true)
+    setRestartTick((n) => n + 1)
   }, [])
 
   return {
     videoRef,
     streamRef,
     cameraState,
+    cameraErrorMessage,
     devices,
     selectedDeviceId,
     facingMode,

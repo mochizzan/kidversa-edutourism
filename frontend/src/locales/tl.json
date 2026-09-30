@@ -1259,6 +1259,7 @@
       "frameLoadError": "Nabigong i-load ang data ng frame. Suriin ang koneksyon at subukan muli.",
       "photoLoadError": "Nabigong i-load ang data ng larawan. Suriin ang koneksyon at subukan muli.",
       "frameFallbackToast": "Nabigong i-load ang frame. Ipinapakita ang larawan nang walang frame.",
+      "composeError": "Nabigong iproses ang nakuhang larawan. Mangyaring kumuha muli ng larawan.",
       "notInSession": "Hindi pa nakakapasok ang kalahok sa session",
       "maxPhotos": "Maximum na {{max}} na larawan bawat bata",
       "consentRequired": "Hindi pa naibibigay ang pahintulot sa larawan",
@@ -1297,6 +1298,7 @@
       "front": "Front Camera",
       "flip": "I-flip",
       "grid": "Grid",
+      "mirror": "Salamin",
       "emptyDesc": "Walang aktibong grupo na may mga kalahok na kukunan ng larawan.",
       "noConsentBadge": "Walang pahintulot",
       "errDenied": "Tinanggihan ang pahintulot sa camera. Payagan ang access sa camera sa mga setting ng browser.",
@@ -1304,7 +1306,8 @@
       "errNotFound": "Walang nakitang camera. Ikabit ang webcam at subukan muli.",
       "errResolution": "Hindi sinusuportahan ng camera ang hiniling na resolution. Subukang pumili ng ibang camera.",
       "errAborted": "Kinansela ang access sa camera. Subukan muli.",
-      "errGeneric": "Nabigong i-access ang camera. Suriin ang koneksyon ng webcam o magbigay ng pahintulot."
+      "errGeneric": "Nabigong i-access ang camera. Suriin ang koneksyon ng webcam o magbigay ng pahintulot.",
+      "errStreamEnded": "Biglang huminto ang camera. Suriin ang koneksyon ng camera, pagkatapos subukan muli."
     },
     "frame": {
       "none": "Walang Frame",

@@ -1259,6 +1259,7 @@
       "frameLoadError": "Gagal memuatkan data bingkai. Periksa sambungan kemudian cuba lagi.",
       "photoLoadError": "Gagal memuatkan data foto. Periksa sambungan kemudian cuba lagi.",
       "frameFallbackToast": "Gagal memuatkan bingkai. Foto dipaparkan tanpa bingkai.",
+      "composeError": "Gagal memproses foto yang diambil. Silakan ambil foto semula.",
       "notInSession": "Peserta belum masuk sesi",
       "maxPhotos": "Maksimum {{max}} foto bagi setiap kanak-kanak",
       "consentRequired": "Kebenaran foto belum diberikan",
@@ -1297,6 +1298,7 @@
       "front": "Kamera Depan",
       "flip": "Balik",
       "grid": "Grid",
+      "mirror": "Cermin",
       "emptyDesc": "Tiada kumpulan aktif dengan peserta untuk difoto.",
       "noConsentBadge": "Tiada kebenaran",
       "errDenied": "Kebenaran kamera ditolak. Benarkan akses kamera dalam tetapan pelayar.",
@@ -1304,7 +1306,8 @@
       "errNotFound": "Tiada kamera dikesan. Pasang kamera web kemudian cuba lagi.",
       "errResolution": "Kamera tidak menyokong resolusi yang diminta. Cuba pilih kamera lain.",
       "errAborted": "Akses kamera dibatalkan. Cuba lagi.",
-      "errGeneric": "Gagal mengakses kamera. Periksa sambungan kamera web atau berikan kebenaran."
+      "errGeneric": "Gagal mengakses kamera. Periksa sambungan kamera web atau berikan kebenaran.",
+      "errStreamEnded": "Kamera berhenti secara tidak dijangka. Semak sambungan kamera, kemudian cuba lagi."
     },
     "frame": {
       "none": "Tanpa Bingkai",

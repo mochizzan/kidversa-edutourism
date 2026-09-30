@@ -1259,6 +1259,7 @@
       "frameLoadError": "Failed to load frame data. Check your connection and try again.",
       "photoLoadError": "Failed to load photo data. Check your connection and try again.",
       "frameFallbackToast": "Failed to load frame. Photo displayed without frame.",
+      "composeError": "Failed to process the captured photo. Please take the photo again.",
       "notInSession": "Participant has not joined the session",
       "maxPhotos": "Maximum {{max}} photos per child",
       "consentRequired": "Photo permission not granted",
@@ -1297,6 +1298,7 @@
       "front": "Front Camera",
       "flip": "Flip",
       "grid": "Grid",
+      "mirror": "Mirror",
       "emptyDesc": "No active groups with participants to photograph.",
       "noConsentBadge": "No permission",
       "errDenied": "Camera permission denied. Please allow camera access in your browser settings.",
@@ -1304,7 +1306,8 @@
       "errNotFound": "No camera detected. Connect a webcam and try again.",
       "errResolution": "Camera does not support the requested resolution. Try selecting another camera.",
       "errAborted": "Camera access cancelled. Try again.",
-      "errGeneric": "Failed to access camera. Check your webcam connection or grant permission."
+      "errGeneric": "Failed to access camera. Check your webcam connection or grant permission.",
+      "errStreamEnded": "The camera stopped unexpectedly. Check the camera connection, then try again."
     },
     "frame": {
       "none": "No Frame",

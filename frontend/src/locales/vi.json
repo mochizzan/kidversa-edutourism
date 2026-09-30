@@ -1259,6 +1259,7 @@
       "frameLoadError": "Tải dữ liệu khung hình thất bại. Kiểm tra kết nối và thử lại.",
       "photoLoadError": "Tải dữ liệu ảnh thất bại. Kiểm tra kết nối và thử lại.",
       "frameFallbackToast": "Tải khung hình thất bại. Ảnh được hiển thị không có khung.",
+      "composeError": "Xử lý ảnh vừa chụp thất bại. Vui lòng chụp lại ảnh.",
       "notInSession": "Người tham gia chưa vào phiên",
       "maxPhotos": "Tối đa {{max}} ảnh mỗi trẻ",
       "consentRequired": "Chưa cấp quyền chụp ảnh",
@@ -1297,6 +1298,7 @@
       "front": "Kamera Depan",
       "flip": "Balik",
       "grid": "Grid",
+      "mirror": "Gương",
       "emptyDesc": "Tidak ada kelompok aktif dengan peserta untuk difoto.",
       "noConsentBadge": "Tidak ada izin",
       "errDenied": "Izin kamera ditolak. Izinkan akses kamera di pengaturan browser.",
@@ -1304,7 +1306,8 @@
       "errNotFound": "Tidak ada kamera yang terdeteksi. Pasang webcam lalu coba lagi.",
       "errResolution": "Kamera tidak mendukung resolusi yang diminta. Coba pilih kamera lain.",
       "errAborted": "Akses kamera dibatalkan. Coba lagi.",
-      "errGeneric": "Gagal mengakses kamera. Periksa koneksi webcam atau berikan izin."
+      "errGeneric": "Gagal mengakses kamera. Periksa koneksi webcam atau berikan izin.",
+      "errStreamEnded": "Camera đã dừng đột ngột. Kiểm tra kết nối camera rồi thử lại."
     },
     "frame": {
       "none": "Tanpa Bingkai",

@@ -17,6 +17,7 @@ import { useGroupOwnership } from '../hooks/useGroupOwnership'
 import { CameraViewport } from '../components/CameraViewport'
 import { PhotoEditor } from '../components/PhotoEditor'
 import { FramePicker } from '../components/FramePicker'
+import { computeCaptureCrop, composePhoto, drawVideoCrop } from '../utils/photoCapture'
 import type { PhotoFrame, Participant } from '../../../core/types'
 
 /**
@@ -51,14 +52,18 @@ const SmartPhotoPage = () => {
 
  const captureCanvasRef = useRef<HTMLCanvasElement>(null)
  const editorCanvasRef = useRef<HTMLCanvasElement>(null)
+ // Id of the frame actually drawn into the editor canvas (null = frame-free
+ // base). Kept in sync with the canvas pixels by the compose effect so the
+ // uploaded `frame_id` always matches what is inside the saved JPEG.
+ const composedFrameIdRef = useRef<string | null>(null)
 
  const [phase, setPhase] = useState<'camera' | 'editor'>('camera')
  const [pageError, setPageError] = useState<string | null>(null)
  const [cameraPickerOpen, setCameraPickerOpen] = useState(false)
  const [showGrid, setShowGrid] = useState(false)
-
- const [isMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 1024)
- const [isDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth > 1024)
+ // Horizontally mirror the preview; the capture flips identically so the
+ // saved photo always matches what the user saw. Persists across retakes.
+ const [mirror, setMirror] = useState(false)
 
  const [frames, setFrames] = useState<PhotoFrame[]>([])
  const [activeFrames, setActiveFrames] = useState<PhotoFrame[]>([])
@@ -81,14 +86,14 @@ const SmartPhotoPage = () => {
 
  const {
   videoRef,
-  streamRef,
   cameraState,
+  cameraErrorMessage,
   devices,
   selectedDeviceId,
-  facingMode,
   switchCamera,
   selectDevice,
   restartCamera,
+  stopStream,
  } = useCamera({ enabled: phase === 'camera' && !!participant?.consent_photo })
 
  const { photos, loadPhotos, uploadPhoto } = useSmartPhotos(childId, participant)
@@ -157,29 +162,45 @@ const SmartPhotoPage = () => {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   let cancelled = false
-  const draw = async () => {
-   const img = await loadImage(capturedPhotoDataUrl)
-   if (cancelled) return
-   canvas.width = img.width
-   canvas.height = img.height
-   ctx.drawImage(img, 0, 0)
-   if (selectedFrameId) {
+  const compose = async () => {
+   try {
+    const baseImg = await loadImage(capturedPhotoDataUrl)
+    if (cancelled) return
+    canvas.width = baseImg.width
+    canvas.height = baseImg.height
+    // Always recompose from the frame-free base: changing or clearing the
+    // frame redraws base (+ frame) instead of stacking a frame on top of an
+    // already-composed image — the canvas holds ONE whole photo at all times.
+    composePhoto(ctx, { base: baseImg })
+    composedFrameIdRef.current = null
+    if (!selectedFrameId) return
     const frame = frames.find((f) => f.id === selectedFrameId)
-    if (frame?.file_url) {
-     try {
-      const frameImg = await loadImage(
-       getMediaUrl('frame', frame.id),
-      )
-      if (!cancelled) ctx.drawImage(frameImg, 0, 0, canvas.width, canvas.height)
-     } catch {
-      if (!cancelled) {
-       addToast({ type: 'warning', message: t('fasilitator.photos.frameFallbackToast') })
-      }
+    if (!frame?.file_url) {
+     // Selected frame has no image to draw — never a silent path: warn and
+     // fall back to the frame-free base (already on the canvas).
+     console.warn('[SmartPhotoPage] selected frame has no image; saving frame-free', selectedFrameId)
+     addToast({ type: 'warning', message: t('fasilitator.photos.frameFallbackToast') })
+     return
+    }
+    try {
+     const frameImg = await loadImage(getMediaUrl('frame', frame.id))
+     if (cancelled) return
+     composePhoto(ctx, { base: baseImg, frame: frameImg })
+     composedFrameIdRef.current = frame.id
+    } catch (err) {
+     if (!cancelled) {
+      console.warn('[SmartPhotoPage] frame image failed to load; saving frame-free', err)
+      addToast({ type: 'warning', message: t('fasilitator.photos.frameFallbackToast') })
      }
+    }
+   } catch (err) {
+    if (!cancelled) {
+     console.error('[SmartPhotoPage] failed to compose the captured photo', err)
+     addToast({ type: 'error', message: t('fasilitator.photos.composeError') })
     }
    }
   }
-  draw()
+  compose()
   return () => {
    cancelled = true
   }
@@ -189,45 +210,25 @@ const SmartPhotoPage = () => {
   if (!videoRef.current || !captureCanvasRef.current || !user || !isMine) return
   const video = videoRef.current
   const canvas = captureCanvasRef.current
-  const isPortrait = window.innerWidth <= 1024
+  // Always a centered 9:16 crop of the video, regardless of viewport size.
+  const crop = computeCaptureCrop(video.videoWidth, video.videoHeight)
 
-  let captureWidth: number
-  let captureHeight: number
-
-  if (isPortrait) {
-   captureHeight = video.videoHeight
-   captureWidth = Math.round(video.videoHeight * (9 / 16))
-   if (captureWidth > video.videoWidth) {
-    captureWidth = video.videoWidth
-    captureHeight = Math.round(video.videoWidth * (16 / 9))
-   }
-  } else {
-   captureWidth = video.videoWidth
-   captureHeight = Math.round(video.videoWidth * (9 / 16))
-   if (captureHeight > video.videoHeight) {
-    captureHeight = video.videoHeight
-    captureWidth = Math.round(video.videoHeight * (16 / 9))
-   }
-  }
-
-  canvas.width = captureWidth
-  canvas.height = captureHeight
+  canvas.width = crop.sw
+  canvas.height = crop.sh
   const ctx = canvas.getContext('2d')
   if (!ctx) return
-  const offsetX = (video.videoWidth - captureWidth) / 2
-  const offsetY = (video.videoHeight - captureHeight) / 2
-  ctx.drawImage(video, offsetX, offsetY, captureWidth, captureHeight, 0, 0, captureWidth, captureHeight)
+  drawVideoCrop(ctx, video, crop, mirror)
   const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+  composedFrameIdRef.current = null
   setCapturedPhotoDataUrl(dataUrl)
   setPhase('editor')
   setIsReportPhoto(false)
 
-  if (streamRef.current) {
-   streamRef.current.getTracks().forEach((t) => t.stop())
-   streamRef.current = null
-  }
-  video.srcObject = null
- }, [user, isMine, videoRef, streamRef])
+  // Intentional stop: the hook detaches its stream-death listeners and nulls
+  // the stream before stopping the tracks, so ending the preview here can
+  // never surface as a live-stream error toast.
+  stopStream()
+ }, [user, isMine, videoRef, stopStream, mirror])
 
  const handleRetake = useCallback(() => {
   setCapturedPhotoDataUrl(null)
@@ -249,13 +250,29 @@ const SmartPhotoPage = () => {
   // closure bug where `participant` was captured as null on first render.
   const currentParticipant = participantRef.current
   const currentIsMine = isMineRef.current
-  if (!editorCanvasRef.current || !childId || !currentParticipant || !user || !currentIsMine) return
+  if (!editorCanvasRef.current || !childId || !currentParticipant || !user || !currentIsMine) {
+   // Defensive guard, not a user-reachable error: the editor only renders
+   // with a participant/canvas. Logged so a future regression isn't silent.
+   console.warn('[SmartPhotoPage] save skipped: editor context not ready', {
+    hasCanvas: !!editorCanvasRef.current,
+    hasChildId: !!childId,
+    hasParticipant: !!currentParticipant,
+    hasUser: !!user,
+    isMine: currentIsMine,
+   })
+   return
+  }
   if (!currentParticipant.session_id) {
    addToast({ type: 'error', message: t('fasilitator.photos.notInSession') })
    return
   }
   setIsSaving(true)
   try {
+   // `frame_id` must match the pixels being blobbed: only the frame that was
+   // really composed into the canvas is reported (null = frame-free base).
+   // Reading the ref and starting toBlob happen in the same synchronous
+   // block, so a late frame load can't desync metadata from the image.
+   const frameId = composedFrameIdRef.current
    const blob = await new Promise<Blob | null>((resolve) =>
     editorCanvasRef.current!.toBlob(resolve, 'image/jpeg', 0.9),
    )
@@ -266,7 +283,7 @@ const SmartPhotoPage = () => {
     participant: currentParticipant,
     takenBy: user.id,
     blob,
-    frameId: selectedFrameId,
+    frameId,
     isReportPhoto,
    })
 
@@ -292,7 +309,7 @@ const SmartPhotoPage = () => {
   } finally {
    setIsSaving(false)
   }
- }, [childId, user, selectedFrameId, isReportPhoto, uploadPhoto, addToast, navigate])
+ }, [childId, user, isReportPhoto, uploadPhoto, addToast, navigate])
 
  const handleBack = useCallback(() => {
   if (phase === 'editor') {
@@ -303,9 +320,6 @@ const SmartPhotoPage = () => {
  }, [phase, navigate, handleRetake])
 
  const currentCameraLabel = (() => {
-  if (window.innerWidth <= 1024) {
-   return facingMode === 'environment' ? t('fasilitator.camera.back') : t('fasilitator.camera.front')
-  }
   if (!selectedDeviceId) return t('fasilitator.camera.auto')
   const device = devices.find((d) => d.deviceId === selectedDeviceId)
   return device?.label || t('fasilitator.camera.deviceFallback')
@@ -392,11 +406,13 @@ const SmartPhotoPage = () => {
      </div>
     </div>
 
-    <div className="relative aspect-[9/16] md:h-[504px] md:aspect-auto w-full md:max-w-4xl md:mx-auto rounded-3xl overflow-hidden bg-black shadow-md border border-slate-200">
+    <div className="relative aspect-[9/16] w-full max-w-[min(56.25dvh,56rem)] md:mx-auto rounded-3xl overflow-hidden bg-black shadow-md border border-slate-200">
      {phase === 'camera' && (
       <CameraViewport
        videoRef={videoRef}
        cameraState={cameraState}
+       cameraErrorMessage={cameraErrorMessage}
+       onRetryCamera={restartCamera}
        showGrid={showGrid}
        pageError={pageError}
        onRetryLoad={() => {
@@ -404,8 +420,6 @@ const SmartPhotoPage = () => {
         loadInitialData()
        }}
        participant={participant}
-       isMobile={isMobile}
-       isDesktop={isDesktop}
        devices={devices}
        selectedDeviceId={selectedDeviceId}
        currentCameraLabel={currentCameraLabel}
@@ -415,6 +429,8 @@ const SmartPhotoPage = () => {
        onDeviceChange={selectDevice}
        onSwitchCamera={switchCamera}
        onToggleGrid={() => setShowGrid((v) => !v)}
+       mirror={mirror}
+       onToggleMirror={() => setMirror((v) => !v)}
        photoCount={photoCount}
        maxPhotos={MAX_PHOTOS}
        isMaxPhotos={isMaxPhotos}
@@ -424,6 +440,15 @@ const SmartPhotoPage = () => {
        }}
        onOpenFramePicker={() => setFramePickerOpen(true)}
        disabled={!isMine}
+      />
+     )}
+
+     {phase === 'camera' && selectedFrameId && (
+      <img
+       src={getMediaUrl('frame', selectedFrameId)}
+       alt=""
+       className="absolute inset-0 w-full h-full object-fill z-[6] pointer-events-none"
+       onError={() => addToast({ type: 'warning', message: t('fasilitator.photos.frameFallbackToast') })}
       />
      )}
 

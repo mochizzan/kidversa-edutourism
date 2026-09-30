@@ -1259,6 +1259,7 @@
       "frameLoadError": "加载相框数据失败。请检查网络后重试。",
       "photoLoadError": "加载照片数据失败。请检查网络后重试。",
       "frameFallbackToast": "加载相框失败。照片将以无相框形式显示。",
+      "composeError": "处理拍摄的照片失败。请重新拍摄照片。",
       "notInSession": "参与者尚未进入课程",
       "maxPhotos": "每位儿童最多 {{max}} 张照片",
       "consentRequired": "尚未授予照片权限",
@@ -1297,6 +1298,7 @@
       "front": "前置摄像头",
       "flip": "翻转",
       "grid": "网格",
+      "mirror": "镜像",
       "emptyDesc": "没有可供拍照的活跃群组。",
       "noConsentBadge": "无权限",
       "errDenied": "相机权限被拒绝。请在浏览器设置中允许相机访问。",
@@ -1304,7 +1306,8 @@
       "errNotFound": "未检测到相机。请连接网络摄像头后再试。",
       "errResolution": "相机不支持所请求的分辨率。请尝试选择其他相机。",
       "errAborted": "相机访问已取消。请重试。",
-      "errGeneric": "无法访问相机。请检查网络摄像头连接或授予权限。"
+      "errGeneric": "无法访问相机。请检查网络摄像头连接或授予权限。",
+      "errStreamEnded": "相机意外停止。请检查相机连接后重试。"
     },
     "frame": {
       "none": "无相框",

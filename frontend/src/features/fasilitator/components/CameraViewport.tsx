@@ -7,23 +7,25 @@ import {
   RefreshCw,
   LayoutGrid,
   Image,
+  FlipHorizontal,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../../shared/components/ui/Button'
 import { cn } from '../../../core/utils'
-import { CircleControlBtn } from './CircleControlBtn'
 import type { CameraState } from '../hooks/useCamera'
 import type { Participant } from '../../../core/types'
 
 interface CameraViewportProps {
   videoRef: RefObject<HTMLVideoElement | null>
   cameraState: CameraState
+  // Reason behind the current denied/error state — rendered in the overlay
+  // so the failure stays visible after the toast expires.
+  cameraErrorMessage: string | null
+  onRetryCamera: () => void
   showGrid: boolean
   pageError: string | null
   onRetryLoad: () => void
   participant: Participant
-  isMobile: boolean
-  isDesktop: boolean
   devices: MediaDeviceInfo[]
   selectedDeviceId: string
   currentCameraLabel: string
@@ -33,6 +35,8 @@ interface CameraViewportProps {
   onDeviceChange: (deviceId: string) => void
   onSwitchCamera: () => void
   onToggleGrid: () => void
+  mirror: boolean
+  onToggleMirror: () => void
   photoCount: number
   maxPhotos: number
   isMaxPhotos: boolean
@@ -45,12 +49,12 @@ interface CameraViewportProps {
 export const CameraViewport = ({
   videoRef,
   cameraState,
+  cameraErrorMessage,
+  onRetryCamera,
   showGrid,
   pageError,
   onRetryLoad,
   participant,
-  isMobile,
-  isDesktop,
   devices,
   selectedDeviceId,
   currentCameraLabel,
@@ -60,6 +64,8 @@ export const CameraViewport = ({
   onDeviceChange,
   onSwitchCamera,
   onToggleGrid,
+  mirror,
+  onToggleMirror,
   photoCount,
   maxPhotos,
   isMaxPhotos,
@@ -93,6 +99,7 @@ export const CameraViewport = ({
         autoPlay
         playsInline
         muted
+        style={mirror ? { transform: 'scaleX(-1)' } : undefined}
         className={cn(
           'absolute inset-0 w-full h-full object-cover object-center z-0',
           cameraState === 'active' ? 'opacity-100' : 'opacity-0',
@@ -115,13 +122,21 @@ export const CameraViewport = ({
       )}
 
       {(cameraState === 'denied' || cameraState === 'error') && (
-        <div className="absolute top-14 left-4 z-10 flex items-center gap-1.5 backdrop-blur-md bg-error/20 border border-error/30 text-white/90 px-3 py-1 rounded-full text-[10px] font-bold shadow-lg">
-          <AlertTriangle className="w-3 h-3" />
-          {t('fasilitator.camera.errorBadge')}
+        <div
+          role="alert"
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 p-8 bg-on-surface text-white text-center"
+        >
+          <AlertTriangle className="w-12 h-12 text-error" />
+          <p className="text-sm font-medium text-white/90 max-w-[320px]">
+            {cameraErrorMessage || t('fasilitator.camera.errGeneric')}
+          </p>
+          <Button variant="secondary" onClick={onRetryCamera}>
+            {t('fasilitator.photos.retry')}
+          </Button>
         </div>
       )}
 
-      {cameraState !== 'loading' && isDesktop && devices.length > 0 && (
+      {cameraState !== 'loading' && (
         <div className="absolute top-4 right-4 z-10">
           <button
             onClick={onToggleCameraPicker}
@@ -136,43 +151,88 @@ export const CameraViewport = ({
             <>
               <div className="fixed inset-0 z-40" onClick={onCloseCameraPicker} />
               <div className="absolute right-0 top-full mt-2 w-64 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50">
-                <div className="p-1.5 space-y-1">
+                {devices.length > 0 && (
+                  <div className="p-1.5 space-y-1">
+                    <button
+                      onClick={() => {
+                        onDeviceChange('')
+                        onCloseCameraPicker()
+                      }}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
+                        !selectedDeviceId
+                          ? 'bg-primary-container text-primary'
+                          : 'hover:bg-surface-container-low text-on-surface',
+                      )}
+                    >
+                      <Camera className="w-4 h-4 text-primary" />
+                      <span>{t('fasilitator.camera.auto')}</span>
+                    </button>
+                    {devices.map((device) => {
+                      const isSelected = selectedDeviceId === device.deviceId
+                      return (
+                        <button
+                          key={device.deviceId}
+                          onClick={() => {
+                            onDeviceChange(device.deviceId)
+                            onCloseCameraPicker()
+                          }}
+                          className={cn(
+                            'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold truncate',
+                            isSelected
+                              ? 'bg-primary-container text-primary'
+                              : 'hover:bg-surface-container-low text-on-surface',
+                          )}
+                        >
+                          <Monitor className="w-4 h-4 text-on-surface-variant" />
+                          <span className="truncate">{device.label || t('fasilitator.camera.deviceFallback')}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className={cn('p-1.5 space-y-1', devices.length > 0 && 'border-t border-slate-100')}>
                   <button
                     onClick={() => {
-                      onDeviceChange('')
+                      onSwitchCamera()
+                      onCloseCameraPicker()
+                    }}
+                    className="w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold hover:bg-surface-container-low text-on-surface"
+                  >
+                    <RefreshCw className="w-4 h-4 text-on-surface-variant" />
+                    <span>{t('fasilitator.camera.flip')}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onToggleGrid()
                       onCloseCameraPicker()
                     }}
                     className={cn(
                       'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
-                      !selectedDeviceId
+                      showGrid
                         ? 'bg-primary-container text-primary'
                         : 'hover:bg-surface-container-low text-on-surface',
                     )}
                   >
-                    <Camera className="w-4 h-4 text-primary" />
-                    <span>{t('fasilitator.camera.auto')}</span>
+                    <LayoutGrid className={cn('w-4 h-4', showGrid ? 'text-primary' : 'text-on-surface-variant')} />
+                    <span>{t('fasilitator.camera.grid')}</span>
                   </button>
-                  {devices.map((device) => {
-                    const isSelected = selectedDeviceId === device.deviceId
-                    return (
-                      <button
-                        key={device.deviceId}
-                        onClick={() => {
-                          onDeviceChange(device.deviceId)
-                          onCloseCameraPicker()
-                        }}
-                        className={cn(
-                          'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold truncate',
-                          isSelected
-                            ? 'bg-primary-container text-primary'
-                            : 'hover:bg-surface-container-low text-on-surface',
-                        )}
-                      >
-                        <Monitor className="w-4 h-4 text-on-surface-variant" />
-                        <span className="truncate">{device.label || t('fasilitator.camera.deviceFallback')}</span>
-                      </button>
-                    )
-                  })}
+                  <button
+                    onClick={() => {
+                      onToggleMirror()
+                      onCloseCameraPicker()
+                    }}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
+                      mirror
+                        ? 'bg-primary-container text-primary'
+                        : 'hover:bg-surface-container-low text-on-surface',
+                    )}
+                  >
+                    <FlipHorizontal className={cn('w-4 h-4', mirror ? 'text-primary' : 'text-on-surface-variant')} />
+                    <span>{t('fasilitator.camera.mirror')}</span>
+                  </button>
                 </div>
               </div>
             </>
@@ -180,15 +240,8 @@ export const CameraViewport = ({
         </div>
       )}
 
-      {cameraState !== 'loading' && isMobile && (
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-4">
-          <CircleControlBtn icon={RefreshCw} label={t('fasilitator.camera.flip')} onClick={onSwitchCamera} />
-          <CircleControlBtn icon={LayoutGrid} label={t('fasilitator.camera.grid')} onClick={onToggleGrid} active={showGrid} />
-        </div>
-      )}
-
       {cameraState !== 'loading' && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 w-[90%] md:w-[70%] max-w-md backdrop-blur-md bg-black/50 border border-white/15 rounded-full px-5 py-3 flex items-center justify-between gap-4 shadow-lg">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 w-[90%] max-w-md backdrop-blur-md bg-black/50 border border-white/15 rounded-full px-5 py-3 flex items-center justify-between gap-4 shadow-lg">
           <button
             onClick={onOpenGallery}
             className="flex items-center gap-1.5 text-xs font-extrabold text-white/80 hover:text-white transition-colors"
