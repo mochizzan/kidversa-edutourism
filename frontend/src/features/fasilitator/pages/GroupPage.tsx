@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, Monitor, User } from 'lucide-react'
+import { Users, /* Monitor, */ User } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
 import { SessionStatus } from '../../../core/types/enums'
 import { liveService } from '../../../core/services/live'
 import { ROUTES } from '../../../core/constants/app'
-import { kioskAccessPath } from '../../../core/constants/app'
-import { apiRequest } from '../../../core/services/backend-client'
-import { API_ROUTES } from '../../../core/constants/apiRoutes'
+// import { kioskAccessPath } from '../../../core/constants/app' // hidden: tombol Buka Kiosk
+// import { apiRequest } from '../../../core/services/backend-client' // hidden: tombol Buka Kiosk
+// import { API_ROUTES } from '../../../core/constants/apiRoutes' // hidden: tombol Buka Kiosk
 import { parentStageId, substagesOfStage } from '../../../core/utils/substage'
 import { assessmentService } from '../../../core/services/assessments'
 import { attendanceService } from '../../../core/services/attendance'
@@ -93,7 +93,7 @@ const GroupPage = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [sessionSubstages, setSessionSubstages] = useState<SessionSubstage[]>([])
   const [completing, setCompleting] = useState(false)
-  const [kioskLoading, setKioskLoading] = useState(false)
+  // const [kioskLoading, setKioskLoading] = useState(false) // hidden: tombol Buka Kiosk
   const [attendanceMap, setAttendanceMap] = useState<Map<string, boolean>>(new Map())
   const [attendanceLoading, setAttendanceLoading] = useState<Set<string>>(new Set())
 
@@ -287,47 +287,47 @@ const GroupPage = () => {
     })
   }
 
-  const handleOpenKiosk = async () => {
-    if (!groupDetail || !groupDetail.session.id) return
-    const sessionId = groupDetail.session.id
-    const stageId = openableStageId ?? groupDetail.group.current_session_stage_id
-    if (!stageId) {
-      addToast({ type: 'error', message: t('fasilitator.group.noActiveStage') })
-      return
-    }
-    // Edge case: kiosk token multi-use dan tidak pernah dikonsumsi (berlaku
-    // sampai TTL-nya habis). Jika sesi belum ACTIVE, konten mungkin kosong —
-    // beri peringatan, tapi tetap izinkan (backend tidak memblokir).
-    if (groupDetail.session.status !== 'ACTIVE') {
-      addToast({ type: 'info', message: t('fasilitator.group.sessionInactiveKiosk') })
-    }
-    setKioskLoading(true)
-    // Buka jendela SEBELUM await agar tidak terblokir popup blocker
-    // (browser hanya mengizinkan window.open dalam user-gesture sync).
-    const kioskUrl = `${kioskAccessPath(sessionId, stageId, groupId)}?token=`
-    const popup = window.open(kioskUrl, '_blank')
-    try {
-      const res = await apiRequest<{ data: { token: string } }>(
-        'POST',
-        API_ROUTES.AUTH.KIOSK,
-        { session_id: sessionId },
-      )
-      const token = res.data.token
-      const finalUrl = `${kioskAccessPath(sessionId, stageId, groupId)}?token=${encodeURIComponent(token)}`
-      if (popup) {
-        popup.location.href = finalUrl
-        popup.focus()
-      } else {
-        // Popup diblokir: fallback buka lewat anchor (user-gesture sudah lewat).
-        window.open(finalUrl, '_blank')
-      }
-    } catch (err) {
-      addToast({ type: 'error', message: friendlyError(err) })
-      popup?.close()
-    } finally {
-      setKioskLoading(false)
-    }
-  }
+  // const handleOpenKiosk = async () => { // hidden: tombol Buka Kiosk
+  //   if (!groupDetail || !groupDetail.session.id) return
+  //   const sessionId = groupDetail.session.id
+  //   const stageId = openableStageId ?? groupDetail.group.current_session_stage_id
+  //   if (!stageId) {
+  //     addToast({ type: 'error', message: t('fasilitator.group.noActiveStage') })
+  //     return
+  //   }
+  //   // Edge case: kiosk token multi-use dan tidak pernah dikonsumsi (berlaku
+  //   // sampai TTL-nya habis). Jika sesi belum ACTIVE, konten mungkin kosong —
+  //   // beri peringatan, tapi tetap izinkan (backend tidak memblokir).
+  //   if (groupDetail.session.status !== 'ACTIVE') {
+  //     addToast({ type: 'info', message: t('fasilitator.group.sessionInactiveKiosk') })
+  //   }
+  //   setKioskLoading(true)
+  //   // Buka jendela SEBELUM await agar tidak terblokir popup blocker
+  //   // (browser hanya mengizinkan window.open dalam user-gesture sync).
+  //   const kioskUrl = `${kioskAccessPath(sessionId, stageId, groupId)}?token=`
+  //   const popup = window.open(kioskUrl, '_blank')
+  //   try {
+  //     const res = await apiRequest<{ data: { token: string } }>(
+  //       'POST',
+  //       API_ROUTES.AUTH.KIOSK,
+  //       { session_id: sessionId },
+  //     )
+  //     const token = res.data.token
+  //     const finalUrl = `${kioskAccessPath(sessionId, stageId, groupId)}?token=${encodeURIComponent(token)}`
+  //     if (popup) {
+  //       popup.location.href = finalUrl
+  //       popup.focus()
+  //     } else {
+  //       // Popup diblokir: fallback buka lewat anchor (user-gesture sudah lewat).
+  //       window.open(finalUrl, '_blank')
+  //     }
+  //   } catch (err) {
+  //     addToast({ type: 'error', message: friendlyError(err) })
+  //     popup?.close()
+  //   } finally {
+  //     setKioskLoading(false)
+  //   }
+  // }
 
   const handleToggleAttendance = useCallback(async (participantId: string) => {
     if (!groupDetail) return
@@ -393,7 +393,7 @@ const GroupPage = () => {
   }
 
   const { group, participants, programStageName } = groupDetail
-  const openableStageId = groupDetail.sessionStage?.id ?? groupDetail.group.current_session_stage_id
+  // const openableStageId = groupDetail.sessionStage?.id ?? groupDetail.group.current_session_stage_id // hidden: tombol Buka Kiosk
   // PIC name is resolved server-side (Opsi B) and sent on each group, so it is
   // safe for any role that can open this page — no admin-only call needed.
   const facilitatorName = group.facilitator_name
@@ -419,19 +419,19 @@ const GroupPage = () => {
           { label: t('common.dashboard'), href: ROUTES.FASILITATOR.DASHBOARD },
           { label: group.name },
         ]}
-        actions={
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleOpenKiosk}
-            loading={kioskLoading}
-            disabled={!openableStageId || !isMine}
-            icon={<Monitor className="w-4 h-4" />}
-            className="shrink-0 whitespace-nowrap"
-          >
-            {t('fasilitator.group.openKiosk')}
-          </Button>
-        }
+      // actions={ // hidden: tombol Buka Kiosk
+      //   <Button
+      //     variant="primary"
+      //     size="sm"
+      //     onClick={handleOpenKiosk}
+      //     loading={kioskLoading}
+      //     disabled={!openableStageId || !isMine}
+      //     icon={<Monitor className="w-4 h-4" />}
+      //     className="shrink-0 whitespace-nowrap"
+      //   >
+      //     {t('fasilitator.group.openKiosk')}
+      //   </Button>
+      // }
       />
 
       {!isSessionActive && (
