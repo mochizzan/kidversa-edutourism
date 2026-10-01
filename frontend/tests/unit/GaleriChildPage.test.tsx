@@ -91,6 +91,14 @@ const photo = {
   taken_at: '2026-09-30T02:00:00Z',
 }
 
+// The photo tile itself is a role="button" whose name-from-content equals the
+// pick label, so filter to the real <button> elements for pick selectors.
+function getPickButtons(label = 'pilih foto untuk mini rapor') {
+  return screen
+    .getAllByRole('button', { name: label })
+    .filter((el): el is HTMLButtonElement => el.tagName === 'BUTTON')
+}
+
 async function renderChildPage() {
   const result = render(
     <MemoryRouter initialEntries={['/fasilitator/galeri/peserta/c-1']}>
@@ -150,14 +158,14 @@ describe('GaleriChildPage: actions and locks', () => {
     expect(screen.getByText('Belum ada foto untuk Budi')).toBeInTheDocument()
     expect(screen.getByText('0/10 foto')).toBeInTheDocument()
     // …and no per-photo actions exist without photos.
-    expect(screen.queryByRole('button', { name: 'Jadikan foto rapor' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'pilih foto untuk mini rapor' })).toBeNull()
     expect(screen.queryByText('Terjadi Kesalahan')).toBeNull()
   })
 
-  it('calls the report-pick service when picking a photo as foto rapor', async () => {
+  it('calls the report-pick service when picking a photo, then shows the Mini Rapor badge', async () => {
     await renderChildPage()
 
-    const pickButtons = screen.getAllByRole('button', { name: 'Jadikan foto rapor' })
+    const pickButtons = getPickButtons()
     expect(pickButtons.length).toBeGreaterThan(0)
     await act(async () => {
       fireEvent.click(pickButtons[0])
@@ -169,6 +177,13 @@ describe('GaleriChildPage: actions and locks', () => {
       program_stage_id: 'ps1',
       photo_id: 'ph-1',
     })
+
+    // Foto terpilih: badge teks "Mini Rapor" + tombol batal pilihan berlabel jelas
+    expect(screen.getByText('Mini Rapor')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'pilih foto untuk mini rapor' })).toBeNull()
+    expect(
+      screen.getAllByRole('button', { name: 'batalkan pilihan untuk mini rapor' }).length,
+    ).toBeGreaterThan(0)
   })
 
   it('disables the pick action with a visible reason when photo consent is missing', async () => {
@@ -319,7 +334,7 @@ describe('GaleriChildPage: failed photo loads and mutations surface readable err
 
     await renderChildPage()
 
-    const pickButtons = screen.getAllByRole('button', { name: 'Jadikan foto rapor' })
+    const pickButtons = getPickButtons()
     await act(async () => {
       fireEvent.click(pickButtons[0])
     })
@@ -350,5 +365,34 @@ describe('GaleriChildPage: failed photo loads and mutations surface readable err
     expect(
       screen.queryByText('Gagal terhubung ke server. Periksa koneksi internet Anda.'),
     ).toBeNull()
+  })
+
+  it('shows an error toast when report picks fail to load (never silent), keeping the grid usable', async () => {
+    vi.mocked(photoService.getReportPicks).mockRejectedValue(new TypeError('fetch failed'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+
+    try {
+      await renderChildPage()
+      await act(async () => { }) // drain the void loadPicks() rejection → toast
+
+      // The hook logs the cause and toasts picksLoadError — no silent swallow.
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[useSmartPhotos.loadPicks]',
+        expect.any(TypeError),
+      )
+      const errorToasts = useToastStore.getState().toasts.filter((t) => t.type === 'error')
+      expect(
+        errorToasts.some((t) => t.message === 'Gagal memuat pilihan foto rapor.'),
+      ).toBe(true)
+
+      // Picks degrade to an empty list: the photo grid still renders (no
+      // empty-state regression, no crash) and pick actions remain available.
+      expect(screen.getByText('Galeri Foto — Budi')).toBeInTheDocument()
+      expect(screen.getByText('1/10 foto')).toBeInTheDocument()
+      expect(getPickButtons().length).toBeGreaterThan(0)
+      expect(screen.queryByText('Terjadi Kesalahan')).toBeNull()
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })

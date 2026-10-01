@@ -2,34 +2,129 @@ package reports
 
 import (
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
 
+// Per-report lifecycle states inside one generate run (active_generate items).
+const (
+	GenerateItemQueued     = "queued"
+	GenerateItemProcessing = "processing"
+	GenerateItemSuccess    = "success"
+	GenerateItemError      = "error"
+)
+
+// Phases a worklist report moves through during a run: the narrative worker
+// (draft text) and the mission-selection pass (H's phase) run concurrently.
+const (
+	GeneratePhaseNarrative = "narrative"
+	GeneratePhaseMissions  = "missions"
+)
+
+// GenerateItem is one report's point-in-time state in an active run, as
+// exposed by the active_generate envelope (status derived from the two
+// phases — see deriveGenerateItem).
+type GenerateItem struct {
+	ReportID string
+	Status   string // queued|processing|success|error
+	Phase    string // narrative|missions — set while processing or on failure
+	Error    string // failure message when Status == error
+}
+
 // GenerateStatus is a point-in-time snapshot of an in-flight session generate
 // run, as exposed by the reports list envelope (active_generate).
 type GenerateStatus struct {
-	SessionID     string
-	TenantID      string
-	StartedAt     time.Time
+	SessionID string
+	TenantID  string
+	StartedAt time.Time
+	// QueuedIDs / ProcessingIDs are the NARRATIVE-phase views of the worklist
+	// (report whose draft text is still enqueued / being generated). They keep
+	// the pre-existing envelope semantics; Items carries the richer per-report
+	// state (narrative AND mission phase combined).
 	QueuedIDs     []string
 	ProcessingIDs []string
+	// Items is one entry per worklist report, sorted by report id.
+	Items []GenerateItem
+	// Aggregates over Items' derived status.
+	Total      int
+	Queued     int
+	Processing int
+	Succeeded  int
+	ErrorCount int
+	// Failed maps reportID → the derived per-item failure message (both
+	// phases). Entries live until end() drops the run, so a status consumer
+	// can report them for the whole run.
+	Failed map[string]string
 }
 
-// generateRun is one session's worklist during a blocking GenerateForSession.
+// generatePhase tracks one phase of a report within a run. The zero status
+// for the mission phase means "not applicable / not started" (a report that
+// already carries missions never enters it); the narrative phase is always
+// present because the worklist IS the narrative worklist.
+type generatePhase struct {
+	status string
+	err    string
+}
+
+// generateItem is the registry-side state of one worklist report.
+type generateItem struct {
+	narrative generatePhase
+	missions  generatePhase
+}
+
+// deriveGenerateItem folds the two phase states into the single
+// status+phase+error triple the envelope exposes. Priority: any phase error
+// wins (narrative message first, missions message appended), then narrative
+// progress (the primary work), then a still-running mission pass after the
+// narrative finished, then success.
+func deriveGenerateItem(it *generateItem) GenerateItem {
+	var out GenerateItem
+	nar, mis := it.narrative, it.missions
+	switch {
+	case nar.status == GenerateItemError || mis.status == GenerateItemError:
+		out.Status = GenerateItemError
+		switch {
+		case nar.status == GenerateItemError && mis.status == GenerateItemError:
+			out.Phase = GeneratePhaseNarrative
+			out.Error = strings.TrimSpace(nar.err + "; " + mis.err)
+		case nar.status == GenerateItemError:
+			out.Phase = GeneratePhaseNarrative
+			out.Error = nar.err
+		default:
+			out.Phase = GeneratePhaseMissions
+			out.Error = mis.err
+		}
+	case nar.status == GenerateItemProcessing:
+		out.Status = GenerateItemProcessing
+		out.Phase = GeneratePhaseNarrative
+	case nar.status == GenerateItemQueued:
+		out.Status = GenerateItemQueued
+	case mis.status == GenerateItemProcessing:
+		// Narrative done, mission pass still running.
+		out.Status = GenerateItemProcessing
+		out.Phase = GeneratePhaseMissions
+	default:
+		out.Status = GenerateItemSuccess
+	}
+	return out
+}
+
+// generateRun is one session's worklist during a generate run.
 type generateRun struct {
-	tenantID   string
-	startedAt  time.Time
-	queued     map[string]bool
-	processing map[string]bool
+	tenantID  string
+	startedAt time.Time
+	items     map[string]*generateItem // keyed by report id
 }
 
 // generateRegistry is the usecase-level, mutex-guarded source of truth for
-// per-report generation status. Rows are queued when the worklist is
-// enqueued, move to processing when the semaphore is acquired, and are removed
-// when their draft persist finishes (or the attempt errors). GenerateForSession
-// guarantees cleanup on every return path via defer end(), so a fresh process
-// (empty registry) always means "not generating" — persisted drafts win.
+// per-report generation status. Rows are registered as queued with the
+// worklist, move through processing to success/error per phase, and every
+// entry (including terminal ones) stays observable until end() drops the run
+// — so a status consumer can report per-item outcomes for the whole run.
+// GenerateForSession guarantees cleanup on every return path via defer end(),
+// so a fresh process (empty registry) always means "not generating" —
+// persisted evidence (draft + missions) wins.
 type generateRegistry struct {
 	mu   sync.Mutex
 	runs map[string]*generateRun // keyed by session ID
@@ -41,46 +136,100 @@ func newGenerateRegistry() *generateRegistry {
 
 // begin registers reportIDs as the queued worklist for a session, replacing
 // any stale run for that session (genMu upstream prevents overlap anyway).
+// An empty reportIDs registers an empty run — the handler uses that to expose
+// the run from the moment the 202 is returned, before the worker's begin()
+// replaces it with the real worklist.
 func (g *generateRegistry) begin(sessionID, tenantID string, reportIDs []string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	run := &generateRun{
-		tenantID:   tenantID,
-		startedAt:  time.Now().UTC(),
-		queued:     make(map[string]bool, len(reportIDs)),
-		processing: make(map[string]bool),
+		tenantID:  tenantID,
+		startedAt: time.Now().UTC(),
+		items:     make(map[string]*generateItem, len(reportIDs)),
 	}
 	for _, id := range reportIDs {
-		run.queued[id] = true
+		run.items[id] = &generateItem{narrative: generatePhase{status: GenerateItemQueued}}
 	}
 	g.runs[sessionID] = run
 }
 
-// markProcessing moves a report from queued to processing (semaphore acquired).
-// A missing run cannot happen while goroutines are alive (end() runs after
-// wg.Wait); the no-op keeps the worker path panic-free.
+// item returns the report's registry entry; nil when the run or the item is
+// missing (no-op keeps the worker path panic-free after end()).
+func (g *generateRegistry) item(sessionID, reportID string) *generateItem {
+	run := g.runs[sessionID]
+	if run == nil {
+		return nil
+	}
+	return run.items[reportID]
+}
+
+// markProcessing moves a report's narrative phase from queued to processing
+// (semaphore acquired). A missing run cannot happen while goroutines are
+// alive (end() runs after wg.Wait); the no-op keeps the worker path safe.
 func (g *generateRegistry) markProcessing(sessionID, reportID string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	run := g.runs[sessionID]
-	if run == nil {
-		return
+	if it := g.item(sessionID, reportID); it != nil && it.narrative.status == GenerateItemQueued {
+		it.narrative.status = GenerateItemProcessing
 	}
-	delete(run.queued, reportID)
-	run.processing[reportID] = true
 }
 
-// remove drops a report from the run (draft persisted, or attempt failed —
-// deferred in the worker so every exit path cleans up).
-func (g *generateRegistry) remove(sessionID, reportID string) {
+// markNarrativeSuccess records that the draft text was persisted for the
+// report (narrative phase terminal success).
+func (g *generateRegistry) markNarrativeSuccess(sessionID, reportID string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	run := g.runs[sessionID]
-	if run == nil {
-		return
+	if it := g.item(sessionID, reportID); it != nil && it.narrative.status == GenerateItemProcessing {
+		it.narrative.status = GenerateItemSuccess
 	}
-	delete(run.queued, reportID)
-	delete(run.processing, reportID)
+}
+
+// markNarrativeFailed records a per-item narrative failure (generation error
+// or persist error) with a clear message. The aggregate run error is still
+// returned by GenerateForSession — this only makes the failure observable
+// per report while the run is visible.
+func (g *generateRegistry) markNarrativeFailed(sessionID, reportID, msg string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if it := g.item(sessionID, reportID); it != nil && it.narrative.status != GenerateItemSuccess {
+		it.narrative.status = GenerateItemError
+		it.narrative.err = msg
+	}
+}
+
+// markMissionsProcessing records that the mission-selection pass started for
+// the report (phase channeling only — the mission logic itself lives in
+// GenerateForSession).
+func (g *generateRegistry) markMissionsProcessing(sessionID, reportID string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if it := g.item(sessionID, reportID); it != nil {
+		it.missions.status = GenerateItemProcessing
+	}
+}
+
+// markMissionsSuccess records that the mission selection was persisted
+// (ReplaceByReport) for the report.
+func (g *generateRegistry) markMissionsSuccess(sessionID, reportID string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if it := g.item(sessionID, reportID); it != nil && it.missions.status == GenerateItemProcessing {
+		it.missions.status = GenerateItemSuccess
+	}
+}
+
+// markFailed records a per-item mission-phase failure with a clear message
+// (empty mission bank, zero candidates, recommender error, or persist error).
+// The narrative attempt for the same report is unaffected — the item's
+// derived status just becomes error with phase=missions. A missing run is a
+// no-op so the worker path stays panic-free.
+func (g *generateRegistry) markFailed(sessionID, reportID, msg string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if it := g.item(sessionID, reportID); it != nil {
+		it.missions.status = GenerateItemError
+		it.missions.err = msg
+	}
 }
 
 // end drops the session's run entirely (deferred cleanup in GenerateForSession).
@@ -99,28 +248,66 @@ func (g *generateRegistry) status(sessionID, tenantID string) (GenerateStatus, b
 	if run == nil || run.tenantID != tenantID {
 		return GenerateStatus{}, false
 	}
-	return GenerateStatus{
+	st := GenerateStatus{
 		SessionID:     sessionID,
 		TenantID:      run.tenantID,
 		StartedAt:     run.startedAt,
-		QueuedIDs:     sortedIDSet(run.queued),
-		ProcessingIDs: sortedIDSet(run.processing),
-	}, true
-}
-
-// sortedIDSet returns the set's keys in deterministic (sorted) order; never nil
-// so the JSON envelope always renders [] rather than null.
-func sortedIDSet(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for id := range set {
-		out = append(out, id)
+		Items:         make([]GenerateItem, 0, len(run.items)),
+		Failed:        make(map[string]string),
+		QueuedIDs:     make([]string, 0, len(run.items)),
+		ProcessingIDs: make([]string, 0, len(run.items)),
 	}
-	sort.Strings(out)
-	return out
+	ids := make([]string, 0, len(run.items))
+	for id := range run.items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		it := run.items[id]
+		derived := deriveGenerateItem(it)
+		derived.ReportID = id
+		st.Items = append(st.Items, derived)
+		st.Total++
+		switch derived.Status {
+		case GenerateItemQueued:
+			st.Queued++
+		case GenerateItemProcessing:
+			st.Processing++
+		case GenerateItemSuccess:
+			st.Succeeded++
+		case GenerateItemError:
+			st.ErrorCount++
+			st.Failed[id] = derived.Error
+		}
+		// Legacy narrative-phase views (kept for the queued_ids /
+		// processing_ids envelope fields and existing consumers).
+		switch it.narrative.status {
+		case GenerateItemQueued:
+			st.QueuedIDs = append(st.QueuedIDs, id)
+		case GenerateItemProcessing:
+			st.ProcessingIDs = append(st.ProcessingIDs, id)
+		}
+	}
+	return st, true
 }
 
 // GenerateStatus exposes the live generation registry for a session. Reports
 // false after the run completes, errors out, or on a fresh process/restart.
 func (u *Usecase) GenerateStatus(sessionID, tenantID string) (GenerateStatus, bool) {
 	return u.genReg.status(sessionID, tenantID)
+}
+
+// BeginGenerateRun registers an empty run for the session so the reports
+// envelope (active_generate) is live from the moment the async generate POST
+// returns 202 — before the worker's own begin() replaces it with the real
+// worklist. Also guarantees the registry entry is dropped if the worker dies
+// before its begin() ran (EndGenerateRun below).
+func (u *Usecase) BeginGenerateRun(sessionID, tenantID string) {
+	u.genReg.begin(sessionID, tenantID, nil)
+}
+
+// EndGenerateRun drops any leftover registry entry for the session. Safe to
+// call after GenerateForSession already cleaned up (end() is idempotent).
+func (u *Usecase) EndGenerateRun(sessionID string) {
+	u.genReg.end(sessionID)
 }

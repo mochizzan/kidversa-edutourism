@@ -8,6 +8,15 @@ const gen = (queued_ids: string[], processing_ids: string[]): ReportGenerateOper
   started_at: '2026-09-30T00:00:00Z',
   queued_ids,
   processing_ids,
+  items: [
+    ...queued_ids.map((report_id) => ({ report_id, status: 'queued' as const })),
+    ...processing_ids.map((report_id) => ({ report_id, status: 'processing' as const })),
+  ],
+  total: queued_ids.length + processing_ids.length,
+  queued: queued_ids.length,
+  processing: processing_ids.length,
+  succeeded: 0,
+  failed: 0,
 })
 
 const send = (queued_ids: string[], sending_ids: string[]): ReportSendOperation => ({

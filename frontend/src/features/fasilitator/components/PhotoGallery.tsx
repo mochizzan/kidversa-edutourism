@@ -1,4 +1,4 @@
-import { Camera, FileText, Check, X, Trash2 } from 'lucide-react'
+import { Camera, FileText, X, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getMediaUrl } from '../../../core/utils/media'
 import type { SmartPhoto, Participant } from '../../../core/types'
@@ -70,11 +70,14 @@ export const PhotoGallery = ({
                   </span>
                 )}
                 {selected && (
-                  <span className="absolute top-2 right-2 z-10 rounded-full bg-primary p-1 text-white shadow">
-                    <Check className="h-3.5 w-3.5" />
+                  <span
+                    aria-label={t('fasilitator.photos.miniRaportBadge')}
+                    className="absolute top-2 right-2 z-10 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-white shadow"
+                  >
+                    {t('fasilitator.photos.miniRaportBadge')}
                   </span>
                 )}
-                <div className="absolute bottom-2 left-2 z-10 flex gap-1.5">
+                <div className="absolute bottom-2 left-2 right-2 z-10 flex items-end gap-1.5">
                   <button
                     type="button"
                     disabled={!canPick}
@@ -96,10 +99,12 @@ export const PhotoGallery = ({
                       e.stopPropagation()
                       onTogglePick(photo)
                     }}
-                    className={`rounded-full p-1.5 shadow-md transition ${selected ? 'bg-primary text-white' : 'bg-black/50 text-white hover:bg-black/70'
+                    className={`min-w-0 flex-1 rounded-lg px-2 py-1 text-left text-[10px] font-semibold leading-tight shadow-md transition ${selected ? 'bg-primary text-white hover:bg-primary/90' : 'bg-black/60 text-white hover:bg-black/70'
                       } disabled:cursor-not-allowed disabled:opacity-40`}
                   >
-                    {selected ? <X className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
+                    {selected
+                      ? t('fasilitator.photos.unpickPhoto')
+                      : t('fasilitator.photos.pickPhoto')}
                   </button>
                   <button
                     type="button"

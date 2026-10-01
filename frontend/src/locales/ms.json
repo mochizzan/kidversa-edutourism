@@ -318,7 +318,11 @@
       "rejected": "Ditolak",
       "queued": "Dalam Barisan",
       "processing": "Memproses",
-      "operationInterrupted": "Proses di pelayan telah terhenti"
+      "operationInterrupted": "Proses di pelayan telah terhenti",
+      "error": "Ralat",
+      "interrupted": "Terputus",
+      "phaseNarrative": "Naratif",
+      "phaseMissions": "Misi"
     },
     "reportStatus": {
       "draft": "Draf",
@@ -864,7 +868,7 @@
       "noAssessmentTip": "Lengkapkan penilaian terlebih dahulu di halaman Assessment",
       "incompleteTip": "Peserta belum mempunyai penilaian. Lengkapkan penilaian terlebih dahulu.",
       "generateResultTitle": "Hasil Penjanaan Laporan",
-      "generateOk": "Berjaya menjana <strong>{{count}} laporan</strong> untuk peserta yang sudah mempunyai penilaian.",
+      "generateOk": "Penjanaan dimulakan untuk <strong>{{count}} laporan</strong> — jejak kemajuan dalam senarai laporan di bawah.",
       "generateSkip": "Peserta berikut <strong>tidak dapat dijana</strong> kerana belum mempunyai data penilaian:",
       "understand": "Faham",
       "sendConfirmTitle": "Pengesahan Hantar Laporan",
@@ -1291,8 +1295,9 @@
       "deletePhoto": "Padam Foto",
       "deleteConfirm": "Yakin ingin memadam foto ini? Tindakan ini tidak boleh dibatalkan.",
       "deleteError": "Gagal memadam foto",
-      "pickPhoto": "Select as report photo",
-      "unpickPhoto": "Deselect report photo",
+      "pickPhoto": "pilih foto untuk mini rapor",
+      "unpickPhoto": "batalkan pilihan untuk mini rapor",
+      "miniRaportBadge": "Mini Rapor",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo",
       "reportBadge": "Foto Laporan"

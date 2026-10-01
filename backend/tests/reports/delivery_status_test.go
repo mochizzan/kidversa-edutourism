@@ -126,11 +126,13 @@ func (f *genRepo) Update(ctx context.Context, r *entity.Report) error {
 
 // blockingGen is a controllable NarrativeGenerator: every Generate call signals
 // started, then blocks on its own channel (released by the test) or fails
-// immediately when failAll is set.
+// immediately when failAll is set — or when the report id is listed in failIDs
+// (per-report narrative failure, for per-item registry tests).
 type blockingGen struct {
 	started chan string
 	blocks  map[string]chan struct{}
 	failAll bool
+	failIDs map[string]bool
 }
 
 func newBlockingGen(ids ...string) *blockingGen {
@@ -146,7 +148,7 @@ func (g *blockingGen) Generate(ctx context.Context, reportID, tenantID string) (
 	case g.started <- reportID:
 	default:
 	}
-	if g.failAll {
+	if g.failAll || g.failIDs[reportID] {
 		return "", errors.New("generation boom")
 	}
 	ch, ok := g.blocks[reportID]
@@ -465,6 +467,16 @@ func stringArray(t *testing.T, raw json.RawMessage) []string {
 	return out
 }
 
+// jsonFloat decodes a JSON number (envelope aggregates).
+func jsonFloat(t *testing.T, raw json.RawMessage) float64 {
+	t.Helper()
+	var f float64
+	if err := json.Unmarshal(raw, &f); err != nil {
+		t.Fatalf("not a JSON number: %s (%v)", string(raw), err)
+	}
+	return f
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -477,18 +489,24 @@ func equalStrings(a, b []string) bool {
 	return true
 }
 
-// TestListReportsActiveGenerateEnvelope: while the handler-level generate runs,
-// GET /api/reports carries active_generate with the exact contract keys;
-// it is tenant-filtered and vanishes when the run ends (and on a fresh
-// handler instance — restart semantics).
+// TestListReportsActiveGenerateEnvelope: while the background session generate
+// runs, GET /api/reports carries active_generate with the exact contract keys
+// (per-report items + aggregates included); it is tenant-filtered and vanishes
+// when the run ends (and on a fresh handler instance — restart semantics).
+// The POST itself must return 202 promptly — it never waits for the run.
 func TestListReportsActiveGenerateEnvelope(t *testing.T) {
 	repo := newGenRepo("p-a", "p-b", "p-c", "p-d", "p-e")
 	gen := newBlockingGen("r-p-a", "r-p-b", "r-p-c", "r-p-d", "r-p-e")
 	sess := &genSessionRepo{participants: newParticipants(5)}
 	h, e := newDeliveryHandlerFixture(repo, gen, sess, &gateMessenger{started: make(chan struct{}, 4), release: make(chan struct{})})
 
-	// POST /api/reports/generate blocks for the whole run → drive it in a goroutine.
-	runDone := make(chan error, 1)
+	// POST /api/reports/generate is async: it must answer 202 while the
+	// narrative workers are still blocked (proof the run is detached).
+	type postResult struct {
+		err  error
+		code int
+	}
+	runDone := make(chan postResult, 1)
 	go func() {
 		req := httptest.NewRequest(http.MethodPost, "/api/reports/generate",
 			strings.NewReader(`{"session_id":"`+genSessionID+`"}`))
@@ -496,8 +514,19 @@ func TestListReportsActiveGenerateEnvelope(t *testing.T) {
 		rec := httptest.NewRecorder()
 		c := e.NewContext(req, rec)
 		c.Set(appmiddleware.CtxTenantID, testTenantID)
-		runDone <- h.GenerateForSession(c)
+		runDone <- postResult{err: h.GenerateForSession(c), code: rec.Code}
 	}()
+	select {
+	case res := <-runDone:
+		if res.err != nil {
+			t.Fatalf("generate POST returned error: %v", res.err)
+		}
+		if res.code != http.StatusAccepted {
+			t.Fatalf("generate POST status = %d, want 202", res.code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("generate POST must return 202 without waiting for the run to finish")
+	}
 
 	started := waitStarted(t, gen, 3)
 
@@ -512,7 +541,8 @@ func TestListReportsActiveGenerateEnvelope(t *testing.T) {
 	if err := json.Unmarshal(data["active_generate"], &ag); err != nil {
 		t.Fatalf("invalid active_generate: %v", err)
 	}
-	requireExactKeys(t, ag, "session_id", "started_at", "queued_ids", "processing_ids")
+	requireExactKeys(t, ag, "session_id", "started_at", "queued_ids", "processing_ids",
+		"items", "total", "queued", "processing", "succeeded", "failed")
 	if got := jsonString(t, ag["session_id"]); got != genSessionID {
 		t.Errorf("session_id = %q, want %q", got, genSessionID)
 	}
@@ -525,6 +555,77 @@ func TestListReportsActiveGenerateEnvelope(t *testing.T) {
 	wantQueued := difference(t, allReportIDs(), started)
 	if got := stringArray(t, ag["queued_ids"]); !equalStrings(got, wantQueued) {
 		t.Errorf("queued_ids = %v, want %v", got, wantQueued)
+	}
+	// Per-report items: one entry per worklist report, each with a valid
+	// lifecycle status (narrative is still in flight, so only these appear).
+	var items []map[string]json.RawMessage
+	if err := json.Unmarshal(ag["items"], &items); err != nil {
+		t.Fatalf("invalid items: %v", err)
+	}
+	if len(items) != len(allReportIDs()) {
+		t.Fatalf("items len = %d, want %d", len(items), len(allReportIDs()))
+	}
+	itemIDs := make([]string, 0, len(items))
+	for _, it := range items {
+		id := jsonString(t, it["report_id"])
+		itemIDs = append(itemIDs, id)
+		status := jsonString(t, it["status"])
+		switch status {
+		case "queued", "processing", "error":
+		default:
+			t.Errorf("item %s status = %q, want queued|processing|error while the run is live", id, status)
+		}
+	}
+	sort.Strings(itemIDs)
+	if !equalStrings(itemIDs, allReportIDs()) {
+		t.Errorf("item report_ids = %v, want %v", itemIDs, allReportIDs())
+	}
+	// Aggregates are self-consistent (each item counts exactly once) and the
+	// run has not finished any narrative yet.
+	if got := jsonFloat(t, ag["total"]); got != 5 {
+		t.Errorf("total = %v, want 5", got)
+	}
+	if got := jsonFloat(t, ag["succeeded"]); got != 0 {
+		t.Errorf("succeeded = %v, want 0 (narrative workers are blocked)", got)
+	}
+	if q, p, f := jsonFloat(t, ag["queued"]), jsonFloat(t, ag["processing"]), jsonFloat(t, ag["failed"]); q+p+f != 5 {
+		t.Errorf("queued+processing+failed = %v+%v+%v, want 5", q, p, f)
+	}
+
+	// Deterministic terminal state: these topic-less reports fail the mission
+	// phase (topic_required), so every item ends as error/missions with a
+	// message — the envelope must surface phase + error per report.
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		data = listGET(t, h, e, testTenantID, genSessionID)
+		if err := json.Unmarshal(data["active_generate"], &ag); err != nil {
+			t.Fatalf("invalid active_generate: %v", err)
+		}
+		if jsonFloat(t, ag["failed"]) == 5 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timeout waiting for per-item mission failures (failed=%s)", string(ag["failed"]))
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if err := json.Unmarshal(ag["items"], &items); err != nil {
+		t.Fatalf("invalid items: %v", err)
+	}
+	for _, it := range items {
+		requireExactKeys(t, it, "report_id", "status", "phase", "error")
+		if got := jsonString(t, it["status"]); got != "error" {
+			t.Errorf("item %s status = %q, want error", jsonString(t, it["report_id"]), got)
+		}
+		if got := jsonString(t, it["phase"]); got != "missions" {
+			t.Errorf("item %s phase = %q, want missions", jsonString(t, it["report_id"]), got)
+		}
+		if msg := jsonString(t, it["error"]); !strings.Contains(msg, "topic_required") {
+			t.Errorf("item %s error = %q, want it to contain topic_required", jsonString(t, it["report_id"]), msg)
+		}
+	}
+	if q, p, s, f := jsonFloat(t, ag["queued"]), jsonFloat(t, ag["processing"]), jsonFloat(t, ag["succeeded"]), jsonFloat(t, ag["failed"]); q != 0 || p != 0 || s != 0 || f != 5 {
+		t.Errorf("aggregates queued/processing/succeeded/failed = %v/%v/%v/%v, want 0/0/0/5", q, p, s, f)
 	}
 
 	// Tenant safety: another tenant sees neither flag.
@@ -546,7 +647,8 @@ func TestListReportsActiveGenerateEnvelope(t *testing.T) {
 		t.Error("fresh instance must omit active_send")
 	}
 
-	// Finish the run → flag disappears.
+	// Finish the run → flag disappears (poll: the 202 returned long ago, so
+	// completion must be observed from the envelope itself).
 	for _, id := range []string{"r-p-a", "r-p-b", "r-p-c", "r-p-d", "r-p-e"} {
 		ch := gen.blocks[id]
 		select {
@@ -555,14 +657,18 @@ func TestListReportsActiveGenerateEnvelope(t *testing.T) {
 			close(ch)
 		}
 	}
-	if err := <-runDone; err != nil {
-		t.Fatalf("generate handler returned error: %v", err)
+	deadline = time.Now().Add(3 * time.Second)
+	for {
+		dataAfter := listGET(t, h, e, testTenantID, genSessionID)
+		if _, ok := dataAfter["active_generate"]; !ok {
+			requireExactKeys(t, dataAfter, "items")
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("active_generate must vanish after the run completes")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
-	dataAfter := listGET(t, h, e, testTenantID, genSessionID)
-	if _, ok := dataAfter["active_generate"]; ok {
-		t.Fatal("active_generate must vanish after the run completes")
-	}
-	requireExactKeys(t, dataAfter, "items")
 }
 
 // difference returns sorted a minus b.

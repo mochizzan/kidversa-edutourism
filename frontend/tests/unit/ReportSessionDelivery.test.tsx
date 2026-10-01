@@ -106,10 +106,29 @@ const reportBela = (status: ReportStatus): Report => ({
 const generatedReport = (status: ReportStatus): Report => ({
  ...reportAna(status),
  ai_narrative_draft: 'Naskah narasi hasil generate',
+ mission_ids: ['m-1'],
 })
 
+/**
+ * Server truth for an active run: the narrative-phase id views plus the
+ * per-report items + aggregates the row statuses read (active_generate
+ * contract — items are derived from the id views by the server).
+ */
 const activeGenerate = (extras: { queued_ids: string[]; processing_ids: string[] }): ReportSessionExtras => ({
- active_generate: { session_id: 's1', started_at: '2026-09-30T00:00:00Z', ...extras },
+ active_generate: {
+  session_id: 's1',
+  started_at: '2026-09-30T00:00:00Z',
+  ...extras,
+  items: [
+   ...extras.queued_ids.map((report_id) => ({ report_id, status: 'queued' as const })),
+   ...extras.processing_ids.map((report_id) => ({ report_id, status: 'processing' as const })),
+  ],
+  total: extras.queued_ids.length + extras.processing_ids.length,
+  queued: extras.queued_ids.length,
+  processing: extras.processing_ids.length,
+  succeeded: 0,
+  failed: 0,
+ },
 })
 
 const activeSend = (extras: { queued_ids: string[]; sending_ids: string[] }): ReportSessionExtras => ({
@@ -411,6 +430,11 @@ describe('ReportSessionPage — server-driven per-row delivery state', () => {
    expect(vi.mocked(reportService.getBySession)).toHaveBeenCalledTimes(3)
    // State still renders — never blanked, never claimed "done".
    expect(screen.getByText('Ana')).toBeInTheDocument()
+   // Registry gone + evidence incomplete → the row shows "terputus", not a
+   // fake completion (per-row verdict from extras + persistent evidence).
+   const interruptedRow = screen.getByTestId('report-generate-state')
+   expect(interruptedRow.getAttribute('data-status')).toBe('interrupted')
+   expect(interruptedRow.textContent ?? '').toContain(i18n.t('admin.status.interrupted'))
 
    // One-shot: later time passes produce no repeat notice and no fetches.
    await act(async () => {
@@ -451,6 +475,11 @@ describe('ReportSessionPage — server-driven per-row delivery state', () => {
     ),
    ).toHaveLength(0)
    expect(vi.mocked(reportService.getBySession)).toHaveBeenCalledTimes(2)
+   // Registry gone + evidence complete → the watched row shows "selesai"
+   // (from persisted draft + missions, not from local state).
+   const doneRow = screen.getByTestId('report-generate-state')
+   expect(doneRow.getAttribute('data-status')).toBe('success')
+   expect(doneRow.textContent ?? '').toContain(i18n.t('admin.status.completed'))
    await act(async () => {
     await vi.advanceTimersByTimeAsync(6000)
    })
@@ -545,5 +574,188 @@ describe('ReportSessionPage — server-driven per-row delivery state', () => {
   expect(screen.getByText(i18n.t('admin.reports.loadDataError'))).toBeInTheDocument()
   // No silent blank screen and no infinite auto-retry.
   expect(vi.mocked(reportService.getBySession)).toHaveBeenCalledTimes(1)
+ })
+
+ it('renders a failed item as error + phase + message straight from server extras', async () => {
+  const items = [reportAna(ReportStatus.DRAFT), reportBela(ReportStatus.DRAFT)]
+  setupMocks(async () => ({
+   items,
+   extras: {
+    active_generate: {
+     session_id: 's1',
+     started_at: '2026-09-30T00:00:00Z',
+     queued_ids: ['r-ana'],
+     processing_ids: [],
+     items: [
+      { report_id: 'r-ana', status: 'queued' as const },
+      {
+       report_id: 'r-bela',
+       status: 'error' as const,
+       phase: 'missions' as const,
+       error: 'mission_selection_failed: kandidat misi kosong',
+      },
+     ],
+     total: 2,
+     queued: 1,
+     processing: 0,
+     succeeded: 0,
+     failed: 1,
+    },
+   },
+  }))
+
+  renderPage()
+  await flush()
+
+  const statuses = screen
+   .getAllByTestId('report-generate-state')
+   .map((el) => el.getAttribute('data-status'))
+  expect(statuses).toEqual(['queued', 'error'])
+  // The error row shows the label, its phase and the server-provided message.
+  const errorRow = screen
+   .getAllByTestId('report-generate-state')
+   .find((el) => el.getAttribute('data-status') === 'error')
+  expect(errorRow?.textContent ?? '').toContain(i18n.t('admin.status.error'))
+  expect(errorRow?.textContent ?? '').toContain(i18n.t('admin.status.phaseMissions'))
+  expect(screen.getByTestId('report-generate-error').textContent).toContain(
+   'mission_selection_failed: kandidat misi kosong',
+  )
+ })
+
+ it('a reload with identical extras computes the identical per-row statuses (no local status state)', async () => {
+  const items = [reportAna(ReportStatus.DRAFT), reportBela(ReportStatus.DRAFT)]
+  const extras: ReportSessionExtras = {
+   active_generate: {
+    session_id: 's1',
+    started_at: '2026-09-30T00:00:00Z',
+    queued_ids: ['r-ana'],
+    processing_ids: ['r-bela'],
+    items: [
+     { report_id: 'r-ana', status: 'queued' },
+     { report_id: 'r-bela', status: 'processing', phase: 'narrative' },
+    ],
+    total: 2,
+    queued: 1,
+    processing: 1,
+    succeeded: 0,
+    failed: 0,
+   },
+  }
+  setupMocks(async () => ({ items, extras }))
+
+  const first = renderPage()
+  await flush()
+  const before = screen
+   .getAllByTestId('report-generate-state')
+   .map((el) => `${el.getAttribute('data-status')}:${el.textContent ?? ''}`)
+  expect(before).toHaveLength(2)
+
+  first.unmount()
+  renderPage()
+  await flush()
+  const after = screen
+   .getAllByTestId('report-generate-state')
+   .map((el) => `${el.getAttribute('data-status')}:${el.textContent ?? ''}`)
+
+  expect(after).toEqual(before)
+ })
+
+ it('accepts the 202 and polls server truth immediately (statuses never wait on a blocking POST)', async () => {
+  vi.useFakeTimers()
+  try {
+   let calls = 0
+   setupMocks(async () => {
+    calls++
+    if (calls === 1) return { items: [], extras: {} } // nothing generated yet
+    return {
+     items: [reportAna(ReportStatus.DRAFT)],
+     extras: activeGenerate({ queued_ids: ['r-ana'], processing_ids: [] }),
+    }
+   })
+   // p1 has assessments (ready_to_generate), p2 does not (skipped participant).
+   vi.mocked(sessionService.getSubstages).mockResolvedValue([
+    { id: 'sub1', session_stage_id: 'st1' },
+   ] as never)
+   vi.mocked(assessmentService.getBySession).mockResolvedValue([
+    { participant_id: 'p1', session_substage_id: 'sub1', star_rating: 5 },
+   ] as never)
+   // The endpoint acknowledges acceptance (202) instead of returning the
+   // finished reports — the hook must not block on completion.
+   vi.mocked(reportService.generate).mockResolvedValue(undefined)
+
+   renderPage()
+   await act(async () => { })
+
+   const generateBtn = screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') })
+   await act(async () => {
+    generateBtn.click()
+   })
+   await flush(4)
+
+   expect(reportService.generate).toHaveBeenCalledTimes(1)
+   expect(reportService.generate).toHaveBeenCalledWith('s1')
+   // The post-202 refetch already observes active_generate → the row status
+   // comes from the polled extras, not from the local click.
+   expect(vi.mocked(reportService.getBySession).mock.calls.length).toBeGreaterThanOrEqual(2)
+   const rowState = screen.getAllByTestId('report-generate-state')[0]
+   expect(rowState.getAttribute('data-status')).toBe('queued')
+   // The server flag keeps the 2s interval polling alive afterwards.
+   await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000)
+   })
+   expect(vi.mocked(reportService.getBySession).mock.calls.length).toBeGreaterThanOrEqual(3)
+  } finally {
+   vi.useRealTimers()
+  }
+ })
+
+ it('a failed generate POST surfaces the error inline, releases the loading bridge, and never fakes server status', async () => {
+  // No reports yet + assessments for both rows → both ready_to_generate
+  // (nothing to skip, so the failure path does not open the skip modal).
+  setupMocks(async () => ({ items: [], extras: {} }))
+  vi.mocked(sessionService.getSubstages).mockResolvedValue([
+   { id: 'sub1', session_stage_id: 'st1' },
+  ] as never)
+  vi.mocked(assessmentService.getBySession).mockResolvedValue([
+   { participant_id: 'p1', session_substage_id: 'sub1', star_rating: 5 },
+   { participant_id: 'p2', session_substage_id: 'sub1', star_rating: 4 },
+  ] as never)
+  // Network error: the POST rejects before the server registers any run.
+  vi.mocked(reportService.generate).mockRejectedValue(new TypeError('Failed to fetch'))
+
+  renderPage()
+  await flush()
+
+  const generateBtn = screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') })
+  expect(generateBtn).toBeEnabled()
+  await act(async () => {
+   generateBtn.click()
+  })
+  await flush(4)
+
+  expect(reportService.generate).toHaveBeenCalledTimes(1)
+
+  // The failure is surfaced inline (genError banner) — never swallowed.
+  expect(screen.getByText('Failed to fetch')).toBeInTheDocument()
+
+  // Loading bridge released: the bulk button is idle again, not stuck on the
+  // "generating" spinner.
+  expect(screen.queryByRole('button', { name: i18n.t('admin.reports.generating') })).toBeNull()
+  expect(screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') })).toBeEnabled()
+
+  // Row status stays server-sourced: no generate overlay was invented locally
+  // (no active_generate was ever observed), so there is no fake
+  // queued/success state — rows keep their server-derived ready badge.
+  expect(screen.queryAllByTestId('report-generate-state')).toHaveLength(0)
+  expect(screen.getAllByText(i18n.t('admin.reports.readyGenerate'))).toHaveLength(2)
+
+  // No polling armed for a run that never started, and no interruption toast
+  // double-reports the failure genError already carries.
+  expect(vi.mocked(reportService.getBySession)).toHaveBeenCalledTimes(1)
+  expect(
+   useToastStore.getState().toasts.filter(
+    (t) => t.message === i18n.t('admin.status.operationInterrupted'),
+   ),
+  ).toHaveLength(0)
  })
 })

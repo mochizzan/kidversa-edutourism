@@ -318,7 +318,11 @@
       "rejected": "却下済み",
       "queued": "キュー待ち",
       "processing": "処理中",
-      "operationInterrupted": "サーバー側のプロセスが中断されました"
+      "operationInterrupted": "サーバー側のプロセスが中断されました",
+      "error": "エラー",
+      "interrupted": "中断",
+      "phaseNarrative": "ナラティブ",
+      "phaseMissions": "ミッション"
     },
     "reportStatus": {
       "draft": "下書き",
@@ -864,7 +868,7 @@
       "noAssessmentTip": "先に評価ページで評価を完了してください",
       "incompleteTip": "参加者の評価が未完了です。先に評価を完了してください。",
       "generateResultTitle": "レポート生成結果",
-      "generateOk": "評価済みの参加者<strong>{{count}}名分</strong>のレポートを生成しました。",
+      "generateOk": "レポート<strong>{{count}}件</strong>の生成を開始しました。下の一覧で進捗を確認できます。",
       "generateSkip": "以下の参加者は評価データがないため<strong>生成できません</strong>でした:",
       "understand": "了解",
       "sendConfirmTitle": "レポート送信の確認",
@@ -1291,8 +1295,9 @@
       "deletePhoto": "写真を削除",
       "deleteConfirm": "この写真を削除しますか？この操作は取り消せません。",
       "deleteError": "写真の削除に失敗しました",
-      "pickPhoto": "Select as report photo",
-      "unpickPhoto": "Deselect report photo",
+      "pickPhoto": "ミニ成績表の写真を選ぶ",
+      "unpickPhoto": "ミニ成績表の選択を解除",
+      "miniRaportBadge": "ミニ成績表",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo",
       "reportBadge": "レポート写真"

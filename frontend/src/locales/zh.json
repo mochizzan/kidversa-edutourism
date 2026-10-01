@@ -318,7 +318,11 @@
       "rejected": "已拒绝",
       "queued": "排队中",
       "processing": "处理中",
-      "operationInterrupted": "服务器上的进程已中断"
+      "operationInterrupted": "服务器上的进程已中断",
+      "error": "错误",
+      "interrupted": "已中断",
+      "phaseNarrative": "叙述",
+      "phaseMissions": "任务"
     },
     "reportStatus": {
       "draft": "草稿",
@@ -864,7 +868,7 @@
       "noAssessmentTip": "请先在评估页面完成评估",
       "incompleteTip": "学员尚未进行评估。请先完成评估。",
       "generateResultTitle": "报告生成结果",
-      "generateOk": "已成功为有评估记录的学员生成 <strong>{{count}} 份报告</strong>。",
+      "generateOk": "已开始生成 <strong>{{count}} 份报告</strong> — 请在下方报告列表中查看进度。",
       "generateSkip": "以下学员<strong>无法生成报告</strong>，因为尚未有评估数据：",
       "understand": "明白",
       "sendConfirmTitle": "确认发送报告",
@@ -1291,8 +1295,9 @@
       "deletePhoto": "删除照片",
       "deleteConfirm": "确定要删除此照片吗？此操作无法撤销。",
       "deleteError": "删除照片失败",
-      "pickPhoto": "Select as report photo",
-      "unpickPhoto": "Deselect report photo",
+      "pickPhoto": "选择迷你成绩单照片",
+      "unpickPhoto": "取消选择迷你成绩单照片",
+      "miniRaportBadge": "迷你成绩单",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo",
       "reportBadge": "成绩单照片"

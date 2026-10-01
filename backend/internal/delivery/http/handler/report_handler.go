@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -233,6 +232,15 @@ func (h *ReportHandler) runNarrativeStream(ctx context.Context, id, tenantID str
 // yet, then triggers narrative generation for every report. Reports are created
 // per (participant, topic) so the invariant 1 Report = 1 Topic = 1 Participant
 // holds; the session's Topics are resolved from its session_stages.
+//
+// The run is detached (same pattern as GenerateStream): request validation
+// (bind, tenant, topics, participants, genMu guard) runs inline so caller
+// mistakes keep their HTTP status codes, then the work executes in a worker
+// goroutine on context.WithoutCancel of the request and the handler answers
+// 202 immediately — a reload or closed tab can no longer cancel the run. The
+// registry run is registered BEFORE the 202 returns, so the first
+// GET /api/reports poll after acceptance always observes active_generate.
+// The genMu guard still yields 409 already_generating while a run is active.
 func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	var req dto.ReportGenerateSessionRequest
 	if err := bindAndValidate(c, &req); err != nil {
@@ -271,27 +279,43 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 			h.endGenerate(req.SessionID)
 			return appresp.Fail(c, http.StatusConflict, "already_generating")
 		}
-		defer h.endGenerate(req.SessionID + ":" + req.ParticipantID)
-		defer h.endGenerate(req.SessionID)
-		reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, tenantID, []entity.Participant{*one}, topicIDs)
-		if err != nil {
-			return appresp.Fail(c, http.StatusInternalServerError, "internal_error")
-		}
-		return appresp.OK(c, dto.NewReportListResponse(reports))
+		h.startGenerateRun((*c).Request().Context(), req.SessionID, tenantID,
+			[]entity.Participant{*one}, topicIDs, req.SessionID+":"+req.ParticipantID)
+		return appresp.AcceptedWithData(c, dto.ReportGenerateAccepted{Status: "accepted", SessionID: req.SessionID})
 	}
 	if !h.tryBeginGenerate(req.SessionID) {
 		return appresp.Fail(c, http.StatusConflict, "already_generating")
 	}
-	defer h.endGenerate(req.SessionID)
 	participants, err := h.sessionRepo.ListParticipants((*c).Request().Context(), req.SessionID, "", tenantID)
 	if err != nil {
+		h.endGenerate(req.SessionID)
 		return err
 	}
-	reports, err := h.uc.GenerateForSession((*c).Request().Context(), req.SessionID, tenantID, participants, topicIDs)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, dto.NewReportListResponse(reports))
+	h.startGenerateRun((*c).Request().Context(), req.SessionID, tenantID, participants, topicIDs, "")
+	return appresp.AcceptedWithData(c, dto.ReportGenerateAccepted{Status: "accepted", SessionID: req.SessionID})
+}
+
+// startGenerateRun registers the run in the usecase registry (live from the
+// moment the 202 returns) and spawns the detached worker. The worker owns the
+// genMu guard(s) and the registry entry: both are released when the run ends,
+// on success or error. ctx is the request context; the worker runs it through
+// context.WithoutCancel so the caller's disconnect never aborts the run.
+// extraGuardKey is the per-row generate-one key ("" for a full-session run).
+func (h *ReportHandler) startGenerateRun(ctx context.Context, sessionID, tenantID string, participants []entity.Participant, topicIDs []string, extraGuardKey string) {
+	runCtx := context.WithoutCancel(ctx)
+	h.uc.BeginGenerateRun(sessionID, tenantID)
+	go func() {
+		defer h.uc.EndGenerateRun(sessionID)
+		defer h.endGenerate(sessionID)
+		if extraGuardKey != "" {
+			defer h.endGenerate(extraGuardKey)
+		}
+		if _, err := h.uc.GenerateForSession(runCtx, sessionID, tenantID, participants, topicIDs); err != nil {
+			// The run's per-item outcome lives in active_generate; the
+			// aggregate failure is logged so it is never silent.
+			log.Printf("reports: session generate for %s failed: %v", sessionID, err)
+		}
+	}()
 }
 
 // resolveSessionTopics returns the program_stage_ids of the session's
@@ -437,12 +461,7 @@ func (h *ReportHandler) ListReports(c *echo.Context) error {
 	if sessionID != "" {
 		if _, generating := h.genMu.Load(sessionID); generating {
 			if gs, ok := h.uc.GenerateStatus(sessionID, tenantID); ok {
-				resp.ActiveGenerate = &dto.ReportActiveGenerate{
-					SessionID:     gs.SessionID,
-					StartedAt:     gs.StartedAt.Format(time.RFC3339),
-					QueuedIDs:     gs.QueuedIDs,
-					ProcessingIDs: gs.ProcessingIDs,
-				}
+				resp.ActiveGenerate = dto.NewReportActiveGenerate(gs)
 			}
 		}
 		resp.ActiveSend = h.sendQueue.ActiveSend(tenantID, sessionID)

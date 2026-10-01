@@ -346,7 +346,11 @@
       "rejected": "Ditolak",
       "queued": "Dalam Antrian",
       "processing": "Memproses",
-      "operationInterrupted": "Proses di server terhenti"
+      "operationInterrupted": "Proses di server terhenti",
+      "error": "Gagal",
+      "interrupted": "Terputus",
+      "phaseNarrative": "Narasi",
+      "phaseMissions": "Misi"
     },
     "reportStatus": {
       "draft": "Draft",
@@ -994,7 +998,7 @@
       "noAssessmentTip": "Lengkapi penilaian terlebih dahulu di halaman Assessment",
       "incompleteTip": "Peserta belum memiliki penilaian. Lengkapi penilaian terlebih dahulu.",
       "generateResultTitle": "Hasil Generate Laporan",
-      "generateOk": "Berhasil generate <strong>{{count}} laporan</strong> untuk peserta yang sudah memiliki penilaian.",
+      "generateOk": "Generate dimulai untuk <strong>{{count}} laporan</strong> — pantau progresnya di daftar laporan di bawah.",
       "generateSkip": "Peserta berikut <strong>tidak dapat digenerate</strong> karena belum memiliki data penilaian:",
       "understand": "Mengerti",
       "sendConfirmTitle": "Konfirmasi Kirim Laporan",
@@ -1276,8 +1280,9 @@
       "deletePhoto": "Hapus Foto",
       "deleteConfirm": "Yakin ingin menghapus foto ini? Tindakan ini tidak dapat dibatalkan.",
       "deleteError": "Gagal menghapus foto",
-      "pickPhoto": "Jadikan foto rapor",
-      "unpickPhoto": "Batalkan pilihan foto rapor",
+      "pickPhoto": "pilih foto untuk mini rapor",
+      "unpickPhoto": "batalkan pilihan untuk mini rapor",
+      "miniRaportBadge": "Mini Rapor",
       "pickError": "Foto rapor gagal dipilih",
       "clearPickError": "Pilihan foto rapor gagal dibatalkan",
       "reportBadge": "Foto Raport"

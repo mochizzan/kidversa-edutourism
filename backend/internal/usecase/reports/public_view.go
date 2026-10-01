@@ -11,8 +11,8 @@ import (
 )
 
 // Public payload shapes for GET /api/reports/access. Assembly mirrors the admin
-// preview (frontend useReportReview.buildRaportHtml + missionSelector) field by
-// field so the parent mini-raport equals the admin render; JSON tags live here
+// preview (frontend useReportReview.buildRaportHtml) field by field so the
+// parent mini-raport equals the admin render; JSON tags live here
 // and the delivery-layer DTO reuses these slice types verbatim. RAPORT_LAYOUT
 // caps (stages/missions/badges) are applied client-side, like the admin does.
 
@@ -68,9 +68,6 @@ const publicAssessmentPageSize = 100
 
 // publicMissionCandidateLimit mirrors missionService.getByTopic({limit: 100}).
 const publicMissionCandidateLimit = 100
-
-// fallbackMissionCount mirrors missionSelector.selectMissionsForParticipant (3).
-const fallbackMissionCount = 3
 
 // BuildPublicReportView assembles everything the parent mini-raport renders —
 // the same data the admin preview collects from ~10 authenticated frontend
@@ -222,15 +219,13 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 	// Admin stageInfos equivalent: session stages in session order, skipping
 	// stages whose program Topik no longer exists.
 	type stageKegiatan struct {
-		name          string
-		rating        int
-		hasAssessment bool
+		name   string
+		rating int
 	}
 	type stageInfo struct {
-		programStageID string
-		name           string
-		sequenceOrder  int
-		kegiatan       []stageKegiatan
+		name          string
+		sequenceOrder int
+		kegiatan      []stageKegiatan
 	}
 	stageInfos := make([]stageInfo, 0, len(sessStages))
 	for _, ss := range sessStages {
@@ -247,10 +242,9 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 		}
 		subs := subsByStage[ss.ID]
 		info := stageInfo{
-			programStageID: ps.ID,
-			name:           ps.Name,
-			sequenceOrder:  ps.SequenceOrder,
-			kegiatan:       make([]stageKegiatan, 0, len(subs)),
+			name:          ps.Name,
+			sequenceOrder: ps.SequenceOrder,
+			kegiatan:      make([]stageKegiatan, 0, len(subs)),
 		}
 		for _, sub := range subs {
 			// Admin: subNameById.get(id) ?? id (raw id when the program Kegiatan is gone).
@@ -261,7 +255,6 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 			k := stageKegiatan{name: name}
 			if a, ok := firstBySubstage[sub.ID]; ok {
 				k.rating = a.StarRating
-				k.hasAssessment = true
 			}
 			info.kegiatan = append(info.kegiatan, k)
 		}
@@ -280,38 +273,6 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 		view.Stages = append(view.Stages, st)
 	}
 
-	// Fallback-mission input (missionSelector): average rating per program
-	// Topik over EXISTING assessments of mapped stages, in first-encounter
-	// order; the 2 lowest averages win (stable sort keeps encounter order on ties).
-	sums := map[string]float64{}
-	counts := map[string]int{}
-	var encounterOrder []string
-	for _, si := range stageInfos {
-		for _, k := range si.kegiatan {
-			if !k.hasAssessment {
-				continue
-			}
-			if _, ok := sums[si.programStageID]; !ok {
-				encounterOrder = append(encounterOrder, si.programStageID)
-			}
-			sums[si.programStageID] += float64(k.rating)
-			counts[si.programStageID]++
-		}
-	}
-	type avgRating struct {
-		id  string
-		avg float64
-	}
-	avgs := make([]avgRating, 0, len(encounterOrder))
-	for _, id := range encounterOrder {
-		avgs = append(avgs, avgRating{id: id, avg: sums[id] / float64(counts[id])})
-	}
-	sort.SliceStable(avgs, func(i, j int) bool { return avgs[i].avg < avgs[j].avg })
-	lowestStageIDs := make([]string, 0, 2)
-	for i := 0; i < len(avgs) && i < 2; i++ {
-		lowestStageIDs = append(lowestStageIDs, avgs[i].id)
-	}
-
 	// Topic-scoped active mission candidates (missionService.getByTopic query:
 	// topic_id + is_active=true, page 1, limit 100, created_at DESC).
 	var candidates []entity.MissionBank
@@ -327,7 +288,7 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 		candidates = res.Items
 	}
 
-	view.Missions, err = u.resolvePublicMissions(ctx, r, candidates, lowestStageIDs, tenant)
+	view.Missions, err = u.resolvePublicMissions(ctx, r, candidates, tenant)
 	if err != nil {
 		return nil, err
 	}
@@ -350,106 +311,49 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 }
 
 // resolvePublicMissions picks the mission list the admin preview prints: the
-// assigned (report.mission_ids) titles in admin order, falling back to the
-// deterministic selector when no assigned title resolves.
-func (u *Usecase) resolvePublicMissions(ctx context.Context, r *entity.Report, candidates []entity.MissionBank, lowestStageIDs []string, tenant string) ([]PublicMission, error) {
+// assigned (report.mission_ids) titles in admin order, capped at
+// MaxReportMissions. There is NO fallback selector — a report whose missions
+// are unassigned (or whose assigned missions were all deleted) resolves to an
+// empty list, and the frontend hides the mission section for an empty list.
+func (u *Usecase) resolvePublicMissions(ctx context.Context, r *entity.Report, candidates []entity.MissionBank, tenant string) ([]PublicMission, error) {
 	ids := r.MissionIDs
 	if len(ids) > MaxReportMissions {
 		ids = ids[:MaxReportMissions] // admin: assignedMissionIds.slice(0, 4)
 	}
-	if len(ids) > 0 {
-		assigned := make(map[string]bool, len(ids))
-		for _, id := range ids {
-			assigned[id] = true
-		}
-		// Admin display order: candidate list (created_at DESC) filtered to the
-		// assigned set. Assigned ids the topic page does not carry (unlinked,
-		// inactive, or beyond the page limit) are resolved directly so a saved
-		// selection is never dropped.
-		resolved := make([]PublicMission, 0, len(ids))
-		seen := make(map[string]bool, len(ids))
-		for _, m := range candidates {
-			if assigned[m.ID] {
-				resolved = append(resolved, PublicMission{ID: m.ID, Title: m.Title})
-				seen[m.ID] = true
-			}
-		}
-		for _, id := range ids {
-			if seen[id] {
-				continue
-			}
-			seen[id] = true
-			m, err := u.missionRepo.GetByID(ctx, id, tenant)
-			if err != nil {
-				if isNotFound(err) {
-					continue // deleted mission: admin never prints it either
-				}
-				return nil, err // surface real failures to the caller
-			}
-			resolved = append(resolved, PublicMission{ID: m.ID, Title: m.Title})
-		}
-		if len(resolved) > 0 {
-			return resolved, nil
-		}
+	if len(ids) == 0 {
+		return []PublicMission{}, nil
 	}
-	// Admin fallback (selectMissionsForParticipant) when no assigned title
-	// resolves: score = overlap of related_stage_ids with the 2 lowest-averaged
-	// Topik, score desc then id asc, take 3 — printed in candidate order.
-	picked := selectFallbackMissions(candidates, lowestStageIDs)
-	if len(picked) == 0 {
-		return nil, nil
+	assigned := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		assigned[id] = true
 	}
-	pickedSet := make(map[string]bool, len(picked))
-	for _, id := range picked {
-		pickedSet[id] = true
-	}
-	out := make([]PublicMission, 0, len(picked))
+	// Admin display order: candidate list (created_at DESC) filtered to the
+	// assigned set. Assigned ids the topic page does not carry (unlinked,
+	// inactive, or beyond the page limit) are resolved directly so a saved
+	// selection is never dropped.
+	resolved := make([]PublicMission, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
 	for _, m := range candidates {
-		if pickedSet[m.ID] {
-			out = append(out, PublicMission{ID: m.ID, Title: m.Title})
+		if assigned[m.ID] {
+			resolved = append(resolved, PublicMission{ID: m.ID, Title: m.Title})
+			seen[m.ID] = true
 		}
 	}
-	return out, nil
-}
-
-// selectFallbackMissions returns up to fallbackMissionCount candidate ids
-// (score order) for the deterministic admin fallback selector.
-func selectFallbackMissions(candidates []entity.MissionBank, lowestStageIDs []string) []string {
-	if len(candidates) == 0 {
-		return nil
-	}
-	// Candidates arrive active-only (query mirrors getByTopic is_active=true).
-	type scored struct {
-		id    string
-		score int
-	}
-	items := make([]scored, 0, len(candidates))
-	for _, c := range candidates {
-		score := 0
-		for _, sid := range c.RelatedStageIDs {
-			for _, low := range lowestStageIDs {
-				if sid == low {
-					score++
-				}
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		m, err := u.missionRepo.GetByID(ctx, id, tenant)
+		if err != nil {
+			if isNotFound(err) {
+				continue // deleted mission: admin never prints it either
 			}
+			return nil, err // surface real failures to the caller
 		}
-		items = append(items, scored{id: c.ID, score: score})
+		resolved = append(resolved, PublicMission{ID: m.ID, Title: m.Title})
 	}
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].score != items[j].score {
-			return items[i].score > items[j].score
-		}
-		return items[i].id < items[j].id
-	})
-	limit := fallbackMissionCount
-	if len(items) < limit {
-		limit = len(items)
-	}
-	picked := make([]string, 0, limit)
-	for i := 0; i < limit; i++ {
-		picked = append(picked, items[i].id)
-	}
-	return picked
+	return resolved, nil
 }
 
 // loadPublicAssessments pages through every assessment row for the report's

@@ -28,7 +28,6 @@ import {
  downloadBlob,
 } from '../../../core/utils/raportCapture'
 import { substagesOfStage } from '../../../core/utils/substage'
-import { selectMissionsForParticipant } from '../../../core/utils/missionSelector'
 import { programSubstageService } from '../../../core/services/program-substages'
 import type {
  Report,
@@ -86,6 +85,18 @@ export function resolveReportPhoto(
  const pick = picks.find((p) => p.program_stage_id === activeTopicId)
  if (!pick) return fallback
  return photos.find((p) => p.id === pick.photo_id) ?? fallback
+}
+
+/** Judul misi untuk preview rapor: HANYA dari pilihan admin
+ *  (assignedMissionIds) yang masih ada di bank misi, di-cap
+ *  RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW. Tanpa pilihan → [] (tanpa fallback
+ *  otomatis — kartu MISI tidak dirender bila kosong). */
+export function selectMissionTitles(
+ assignedMissionIds: string[],
+ missions: MissionBank[],
+): string[] {
+ const selectedIds = assignedMissionIds.slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
+ return missions.filter((m) => selectedIds.includes(m.id)).map((m) => m.title)
 }
 
 export function useReportReview(sessionId: string | undefined, participantId: string | undefined) {
@@ -471,28 +482,7 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
   const narrative = narrativeText
 
-  const selectedMissionIds = assignedMissionIds.slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
-  let missionTitles = missions
-   .filter((m) => selectedMissionIds.includes(m.id))
-   .map((m) => m.title)
-  if (missionTitles.length === 0) {
-   const picked = selectMissionsForParticipant({
-    assessments: stageInfos.flatMap((si) =>
-     si.kegiatan.map((k) => k.assessment).filter((a): a is NonNullable<typeof a> => !!a),
-    ),
-    availableMissions: missions,
-    substages: stageInfos.flatMap((si) =>
-     si.kegiatan.map((k) => ({
-      id: k.sessionSubstage.id,
-      program_stage_id: si.programStage.id,
-     })),
-    ),
-   })
-   const pickedIds = picked.slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
-   missionTitles = missions
-    .filter((m) => pickedIds.includes(m.id))
-    .map((m) => m.title)
-  }
+  const missionTitles = selectMissionTitles(assignedMissionIds, missions)
 
   const mappedBadges = badges.slice(0, RAPORT_LAYOUT.MAX_BADGES_PREVIEW).map((b) => ({
    badgeName: b.badge_name,
@@ -508,7 +498,11 @@ export function useReportReview(sessionId: string | undefined, participantId: st
      `${window.location.origin}/gallery?token=${report.gallery_access_token}`,
      { width: 128, margin: 1, errorCorrectionLevel: 'M' },
     )
-   } catch { /* leave undefined — placeholder fallback */ }
+   } catch (err) {
+    // QR is decorative (gallery link) — degrade to the template placeholder,
+    // but never swallow the cause: a broken encoder/token must be diagnosable.
+    console.warn('[useReportReview] gallery QR generation failed', err)
+   }
   }
 
   return generateMiniRaportHTML({
@@ -544,7 +538,10 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   const poll = () => {
    try {
     if (win.closed) return
-   } catch {
+   } catch (err) {
+    // Cross-origin/inaccessible window: printing cannot proceed — stop the
+    // poll and record why instead of aborting silently (fires once).
+    console.warn('[useReportReview] print window inaccessible; aborting print', err)
     return
    }
    const remaining = win.document.querySelectorAll('i[class*="fa-"]')

@@ -149,10 +149,14 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 			Token:         tok,
 			ExpiresAt:     time.Now().UTC().Add(u.cfg.GalleryTokenTTL),
 		}
-		_ = u.galleryRepo.Create(ctx, gt)
+		if gerr := u.galleryRepo.Create(ctx, gt); gerr != nil {
+			log.Printf("reports: gallery token create failed for report %s: %v", r.ID, gerr)
+		}
 		r.GalleryAccessToken = tok
 		r.GalleryTokenExpiresAt = &gt.ExpiresAt
-		_ = u.repo.Update(ctx, r)
+		if uerr := u.repo.Update(ctx, r); uerr != nil {
+			log.Printf("reports: persist gallery token failed for report %s: %v", r.ID, uerr)
+		}
 	}
 	// Persist the approved mission selections into participant_missions (the
 	// single source of truth; r.MissionIDs is read-derived from that join).
@@ -319,7 +323,10 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 
 // GenerateForSession creates a DRAFT report for each (participant, topic)
 // pair that does not already have one, then runs the narrative generator for
-// every report in the session concurrently. topicIDs is the set of
+// every report in the session concurrently. Reports in the worklist that do
+// not have persisted missions yet also get a mission-selection pass (existing
+// SuggestMissions recommender persisted via SaveMissions); failures are
+// recorded per item in the generation registry (markFailed). topicIDs is the set of
 // program_stage_ids instantiated by the session (resolved by the caller via
 // sessionRepo.ListSessionStages). Passing an empty topicIDs creates only the
 // legacy whole-session report (program_stage_id = "") for backward
@@ -375,6 +382,54 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 	// Guaranteed cleanup on every return path below, success or error.
 	defer u.genReg.end(sessionID)
 
+	// Mission-selection phase (runs alongside the narrative workers below): for
+	// every worklist report that has no persisted missions yet, reuse the
+	// existing recommender (SuggestMissions) and persist its result through the
+	// existing SaveMissions → ReplaceByReport path. Reports that already carry
+	// missions are skipped — mirroring the narrative rule of only filling empty
+	// drafts — so an existing selection is never overwritten. Any failure (empty
+	// mission bank / zero candidates, recommender error, persist error) is
+	// recorded per item in the generation registry with a clear message and
+	// logged; it never panics, never aborts the run, and never touches the
+	// narrative worklist/semaphore.
+	var missionWg sync.WaitGroup
+	missionSem := make(chan struct{}, constants.ReportNarrativeConcurrency)
+	for _, r := range work {
+		if len(r.MissionIDs) > 0 {
+			continue
+		}
+		missionWg.Add(1)
+		go func(report entity.Report) {
+			defer missionWg.Done()
+			missionSem <- struct{}{}
+			defer func() { <-missionSem }()
+
+			fail := func(code string, err error) {
+				msg := missionFailureMessage(code, err)
+				u.genReg.markFailed(sessionID, report.ID, msg)
+				log.Printf("reports: mission phase failed for report %s: %s", report.ID, msg)
+			}
+
+			// Status channeling only: the registry learns the pass started
+			// and succeeded so active_generate can show phase=missions.
+			u.genReg.markMissionsProcessing(sessionID, report.ID)
+			ids, err := u.SuggestMissions(ctx, report.ID, tenantID)
+			if err != nil {
+				fail("mission_selection_failed", err)
+				return
+			}
+			if len(ids) == 0 {
+				fail("mission_selection_failed", fmt.Errorf("kandidat misi kosong: mission bank topik ini tidak memiliki misi aktif"))
+				return
+			}
+			if _, err := u.SaveMissions(ctx, report.ID, tenantID, ids); err != nil {
+				fail("mission_persist_failed", err)
+				return
+			}
+			u.genReg.markMissionsSuccess(sessionID, report.ID)
+		}(r)
+	}
+
 	for _, r := range work {
 		wg.Add(1)
 		go func(report entity.Report) {
@@ -382,16 +437,18 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			// Semaphore acquired → processing; removal is deferred so every exit
-			// path (draft persisted, generation error, update error) cleans up.
+			// Semaphore acquired → processing. Every exit path below marks the
+			// narrative phase terminal (success or error with a message) so the
+			// per-item registry state is observable until end() drops the run;
+			// the aggregate error return is unchanged.
 			u.genReg.markProcessing(sessionID, report.ID)
-			defer u.genReg.remove(sessionID, report.ID)
 
 			genCtx, cancel := context.WithTimeout(ctx, ai.OpenRouterRequestTimeout)
 			defer cancel()
 
 			text, err := u.gen.Generate(genCtx, report.ID, tenantID)
 			if err != nil {
+				u.genReg.markNarrativeFailed(sessionID, report.ID, err.Error())
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("report %s: %w", report.ID, err))
 				mu.Unlock()
@@ -399,13 +456,20 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			}
 			report.AINarrativeDraft = text
 			if err := u.repo.Update(genCtx, &report); err != nil {
+				u.genReg.markNarrativeFailed(sessionID, report.ID, err.Error())
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("update report %s: %w", report.ID, err))
 				mu.Unlock()
+				return
 			}
+			u.genReg.markNarrativeSuccess(sessionID, report.ID)
 		}(r)
 	}
 	wg.Wait()
+	// The mission phase runs concurrently with the narrative workers; wait for
+	// it before reading results or returning so no item can markFailed after
+	// end() drops the run.
+	missionWg.Wait()
 
 	if len(errs) > 0 {
 		return nil, apperrors.Internal("narrative_generation_failed",
@@ -418,4 +482,16 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 	}
 
 	return all.Items, nil
+}
+
+// missionFailureMessage renders the per-item registry failure text for the
+// mission-selection phase: a stable snake_case code prefix plus the underlying
+// cause — prefixed with the AppError code when present — so the status payload
+// is actionable (e.g. "mission_selection_failed: topic_required: report X is
+// not scoped to a topic").
+func missionFailureMessage(code string, err error) string {
+	if _, appCode, ok := apperrors.AsAppError(err); ok {
+		return fmt.Sprintf("%s: %s: %v", code, appCode, err)
+	}
+	return fmt.Sprintf("%s: %v", code, err)
 }

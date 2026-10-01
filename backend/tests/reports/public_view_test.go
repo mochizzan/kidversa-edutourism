@@ -250,7 +250,8 @@ func assertStrings(t *testing.T, what string, got, want []string) {
 // TestBuildPublicReportViewMirrorsAdminPreview covers the assembled payload:
 // child/program/session fields, live group + facilitator fallback, stage order
 // with deleted-Topic skip, first-wins star ratings, kegiatan name fallback,
-// public badge URLs, and the documented fallback mission selector.
+// public badge URLs, and the empty mission list when no missions are assigned
+// (there is no fallback auto-pick — the frontend hides the section).
 func TestBuildPublicReportViewMirrorsAdminPreview(t *testing.T) {
 	f := newViewFixture()
 	view, err := f.uc.BuildPublicReportView(context.Background(), newViewReport())
@@ -302,12 +303,13 @@ func TestBuildPublicReportViewMirrorsAdminPreview(t *testing.T) {
 		t.Errorf("stage[2] = %q rating %d", view.Stages[2].Name, view.Stages[2].Kegiatan[0].StarRating)
 	}
 
-	// Fallback selector: averages stage2=1, stage1=4, stage3=5 → lowest two are
-	// stage2+stage1 → scores m3=2, m1=1, m2=1, m4=0 → top3 by (score desc, id
-	// asc) = m3,m1,m2 → printed in candidate order (m4,m3,m2,m1) → m3,m2,m1.
-	assertStrings(t, "fallback missions", missionIDs(view.Missions), []string{"m3", "m2", "m1"})
-	if view.Missions[0].Title != "Misi Tiga" {
-		t.Errorf("mission title = %q", view.Missions[0].Title)
+	// No assigned missions → empty list (NOT nil, so JSON serializes as []),
+	// and NO fallback auto-pick runs even though topic candidates exist.
+	if view.Missions == nil {
+		t.Fatal("Missions = nil, want empty non-nil slice (JSON [])")
+	}
+	if len(view.Missions) != 0 {
+		t.Errorf("missions = %v, want [] (no fallback selector)", missionIDs(view.Missions))
 	}
 
 	if len(view.Badges) != 2 {
@@ -336,7 +338,7 @@ func TestBuildPublicReportViewMirrorsAdminPreview(t *testing.T) {
 
 // TestBuildPublicReportViewAssignedMissions covers the assigned path: titles
 // resolve in admin (candidate) order, and ids the topic page does not carry
-// are resolved directly instead of triggering the fallback selector.
+// are resolved directly. There is no fallback selector.
 func TestBuildPublicReportViewAssignedMissions(t *testing.T) {
 	f := newViewFixture()
 	r := newViewReport()
@@ -347,7 +349,7 @@ func TestBuildPublicReportViewAssignedMissions(t *testing.T) {
 		t.Fatalf("BuildPublicReportView: %v", err)
 	}
 	// Candidates arrive [m4,m3,m2,m1] → assigned ∩ candidates = [m1], then the
-	// direct lookup appends m9. The fallback selector must NOT run.
+	// direct lookup appends m9 (there is no fallback selector).
 	assertStrings(t, "assigned missions", missionIDs(view.Missions), []string{"m1", "m9"})
 	if view.Missions[0].Title != "Misi Satu" || view.Missions[1].Title != "Misi Mandiri" {
 		t.Errorf("titles = %q/%q", view.Missions[0].Title, view.Missions[1].Title)

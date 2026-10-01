@@ -318,7 +318,11 @@
       "rejected": "Tinanggihan",
       "queued": "Nasa Pila",
       "processing": "Pinoproseso",
-      "operationInterrupted": "Naputol ang proseso sa server"
+      "operationInterrupted": "Naputol ang proseso sa server",
+      "error": "Error",
+      "interrupted": "Naantala",
+      "phaseNarrative": "Narrative",
+      "phaseMissions": "Missions"
     },
     "reportStatus": {
       "draft": "Draft",
@@ -864,7 +868,7 @@
       "noAssessmentTip": "Kumpletuhin muna ang pagtatasa sa pahina ng Assessment",
       "incompleteTip": "Wala pang pagtatasa ang kalahok. Kumpletuhin muna ang pagtatasa.",
       "generateResultTitle": "Resulta ng Pag-generate ng Ulat",
-      "generateOk": "Matagumpay na na-generate ang <strong>{{count}} ulat</strong> para sa mga kalahok na mayroon nang pagtatasa.",
+      "generateOk": "Nagsimula ang pag-generate ng <strong>{{count}} ulat</strong> — subaybayan ang progreso sa listahan sa ibaba.",
       "generateSkip": "Ang mga sumusunod na kalahok ay <strong>hindi ma-generate</strong> dahil wala pa silang data ng pagtatasa:",
       "understand": "Naiintindihan ko",
       "sendConfirmTitle": "Kumpirmahin ang Pagpapadala ng Ulat",
@@ -1291,8 +1295,9 @@
       "deletePhoto": "Burahin ang Larawan",
       "deleteConfirm": "Sigurado ka bang gusto mong burahin ang larawang ito? Hindi na ito maibabalik.",
       "deleteError": "Nabigong burahin ang larawan",
-      "pickPhoto": "Select as report photo",
-      "unpickPhoto": "Deselect report photo",
+      "pickPhoto": "piliin ang larawan para sa mini report",
+      "unpickPhoto": "kanselahin ang pagpili para sa mini report",
+      "miniRaportBadge": "Mini Report",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo",
       "reportBadge": "Larawan ng Ulat"

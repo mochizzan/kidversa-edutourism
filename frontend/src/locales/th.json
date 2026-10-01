@@ -318,7 +318,11 @@
       "rejected": "ปฏิเสธแล้ว",
       "queued": "อยู่ในคิว",
       "processing": "กำลังประมวลผล",
-      "operationInterrupted": "กระบวนการบนเซิร์ฟเวอร์ถูกขัดจังหวะ"
+      "operationInterrupted": "กระบวนการบนเซิร์ฟเวอร์ถูกขัดจังหวะ",
+      "error": "ข้อผิดพลาด",
+      "interrupted": "ถูกขัดจังหวะ",
+      "phaseNarrative": "เรื่องเล่า",
+      "phaseMissions": "ภารกิจ"
     },
     "reportStatus": {
       "draft": "ฉบับร่าง",
@@ -864,7 +868,7 @@
       "noAssessmentTip": "โปรดทำการประเมินให้เสร็จสิ้นในหน้าการประเมินก่อน",
       "incompleteTip": "ผู้เข้าร่วมยังไม่มีการประเมิน โปรดทำการประเมินให้เสร็จสิ้นก่อน",
       "generateResultTitle": "ผลลัพธ์การสร้างรายงาน",
-      "generateOk": "สร้าง <strong>{{count}} รายงาน</strong> สำหรับผู้เข้าร่วมที่มีการประเมินเรียบร้อยแล้ว",
+      "generateOk": "เริ่มสร้าง <strong>{{count}} รายงาน</strong> แล้ว — ติดตามความคืบหน้าได้ในรายการด้านล่าง",
       "generateSkip": "ผู้เข้าร่วมต่อไปนี้ <strong>ไม่สามารถสร้างรายงานได้</strong> เนื่องจากยังไม่มีข้อมูลการประเมิน:",
       "understand": "เข้าใจแล้ว",
       "sendConfirmTitle": "ยืนยันการส่งรายงาน",
@@ -1291,8 +1295,9 @@
       "deletePhoto": "ลบรูปภาพ",
       "deleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพนี้? การดำเนินการนี้ไม่สามารถยกเลิกได้",
       "deleteError": "ลบรูปภาพไม่สำเร็จ",
-      "pickPhoto": "Select as report photo",
-      "unpickPhoto": "Deselect report photo",
+      "pickPhoto": "เลือกรูปภาพสำหรับมินิรายงาน",
+      "unpickPhoto": "ยกเลิกการเลือกรูปภาพมินิรายงาน",
+      "miniRaportBadge": "มินิรายงาน",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo",
       "reportBadge": "รูปภาพรายงาน"

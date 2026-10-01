@@ -32,6 +32,9 @@ import {
   REPORT_DELIVERY_LABEL,
   NO_ASSESSMENT_LABEL,
   NO_REPORT_LABEL,
+  getGenerateRowState,
+  GENERATE_ROW_LABEL,
+  GENERATE_PHASE_LABEL,
 } from '../../../core/constants/reportStatus'
 import { useReportSession } from '../hooks/useReportSession'
 import { CompactPagination } from '../../../shared/components/data/CompactPagination'
@@ -62,6 +65,8 @@ const ReportSessionPage = () => {
     sendError,
     activeGenerate,
     activeSend,
+    generateWatch,
+    generateErrors,
     filteredReports,
     loadData,
     handleGenerateAll,
@@ -101,7 +106,10 @@ const ReportSessionPage = () => {
 
   // Bulk progress derives from the SERVER flags; the local `generating`/
   // `sending` booleans only bridge the gap between the click and the first
-  // server observation of the run (server wins on every fetch).
+  // server observation of the run (server wins on every fetch). The local
+  // flag gates this button only — every per-row status below is computed from
+  // server extras (active_generate items) + persisted evidence, never from
+  // local state.
   const generateInProgress = generating || activeGenerate !== null
   const sendInProgress = sending || activeSend !== null
   const sendRemaining = activeSend
@@ -338,12 +346,26 @@ const ReportSessionPage = () => {
             const showGenerateBtn = item.status === 'ready_to_generate'
             const isIncomplete = item.status === 'incomplete'
             const isNoAssessment = item.status === 'no_assessment'
-            // Server operation overlay — identical mapping and labels for the
-            // generate-driven and send-driven flows (see reportStatus.ts).
-            const deliveryState = getReportDeliveryState(item.report?.id ?? null, {
-              activeGenerate,
+            // Send overlay: the server send flags (mapping in reportStatus.ts).
+            const sendState = getReportDeliveryState(item.report?.id ?? null, {
               activeSend,
             })
+            // Generate overlay: active_generate items are authoritative while
+            // the run is live; after the registry vanishes the same pure
+            // function resolves the row from persisted evidence + the
+            // watch/error sets (both rebuilt from these very extras on mount,
+            // so a reload yields identical statuses).
+            const generateState = item.report
+              ? getGenerateRowState(item.report.id, item.report, {
+                activeGenerate,
+                watchedIds: generateWatch,
+                recordedErrors: generateErrors,
+              })
+              : null
+            // A live send or an unfinished/interrupted generate holds the row
+            // (bulk Generate retries it); a completed row keeps its navigation.
+            const holdsRow =
+              sendState !== null || (generateState !== null && generateState.status !== 'success')
 
             const cardContent = (
               <div
@@ -411,15 +433,41 @@ const ReportSessionPage = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {deliveryState ? (
+                    {sendState ? (
                       <span
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-on-surface-variant"
                         data-testid="report-delivery-state"
                       >
-                        {deliveryState === 'processing' && (
+                        {sendState === 'processing' && (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         )}
-                        {t(REPORT_DELIVERY_LABEL[deliveryState])}
+                        {t(REPORT_DELIVERY_LABEL[sendState])}
+                      </span>
+                    ) : generateState ? (
+                      <span
+                        className="inline-flex flex-col items-end gap-0.5 text-xs font-medium text-on-surface-variant"
+                        data-testid="report-generate-state"
+                        data-status={generateState.status}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          {generateState.status === 'processing' && (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          )}
+                          {t(GENERATE_ROW_LABEL[generateState.status])}
+                          {generateState.phase && (
+                            <span className="text-[10px] font-normal uppercase tracking-wide">
+                              · {t(GENERATE_PHASE_LABEL[generateState.phase])}
+                            </span>
+                          )}
+                        </span>
+                        {generateState.message && (
+                          <span
+                            className="max-w-[16rem] break-words text-right text-[11px] font-normal text-error"
+                            data-testid="report-generate-error"
+                          >
+                            {generateState.message}
+                          </span>
+                        )}
                       </span>
                     ) : (
                       <>
@@ -448,7 +496,7 @@ const ReportSessionPage = () => {
               </div>
             )
 
-            if (isClickable && item.report && !deliveryState) {
+            if (isClickable && item.report && !holdsRow) {
               return (
                 <Link
                   key={item.participant.id}

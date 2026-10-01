@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { generateMiniRaportHTML, type MiniRaportData } from '@/shared/templates/miniRaport'
-import { resolveReportPhoto } from '@/features/admin/hooks/useReportReview'
-import type { ReportPhotoPick, SmartPhoto } from '@/core/types'
+import { resolveReportPhoto, selectMissionTitles } from '@/features/admin/hooks/useReportReview'
+import type { ReportPhotoPick, SmartPhoto, MissionBank } from '@/core/types'
 
 const PHOTO_URL = 'https://cdn.example.com/photos/momen.jpg'
 
@@ -28,6 +28,18 @@ describe('generateMiniRaportHTML — foto rapor vs placeholder', () => {
     expect(html).toContain(`src="${PHOTO_URL}"`)
     expect(html).not.toContain('PLACEHOLDER FOTO ANAK')
     expect(html).toContain('Momen Terbaik Hari Ini')
+  })
+
+  it('photoUrl set → kotak foto rasio 9:16 dan <img> object-contain tanpa crop', () => {
+    const html = generateMiniRaportHTML(baseData({ photoUrl: PHOTO_URL }))
+    // Kotak berbingkai yang membungkus photoBlock memakai rasio tetap 9:16.
+    expect(html).toMatch(/class="[^"]*aspect-\[9\/16\][^"]*"/)
+    // <img> memakai object-contain (fit, tanpa crop) — bukan object-cover.
+    const img = html.match(/<img[^>]*src="https:\/\/cdn\.example\.com\/photos\/momen\.jpg"[^>]*>/)
+    expect(img).not.toBeNull()
+    expect(img![0]).toContain('object-contain')
+    expect(img![0]).not.toContain('object-cover')
+    expect(img![0]).toContain('w-full h-full')
   })
 
   it('photoUrl undefined → placeholder renders, badge kept', () => {
@@ -87,5 +99,84 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → fallback)',
   it('nothing flagged → null (buildRaportHtml maps null to an undefined photoUrl)', () => {
     expect(resolveReportPhoto(null, [], participantId, topicA)).toBe(null)
     expect(resolveReportPhoto(null, [photo('plain', false)], participantId, null)).toBe(null)
+  })
+})
+
+describe('generateMiniRaportHTML — bintang penilaian di-capped 4 slot (domain skor 0..4)', () => {
+  // Persis markup slot dari starsHTML; ikon header ("fas fa-star text-xs" /
+  // "text-brand-star text-xs") punya kelas ekstra sehingga tidak ikut terhitung.
+  const STAR_SLOT = /<i class="fas fa-star (?:text-brand-star|text-gray-200)"><\/i>/g
+
+  const ratingCases: Array<{ rating: number; filled: number }> = [
+    { rating: 0, filled: 0 },
+    { rating: 3, filled: 3 },
+    { rating: 4, filled: 4 },
+    { rating: 5, filled: 4 },
+  ]
+
+  for (const { rating, filled } of ratingCases) {
+    it(`starRating ${rating} → 4 ikon fa-star, ${filled} terisi`, () => {
+      const html = generateMiniRaportHTML(
+        baseData({
+          stages: [
+            {
+              name: 'Topik 1',
+              sequenceOrder: 1,
+              kegiatan: [{ name: 'Kegiatan A', starRating: rating }],
+            },
+          ],
+        }),
+      )
+      const starIcons = html.match(STAR_SLOT) ?? []
+      expect(starIcons.length).toBe(4)
+      expect(starIcons.filter((icon: string) => icon.includes('text-brand-star')).length).toBe(
+        filled,
+      )
+    })
+  }
+})
+
+describe('generateMiniRaportHTML — kartu MISI hanya bila ada misi terpilih', () => {
+  it('missions: [] → kartu MISI RUMAH BERSAMA KELUARGA tidak dirender', () => {
+    const html = generateMiniRaportHTML(baseData({ missions: [] }))
+    expect(html).not.toContain('MISI RUMAH BERSAMA KELUARGA')
+  })
+
+  it('missions terisi → kartu tampil, maksimal 4 judul', () => {
+    const missions = ['Misi A', 'Misi B', 'Misi C', 'Misi D', 'Misi E']
+    const html = generateMiniRaportHTML(baseData({ missions }))
+    expect(html).toContain('MISI RUMAH BERSAMA KELUARGA')
+    for (const m of missions.slice(0, 4)) {
+      expect(html).toContain(`>${m}</p>`)
+    }
+    expect(html).not.toContain('Misi E')
+  })
+})
+
+describe('selectMissionTitles — preview rapor tanpa fallback misi otomatis', () => {
+  const bank = (...ids: string[]): MissionBank[] =>
+    ids.map((id) => ({
+      id,
+      program_id: 'prog-1',
+      title: `Judul ${id}`,
+      is_active: true,
+      created_at: '2026-10-01T00:00:00Z',
+    }))
+
+  it('assignedMissionIds kosong + bank misi tersedia → judul kosong (tanpa fallback)', () => {
+    expect(selectMissionTitles([], bank('m1', 'm2'))).toEqual([])
+  })
+
+  it('hanya judul dari id terpilih yang ada di bank (assigned ∩ bank)', () => {
+    expect(selectMissionTitles(['m2', 'ghost'], bank('m1', 'm2'))).toEqual(['Judul m2'])
+    expect(selectMissionTitles(['ghost'], bank('m1', 'm2'))).toEqual([])
+  })
+
+  it('lebih dari 4 id terpilih → tetap di-cap 4 judul', () => {
+    const titles = selectMissionTitles(
+      ['m1', 'm2', 'm3', 'm4', 'm5'],
+      bank('m1', 'm2', 'm3', 'm4', 'm5'),
+    )
+    expect(titles).toEqual(['Judul m1', 'Judul m2', 'Judul m3', 'Judul m4'])
   })
 })

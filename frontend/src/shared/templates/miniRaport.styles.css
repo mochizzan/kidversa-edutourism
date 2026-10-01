@@ -603,6 +603,9 @@
   .m-0 {
     margin: 0;
   }
+  .m-1 {
+    margin: var(--spacing);
+  }
   .m-2 {
     margin: calc(var(--spacing) * 2);
   }
@@ -1122,6 +1125,9 @@
   .max-w-5xl {
     max-width: var(--container-5xl);
   }
+  .max-w-\[16rem\] {
+    max-width: 16rem;
+  }
   .max-w-\[120px\] {
     max-width: 120px;
   }
@@ -1328,6 +1334,9 @@
   }
   .items-center {
     align-items: center;
+  }
+  .items-end {
+    align-items: flex-end;
   }
   .items-start {
     align-items: flex-start;

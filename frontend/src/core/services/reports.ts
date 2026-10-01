@@ -1,7 +1,7 @@
 import type { PublicReport, Report } from '../types'
 import type { ReportService, ReportSessionResult, ReportTokenResponse } from './types'
 import { apiRequest } from './backend-client'
-import { itemRequest, itemsRequest, itemsWithExtrasRequest } from './api-envelope'
+import { itemRequest, itemsWithExtrasRequest } from './api-envelope'
 import { useAuthStore } from '../stores/authStore'
 import { API_ROUTES } from '../constants/apiRoutes'
 
@@ -19,14 +19,19 @@ const getBySession = async (sessionId: string): Promise<ReportSessionResult> => 
   )
 }
 
-const generate = async (sessionId: string): Promise<Report[]> => {
-  return itemsRequest<Report>('POST', API_ROUTES.REPORTS.GENERATE_SESSION, {
+// Generate is async (202 Accepted): the server runs the session generate in a
+// detached worker and the response only acknowledges acceptance. Progress and
+// per-report outcomes are read from active_generate via getBySession.
+const generate = async (sessionId: string): Promise<void> => {
+  await apiRequest<unknown>('POST', API_ROUTES.REPORTS.GENERATE_SESSION, {
     session_id: sessionId,
   })
 }
 
-const generateOne = async (sessionId: string, participantId: string): Promise<Report[]> => {
-  return itemsRequest<Report>('POST', API_ROUTES.REPORTS.GENERATE_SESSION, {
+// Per-row "generate one" — same async 202 contract as generate (one
+// participant scoped run for the session).
+const generateOne = async (sessionId: string, participantId: string): Promise<void> => {
+  await apiRequest<unknown>('POST', API_ROUTES.REPORTS.GENERATE_SESSION, {
     session_id: sessionId,
     participant_id: participantId,
   })

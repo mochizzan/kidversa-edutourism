@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"time"
+
 	"kidversa-edutourism-backend/internal/domain/entity"
 	apputil "kidversa-edutourism-backend/internal/pkg/util"
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
@@ -29,12 +31,64 @@ type ReportListResponse struct {
 	ActiveSend *ReportActiveSend `json:"active_send,omitempty"`
 }
 
-// ReportActiveGenerate snapshots an in-flight session generate run.
+// ReportGenerateItem is one report's status inside active_generate. status is
+// queued|processing|success|error (derived from the report's narrative and
+// mission phase); phase (narrative|missions) is set while processing or on
+// failure; error carries the failure message when status=error.
+type ReportGenerateItem struct {
+	ReportID string `json:"report_id"`
+	Status   string `json:"status"`
+	Phase    string `json:"phase,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
+
+// ReportActiveGenerate snapshots an in-flight session generate run: the
+// per-report items (authoritative row display) plus aggregates, and the
+// narrative-phase queued/processing id views kept for existing consumers.
 type ReportActiveGenerate struct {
-	SessionID     string   `json:"session_id"`
-	StartedAt     string   `json:"started_at"` // RFC3339
-	QueuedIDs     []string `json:"queued_ids"`
-	ProcessingIDs []string `json:"processing_ids"`
+	SessionID     string               `json:"session_id"`
+	StartedAt     string               `json:"started_at"` // RFC3339
+	QueuedIDs     []string             `json:"queued_ids"`
+	ProcessingIDs []string             `json:"processing_ids"`
+	Items         []ReportGenerateItem `json:"items"`
+	Total         int                  `json:"total"`
+	Queued        int                  `json:"queued"`
+	Processing    int                  `json:"processing"`
+	Succeeded     int                  `json:"succeeded"`
+	Failed        int                  `json:"failed"`
+}
+
+// NewReportActiveGenerate maps a registry snapshot onto the envelope DTO.
+func NewReportActiveGenerate(gs reportsuc.GenerateStatus) *ReportActiveGenerate {
+	items := make([]ReportGenerateItem, 0, len(gs.Items))
+	for _, it := range gs.Items {
+		items = append(items, ReportGenerateItem{
+			ReportID: it.ReportID,
+			Status:   it.Status,
+			Phase:    it.Phase,
+			Error:    it.Error,
+		})
+	}
+	return &ReportActiveGenerate{
+		SessionID:     gs.SessionID,
+		StartedAt:     gs.StartedAt.Format(time.RFC3339),
+		QueuedIDs:     gs.QueuedIDs,
+		ProcessingIDs: gs.ProcessingIDs,
+		Items:         items,
+		Total:         gs.Total,
+		Queued:        gs.Queued,
+		Processing:    gs.Processing,
+		Succeeded:     gs.Succeeded,
+		Failed:        gs.ErrorCount,
+	}
+}
+
+// ReportGenerateAccepted is the 202 body of POST /api/reports/generate: the
+// run was accepted and continues in the background; progress is read from
+// GET /api/reports?session_id= (active_generate), never from this response.
+type ReportGenerateAccepted struct {
+	Status    string `json:"status"` // always "accepted"
+	SessionID string `json:"session_id"`
 }
 
 // ReportActiveSend snapshots the declared send run for a session.

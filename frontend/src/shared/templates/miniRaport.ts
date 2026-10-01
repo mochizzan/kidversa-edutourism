@@ -1,5 +1,5 @@
 import MINI_RAPORT_TAILWIND_CSS from './miniRaport.styles.css?inline'
-import { RATING_ABBREVIATIONS, MAX_STAR_RATING } from '../../core/constants/assessment'
+import { RATING_ABBREVIATIONS } from '../../core/constants/assessment'
 
 export interface MiniRaportData {
  programName: string
@@ -30,7 +30,7 @@ function sanitize(str: string): string {
 }
 
 /** HTML-escape untuk setiap nilai dinamis yang disisipkan ke markup atau atribut.
- *  Nama Topik/Kegiatan/badge/sekolah/kelompok berasal dari input staff, sehingga
+ *  Nama Topik/Ke iatan/badge/sekolah/kelompok berasal dari input staff, sehingga
  *  markup mentah di sana akan tereksekusi di preview & capture. */
 function esc(v: unknown): string {
  return String(v ?? '')
@@ -45,9 +45,12 @@ function dashIfEmpty(v?: string): string {
  return v && v.trim() ? esc(v) : '—'
 }
 
+/** Jumlah slot bintang: domain skor 0..4, konsisten dengan max=4 di ReportAssessmentScores. */
+const STAR_SLOTS = 4
+
 function starsHTML(rating: number): string {
- return Array.from({ length: MAX_STAR_RATING }, (_, i) =>
-  i < rating
+ return Array.from({ length: STAR_SLOTS }, (_, i) =>
+  i < Math.min(rating, STAR_SLOTS)
    ? '<i class="fas fa-star text-brand-star"></i>'
    : '<i class="fas fa-star text-gray-200"></i>'
  ).join('')
@@ -79,8 +82,6 @@ function stageRowHTML(
 }
 
 function missionsHTML(missions: string[]): string {
- if (missions.length === 0)
-  return '<p class="text-[12px] text-gray-500 italic">Belum ada misi yang dipilih.</p>'
  return missions
   .slice(0, 4)
   .map(
@@ -123,7 +124,7 @@ function narrativeBlock(data: MiniRaportData): string {
 
 export function generateMiniRaportHTML(data: MiniRaportData): string {
  const photoBlock = data.photoUrl
-  ? `<img src="${esc(data.photoUrl)}" alt="${esc(data.childName)}" class="w-full h-full object-cover" />`
+  ? `<img src="${esc(data.photoUrl)}" alt="${esc(data.childName)}" class="w-full h-full object-contain" />`
   : `<i class="fas fa-image text-5xl opacity-30"></i>
        <span class="font-bold text-sm tracking-widest">[ PLACEHOLDER FOTO ANAK ]</span>`
 
@@ -468,7 +469,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                     <i class="fas fa-camera text-brand-star text-base"></i>
                     Momen Terbaik Hari Ini
                 </div>
-                <div class="w-full h-full rounded-[1.5rem] border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col gap-2 justify-center items-center text-gray-400 relative overflow-hidden">
+                <div class="w-full aspect-[9/16] mx-auto rounded-[1.5rem] border-2 border-dashed border-gray-300 bg-gray-50 flex flex-col gap-2 justify-center items-center text-gray-400 relative overflow-hidden">
                     ${photoBlock}
                 </div>
             </div>
@@ -526,6 +527,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 <p id="ringkasan-text" class="text-[13px] font-semibold text-gray-800 leading-snug">${narrativeBlock(data)}</p>
             </div>
 
+            ${data.missions.length > 0 ? `
             <!-- 6a. MISI RUMAH BERSAMA KELUARGA -->
             <div class="col-span-6 bg-brand-yellow rounded-[1.25rem] p-4 pt-3 border border-yellow-200 shadow-sm relative">
                 <div class="flex items-center gap-3 mb-3">
@@ -535,7 +537,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 <div class="flex flex-col gap-3">
                     ${missionsHTML(data.missions)}
                 </div>
-            </div>
+            </div>` : ''}
 
             <!-- 6b. PENGESAHAN + TTD -->
             <div class="col-span-6 bg-white border-2 border-gray-200 rounded-[1.25rem] p-4 pt-5 shadow-sm relative mt-2">

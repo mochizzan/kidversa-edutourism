@@ -318,7 +318,11 @@
       "rejected": "Đã từ chối",
       "queued": "Trong hàng đợi",
       "processing": "Đang xử lý",
-      "operationInterrupted": "Quá trình trên máy chủ đã bị gián đoạn"
+      "operationInterrupted": "Quá trình trên máy chủ đã bị gián đoạn",
+      "error": "Lỗi",
+      "interrupted": "Bị gián đoạn",
+      "phaseNarrative": "Tường thuật",
+      "phaseMissions": "Nhiệm vụ"
     },
     "reportStatus": {
       "draft": "Bản nháp",
@@ -864,7 +868,7 @@
       "noAssessmentTip": "Vui lòng hoàn thành đánh giá trước tại trang Đánh giá",
       "incompleteTip": "Người tham gia chưa có đánh giá. Vui lòng hoàn thành đánh giá trước.",
       "generateResultTitle": "Kết quả tạo báo cáo",
-      "generateOk": "Đã tạo thành công <strong>{{count}} báo cáo</strong> cho những người tham gia đã có đánh giá.",
+      "generateOk": "Đã bắt đầu tạo <strong>{{count}} báo cáo</strong> — theo dõi tiến độ trong danh sách báo cáo bên dưới.",
       "generateSkip": "Những người tham gia sau đây <strong>không thể tạo báo cáo</strong> vì chưa có dữ liệu đánh giá:",
       "understand": "Đã hiểu",
       "sendConfirmTitle": "Xác nhận gửi báo cáo",
@@ -1291,8 +1295,9 @@
       "deletePhoto": "Hapus Foto",
       "deleteConfirm": "Yakin ingin menghapus foto ini? Tindakan ini tidak dapat dibatalkan.",
       "deleteError": "Gagal menghapus foto",
-      "pickPhoto": "Select as report photo",
-      "unpickPhoto": "Deselect report photo",
+      "pickPhoto": "chọn ảnh cho báo cáo mini",
+      "unpickPhoto": "hủy chọn ảnh báo cáo mini",
+      "miniRaportBadge": "Báo cáo mini",
       "pickError": "Failed to select report photo",
       "clearPickError": "Failed to deselect report photo",
       "reportBadge": "Ảnh báo cáo"

@@ -158,14 +158,43 @@ export interface ReportTokenResponse {
 }
 
 /**
+ * Per-report lifecycle phase inside an active generate run: the AI narrative
+ * pass and the mission-selection pass run concurrently per worklist report.
+ */
+export type ReportGeneratePhase = 'narrative' | 'missions'
+
+/** One report's status inside active_generate (server-side registry). */
+export type ReportGenerateItemStatus = 'queued' | 'processing' | 'success' | 'error'
+
+/**
+ * One report's status inside active_generate. `phase` is present while the
+ * report is processing or when it failed (which phase failed); `error`
+ * carries the failure message when status=error.
+ */
+export interface ReportGenerateItem {
+ report_id: string
+ status: ReportGenerateItemStatus
+ phase?: ReportGeneratePhase
+ error?: string
+}
+
+/**
  * Server-side generate run for one session. Present in GET /api/reports only
- * while the blocking generate operation is running (omitempty).
+ * while the async generate operation is alive (omitempty).
+ * `items` is the per-report source of truth for row displays; `queued_ids` /
+ * `processing_ids` are the narrative-phase views kept for existing consumers.
  */
 export interface ReportGenerateOperation {
  session_id: string
  started_at?: string
  queued_ids: string[]
  processing_ids: string[]
+ items: ReportGenerateItem[]
+ total: number
+ queued: number
+ processing: number
+ succeeded: number
+ failed: number
 }
 
 /**
@@ -193,8 +222,10 @@ export type ReportSessionResult = {
 
 export interface ReportService {
  getBySession(sessionId: string): Promise<ReportSessionResult>
- generate(sessionId: string): Promise<Report[]>
- generateOne: (sessionId: string, participantId: string) => Promise<Report[]>
+ /** Async generate: 202 Accepted — the run continues server-side; progress
+  *  arrives via active_generate in getBySession, never from this response. */
+ generate(sessionId: string): Promise<void>
+ generateOne: (sessionId: string, participantId: string) => Promise<void>
  approve(
   reportId: string,
   data?: { narrative_final?: string; mission_ids?: string[] },

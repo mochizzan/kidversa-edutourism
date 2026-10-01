@@ -5,6 +5,7 @@ import { assessmentService } from '../../../core/services/assessments'
 import { programService } from '../../../core/services/programs'
 import { i18n } from '../../../core/i18n'
 import { isSendableReportStatus } from '../../../core/constants/reportStatus'
+import type { RecordedGenerateError } from '../../../core/constants/reportStatus'
 import { ReportStatus } from '../../../core/types/enums'
 import { ApiError } from '../../../core/services/backend-client'
 import { useToastStore } from '../../../core/stores/toastStore'
@@ -53,17 +54,26 @@ const STATUS_ORDER: Record<ParticipantReportStatus, number> = {
 const POLL_INTERVAL_MS = 2000
 
 /**
- * Generate-run completion evidence: the worklist of active_generate is exactly
- * the reports whose narrative draft was EMPTY at enqueue, and the run persists
- * every draft before it ends. All watched ids carrying a draft ⇒ the run
- * finished; a watched id still draft-less when the flag vanishes ⇒ the server
- * stopped mid-run (restart) or the run errored before persisting.
+ * Generate-run completion evidence per watched report: the run persisted the
+ * narrative draft AND either persisted its missions (mission_ids) or recorded
+ * a terminal per-item failure in active_generate (captured message). The
+ * worklist of active_generate is exactly the reports whose draft was EMPTY at
+ * enqueue, and the run persists every draft before it ends — so a watched id
+ * missing a draft or mission evidence when the flag vanishes is a server-side
+ * stop (restart / registry loss), never a silent "done".
  */
-function generateSettled(watched: string[], items: Report[]): boolean {
+function generateSettled(
+ watched: string[],
+ items: Report[],
+ recordedErrors: ReadonlyMap<string, RecordedGenerateError>,
+): boolean {
  const byId = new Map<string, Report>(items.map((r) => [r.id, r]))
  return watched.every((id) => {
-  const draft = byId.get(id)?.ai_narrative_draft
-  return typeof draft === 'string' && draft.length > 0
+  const r = byId.get(id)
+  const draft = typeof r?.ai_narrative_draft === 'string' && r.ai_narrative_draft.length > 0
+  if (!draft) return false
+  if (recordedErrors.has(id)) return true // terminal recorded failure counts as settled
+  return Array.isArray(r?.mission_ids) && r.mission_ids.length > 0
  })
 }
 
@@ -185,6 +195,19 @@ export function useReportSession(sessionId: string | undefined) {
  // server-side interruption (restart / registry loss), never a silent "done".
  const prevGenIdsRef = useRef<string[]>([])
  const prevSendIdsRef = useRef<string[]>([])
+ // Every report id ever observed in an active_generate run this page session,
+ // plus the per-item failure messages captured from its items. Both are rebuilt
+ // from GET /api/reports extras on mount (never persisted locally): they only
+ // bridge registry loss so a vanished run resolves to success (evidence
+ // complete) / error (recorded message) / interrupted (evidence missing).
+ const genWatchRef = useRef<Set<string>>(new Set())
+ const genErrorsRef = useRef<Map<string, RecordedGenerateError>>(new Map())
+ // True once the local generate POST was accepted (202) but the local
+ // `generating` bridge has not yet been retired by an authoritative fetch
+ // (one that STARTED after the acceptance, or one that observes the run).
+ // The bridge exists only to keep the poll interval alive until then — the
+ // server extras own every visible status.
+ const genAcceptedRef = useRef(false)
  // Set when a local generate POST already surfaced its failure via genError,
  // so the ensuing flag-clear is not double-reported as an interruption.
  const localGenFailedRef = useRef(false)
@@ -197,8 +220,32 @@ export function useReportSession(sessionId: string | undefined) {
  const applyExtras = useCallback((extras: ReportSessionExtras | null | undefined) => {
   const gen = extras?.active_generate ?? null
   const send = extras?.active_send ?? null
+  if (gen) {
+   // Track the run membership + per-item failures this fetch observed. The
+   // sets grow from server data only, so a remount starts empty and rebuilds
+   // them from the same extras (identical state after a reload).
+   for (const id of gen.queued_ids) genWatchRef.current.add(id)
+   for (const id of gen.processing_ids) genWatchRef.current.add(id)
+   for (const item of gen.items) {
+    genWatchRef.current.add(item.report_id)
+    if (item.status === 'error') {
+     genErrorsRef.current.set(item.report_id, {
+      message: item.error || i18n.t('admin.reports.generateError'),
+      phase: item.phase,
+     })
+    } else if (item.status === 'success') {
+     genErrorsRef.current.delete(item.report_id)
+    }
+   }
+  }
   activeGenerateRef.current = gen
   activeSendRef.current = send
+  if (gen) {
+   // The server run is observed → the local `generating` bridge retires; the
+   // extras flag now gates the button and keeps polling alive.
+   genAcceptedRef.current = false
+   setGenerating(false)
+  }
   setActiveGenerate(gen)
   setActiveSend(send)
  }, [])
@@ -225,7 +272,7 @@ export function useReportSession(sessionId: string | undefined) {
    } else if (prevGenIdsRef.current.length > 0) {
     const locallyHandled = localGenFailedRef.current || generatingRef.current
     localGenFailedRef.current = false
-    if (!locallyHandled && freshItems && !generateSettled(prevGenIdsRef.current, freshItems)) {
+    if (!locallyHandled && freshItems && !generateSettled(prevGenIdsRef.current, freshItems, genErrorsRef.current)) {
      interrupted = true
     }
    }
@@ -254,12 +301,22 @@ export function useReportSession(sessionId: string | undefined) {
  const refreshReports = useCallback(async (): Promise<boolean> => {
   if (!sessionId) return false
   if (endpointGoneRef.current) return false // dead endpoint: no error-loop
+  // A fetch that only STARTED after the generate POST was accepted is
+  // authoritative: the run was registered before the 202 returned, so if its
+  // response carries no active_generate, the run is already over — the local
+  // `generating` bridge may retire (polling then follows the server flags,
+  // or stops when there is genuinely nothing left to poll for).
+  const startedAfterAccept = genAcceptedRef.current
   try {
    const bundle = await reportService.getBySession(sessionId)
    const interrupted = noteExtras(bundle.extras, bundle.items)
    const inputs = joinInputsRef.current
    if (inputs) setReports(buildReportListItems(bundle.items, inputs))
    applyExtras(bundle.extras)
+   if (startedAfterAccept && !bundle.extras?.active_generate) {
+    genAcceptedRef.current = false
+    setGenerating(false)
+   }
    if (interrupted) {
     // Watched operation vanished without persisted completion evidence —
     // one-shot notice + refetch (watch refs already advanced → no loop).
@@ -542,25 +599,35 @@ export function useReportSession(sessionId: string | undefined) {
    .map((r) => r.participant)
 
   if (eligible.length === 0) {
+   generatingRef.current = false
    setGenError(i18n.t('admin.reports.eligibleEmptyError'))
    return { ok: false, generatedCount: 0, skippedParticipants: skipped }
   }
 
-  setGenerating(true) // optimistic overlay; server active_generate wins
+  // The local flag only gates the button and keeps the poll interval alive
+  // until the accepted run is observed — every visible row status comes from
+  // the server's active_generate extras.
+  setGenerating(true)
   try {
-   await reportService.generate(sessionId) // blocking POST — unchanged
-   await refreshReports() // immediate refetch of server truth
-   return { ok: true, generatedCount: eligible.length, skippedParticipants: skipped }
+   await reportService.generate(sessionId) // 202 — the run continues server-side
   } catch (e) {
    // Failure surfaced via genError below — suppress the matching flag-clear
    // interruption notice (noteExtras consumes this on the next fetch).
    localGenFailedRef.current = true
    setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
-   return { ok: false, generatedCount: 0, skippedParticipants: skipped }
-  } finally {
    generatingRef.current = false
    setGenerating(false)
+   genAcceptedRef.current = false
+   return { ok: false, generatedCount: 0, skippedParticipants: skipped }
   }
+  // Accepted: the run is registered before the 202, so polling starts right
+  // away and the first authoritative fetch retires the local bridge (see
+  // refreshReports/applyExtras). If this refetch fails, the bridge keeps the
+  // interval polling until one succeeds.
+  genAcceptedRef.current = true
+  await refreshReports()
+  generatingRef.current = false
+  return { ok: true, generatedCount: eligible.length, skippedParticipants: skipped }
  }, [sessionId, reports, refreshReports])
 
  const handleGenerateOne = useCallback(async (participantId: string): Promise<boolean> => {
@@ -571,21 +638,23 @@ export function useReportSession(sessionId: string | undefined) {
    return false
   }
   setGenError(null)
-  setGenerating(true) // optimistic overlay; server active_generate wins
+  setGenerating(true) // button/poll bridge only; server extras own the status
   try {
-   await reportService.generateOne(sessionId, participantId)
-   await refreshReports() // immediate refetch of server truth
-   return true
+   await reportService.generateOne(sessionId, participantId) // 202
   } catch (e) {
    // Failure surfaced via genError below — suppress the matching flag-clear
    // interruption notice (noteExtras consumes this on the next fetch).
    localGenFailedRef.current = true
    setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
-   return false
-  } finally {
    generatingRef.current = false
    setGenerating(false)
+   genAcceptedRef.current = false
+   return false
   }
+  genAcceptedRef.current = true
+  await refreshReports() // immediate refetch of server truth
+  generatingRef.current = false
+  return true
  }, [sessionId, refreshReports])
 
  const filteredReports = useMemo(() => {
@@ -615,6 +684,8 @@ export function useReportSession(sessionId: string | undefined) {
   sendError,
   activeGenerate,
   activeSend,
+  generateWatch: genWatchRef.current,
+  generateErrors: genErrorsRef.current,
   filteredReports,
   loadData,
   handleGenerateAll,
