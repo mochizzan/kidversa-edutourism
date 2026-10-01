@@ -120,7 +120,7 @@ func main() {
 	registry.Frame = handler.NewFrameHandler(frameRepo)
 	registry.Upload = handler.NewUploadHandler(cfg, photoRepo, frameRepo, contentRepo, userRepo, consentRepo, sessionRepo)
 	registry.Media = handler.NewMediaHandler(cfg, photoRepo, consentRepo, sessionRepo, frameRepo, contentRepo, userRepo)
-	registry.Gallery = handler.NewGalleryHandler(galleryRepo, reportRepo, photoRepo, sessionRepo, consentRepo)
+	registry.Gallery = handler.NewGalleryHandler(cfg, galleryRepo, reportRepo, photoRepo, sessionRepo, consentRepo)
 
 	deps := httppkg.Deps{
 		Config:   cfg,

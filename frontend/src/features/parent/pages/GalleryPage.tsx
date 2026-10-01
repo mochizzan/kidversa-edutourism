@@ -1,14 +1,22 @@
 import { useState } from 'react'
-import { Camera, Award, X } from 'lucide-react'
+import { Camera, Award, ImageOff, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { GalleryTokenGuard, useGalleryToken } from '../components/GalleryTokenGuard'
+import { galleryService } from '../../../core/services/gallery'
 import type { GalleryPhoto } from '../../../core/types'
+
+// Placeholder for a photo whose file failed to load (deleted/404). Inlined in
+// Indonesian because this change intentionally leaves the locale catalogs untouched.
+const PHOTO_UNAVAILABLE = 'Foto tidak tersedia'
 
 /* ── Inner gallery component ── */
 function GalleryView() {
   const { t } = useTranslation()
-  const { gallery, loading } = useGalleryToken()
+  const { gallery, loading, token } = useGalleryToken()
   const [selectedPhoto, setSelectedPhoto] = useState<GalleryPhoto | null>(null)
+  // Photos whose bytes failed to load — each one degrades independently so a
+  // single missing file never blanks the rest of the grid.
+  const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(new Set())
 
   if (loading || !gallery) return null
 
@@ -37,27 +45,48 @@ function GalleryView() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {gallery.photos.map((photo) => (
-              <button
-                key={photo.id}
-                type="button"
-                onClick={() => setSelectedPhoto(photo)}
-                className="relative aspect-[3/4] rounded-xl overflow-hidden bg-surface-variant group"
-              >
-                <img
-                  src={photo.framed_file_url || photo.original_file_url}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-                {photo.report_photo && (
-                  <div className="absolute top-1.5 left-1.5 bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
-                    <Award className="w-3 h-3" /> {t('parent.gallery.reportPhoto')}
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-              </button>
-            ))}
+            {gallery.photos.map((photo) => {
+              const failed = failedIds.has(photo.id)
+              return (
+                <button
+                  key={photo.id}
+                  type="button"
+                  disabled={failed}
+                  onClick={() => setSelectedPhoto(photo)}
+                  className="relative aspect-[3/4] rounded-xl overflow-hidden bg-surface-variant group"
+                >
+                  {failed ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2 text-center">
+                      <ImageOff className="w-5 h-5 text-on-surface-variant" />
+                      <span className="text-[10px] text-on-surface-variant">{PHOTO_UNAVAILABLE}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <img
+                        src={galleryService.photoUrl(token, photo.id, 'framed')}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={() =>
+                          setFailedIds((prev) => {
+                            if (prev.has(photo.id)) return prev
+                            const next = new Set(prev)
+                            next.add(photo.id)
+                            return next
+                          })
+                        }
+                      />
+                      {photo.report_photo && (
+                        <div className="absolute top-1.5 left-1.5 bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5">
+                          <Award className="w-3 h-3" /> {t('parent.gallery.reportPhoto')}
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                    </>
+                  )}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -80,12 +109,27 @@ function GalleryView() {
           >
             <X className="w-8 h-8" />
           </button>
-          <img
-            src={selectedPhoto.original_file_url}
-            alt=""
-            className="max-w-full max-h-full object-contain rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          />
+          {failedIds.has(selectedPhoto.id) ? (
+            <div className="flex flex-col items-center gap-3 text-white/70">
+              <ImageOff className="w-10 h-10" />
+              <p className="text-sm">{PHOTO_UNAVAILABLE}</p>
+            </div>
+          ) : (
+            <img
+              src={galleryService.photoUrl(token, selectedPhoto.id)}
+              alt=""
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onError={() =>
+                setFailedIds((prev) => {
+                  if (prev.has(selectedPhoto.id)) return prev
+                  const next = new Set(prev)
+                  next.add(selectedPhoto.id)
+                  return next
+                })
+              }
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
         </div>
       )}
     </div>

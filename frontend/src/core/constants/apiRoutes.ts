@@ -129,6 +129,8 @@ export const API_ROUTES = {
   ACCESS: '/api/reports/access',
   ACCESS_PHOTO: '/api/reports/access/photo',
   GALLERY: '/api/reports/gallery',
+  GALLERY_PHOTO: (photoId: string) =>
+   `/api/reports/gallery/photo/${encodeURIComponent(photoId)}`,
  },
 
  MISSIONS: {
