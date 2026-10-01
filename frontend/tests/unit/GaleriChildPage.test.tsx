@@ -91,12 +91,30 @@ const photo = {
   taken_at: '2026-09-30T02:00:00Z',
 }
 
-// The photo tile itself is a role="button" whose name-from-content equals the
-// pick label, so filter to the real <button> elements for pick selectors.
-function getPickButtons(label = 'pilih foto untuk mini rapor') {
-  return screen
-    .getAllByRole('button', { name: label })
-    .filter((el): el is HTMLButtonElement => el.tagName === 'BUTTON')
+// Header toggle labels (id is the source locale; tests run forced to 'id').
+const START_LABEL = 'Pilih Foto Mini Rapor'
+const SAVE_LABEL = 'Simpan Pilihan'
+const CANCEL_LABEL = 'Batal'
+const HINT =
+  'Klik foto untuk memilih (maksimal 1 foto), lalu klik Simpan Pilihan. Klik Batal untuk keluar tanpa menyimpan.'
+const NO_PHOTOS_TOAST = 'Belum ada foto yang bisa dipilih.'
+const NOTHING_SELECTED_TOAST = 'Belum ada foto yang dipilih. Klik satu foto terlebih dahulu.'
+const PICK_ERROR_TOAST = 'Foto rapor gagal dipilih'
+
+// The photo tile is a role="button" wrapper around its media URL — locate a
+// tile by the photo id embedded in the img src.
+function getTile(container: HTMLElement, photoId: string) {
+  const tile = Array.from(container.querySelectorAll('[role="button"]')).find((el) =>
+    el.querySelector(`img[src*="${photoId}"]`),
+  )
+  if (!tile) throw new Error(`photo tile ${photoId} not found`)
+  return tile as HTMLElement
+}
+
+async function click(el: HTMLElement) {
+  await act(async () => {
+    fireEvent.click(el)
+  })
 }
 
 async function renderChildPage() {
@@ -116,6 +134,17 @@ async function renderChildPage() {
   return result
 }
 
+async function enterSelectMode() {
+  await click(screen.getByRole('button', { name: START_LABEL }))
+}
+
+function toastMessages(type?: string) {
+  return useToastStore
+    .getState()
+    .toasts.filter((t) => !type || t.type === type)
+    .map((t) => t.message)
+}
+
 function mockHappyPath() {
   vi.mocked(sessionService.getParticipantById).mockResolvedValue(participant as never)
   vi.mocked(sessionService.getById).mockResolvedValue(detail as never)
@@ -128,6 +157,138 @@ function mockHappyPath() {
   vi.mocked(photoService.getByParticipant).mockResolvedValue([photo] as never)
   vi.mocked(photoService.getReportPicks).mockResolvedValue([] as never)
 }
+
+describe('GaleriChildPage: mini rapor select-mode toggle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u1', name: 'Fasil', role: 'FASILITATOR' } } as never)
+    vi.mocked(photoService.setReportPick).mockResolvedValue(photo as never)
+    vi.mocked(photoService.clearReportPick).mockResolvedValue(undefined)
+    useToastStore.setState({ toasts: [] })
+    mockHappyPath()
+  })
+
+  it('enters select mode from the header toggle and marks a clicked photo with the Mini Rapor badge', async () => {
+    const { container } = await renderChildPage()
+
+    // Idle: single-state toggle, no mode chrome, no badge yet.
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
+    expect(screen.queryByText(HINT)).toBeNull()
+    expect(screen.queryByText('Mini Rapor')).toBeNull()
+
+    await enterSelectMode()
+
+    expect(screen.queryByRole('button', { name: START_LABEL })).toBeNull()
+    expect(screen.getByRole('button', { name: SAVE_LABEL })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: CANCEL_LABEL })).toBeInTheDocument()
+    expect(screen.getByText(HINT)).toBeInTheDocument()
+
+    // Clicking a photo in select mode marks it pending — NOT fullscreen.
+    await click(getTile(container, 'ph-1'))
+    expect(within(getTile(container, 'ph-1')).getByText('Mini Rapor')).toBeInTheDocument()
+    expect(screen.queryByText('Hapus Foto')).toBeNull()
+    expect(photoService.setReportPick).not.toHaveBeenCalled()
+  })
+
+  it('keeps at most one pending selection: a second photo replaces the first, re-click deselects', async () => {
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([
+      { ...photo, id: 'ph-1', created_at: '2026-09-30T02:00:00Z' },
+      { ...photo, id: 'ph-2', created_at: '2026-09-30T03:00:00Z' },
+    ] as never)
+
+    const { container } = await renderChildPage()
+    await enterSelectMode()
+
+    await click(getTile(container, 'ph-1'))
+    expect(within(getTile(container, 'ph-1')).getByText('Mini Rapor')).toBeInTheDocument()
+
+    // Selecting another photo replaces the previous one (max 1 selected).
+    await click(getTile(container, 'ph-2'))
+    expect(within(getTile(container, 'ph-2')).getByText('Mini Rapor')).toBeInTheDocument()
+    expect(within(getTile(container, 'ph-1')).queryByText('Mini Rapor')).toBeNull()
+    expect(screen.getAllByText('Mini Rapor')).toHaveLength(1)
+
+    // Re-clicking the selected photo deselects it.
+    await click(getTile(container, 'ph-2'))
+    expect(screen.queryByText('Mini Rapor')).toBeNull()
+  })
+
+  it('saves the pending selection with SIMPAN PILIHAN (photo id + active stage) and exits select mode', async () => {
+    const { container } = await renderChildPage()
+    await enterSelectMode()
+    await click(getTile(container, 'ph-1'))
+    await click(screen.getByRole('button', { name: SAVE_LABEL }))
+
+    expect(photoService.setReportPick).toHaveBeenCalledTimes(1)
+    expect(photoService.setReportPick).toHaveBeenCalledWith({
+      participant_id: 'c-1',
+      session_id: 's-1',
+      program_stage_id: 'ps1',
+      photo_id: 'ph-1',
+    })
+
+    // Exited select mode, and the saved pick drives the badge (synced mini rapor).
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
+    expect(screen.queryByRole('button', { name: CANCEL_LABEL })).toBeNull()
+    expect(within(getTile(container, 'ph-1')).getByText('Mini Rapor')).toBeInTheDocument()
+    expect(toastMessages('error')).toHaveLength(0)
+  })
+
+  it('shows a user-facing message and calls no API when saving with nothing selected', async () => {
+    await renderChildPage()
+    await enterSelectMode()
+
+    await click(screen.getByRole('button', { name: SAVE_LABEL }))
+
+    expect(photoService.setReportPick).not.toHaveBeenCalled()
+    expect(toastMessages('warning')).toContain(NOTHING_SELECTED_TOAST)
+    // Keeps select mode so the user can still pick.
+    expect(screen.getByRole('button', { name: SAVE_LABEL })).toBeInTheDocument()
+  })
+
+  it('discards the pending selection when exiting select mode without saving (Batal)', async () => {
+    const { container } = await renderChildPage()
+    await enterSelectMode()
+    await click(getTile(container, 'ph-1'))
+    expect(within(getTile(container, 'ph-1')).getByText('Mini Rapor')).toBeInTheDocument()
+
+    await click(screen.getByRole('button', { name: CANCEL_LABEL }))
+
+    expect(photoService.setReportPick).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
+    expect(screen.queryByText('Mini Rapor')).toBeNull()
+
+    // Mode is gone: photo clicks open fullscreen again.
+    await click(getTile(container, 'ph-1'))
+    expect(screen.getByText('Hapus Foto')).toBeInTheDocument()
+    expect(photoService.setReportPick).not.toHaveBeenCalled()
+  })
+
+  it('opens the fullscreen viewer when clicking a photo outside select mode', async () => {
+    const { container } = await renderChildPage()
+
+    await click(getTile(container, 'ph-1'))
+
+    expect(screen.getByText('Hapus Foto')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
+    expect(photoService.setReportPick).not.toHaveBeenCalled()
+  })
+
+  it('shows a message and does not enter select mode when the child has no photos', async () => {
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([] as never)
+
+    await renderChildPage()
+    await enterSelectMode()
+
+    expect(toastMessages('warning')).toContain(NO_PHOTOS_TOAST)
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeInTheDocument()
+    expect(photoService.setReportPick).not.toHaveBeenCalled()
+  })
+})
 
 describe('GaleriChildPage: actions and locks', () => {
   beforeEach(() => {
@@ -157,36 +318,13 @@ describe('GaleriChildPage: actions and locks', () => {
     // PhotoGallery's dedicated empty state with the child's name…
     expect(screen.getByText('Belum ada foto untuk Budi')).toBeInTheDocument()
     expect(screen.getByText('0/10 foto')).toBeInTheDocument()
-    // …and no per-photo actions exist without photos.
-    expect(screen.queryByRole('button', { name: 'pilih foto untuk mini rapor' })).toBeNull()
+    // …and no select mode is possible without photos.
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
     expect(screen.queryByText('Terjadi Kesalahan')).toBeNull()
   })
 
-  it('calls the report-pick service when picking a photo, then shows the Mini Rapor badge', async () => {
-    await renderChildPage()
-
-    const pickButtons = getPickButtons()
-    expect(pickButtons.length).toBeGreaterThan(0)
-    await act(async () => {
-      fireEvent.click(pickButtons[0])
-    })
-
-    expect(photoService.setReportPick).toHaveBeenCalledWith({
-      participant_id: 'c-1',
-      session_id: 's-1',
-      program_stage_id: 'ps1',
-      photo_id: 'ph-1',
-    })
-
-    // Foto terpilih: badge teks "Mini Rapor" + tombol batal pilihan berlabel jelas
-    expect(screen.getByText('Mini Rapor')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'pilih foto untuk mini rapor' })).toBeNull()
-    expect(
-      screen.getAllByRole('button', { name: 'batalkan pilihan untuk mini rapor' }).length,
-    ).toBeGreaterThan(0)
-  })
-
-  it('disables the pick action with a visible reason when photo consent is missing', async () => {
+  it('disables entering select mode with a visible reason when photo consent is missing', async () => {
     vi.mocked(sessionService.getParticipantById).mockResolvedValue(
       { ...participant, consent_photo: false } as never,
     )
@@ -194,16 +332,13 @@ describe('GaleriChildPage: actions and locks', () => {
     await renderChildPage()
 
     expect(screen.getByText('Izin foto belum diberikan')).toBeInTheDocument()
-    const pickButtons = screen.getAllByRole('button', { name: 'Izin foto belum diberikan' })
-    expect(pickButtons.length).toBeGreaterThan(0)
-    expect(pickButtons[0]).toBeDisabled()
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeDisabled()
 
     // Tambah Foto is also locked with the same visible reason
     expect(screen.getByRole('button', { name: 'Tambah Foto' })).toBeDisabled()
 
-    await act(async () => {
-      fireEvent.click(pickButtons[0])
-    })
+    await click(screen.getByRole('button', { name: START_LABEL }))
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
     expect(photoService.setReportPick).not.toHaveBeenCalled()
   })
 
@@ -219,16 +354,17 @@ describe('GaleriChildPage: actions and locks', () => {
     expect(
       screen.getByText('Bukan kelompok Anda — foto hanya dapat dilihat (mode baca saja).'),
     ).toBeInTheDocument()
-    // Pick + delete buttons both carry the lock reason as their accessible name
-    const lockedButtons = screen.getAllByRole('button', { name: 'Bukan kelompok Anda' })
-    expect(lockedButtons.length).toBeGreaterThanOrEqual(2)
-    expect(lockedButtons[0]).toBeDisabled()
-    expect(lockedButtons[1]).toBeDisabled()
+    // Select mode cannot be entered; delete stays locked with the reason as its accessible name.
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeDisabled()
+    const lockedDelete = screen
+      .getAllByRole('button', { name: 'Bukan kelompok Anda' })
+      .filter((el) => el.tagName === 'BUTTON')
+    expect(lockedDelete).toHaveLength(1)
+    expect(lockedDelete[0]).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Tambah Foto' })).toBeDisabled()
 
-    await act(async () => {
-      fireEvent.click(lockedButtons[0])
-    })
+    await click(screen.getByRole('button', { name: START_LABEL }))
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
     expect(photoService.setReportPick).not.toHaveBeenCalled()
   })
 
@@ -329,18 +465,24 @@ describe('GaleriChildPage: failed photo loads and mutations surface readable err
     mockHappyPath()
   })
 
-  it('shows an error toast when the server rejects a foto rapor pick', async () => {
+  it('stays in select mode with the selection intact when the save fails', async () => {
     vi.mocked(photoService.setReportPick).mockRejectedValue(new Error('server rejected'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
 
-    await renderChildPage()
+    try {
+      const { container } = await renderChildPage()
+      await enterSelectMode()
+      await click(getTile(container, 'ph-1'))
+      await click(screen.getByRole('button', { name: SAVE_LABEL }))
 
-    const pickButtons = getPickButtons()
-    await act(async () => {
-      fireEvent.click(pickButtons[0])
-    })
-
-    const errorToasts = useToastStore.getState().toasts.filter((t) => t.type === 'error')
-    expect(errorToasts.some((t) => t.message === 'Foto rapor gagal dipilih')).toBe(true)
+      expect(toastMessages('error')).toContain(PICK_ERROR_TOAST)
+      // Still in select mode with the pending selection — user can retry or cancel.
+      expect(screen.getByRole('button', { name: SAVE_LABEL })).toBeInTheDocument()
+      expect(within(getTile(container, 'ph-1')).getByText('Mini Rapor')).toBeInTheDocument()
+      expect(photoService.setReportPick).toHaveBeenCalledTimes(1)
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   it('replaces the photo grid with an error state when the photo fetch fails, then retries', async () => {
@@ -380,19 +522,134 @@ describe('GaleriChildPage: failed photo loads and mutations surface readable err
         '[useSmartPhotos.loadPicks]',
         expect.any(TypeError),
       )
-      const errorToasts = useToastStore.getState().toasts.filter((t) => t.type === 'error')
-      expect(
-        errorToasts.some((t) => t.message === 'Gagal memuat pilihan foto rapor.'),
-      ).toBe(true)
+      expect(toastMessages('error')).toContain('Gagal memuat pilihan foto rapor.')
 
       // Picks degrade to an empty list: the photo grid still renders (no
-      // empty-state regression, no crash) and pick actions remain available.
+      // empty-state regression, no crash) and select mode remains available.
       expect(screen.getByText('Galeri Foto — Budi')).toBeInTheDocument()
       expect(screen.getByText('1/10 foto')).toBeInTheDocument()
-      expect(getPickButtons().length).toBeGreaterThan(0)
+      expect(screen.getByRole('button', { name: START_LABEL })).toBeEnabled()
       expect(screen.queryByText('Terjadi Kesalahan')).toBeNull()
     } finally {
       errorSpy.mockRestore()
     }
+  })
+})
+
+describe('GaleriChildPage: save-flow edge cases (in-flight guard, stale selection, unmount)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u1', name: 'Fasil', role: 'FASILITATOR' } } as never)
+    vi.mocked(photoService.setReportPick).mockResolvedValue(photo as never)
+    vi.mocked(photoService.clearReportPick).mockResolvedValue(undefined)
+    useToastStore.setState({ toasts: [] })
+    mockHappyPath()
+  })
+
+  /** Promise yang dijadwalkan test — menahan save in-flight selama yang diuji. */
+  function deferred<T>() {
+    let resolve!: (v: T) => void
+    let reject!: (e: unknown) => void
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve, reject }
+  }
+
+  it('double-clicking SIMPAN while a save is in flight issues exactly one POST', async () => {
+    const d = deferred<typeof photo>()
+    vi.mocked(photoService.setReportPick).mockReturnValue(d.promise as never)
+    const { container } = await renderChildPage()
+    await enterSelectMode()
+    await click(getTile(container, 'ph-1'))
+
+    await click(screen.getByRole('button', { name: SAVE_LABEL }))
+    // Save berjalan: tombol Simpan & Batal nonaktif (dan guard di handler).
+    expect(screen.getByRole('button', { name: SAVE_LABEL })).toBeDisabled()
+    expect(screen.getByRole('button', { name: CANCEL_LABEL })).toBeDisabled()
+
+    await click(screen.getByRole('button', { name: SAVE_LABEL }))
+    expect(photoService.setReportPick).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      d.resolve(photo)
+    })
+    // Satu POST sukses → keluar select mode.
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()
+  })
+
+  it('Batal pressed during an in-flight save does not exit select mode; the save result applies when it resolves', async () => {
+    const d = deferred<typeof photo>()
+    vi.mocked(photoService.setReportPick).mockReturnValue(d.promise as never)
+    const { container } = await renderChildPage()
+    await enterSelectMode()
+    await click(getTile(container, 'ph-1'))
+    await click(screen.getByRole('button', { name: SAVE_LABEL }))
+
+    await click(screen.getByRole('button', { name: CANCEL_LABEL }))
+    // Mode tidak keluar di tengah save (tanpa state basah)…
+    expect(screen.getByRole('button', { name: SAVE_LABEL })).toBeInTheDocument()
+    expect(screen.getByText(HINT)).toBeInTheDocument()
+    expect(within(getTile(container, 'ph-1')).getByText('Mini Rapor')).toBeInTheDocument()
+    expect(photoService.setReportPick).toHaveBeenCalledTimes(1)
+
+    // …dan hasil save tetap diterapkan begitu server menjawab.
+    await act(async () => {
+      d.resolve(photo)
+    })
+    expect(screen.getByRole('button', { name: START_LABEL })).toBeInTheDocument()
+    expect(within(getTile(container, 'ph-1')).getByText('Mini Rapor')).toBeInTheDocument()
+    expect(toastMessages('error')).toHaveLength(0)
+  })
+
+  it('a save that resolves after unmount is ignored safely (no crash, no unhandled rejection, single POST)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
+    try {
+      const d = deferred<typeof photo>()
+      vi.mocked(photoService.setReportPick).mockReturnValue(d.promise as never)
+      const { container, unmount } = await renderChildPage()
+      await enterSelectMode()
+      await click(getTile(container, 'ph-1'))
+      await click(screen.getByRole('button', { name: SAVE_LABEL }))
+      expect(photoService.setReportPick).toHaveBeenCalledTimes(1)
+
+      unmount()
+      await act(async () => {
+        d.resolve(photo)
+      })
+
+      // Transisi state setelah unmount dilewati (mountedRef) — tanpa error.
+      expect(errorSpy).not.toHaveBeenCalled()
+      expect(toastMessages('error')).toHaveLength(0)
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('deleting the pending photo during select mode clears the selection; SIMPAN then warns without POSTing a dead id', async () => {
+    const { container } = await renderChildPage()
+    await enterSelectMode()
+    await click(getTile(container, 'ph-1'))
+    expect(within(getTile(container, 'ph-1')).getByText('Mini Rapor')).toBeInTheDocument()
+
+    // Refresh setelah delete tidak lagi mengembalikan foto itu.
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([] as never)
+    const trash = within(getTile(container, 'ph-1')).getByRole('button', { name: 'Hapus Foto' })
+    await click(trash)
+    const dialog = screen.getByRole('dialog')
+    await click(within(dialog).getByRole('button', { name: 'Hapus' }))
+
+    // Pilihan tertunda dibersihkan: tidak ada badge, grid kosong, mode aktif.
+    expect(screen.queryByText('Mini Rapor')).toBeNull()
+    expect(screen.getByText('Belum ada foto untuk Budi')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: SAVE_LABEL })).toBeInTheDocument()
+
+    // SIMPAN tidak pernah mengirim photo_id mati — hanya peringatan.
+    await click(screen.getByRole('button', { name: SAVE_LABEL }))
+    expect(photoService.setReportPick).not.toHaveBeenCalled()
+    expect(toastMessages('warning')).toContain(NOTHING_SELECTED_TOAST)
+    expect(screen.getByRole('button', { name: SAVE_LABEL })).toBeInTheDocument()
   })
 })

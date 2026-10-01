@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Lock, Plus } from 'lucide-react'
+import { Images, Lock, Plus, Save, X } from 'lucide-react'
 import { useAuth } from '../../../../core/hooks/useAuth'
 import { sessionService } from '../../../../core/services/sessions'
 import { programService } from '../../../../core/services/programs'
@@ -57,15 +57,20 @@ export function sortPhotosForGallery(
 
 /**
  * Galeri per peserta: photo grid (reuses PhotoGallery + useSmartPhotos) with
- * two actions — Tambah Foto (navigates to the existing camera capture route)
- * and Pilih sebagai foto rapor (setPick/clearPick on the existing
- * /api/photos/report-pick endpoints).
+ * two header actions — Tambah Foto (navigates to the existing camera capture
+ * route) and a two-state mini-rapor toggle. The toggle switches between
+ * "Pilih Foto Mini Rapor" (select mode: clicking a photo marks at most one
+ * pending selection instead of opening fullscreen) and "Simpan Pilihan"
+ * (saves the pending selection via setPick on the existing
+ * /api/photos/report-pick endpoints); "Batal" exits select mode and discards
+ * the pending selection without touching the server.
  *
  * Ownership mirrors useGroupOwnership: a FASILITATOR acts only when
  * group.facilitator_id === user.id; other roles bypass. Consent
- * (participant.consent_photo) and ownership locks disable the actions with a
- * visible explanatory reason. Missing participant (404) renders an error state
- * with retry; an empty photo grid is PhotoGallery's empty state, not an error.
+ * (participant.consent_photo) and ownership locks disable entering select
+ * mode with a visible explanatory reason. Missing participant (404) renders an
+ * error state with retry; an empty photo grid is PhotoGallery's empty state,
+ * not an error.
  */
 const GaleriChildPage = () => {
  const { t } = useTranslation()
@@ -87,8 +92,30 @@ const GaleriChildPage = () => {
  const [fullscreenPhoto, setFullscreenPhoto] = useState<SmartPhoto | null>(null)
  const [confirmDeletePhoto, setConfirmDeletePhoto] = useState<SmartPhoto | null>(null)
 
- const { photos, loadPhotos, picks, loadPicks, setPick, clearPick, deletePhoto } =
-  useSmartPhotos(childId, participant)
+ // Mode pilih mini rapor (toggle dua state di header). pendingPhotoId hanya
+ // hidup selama select mode — belum tersimpan sampai Simpan Pilihan sukses.
+ const [selectMode, setSelectMode] = useState(false)
+ const [pendingPhotoId, setPendingPhotoId] = useState<string | null>(null)
+
+ // Satu save in-flight pada satu waktu: menutup double-POST (klik Simpan ganda
+ // atau Enter berulang) dan membekukan Batal supaya mode tidak keluar di
+ // tengah permintaan (state basah: hasil save telat datang setelah mode ganti).
+ const [saving, setSaving] = useState(false)
+ const savingRef = useRef(false)
+ // Unmount di tengah save (navigasi) → transisi state dilewati; toast global
+ // tetap menampilkan kegagalan sehingga tidak pernah senyap.
+ const mountedRef = useRef(true)
+ useEffect(() => {
+  mountedRef.current = true
+  return () => {
+   mountedRef.current = false
+  }
+ }, [])
+
+ const { photos, loadPhotos, picks, loadPicks, setPick, deletePhoto } = useSmartPhotos(
+  childId,
+  participant,
+ )
 
  // Urutan galeri (K) — client-side; photos sudah difilter server per
  // participant (GET /api/photos?participant_id=), tak ada filter topik di sini.
@@ -210,15 +237,92 @@ const GaleriChildPage = () => {
 
  const pickPhotoId = picks.find((p) => p.program_stage_id === activeStageId)?.photo_id ?? null
 
- const handleTogglePick = async (photo: SmartPhoto) => {
-  if (!activeStageId || pickDisabledReason) return
-  if (photo.id === pickPhotoId) {
-   if (await clearPick(activeStageId)) return
-   addToast({ type: 'error', message: t('fasilitator.photos.clearPickError') })
-  } else {
-   if (await setPick(activeStageId, photo.id)) return
-   addToast({ type: 'error', message: t('fasilitator.photos.pickError') })
+ // ── Toggle mini rapor (dua state) ──
+ // Masuk mode pilih: hanya saat tak ada kendala; daftar foto kosong → toast
+ // (bukan diam, bukan crash). Keluar lewat Simpan Pilihan (sukses) atau Batal.
+ const enterSelectMode = () => {
+  if (pickDisabledReason) return
+  if (photos.length === 0) {
+   addToast({ type: 'warning', message: t('fasilitator.galeri.selectModeNoPhotos') })
+   return
   }
+  setPendingPhotoId(null)
+  setSelectMode(true)
+ }
+
+ // Pilihan tertunda yang menunjuk foto terhapus (dihapus di grid/tab lain atau
+ // hilang saat refetch fokus) dibersihkan begitu daftar foto berubah — Simpan
+ // tidak pernah mengirim photo_id yang sudah tidak ada.
+ useEffect(() => {
+  if (!selectMode || !pendingPhotoId) return
+  if (!photos.some((p) => p.id === pendingPhotoId)) setPendingPhotoId(null)
+ }, [photos, selectMode, pendingPhotoId])
+
+ // Simpan pilihan tertunda. Tanpa pilihan → toast tanpa memanggil API; foto
+ // hilang → bersihkan pilihan + toast (tanpa POST id mati); gagal → log sebab
+ // + toast error dan mode pilih + pilihan tetap; sukses → keluar mode. Satu
+ // permintaan dalam penerbangan: klik kedua diabaikan (tanpa double POST).
+ const saveSelection = async () => {
+  if (savingRef.current) return
+  if (!pendingPhotoId) {
+   addToast({ type: 'warning', message: t('fasilitator.galeri.selectModeNothingSelected') })
+   return
+  }
+  if (!photos.some((p) => p.id === pendingPhotoId)) {
+   setPendingPhotoId(null)
+   addToast({ type: 'warning', message: t('fasilitator.galeri.selectModeNothingSelected') })
+   return
+  }
+  if (!activeStageId) {
+   console.warn('[GaleriChildPage] saveSelection skipped: no active topic', { pendingPhotoId })
+   addToast({ type: 'error', message: t('fasilitator.galeri.noActiveTopic') })
+   return
+  }
+  savingRef.current = true
+  setSaving(true)
+  try {
+   const saved = await setPick(activeStageId, pendingPhotoId)
+   if (!saved) {
+    addToast({ type: 'error', message: t('fasilitator.photos.pickError') })
+    return
+   }
+   if (mountedRef.current) {
+    setSelectMode(false)
+    setPendingPhotoId(null)
+   }
+  } catch (err) {
+   // setPick menangkap kegagalan jaringannya sendiri (→ false); penjaga ini
+   // menutup jalur yang tetap melempar tanpa menelan sebabnya.
+   console.error('[GaleriChildPage] saveSelection failed', err)
+   addToast({ type: 'error', message: t('fasilitator.photos.pickError') })
+  } finally {
+   savingRef.current = false
+   if (mountedRef.current) setSaving(false)
+  }
+ }
+
+ const handleToggleSelectMode = () => {
+  if (selectMode) void saveSelection()
+  else enterSelectMode()
+ }
+
+ // Batal dibekukan selama save in-flight (tombol juga disabled): mode tidak
+ // boleh keluar di tengah permintaan — hasil save yang datang telat tidak boleh
+ // mengubah state yang sudah user reset.
+ const cancelSelectMode = () => {
+  if (savingRef.current) return
+  setSelectMode(false)
+  setPendingPhotoId(null)
+ }
+
+ // Klik tile: mode pilih → tandai/buang pilihan tertunda (maksimal 1, tanpa
+ // fullscreen); di luar mode pilih → buka fullscreen seperti biasa.
+ const handleGridPhotoClick = (photo: SmartPhoto) => {
+  if (!selectMode) {
+   setFullscreenPhoto(photo)
+   return
+  }
+  setPendingPhotoId((prev) => (prev === photo.id ? null : photo.id))
  }
 
  const header = (
@@ -289,6 +393,26 @@ const GaleriChildPage = () => {
     >
      {t('fasilitator.galeri.addPhoto')}
     </Button>
+    <Button
+     icon={selectMode ? <Save className="w-4 h-4" /> : <Images className="w-4 h-4" />}
+     disabled={saving || (!selectMode && !!pickDisabledReason)}
+     tooltip={pickDisabledReason}
+     onClick={handleToggleSelectMode}
+    >
+     {selectMode
+      ? t('fasilitator.galeri.selectModeSave')
+      : t('fasilitator.galeri.selectModeStart')}
+    </Button>
+    {selectMode && (
+     <Button
+      variant="ghost"
+      icon={<X className="w-4 h-4" />}
+      disabled={saving}
+      onClick={cancelSelectMode}
+     >
+      {t('common.cancel')}
+     </Button>
+    )}
     <span className="text-xs text-on-surface-variant">
      {t('fasilitator.photos.photoCount', { count: photos.length, max: MAX_PHOTOS })}
     </span>
@@ -306,8 +430,12 @@ const GaleriChildPage = () => {
     />
    </div>
 
-   {pickDisabledReason && isMine && consentOk && (
-    <p className="text-xs text-on-surface-variant">{pickDisabledReason}</p>
+   {selectMode ? (
+    <p className="text-xs text-on-surface-variant">{t('fasilitator.galeri.selectModeHint')}</p>
+   ) : (
+    pickDisabledReason &&
+    isMine &&
+    consentOk && <p className="text-xs text-on-surface-variant">{pickDisabledReason}</p>
    )}
 
    {topics.length > 0 && (
@@ -335,12 +463,11 @@ const GaleriChildPage = () => {
      <PhotoGallery
       photos={sortedPhotos}
       participant={participant}
-      onPhotoClick={setFullscreenPhoto}
-      activeStageId={activeStageId}
+      onPhotoClick={handleGridPhotoClick}
       pickPhotoId={pickPhotoId}
-      onTogglePick={handleTogglePick}
+      selectMode={selectMode}
+      pendingPhotoId={pendingPhotoId}
       onDelete={(photo) => setConfirmDeletePhoto(photo)}
-      pickDisabledReason={pickDisabledReason}
       deleteDisabledReason={isMine ? undefined : t('fasilitator.notMyGroup')}
      />
     )}
@@ -363,6 +490,9 @@ const GaleriChildPage = () => {
      if (!photo) return
      try {
       await Promise.all([deletePhoto(photo.id), loadPicks()])
+      // Foto yang dihapus adalah pilihan tertunda → pilihannya tidak berlaku
+      // lagi; jangan biarkan Simpan mengirim photo_id yang sudah mati.
+      if (pendingPhotoId === photo.id) setPendingPhotoId(null)
       setFullscreenPhoto(null)
      } catch {
       addToast({ type: 'error', message: t('fasilitator.photos.deleteError') })
