@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Badge } from '../../../shared/components/ui/Badge'
 import { Card } from '../../../shared/components/ui/Card'
+import { getMediaUrl } from '../../../core/utils/media'
 import type { Program } from '../../../core/types'
 
 interface ProgramInfoTabProps {
@@ -35,7 +36,7 @@ export function ProgramInfoTab({ program }: ProgramInfoTabProps) {
           <dd className="mt-1 flex items-center gap-3">
             {program.final_badge_image_url ? (
               <img
-                src={program.final_badge_image_url}
+                src={getMediaUrl('content', program.final_badge_image_url)}
                 alt={program.final_badge_name || t('admin.programs.badgeAlt')}
                 className="h-10 w-10 rounded-full object-cover border border-outline-variant"
               />
