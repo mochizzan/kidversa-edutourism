@@ -1,18 +1,26 @@
+import { useMemo } from 'react'
 import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../../../core/utils'
 import { getMediaUrl } from '../../../core/utils/media'
 import { imageFallbackSrc } from '../../../core/constants/app'
+import { filterFramesForProgram } from '../utils/frameFilter'
 import type { PhotoFrame } from '../../../core/types'
 
 interface FramePickerProps {
   frames: PhotoFrame[]
+  /** Program that owns this picker — frames of other programs are never shown. */
+  programId?: string
   selectedFrameId: string | null
   onSelect: (frameId: string | null) => void
 }
 
-export const FramePicker = ({ frames, selectedFrameId, onSelect }: FramePickerProps) => {
+export const FramePicker = ({ frames, programId, selectedFrameId, onSelect }: FramePickerProps) => {
   const { t } = useTranslation()
+  const visibleFrames = useMemo(
+    () => filterFramesForProgram(frames, programId),
+    [frames, programId],
+  )
   return (
     <div className="grid grid-cols-3 gap-3">
       <button
@@ -31,7 +39,14 @@ export const FramePicker = ({ frames, selectedFrameId, onSelect }: FramePickerPr
           </div>
         )}
       </button>
-      {frames.map((frame) => (
+      {visibleFrames.length === 0 && (
+        <div
+          className="col-span-3 rounded-xl border-2 border-dashed border-outline-variant px-4 py-6 text-center text-xs text-on-surface-variant"
+        >
+          {t('fasilitator.frame.empty')}
+        </div>
+      )}
+      {visibleFrames.map((frame) => (
         <button
           key={frame.id}
           onClick={() => onSelect(frame.id)}

@@ -134,7 +134,6 @@
     --radius-xl: 0.75rem;
     --radius-2xl: 1rem;
     --radius-3xl: 1.5rem;
-    --drop-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.15);
     --ease-out: cubic-bezier(0, 0, 0.2, 1);
     --animate-spin: spin 1s linear infinite;
     --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
@@ -565,6 +564,9 @@
   .z-\[9999\] {
     z-index: 9999;
   }
+  .col-span-3 {
+    grid-column: span 3 / span 3;
+  }
   .col-span-4 {
     grid-column: span 4 / span 4;
   }
@@ -817,6 +819,9 @@
   .h-10 {
     height: calc(var(--spacing) * 10);
   }
+  .h-11 {
+    height: calc(var(--spacing) * 11);
+  }
   .h-12 {
     height: calc(var(--spacing) * 12);
   }
@@ -1027,6 +1032,9 @@
   .w-10 {
     width: calc(var(--spacing) * 10);
   }
+  .w-11 {
+    width: calc(var(--spacing) * 11);
+  }
   .w-12 {
     width: calc(var(--spacing) * 12);
   }
@@ -1050,6 +1058,9 @@
   }
   .w-36 {
     width: calc(var(--spacing) * 36);
+  }
+  .w-44 {
+    width: calc(var(--spacing) * 44);
   }
   .w-48 {
     width: calc(var(--spacing) * 48);

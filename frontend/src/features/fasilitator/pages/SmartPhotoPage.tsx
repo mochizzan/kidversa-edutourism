@@ -47,14 +47,17 @@ const SmartPhotoPage = () => {
  const { childId } = useParams<{ groupId: string; childId: string }>()
  const navigate = useNavigate()
  const user = useAuthStore((s) => s.user)
- const { addToast } = useGlobalToast()
- const { isMine } = useGroupOwnership(childId)
+ const { addToast, removeToast } = useGlobalToast()
+ const { session, isMine } = useGroupOwnership(childId)
+ // Frame ownership: FramePicker filters RAW frames down to the ones allowed
+ // for this program (undefined session → global-only frames, fails closed).
+ const programId = session?.program_id
 
  const captureCanvasRef = useRef<HTMLCanvasElement>(null)
  const editorCanvasRef = useRef<HTMLCanvasElement>(null)
  // Id of the frame actually drawn into the editor canvas (null = frame-free
  // base). Kept in sync with the canvas pixels by the compose effect so the
- // uploaded `frame_id` always matches what is inside the saved JPEG.
+ // uploaded `frame_id` always matches what is inside the saved PNG.
  const composedFrameIdRef = useRef<string | null>(null)
 
  const [phase, setPhase] = useState<'camera' | 'editor'>('camera')
@@ -66,12 +69,22 @@ const SmartPhotoPage = () => {
  const [mirror, setMirror] = useState(false)
 
  const [frames, setFrames] = useState<PhotoFrame[]>([])
- const [activeFrames, setActiveFrames] = useState<PhotoFrame[]>([])
  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null)
  const [capturedPhotoDataUrl, setCapturedPhotoDataUrl] = useState<string | null>(null)
 
  const [isReportPhoto, setIsReportPhoto] = useState(false)
  const [isSaving, setIsSaving] = useState(false)
+
+ // Konfirmasi ke-2 (native): while an upload is in flight, block accidental
+ // tab close/reload. The in-app confirm guards deliberate navigation instead.
+ useEffect(() => {
+  if (!isSaving) return
+  const handler = (e: BeforeUnloadEvent) => {
+   e.preventDefault()
+  }
+  window.addEventListener('beforeunload', handler)
+  return () => window.removeEventListener('beforeunload', handler)
+ }, [isSaving])
 
  const [framePickerOpen, setFramePickerOpen] = useState(false)
 
@@ -139,8 +152,9 @@ const SmartPhotoPage = () => {
   frameService
    .getAll({ page: 1, limit: 100 })
    .then((res) => {
+    // RAW frames (active + inactive): FramePicker filters internally by
+    // program ownership and activation via filterFramesForProgram.
     setFrames(res.data)
-    setActiveFrames(res.data.filter((f) => f.is_active))
    })
    .catch(() => {
     setPageError(t('fasilitator.photos.frameLoadError'))
@@ -218,7 +232,9 @@ const SmartPhotoPage = () => {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   drawVideoCrop(ctx, video, crop, mirror)
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+  // Lossless PNG snapshot: the editor may re-compose (frame overlay) and the
+  // upload sends PNG — JPEG re-encoding here would double-lossy the pixels.
+  const dataUrl = canvas.toDataURL('image/png')
   composedFrameIdRef.current = null
   setCapturedPhotoDataUrl(dataUrl)
   setPhase('editor')
@@ -239,11 +255,13 @@ const SmartPhotoPage = () => {
  }, [restartCamera])
 
  const handleDiscard = useCallback(() => {
+  // Konfirmasi ke-1 (in-app): abandoning a running upload discards it.
+  if (isSaving && !window.confirm(t('fasilitator.photos.leaveUploadConfirm'))) return
   setCapturedPhotoDataUrl(null)
   setSelectedFrameId(null)
   setIsReportPhoto(false)
   navigate(-1)
- }, [navigate])
+ }, [navigate, isSaving, t])
 
  const handleSave = useCallback(async () => {
   // Read from refs so we always see the LATEST values — avoids the stale
@@ -267,6 +285,11 @@ const SmartPhotoPage = () => {
    return
   }
   setIsSaving(true)
+  // Upload toast lifecycle lives in the GLOBAL toast store (not component
+  // state), so it keeps updating and can be cleared even if this page
+  // unmounts mid-upload. Every path removes the uploading toast in finally.
+  let uploadingToastId: string | null = null
+  let lastProgressAt = 0
   try {
    // `frame_id` must match the pixels being blobbed: only the frame that was
    // really composed into the canvas is reported (null = frame-free base).
@@ -274,50 +297,79 @@ const SmartPhotoPage = () => {
    // block, so a late frame load can't desync metadata from the image.
    const frameId = composedFrameIdRef.current
    const blob = await new Promise<Blob | null>((resolve) =>
-    editorCanvasRef.current!.toBlob(resolve, 'image/jpeg', 0.9),
+    editorCanvasRef.current!.toBlob(resolve, 'image/png'),
    )
    if (!blob) throw new Error('Gagal mengkonversi gambar')
 
-   await uploadPhoto({
-    childId,
-    participant: currentParticipant,
-    takenBy: user.id,
-    blob,
-    frameId,
-    isReportPhoto,
+   // Persistent (duration 0) until replaced by a progress update or removed
+   // in finally — the server response is the ONLY source of final status.
+   uploadingToastId = addToast({
+    type: 'info',
+    message: t('fasilitator.photos.uploading'),
+    duration: 0,
    })
+   await uploadPhoto(
+    {
+     childId,
+     participant: currentParticipant,
+     takenBy: user.id,
+     blob,
+     frameId,
+     isReportPhoto,
+    },
+    {
+     onProgress: (percent: number) => {
+      // Throttle refreshes to ≥500ms; removeToast first so the next addToast
+      // isn't de-duped against an identical rapid-fire message.
+      const now = Date.now()
+      if (now - lastProgressAt < 500) return
+      lastProgressAt = now
+      if (uploadingToastId) removeToast(uploadingToastId)
+      uploadingToastId = addToast({
+       type: 'info',
+       message: t('fasilitator.photos.uploadProgress', { percent }),
+       duration: 0,
+      })
+     },
+    },
+   )
 
+   // Saved: reset the editor and stand the camera back up for the next photo.
+   // Deliberately NO navigate() — the gallery opens via its own button.
    setCapturedPhotoDataUrl(null)
    setSelectedFrameId(null)
    setIsReportPhoto(false)
    setPhase('camera')
-   // Kamera ≠ galeri: setelah tersimpan, buka galeri per peserta (halaman
-   // terpisah) alih-alih modal galeri di dalam alur kamera.
-   navigate(ROUTES.FASILITATOR.GALERI_CHILD(childId))
+   addToast({ type: 'success', message: t('fasilitator.photos.uploadSuccess') })
   } catch (err: unknown) {
    const e = err as Error & { code?: string }
    if (e.message === 'MAX_PHOTOS_REACHED') {
     addToast({ type: 'error', message: t('fasilitator.photos.maxPhotos', { max: MAX_PHOTOS }) })
    } else if (e.code === 'consent_required') {
+    // Toast only — no navigate(-1): the user stays put with the capture intact.
     addToast({ type: 'error', message: t('fasilitator.photos.consentRequired') })
-    navigate(-1)
    } else {
     // Surface the backend's readable message (validation codes, file gates…)
-    // with friendlyError's errors.<code>/default fallbacks.
+    // with friendlyError's errors.<code>/default fallbacks. Also covers
+    // failures thrown BEFORE uploadPhoto starts (e.g. toBlob) — no path may
+    // exit handleSave silently.
     addToast({ type: 'error', message: friendlyError(err) })
    }
   } finally {
+   if (uploadingToastId) removeToast(uploadingToastId)
    setIsSaving(false)
   }
- }, [childId, user, isReportPhoto, uploadPhoto, addToast, navigate])
+ }, [childId, user, isReportPhoto, uploadPhoto, addToast, removeToast, t])
 
  const handleBack = useCallback(() => {
   if (phase === 'editor') {
    handleRetake()
-  } else {
-   navigate(-1)
+   return
   }
- }, [phase, navigate, handleRetake])
+  // Konfirmasi ke-1 (in-app): leaving mid-upload discards the upload.
+  if (isSaving && !window.confirm(t('fasilitator.photos.leaveUploadConfirm'))) return
+  navigate(-1)
+ }, [phase, navigate, handleRetake, isSaving, t])
 
  const currentCameraLabel = (() => {
   if (!selectedDeviceId) return t('fasilitator.camera.auto')
@@ -406,81 +458,88 @@ const SmartPhotoPage = () => {
      </div>
     </div>
 
-    <div className="relative aspect-[9/16] w-full max-w-[min(56.25dvh,56rem)] md:mx-auto rounded-3xl overflow-hidden bg-black shadow-md border border-slate-200">
-     {phase === 'camera' && (
-      <CameraViewport
-       videoRef={videoRef}
-       cameraState={cameraState}
-       cameraErrorMessage={cameraErrorMessage}
-       onRetryCamera={restartCamera}
-       showGrid={showGrid}
-       pageError={pageError}
-       onRetryLoad={() => {
-        setPageError(null)
-        loadInitialData()
-       }}
+    {/* Editor host: the wrapper has NO overflow-hidden — it is the
+        positioning context PhotoEditor's absolute controls anchor to —
+        while the inner aspect box clips the camera/editor pixels. */}
+    <div className="relative w-full max-w-[min(56.25dvh,56rem)] mx-auto">
+     <div className="relative aspect-[9/16] w-full rounded-3xl overflow-hidden bg-black shadow-md border border-slate-200">
+      {phase === 'camera' && (
+       <CameraViewport
+        videoRef={videoRef}
+        cameraState={cameraState}
+        cameraErrorMessage={cameraErrorMessage}
+        onRetryCamera={restartCamera}
+        showGrid={showGrid}
+        pageError={pageError}
+        onRetryLoad={() => {
+         setPageError(null)
+         loadInitialData()
+        }}
+        participant={participant}
+        devices={devices}
+        selectedDeviceId={selectedDeviceId}
+        currentCameraLabel={currentCameraLabel}
+        cameraPickerOpen={cameraPickerOpen}
+        onToggleCameraPicker={() => setCameraPickerOpen((v) => !v)}
+        onCloseCameraPicker={() => setCameraPickerOpen(false)}
+        onDeviceChange={selectDevice}
+        onSwitchCamera={switchCamera}
+        onToggleGrid={() => setShowGrid((v) => !v)}
+        mirror={mirror}
+        onToggleMirror={() => setMirror((v) => !v)}
+        photoCount={photoCount}
+        maxPhotos={MAX_PHOTOS}
+        isMaxPhotos={isMaxPhotos}
+        onTakePhoto={takePhoto}
+        onOpenGallery={() => {
+         if (childId) navigate(ROUTES.FASILITATOR.GALERI_CHILD(childId))
+        }}
+        onOpenFramePicker={() => setFramePickerOpen(true)}
+        disabled={!isMine}
+       />
+      )}
+
+      {phase === 'camera' && selectedFrameId && (
+       <img
+        src={getMediaUrl('frame', selectedFrameId)}
+        alt=""
+        className="absolute inset-0 w-full h-full object-fill z-[6] pointer-events-none"
+        onError={() => addToast({ type: 'warning', message: t('fasilitator.photos.frameFallbackToast') })}
+       />
+      )}
+
+      {phase === 'editor' && (
+       <div className="w-full h-full flex items-center justify-center bg-black">
+        {capturedPhotoDataUrl ? (
+         <canvas ref={editorCanvasRef} className="max-w-full max-h-full object-contain rounded-3xl" />
+        ) : (
+         <div className="flex items-center justify-center text-white/50 text-sm">
+          {t('fasilitator.photos.processingImage')}
+         </div>
+        )}
+       </div>
+      )}
+
+      <canvas ref={captureCanvasRef} className="hidden" />
+     </div>
+
+     {/* Mount only once a photo exists: no editor controls (e.g. the report
+         photo toggle) before there is anything to edit. */}
+     {phase === 'editor' && capturedPhotoDataUrl && (
+      <PhotoEditor
        participant={participant}
-       devices={devices}
-       selectedDeviceId={selectedDeviceId}
-       currentCameraLabel={currentCameraLabel}
-       cameraPickerOpen={cameraPickerOpen}
-       onToggleCameraPicker={() => setCameraPickerOpen((v) => !v)}
-       onCloseCameraPicker={() => setCameraPickerOpen(false)}
-       onDeviceChange={selectDevice}
-       onSwitchCamera={switchCamera}
-       onToggleGrid={() => setShowGrid((v) => !v)}
-       mirror={mirror}
-       onToggleMirror={() => setMirror((v) => !v)}
-       photoCount={photoCount}
-       maxPhotos={MAX_PHOTOS}
-       isMaxPhotos={isMaxPhotos}
-       onTakePhoto={takePhoto}
-       onOpenGallery={() => {
-        if (childId) navigate(ROUTES.FASILITATOR.GALERI_CHILD(childId))
-       }}
+       selectedFrameId={selectedFrameId}
+       isReportPhoto={isReportPhoto}
+       isSaving={isSaving}
        onOpenFramePicker={() => setFramePickerOpen(true)}
-       disabled={!isMine}
+       onClearFrame={() => setSelectedFrameId(null)}
+       onToggleReportPhoto={setIsReportPhoto}
+       onRetake={handleRetake}
+       onSave={handleSave}
+       onDiscard={handleDiscard}
       />
      )}
-
-     {phase === 'camera' && selectedFrameId && (
-      <img
-       src={getMediaUrl('frame', selectedFrameId)}
-       alt=""
-       className="absolute inset-0 w-full h-full object-fill z-[6] pointer-events-none"
-       onError={() => addToast({ type: 'warning', message: t('fasilitator.photos.frameFallbackToast') })}
-      />
-     )}
-
-     {phase === 'editor' && (
-      <div className="w-full h-full flex items-center justify-center bg-black">
-       {capturedPhotoDataUrl ? (
-        <canvas ref={editorCanvasRef} className="max-w-full max-h-full object-contain rounded-3xl" />
-       ) : (
-        <div className="flex items-center justify-center text-white/50 text-sm">
-         {t('fasilitator.photos.processingImage')}
-        </div>
-       )}
-      </div>
-     )}
-
-     <canvas ref={captureCanvasRef} className="hidden" />
     </div>
-
-    {phase === 'editor' && (
-     <PhotoEditor
-      participant={participant}
-      selectedFrameId={selectedFrameId}
-      isReportPhoto={isReportPhoto}
-      isSaving={isSaving}
-      onOpenFramePicker={() => setFramePickerOpen(true)}
-      onClearFrame={() => setSelectedFrameId(null)}
-      onToggleReportPhoto={setIsReportPhoto}
-      onRetake={handleRetake}
-      onSave={handleSave}
-      onDiscard={handleDiscard}
-     />
-    )}
 
     <Modal
      open={framePickerOpen}
@@ -489,7 +548,8 @@ const SmartPhotoPage = () => {
      size="md"
     >
      <FramePicker
-      frames={activeFrames}
+      frames={frames}
+      programId={programId}
       selectedFrameId={selectedFrameId}
       onSelect={(id) => {
        setSelectedFrameId(id)

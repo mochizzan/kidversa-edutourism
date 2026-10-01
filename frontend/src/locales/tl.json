@@ -1252,7 +1252,12 @@
       "noActiveTopic": "Walang aktibong paksa para pumili ng larawan ng ulat.",
       "topicLoadError": "Nabigong i-load ang listahan ng paksa. Maaaring hindi kumpleto ang mga pangalan ng paksa.",
       "picksLoadError": "Nabigong i-load ang mga napiling larawan ng ulat.",
-      "groupGoneDesc": "Hindi mahanap ang grupo sa sesyong ito. Maaaring natanggal na."
+      "groupGoneDesc": "Hindi mahanap ang grupo sa sesyong ito. Maaaring natanggal na.",
+      "sortLabel": "I-sort ang mga larawan",
+      "sortNewest": "Pinakabago",
+      "sortOldest": "Pinakaluma",
+      "sortLargest": "Pinakamalaking Laki",
+      "sortSmallest": "Pinakamaliit na Laki"
     },
     "photos": {
       "emptyFor": "Wala pang larawan para kay {{name}}",
@@ -1263,6 +1268,10 @@
       "notInSession": "Hindi pa nakakapasok ang kalahok sa session",
       "maxPhotos": "Maximum na {{max}} na larawan bawat bata",
       "consentRequired": "Hindi pa naibibigay ang pahintulot sa larawan",
+      "uploading": "Nag-a-upload ng larawan…",
+      "uploadProgress": "Nag-a-upload ng larawan… {{percent}}%",
+      "uploadSuccess": "Matagumpay na na-save ang larawan",
+      "leaveUploadConfirm": "Nag-a-upload ng larawan. Kung aalis ka ngayon, makansela ang upload at hindi mai-save ang larawan. Umalis pa rin sa page?",
       "loadingParticipant": "Naglo-load ng data ng kalahok...",
       "childMissingTitle": "Hindi Nahanap ang Bata",
       "childMissingDesc": "Hindi available ang data ng bata o ito ay nabura na.",
@@ -1285,7 +1294,8 @@
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
       "pickError": "Failed to select report photo",
-      "clearPickError": "Failed to deselect report photo"
+      "clearPickError": "Failed to deselect report photo",
+      "reportBadge": "Larawan ng Ulat"
     },
     "camera": {
       "accessing": "Ina-access ang camera...",
@@ -1311,7 +1321,8 @@
     },
     "frame": {
       "none": "Walang Frame",
-      "frameWord": "Frame"
+      "frameWord": "Frame",
+      "empty": "Walang available na frame para sa programang ito"
     },
     "group": {
       "notFound": "Hindi nahanap ang grupo",

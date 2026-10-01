@@ -279,6 +279,11 @@ export interface SmartPhoto {
  is_report_photo: boolean
  taken_by: string
  taken_at: string
+ /** BaseModel timestamps carried on the wire (server order: created_at DESC). */
+ created_at?: string
+ updated_at?: string
+ /** Upload size in bytes; null/undefined on legacy rows (gallery size sort). */
+ file_size?: number | null
 }
 
 /** One topic's chosen report photo, as returned by GET /api/photos/report-picks. */

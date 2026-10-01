@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeCaptureCrop, drawVideoCrop } from '../../src/features/fasilitator/utils/photoCapture'
+import { computeCaptureCrop, composePhoto, drawVideoCrop } from '../../src/features/fasilitator/utils/photoCapture'
 
 describe('computeCaptureCrop', () => {
   it('returns the full frame for an exact 9:16 video', () => {
@@ -149,5 +149,48 @@ describe('drawVideoCrop mirror', () => {
       crop.sw,
       crop.sh,
     ])
+  })
+})
+
+describe('composePhoto', () => {
+  const base = { name: 'base' } as unknown as CanvasImageSource
+  const frame = { name: 'frame' } as unknown as CanvasImageSource
+
+  /** Recording stand-in for CanvasRenderingContext2D — every drawImage arg order preserved. */
+  function recordingCtx(width: number, height: number) {
+    const calls: unknown[][] = []
+    const ctx = {
+      canvas: { width, height },
+      drawImage: (...args: unknown[]) => {
+        calls.push(args)
+      },
+    } as unknown as CanvasRenderingContext2D
+    return { ctx, calls }
+  }
+
+  it('without a frame: draws the base over the full canvas and never draws a frame', () => {
+    const { ctx, calls } = recordingCtx(720, 1280)
+
+    composePhoto(ctx, { base })
+
+    expect(calls).toEqual([[base, 0, 0, 720, 1280]])
+    expect(calls.some((args) => args[0] === frame)).toBe(false)
+  })
+
+  it('with a frame: draws the base first, then the frame stretched to the same rect on top', () => {
+    const { ctx, calls } = recordingCtx(1080, 1920)
+
+    composePhoto(ctx, { base, frame })
+
+    expect(calls).toEqual([
+      [base, 0, 0, 1080, 1920],
+      [frame, 0, 0, 1080, 1920],
+    ])
+    // Order is the contract: the frame overlays the base, exactly once.
+    const baseIndex = calls.findIndex((args) => args[0] === base)
+    const frameIndex = calls.findIndex((args) => args[0] === frame)
+    expect(baseIndex).toBeGreaterThanOrEqual(0)
+    expect(frameIndex).toBeGreaterThan(baseIndex)
+    expect(calls.filter((args) => args[0] === frame)).toHaveLength(1)
   })
 })

@@ -1252,7 +1252,12 @@
       "noActiveTopic": "Tiada topik aktif untuk memilih foto laporan.",
       "topicLoadError": "Gagal memuat senarai topik. Nama topik mungkin tidak lengkap.",
       "picksLoadError": "Gagal memuat pilihan foto laporan.",
-      "groupGoneDesc": "Kelompok tidak ditemui dalam sesi ini. Mungkin telah dipadam."
+      "groupGoneDesc": "Kelompok tidak ditemui dalam sesi ini. Mungkin telah dipadam.",
+      "sortLabel": "Susun foto",
+      "sortNewest": "Terbaharu",
+      "sortOldest": "Tertua",
+      "sortLargest": "Saiz Terbesar",
+      "sortSmallest": "Saiz Terkecil"
     },
     "photos": {
       "emptyFor": "Belum ada foto untuk {{name}}",
@@ -1263,6 +1268,10 @@
       "notInSession": "Peserta belum masuk sesi",
       "maxPhotos": "Maksimum {{max}} foto bagi setiap kanak-kanak",
       "consentRequired": "Kebenaran foto belum diberikan",
+      "uploading": "Sedang memuat naik foto…",
+      "uploadProgress": "Sedang memuat naik foto… {{percent}}%",
+      "uploadSuccess": "Foto berjaya disimpan",
+      "leaveUploadConfirm": "Foto sedang dimuat naik. Jika keluar sekarang, muat naik akan dibatalkan dan foto tidak akan disimpan. Tetap tinggalkan halaman?",
       "loadingParticipant": "Memuatkan data peserta...",
       "childMissingTitle": "Kanak-kanak Tidak Ditemui",
       "childMissingDesc": "Data kanak-kanak tidak tersedia atau telah dipadam.",
@@ -1285,7 +1294,8 @@
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
       "pickError": "Failed to select report photo",
-      "clearPickError": "Failed to deselect report photo"
+      "clearPickError": "Failed to deselect report photo",
+      "reportBadge": "Foto Laporan"
     },
     "camera": {
       "accessing": "Mengakses kamera...",
@@ -1311,7 +1321,8 @@
     },
     "frame": {
       "none": "Tanpa Bingkai",
-      "frameWord": "Bingkai"
+      "frameWord": "Bingkai",
+      "empty": "Tiada bingkai tersedia untuk program ini"
     },
     "group": {
       "notFound": "Kumpulan tidak ditemui",

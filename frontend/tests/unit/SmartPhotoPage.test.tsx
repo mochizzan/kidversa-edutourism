@@ -81,6 +81,7 @@ import { useAuthStore } from '@/core/stores/authStore'
 import { useToastStore } from '@/core/stores/toastStore'
 import { ApiError } from '@/core/services/backend-client'
 import { i18n } from '@/core/i18n'
+import type { SmartPhoto } from '@/core/types'
 
 const NETWORK_MSG = 'Gagal terhubung ke server. Periksa koneksi internet Anda.'
 
@@ -118,6 +119,30 @@ async function captureAndOpenEditor() {
   })
   // Editor phase: PhotoEditor rendered with the Simpan (save) action
   await act(async () => { })
+}
+
+// Two-entry history so a back-navigation (Batal → navigate(-1)) has a
+// visible destination to assert on.
+async function renderPageWithBackStack() {
+  const result = render(
+    <MemoryRouter
+      initialEntries={[
+        '/fasilitator/groups/g-1',
+        '/fasilitator/groups/g-1/children/c-1/photo',
+      ]}
+    >
+      <Routes>
+        <Route path="/fasilitator/groups/:groupId" element={<div>HALAMAN KELOMPOK</div>} />
+        <Route
+          path="/fasilitator/groups/:groupId/children/:childId/photo"
+          element={<SmartPhotoPage />}
+        />
+        <Route path="/fasilitator/galeri/peserta/:childId" element={<div>HALAMAN GALERI</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+  await act(async () => { })
+  return result
 }
 
 function errorToasts() {
@@ -243,6 +268,41 @@ describe('SmartPhotoPage: upload failure surfaces a toast and recovers', () => {
     expect(screen.getByRole('button', { name: 'Simpan' })).not.toBeDisabled()
     expect(screen.queryByText('HALAMAN GALERI')).toBeNull()
   })
+
+  it('upload rejected mid-flight: uploading toast removed, error toast kept, no navigation, editor preserved', async () => {
+    let rejectUpload!: (err: unknown) => void
+    vi.mocked(photoService.upload).mockImplementation(
+      () =>
+        new Promise<SmartPhoto>((_resolve, reject) => {
+          rejectUpload = reject
+        }),
+    )
+
+    await renderPage()
+    await captureAndOpenEditor()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+    })
+
+    // While in flight: the persistent uploading toast is shown, save is locked.
+    const during = useToastStore.getState().toasts
+    expect(during.filter((t) => t.message === i18n.t('fasilitator.photos.uploading'))).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Simpan' })).toBeDisabled()
+    expect(screen.queryByText('HALAMAN GALERI')).toBeNull()
+
+    await act(async () => {
+      rejectUpload(new TypeError('fetch failed'))
+    })
+
+    // After the rejection: uploading toast gone (removed in finally), the
+    // friendly error toast remains, and the editor is intact for a retry.
+    const after = useToastStore.getState().toasts
+    expect(after.some((t) => t.message === i18n.t('fasilitator.photos.uploading'))).toBe(false)
+    expect(after.some((t) => t.type === 'error' && t.message === NETWORK_MSG)).toBe(true)
+    expect(screen.getByRole('button', { name: 'Simpan' })).not.toBeDisabled()
+    expect(screen.queryByText('HALAMAN GALERI')).toBeNull()
+  })
 })
 
 // ── Capture without a frame, mirror-at-capture, base-load failure ──────────
@@ -350,7 +410,7 @@ describe('SmartPhotoPage: capture edge cases', () => {
     vi.mocked(sessionService.getParticipantById).mockResolvedValue(participant as never)
   })
 
-  it('no frame selected: crop captured, base composed, save omits frame metadata, zero toasts', async () => {
+  it('no frame selected: crop captured, base composed, save omits frame metadata, success toast without navigation', async () => {
     const { container } = await renderPage()
     await captureAndOpenEditor()
     await flush()
@@ -377,8 +437,19 @@ describe('SmartPhotoPage: capture edge cases', () => {
     // frame_id omitted → no metadata update at all; nothing to complain about.
     expect(photoService.update).not.toHaveBeenCalled()
     expect(photoService.setReportPhoto).not.toHaveBeenCalled()
-    expect(useToastStore.getState().toasts).toEqual([])
-    expect(screen.getByText('HALAMAN GALERI')).toBeInTheDocument()
+    // Spec: success surfaces exactly ONE success toast — the persistent
+    // uploading toast was removed in finally (only the server's response
+    // decides the final status).
+    const toasts = useToastStore.getState().toasts
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0]).toMatchObject({
+      type: 'success',
+      message: i18n.t('fasilitator.photos.uploadSuccess'),
+    })
+    // Spec: Simpan NEVER navigates — the editor resets to the camera phase.
+    expect(screen.queryByText('HALAMAN GALERI')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Simpan' })).toBeNull()
+    expect(container.querySelector('button.w-14')).not.toBeNull()
   })
 
   it('capture with mirror on uses the flip transform; editor compose/save use only the frozen base', async () => {
@@ -402,8 +473,8 @@ describe('SmartPhotoPage: capture edge cases', () => {
     expect(captureCalls[2].args).toEqual([-1, 1])
     // Crop geometry identical to the unmirrored path — only the transform differs.
     expect(captureCalls[3].args).toEqual([cameraMocks.videoRef.current, 0, 0, 720, 1280, 0, 0, 720, 1280])
-    // Snapshot taken after the flip.
-    expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.9)
+    // Snapshot taken after the flip — lossless PNG (no quality arg).
+    expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledWith('image/png')
 
     // The mirror menu lives only in the camera phase: unmounted in the editor,
     // so nothing can toggle it mid-edit.
@@ -414,14 +485,22 @@ describe('SmartPhotoPage: capture edge cases', () => {
       { canvas: editor, method: 'drawImage', args: [expect.any(HTMLImageElement), 0, 0, 720, 1280] },
     ])
 
-    // Save of the mirrored capture proceeds frame-free with zero toasts.
+    // Save of the mirrored capture proceeds frame-free: one success toast
+    // (uploading toast removed in finally), no navigation, camera phase back.
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
     })
     expect(photoService.upload).toHaveBeenCalledTimes(1)
     expect(photoService.update).not.toHaveBeenCalled()
-    expect(useToastStore.getState().toasts).toEqual([])
-    expect(screen.getByText('HALAMAN GALERI')).toBeInTheDocument()
+    const toasts = useToastStore.getState().toasts
+    expect(toasts).toHaveLength(1)
+    expect(toasts[0]).toMatchObject({
+      type: 'success',
+      message: i18n.t('fasilitator.photos.uploadSuccess'),
+    })
+    expect(screen.queryByText('HALAMAN GALERI')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Simpan' })).toBeNull()
+    expect(container.querySelector('button.w-14')).not.toBeNull()
   })
 
   it('toggling mirror off after a capture only affects the next capture (captured base is frozen)', async () => {
@@ -478,6 +557,207 @@ describe('SmartPhotoPage: capture edge cases', () => {
     } finally {
       consoleErrorSpy.mockRestore()
       imageLoadMode = 'load'
+    }
+  })
+
+  it('selected frame without an image: warns, shows the fallback toast, and saves frame-free', async () => {
+    // Global active frame whose image URL is missing — selectable in the
+    // picker, but there is nothing to compose.
+    vi.mocked(frameService.getAll).mockResolvedValue({
+      data: [
+        {
+          id: 'f-broken',
+          tenant_id: 't1',
+          program_id: '',
+          name: 'Rusak',
+          file_url: '',
+          is_active: true,
+          sort_order: 0,
+          created_at: '2026-09-30T01:00:00Z',
+        },
+      ],
+    } as never)
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+    try {
+      const { container } = await renderPage()
+      await captureAndOpenEditor()
+      await flush()
+
+      const { editor } = canvasesIn(container)
+      const drawsBeforeSelect = callsFor(editor).filter((c) => c.method === 'drawImage').length
+
+      // Pick the broken frame from the picker modal.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Pilih Frame' }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Rusak' }))
+      })
+      await flush()
+
+      // Never a silent path: the fallback is logged AND surfaced to the user.
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[SmartPhotoPage] selected frame has no image; saving frame-free',
+        'f-broken',
+      )
+      expect(
+        useToastStore.getState().toasts.some(
+          (t) =>
+            t.type === 'warning' &&
+            t.message === i18n.t('fasilitator.photos.frameFallbackToast'),
+        ),
+      ).toBe(true)
+
+      // The re-compose drew exactly one rect (the frame-free base) — the
+      // invalid frame was never layered onto the canvas.
+      const drawsAfterSelect = callsFor(editor).filter((c) => c.method === 'drawImage').length
+      expect(drawsAfterSelect - drawsBeforeSelect).toBe(1)
+
+      // Saving reports no frame metadata: composedFrameIdRef stayed null.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+      })
+      expect(photoService.upload).toHaveBeenCalledTimes(1)
+      expect(photoService.update).not.toHaveBeenCalled()
+      expect(photoService.setReportPhoto).not.toHaveBeenCalled()
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('rapor toggle is absent without a captured photo (editor "processing" state)', async () => {
+    await renderPage()
+    // Camera phase — nothing captured: no editor controls at all.
+    expect(screen.queryByRole('button', { name: 'Jadikan Foto Raport' })).toBeNull()
+
+    // Degenerate capture (empty snapshot): the page enters the editor's
+    // processing state — phase editor, but no captured data yet.
+    vi.mocked(HTMLCanvasElement.prototype.toDataURL).mockReturnValueOnce('')
+    await captureAndOpenEditor()
+    await act(async () => { })
+
+    expect(screen.getByText('Memproses gambar...')).toBeInTheDocument()
+    // PhotoEditor (and its rapor toggle / save control) only mounts with data.
+    expect(screen.queryByRole('button', { name: 'Jadikan Foto Raport' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Simpan' })).toBeNull()
+  })
+})
+
+// ── Page guards while an upload is in flight ──────────────────────────────
+describe('SmartPhotoPage: page guards during an in-flight upload', () => {
+  beforeAll(() => {
+    // jsdom has no canvas: stub the 2D surface used by capture/save.
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as never)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,AAAA')
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function(cb: BlobCallback) {
+      cb(new Blob(['x'], { type: 'image/png' }))
+    } as never)
+  })
+
+  afterAll(() => {
+    vi.restoreAllMocks()
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
+    useAuthStore.setState({
+      user: { id: 'u1', name: 'Fasil', role: 'FASILITATOR' },
+    } as never)
+    vi.mocked(frameService.getAll).mockResolvedValue({ data: [] } as never)
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([] as never)
+    vi.mocked(photoService.getReportPicks).mockResolvedValue([] as never)
+    // Drop any pending-upload mock from a previous test.
+    vi.mocked(photoService.upload).mockReset()
+    vi.mocked(sessionService.getParticipantById).mockResolvedValue(participant as never)
+  })
+
+  /** Capture + click Simpan with the upload left pending (in-flight state). */
+  async function startInFlightUpload(page: () => Promise<unknown> = renderPage) {
+    await page()
+    await captureAndOpenEditor()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+    })
+    expect(screen.getByRole('button', { name: 'Simpan' })).toBeDisabled()
+  }
+
+  it('blocks beforeunload only while saving; the listener is removed once the save settles', async () => {
+    let resolveUpload!: (photo: SmartPhoto) => void
+    vi.mocked(photoService.upload).mockImplementation(
+      () =>
+        new Promise<SmartPhoto>((resolve) => {
+          resolveUpload = resolve
+        }),
+    )
+
+    await startInFlightUpload()
+
+    const duringSaving = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(duringSaving)
+    expect(duringSaving.defaultPrevented).toBe(true)
+
+    // Save settles (success) → isSaving false → guard removed.
+    await act(async () => {
+      resolveUpload({
+        id: 'ph-9',
+        participant_id: 'c-1',
+        session_id: 's-1',
+        original_file_url: '',
+        is_report_photo: false,
+        taken_by: 'u1',
+        taken_at: '2026-09-30T02:00:00Z',
+      })
+    })
+    expect(screen.queryByRole('button', { name: 'Simpan' })).toBeNull()
+
+    const afterSaving = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterSaving)
+    expect(afterSaving.defaultPrevented).toBe(false)
+  })
+
+  it('Batal during an in-flight upload, confirm declined: no navigation, upload guard stays', async () => {
+    vi.mocked(photoService.upload).mockImplementation(
+      () => new Promise<SmartPhoto>(() => { }),
+    )
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    try {
+      await startInFlightUpload(renderPageWithBackStack)
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Batal' }))
+      })
+
+      expect(confirmSpy).toHaveBeenCalledWith(i18n.t('fasilitator.photos.leaveUploadConfirm'))
+      expect(screen.queryByText('HALAMAN KELOMPOK')).toBeNull()
+      expect(screen.queryByText('HALAMAN GALERI')).toBeNull()
+      // Still in the editor with the save locked — the upload was not abandoned.
+      expect(screen.getByRole('button', { name: 'Simpan' })).toBeDisabled()
+    } finally {
+      confirmSpy.mockRestore()
+    }
+  })
+
+  it('Batal during an in-flight upload, confirm accepted: navigates back off the capture page', async () => {
+    vi.mocked(photoService.upload).mockImplementation(
+      () => new Promise<SmartPhoto>(() => { }),
+    )
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    try {
+      await startInFlightUpload(renderPageWithBackStack)
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Batal' }))
+      })
+
+      expect(confirmSpy).toHaveBeenCalledWith(i18n.t('fasilitator.photos.leaveUploadConfirm'))
+      expect(screen.getByText('HALAMAN KELOMPOK')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Simpan' })).toBeNull()
+    } finally {
+      confirmSpy.mockRestore()
     }
   })
 })

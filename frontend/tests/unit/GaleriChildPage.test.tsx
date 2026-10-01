@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act } from 'react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, within } from '@testing-library/react'
 import { render, screen } from './test-utils'
 
 // ── Mocks (registered before importing the page) ──────────────────────────
@@ -141,6 +141,19 @@ describe('GaleriChildPage: actions and locks', () => {
     expect(screen.getByText('HALAMAN KAMERA')).toBeInTheDocument()
   })
 
+  it('shows the empty-state message (not an error) when the child has no photos', async () => {
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([] as never)
+
+    await renderChildPage()
+
+    // PhotoGallery's dedicated empty state with the child's name…
+    expect(screen.getByText('Belum ada foto untuk Budi')).toBeInTheDocument()
+    expect(screen.getByText('0/10 foto')).toBeInTheDocument()
+    // …and no per-photo actions exist without photos.
+    expect(screen.queryByRole('button', { name: 'Jadikan foto rapor' })).toBeNull()
+    expect(screen.queryByText('Terjadi Kesalahan')).toBeNull()
+  })
+
   it('calls the report-pick service when picking a photo as foto rapor', async () => {
     await renderChildPage()
 
@@ -229,6 +242,65 @@ describe('GaleriChildPage: actions and locks', () => {
     expect(screen.getByText('Anak Tidak Ditemukan')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Coba Lagi' })).toBeInTheDocument()
     expect(photoService.getByParticipant).not.toHaveBeenCalled()
+  })
+})
+
+describe('GaleriChildPage: gallery sort dropdown and report badge', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'u1', name: 'Fasil', role: 'FASILITATOR' } } as never)
+    vi.mocked(photoService.setReportPick).mockResolvedValue(photo as never)
+    vi.mocked(photoService.clearReportPick).mockResolvedValue(undefined)
+    useToastStore.setState({ toasts: [] })
+    mockHappyPath()
+  })
+
+  it('renders the sort select defaulted to Terbaru and reorders photos by size', async () => {
+    // Server order (created_at DESC): small terbaru dulu, big lebih lama —
+    // urutan beda dengan ukuran, jadi pergantian sort terlihat di DOM.
+    const smallPhoto = { ...photo, id: 'ph-small', created_at: '2026-09-30T03:00:00Z', file_size: 100 }
+    const bigPhoto = { ...photo, id: 'ph-big', created_at: '2026-09-30T01:00:00Z', file_size: 9000 }
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([smallPhoto, bigPhoto] as never)
+
+    const { container } = await renderChildPage()
+
+    const select = screen.getByRole('combobox', { name: 'Urutkan foto' })
+    expect(select).toHaveValue('newest')
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Terbaru', 'Terlama', 'Ukuran Terbesar', 'Ukuran Terkecil'])
+
+    const tileSrcs = () =>
+      Array.from(container.querySelectorAll('img')).map((img) => img.getAttribute('src') ?? '')
+
+    // Default 'newest' = created_at DESC
+    expect(tileSrcs()[0]).toContain('ph-small')
+    expect(tileSrcs()[1]).toContain('ph-big')
+
+    await act(async () => {
+      fireEvent.change(select, { target: { value: 'largest' } })
+    })
+
+    expect(select).toHaveValue('largest')
+    expect(tileSrcs()[0]).toContain('ph-big')
+    expect(tileSrcs()[1]).toContain('ph-small')
+  })
+
+  it('shows a text badge with aria-label on report photos', async () => {
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([
+      { ...photo, id: 'ph-report', is_report_photo: true },
+      { ...photo, id: 'ph-normal', is_report_photo: false },
+    ] as never)
+
+    await renderChildPage()
+
+    const badge = screen.getByLabelText('Foto Raport')
+    // Teks, bukan warna saja
+    expect(badge).toHaveTextContent('Foto Raport')
+    // Foto non-rapor tidak dapat badge yang sama
+    expect(screen.getAllByLabelText('Foto Raport')).toHaveLength(1)
   })
 })
 

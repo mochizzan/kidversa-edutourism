@@ -1252,7 +1252,12 @@
       "noActiveTopic": "没有可用于选择报告照片的进行中主题。",
       "topicLoadError": "加载主题列表失败。主题名称可能不完整。",
       "picksLoadError": "加载报告照片选择失败。",
-      "groupGoneDesc": "在此活动中未找到该小组，可能已被删除。"
+      "groupGoneDesc": "在此活动中未找到该小组，可能已被删除。",
+      "sortLabel": "照片排序",
+      "sortNewest": "最新",
+      "sortOldest": "最早",
+      "sortLargest": "尺寸最大",
+      "sortSmallest": "尺寸最小"
     },
     "photos": {
       "emptyFor": "{{name}} 暂无照片",
@@ -1263,6 +1268,10 @@
       "notInSession": "参与者尚未进入课程",
       "maxPhotos": "每位儿童最多 {{max}} 张照片",
       "consentRequired": "尚未授予照片权限",
+      "uploading": "正在上传照片…",
+      "uploadProgress": "正在上传照片… {{percent}}%",
+      "uploadSuccess": "照片保存成功",
+      "leaveUploadConfirm": "照片正在上传中。如果现在离开，上传将被取消且照片不会保存。仍要离开页面吗？",
       "loadingParticipant": "正在加载参与者数据...",
       "childMissingTitle": "未找到儿童",
       "childMissingDesc": "儿童数据不可用或已被删除。",
@@ -1285,7 +1294,8 @@
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
       "pickError": "Failed to select report photo",
-      "clearPickError": "Failed to deselect report photo"
+      "clearPickError": "Failed to deselect report photo",
+      "reportBadge": "成绩单照片"
     },
     "camera": {
       "accessing": "正在访问相机...",
@@ -1311,7 +1321,8 @@
     },
     "frame": {
       "none": "无相框",
-      "frameWord": "相框"
+      "frameWord": "相框",
+      "empty": "此项目暂无可用相框"
     },
     "group": {
       "notFound": "未找到群组",

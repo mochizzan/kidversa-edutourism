@@ -72,9 +72,9 @@ func assertParticipantGroupOwnership(ctx context.Context, sessions sessionScope,
 
 // resolveReportPhoto returns the photo backing a report for one participant,
 // session and topic (program stage). An explicit report_photo_picks row wins;
-// when no pick row exists the session's exclusive is_report_photo default is
-// the fallback. A pick whose photo was deleted resolves to (nil, nil) — no
-// fallback, no dangling reference (spec §1 + §5.1; see plan R2).
+// when no pick row exists — or the pick's photo was deleted — the session's
+// exclusive is_report_photo default is the fallback, so the mini-raport photo
+// always replaces the placeholder whenever a flagged photo exists (spec §4.1).
 func resolveReportPhoto(ctx context.Context, photos repository.PhotoRepository,
 	participantID, sessionID, programStageID string) (*entity.SmartPhoto, error) {
 	pick, err := photos.GetReportPhotoPick(ctx, participantID, sessionID, programStageID)
@@ -83,14 +83,15 @@ func resolveReportPhoto(ctx context.Context, photos repository.PhotoRepository,
 	}
 	if pick != nil {
 		rec, err := photos.GetPhotoByID(ctx, pick.PhotoID, "")
-		if err != nil {
-			var ae *apperrors.AppError
-			if errors.As(err, &ae) && ae.Status == http.StatusNotFound {
-				return nil, nil // pick's photo deleted/soft-removed: gugur, tanpa fallback
-			}
+		if err == nil {
+			return rec, nil
+		}
+		var ae *apperrors.AppError
+		if !(errors.As(err, &ae) && ae.Status == http.StatusNotFound) {
 			return nil, err
 		}
-		return rec, nil
+		// Pick's photo deleted/soft-removed: gugur — jatuh ke fallback
+		// is_report_photo di bawah (tanpa referensi menggantung).
 	}
 	isTrue := true
 	page, err := photos.ListPhotos(ctx, repository.PhotoFilter{

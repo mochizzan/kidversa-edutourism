@@ -1,90 +1,135 @@
-import { LayoutGrid, RotateCcw, Check } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { FileCheck, Images, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../../shared/components/ui/Button'
+import { Tooltip } from '../../../shared/components/ui/Tooltip'
+import { cn } from '../../../core/utils'
 import type { Participant } from '../../../core/types'
 
 interface PhotoEditorProps {
-  participant: Participant
-  selectedFrameId: string | null
-  isReportPhoto: boolean
-  isSaving: boolean
-  onOpenFramePicker: () => void
-  onClearFrame: () => void
-  onToggleReportPhoto: (checked: boolean) => void
-  onRetake: () => void
-  onSave: () => void
-  onDiscard: () => void
+ participant: Participant
+ selectedFrameId: string | null
+ isReportPhoto: boolean
+ isSaving: boolean
+ onOpenFramePicker: () => void
+ onClearFrame: () => void
+ onToggleReportPhoto: (checked: boolean) => void
+ onRetake: () => void
+ onSave: () => void
+ onDiscard: () => void
+}
+
+interface CircleIconButtonProps {
+ /** Accessible name AND tooltip content (icon-only control). */
+ label: string
+ icon: ReactNode
+ disabled?: boolean
+ /** Toggle state for the report-photo control; undefined = plain action button. */
+ pressed?: boolean
+ onClick: () => void
+}
+
+/**
+ * Icon-only circular control for the vertical column over the canvas.
+ * Native <button> so aria-label/aria-pressed land on the real button element
+ * (the shared Button does not forward ARIA attributes).
+ */
+function CircleIconButton({ label, icon, disabled, pressed, onClick }: CircleIconButtonProps) {
+ return (
+  <Tooltip content={label}>
+   <button
+    type="button"
+    aria-label={label}
+    aria-pressed={pressed}
+    disabled={disabled}
+    onClick={onClick}
+    className={cn(
+     'flex h-11 w-11 items-center justify-center rounded-full transition-colors',
+     'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+     'disabled:cursor-not-allowed disabled:opacity-50',
+     pressed
+      ? 'bg-primary text-on-primary hover:bg-primary-dark'
+      : 'bg-white text-on-surface-variant hover:bg-surface-container-high',
+    )}
+   >
+    {icon}
+   </button>
+  </Tooltip>
+ )
 }
 
 export const PhotoEditor = ({
-  participant,
-  selectedFrameId,
-  isReportPhoto,
-  isSaving,
-  onOpenFramePicker,
-  onClearFrame,
-  onToggleReportPhoto,
-  onRetake,
-  onSave,
-  onDiscard,
+ participant,
+ selectedFrameId,
+ isReportPhoto,
+ isSaving,
+ onOpenFramePicker,
+ onClearFrame,
+ onToggleReportPhoto,
+ onRetake,
+ onSave,
+ onDiscard,
 }: PhotoEditorProps) => {
-  const { t } = useTranslation()
-  return (
-    <div className="bg-white border border-surface-container-highest rounded-3xl p-5 shadow-sm space-y-4 max-w-lg md:mx-auto">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={onOpenFramePicker}
-          className="flex items-center gap-2 text-sm font-extrabold text-on-surface bg-surface-container-low hover:bg-surface-container-high px-4 py-2 rounded-xl transition-all"
-        >
-          <LayoutGrid className="w-4 h-4 text-primary" />
-          {selectedFrameId ? t('fasilitator.photos.changeFrame') : t('fasilitator.photos.chooseFrame')}
-        </button>
-        {selectedFrameId && (
-          <button onClick={onClearFrame} className="text-xs font-bold text-error hover:underline">
-            {t('fasilitator.photos.deleteFrame')}
-          </button>
-        )}
-      </div>
+ const { t } = useTranslation()
+ const frameLabel = selectedFrameId
+  ? t('fasilitator.photos.changeFrame')
+  : t('fasilitator.photos.chooseFrame')
 
-      <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-sm font-bold text-on-surface cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isReportPhoto}
-            onChange={(e) => onToggleReportPhoto(e.target.checked)}
-            disabled={!participant.consent_photo}
-            className="w-4 h-4 rounded accent-primary"
-          />
-          {t('fasilitator.photos.setReportPhoto')}
-        </label>
-        {!participant.consent_photo && (
-          <span className="text-[10px] text-warning-text bg-warning-surface px-2 py-0.5 rounded-full font-bold">
-            {t('fasilitator.photos.consentRequired')}
-          </span>
-        )}
-      </div>
+ return (
+  <>
+   {/* Vertical icon column anchored to the page's relative editor wrapper. */}
+   <div className="absolute right-2 top-2 z-10 flex flex-col items-center gap-2">
+    <CircleIconButton
+     label={frameLabel}
+     icon={<Images className="h-5 w-5" aria-hidden="true" />}
+     disabled={isSaving}
+     onClick={onOpenFramePicker}
+    />
+    {selectedFrameId && (
+     <CircleIconButton
+      label={t('fasilitator.photos.deleteFrame')}
+      icon={<Trash2 className="h-5 w-5" aria-hidden="true" />}
+      disabled={isSaving}
+      onClick={onClearFrame}
+     />
+    )}
+    <CircleIconButton
+     label={t('fasilitator.photos.setReportPhoto')}
+     icon={<FileCheck className="h-5 w-5" aria-hidden="true" />}
+     disabled={isSaving || !participant.consent_photo}
+     pressed={isReportPhoto}
+     onClick={() => onToggleReportPhoto(!isReportPhoto)}
+    />
+    <CircleIconButton
+     label={t('fasilitator.photos.retake')}
+     icon={<RotateCcw className="h-5 w-5" aria-hidden="true" />}
+     disabled={isSaving}
+     onClick={onRetake}
+    />
+    <CircleIconButton
+     label={t('common.save')}
+     icon={<Save className="h-5 w-5" aria-hidden="true" />}
+     disabled={isSaving}
+     onClick={onSave}
+    />
+   </div>
 
-      <div className="flex items-center justify-center gap-4 pt-2">
-        <Button
-          variant="secondary"
-          icon={<RotateCcw className="w-4 h-4" />}
-          onClick={onRetake}
-          className="w-full justify-center"
-        >
-          {t('fasilitator.photos.retake')}
-        </Button>
-        <Button
-          loading={isSaving}
-          icon={<Check className="w-4 h-4" />}
-          onClick={onSave}
-          className="w-full justify-center"
-        >
-          {t('common.save')}
-        </Button>
-        <Button variant="ghost" onClick={onDiscard} className="text-on-surface-variant">
-          {t('common.cancel')}
-        </Button>
-      </div>
-    </div>
-  )
+   {/* Card below the canvas: consent status (when missing) + labeled Batal. */}
+   <div
+    className={cn(
+     'mt-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm',
+     participant.consent_photo && 'justify-end',
+    )}
+   >
+    {!participant.consent_photo && (
+     <span className="rounded-full bg-warning-surface px-2 py-0.5 text-[10px] font-bold text-warning-text">
+      {t('fasilitator.photos.consentRequired')}
+     </span>
+    )}
+    <Button variant="secondary" onClick={onDiscard}>
+     {t('common.cancel')}
+    </Button>
+   </div>
+  </>
+ )
 }

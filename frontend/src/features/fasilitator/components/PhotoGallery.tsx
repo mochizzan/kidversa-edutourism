@@ -1,4 +1,4 @@
-import { Camera, Award, Check, X, Trash2 } from 'lucide-react'
+import { Camera, FileText, Check, X, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getMediaUrl } from '../../../core/utils/media'
 import type { SmartPhoto, Participant } from '../../../core/types'
@@ -60,10 +60,14 @@ export const PhotoGallery = ({
                   alt=""
                   className="w-full h-full object-cover"
                 />
-                {photo.is_report_photo && !selected && (
-                  <div className="absolute top-2 right-2 bg-accent text-white rounded-full p-1 shadow">
-                    <Award className="w-3.5 h-3.5" />
-                  </div>
+                {photo.is_report_photo && (
+                  <span
+                    aria-label={t('fasilitator.photos.reportBadge')}
+                    className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-white shadow"
+                  >
+                    <FileText className="h-3 w-3" aria-hidden="true" />
+                    {t('fasilitator.photos.reportBadge')}
+                  </span>
                 )}
                 {selected && (
                   <span className="absolute top-2 right-2 z-10 rounded-full bg-primary p-1 text-white shadow">

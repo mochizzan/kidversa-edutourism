@@ -1252,7 +1252,12 @@
       "noActiveTopic": "보고서 사진을 선택할 활성 주제가 없습니다.",
       "topicLoadError": "주제 목록을 불러오지 못했습니다. 주제 이름이 불완전할 수 있습니다.",
       "picksLoadError": "보고서 사진 선택을 불러오지 못했습니다.",
-      "groupGoneDesc": "이 세션에서 그룹을 찾을 수 없습니다. 삭제되었을 수 있습니다."
+      "groupGoneDesc": "이 세션에서 그룹을 찾을 수 없습니다. 삭제되었을 수 있습니다.",
+      "sortLabel": "사진 정렬",
+      "sortNewest": "최신순",
+      "sortOldest": "오래된순",
+      "sortLargest": "크기 큰순",
+      "sortSmallest": "크기 작은순"
     },
     "photos": {
       "emptyFor": "{{name}}에 대한 사진이 없습니다.",
@@ -1263,6 +1268,10 @@
       "notInSession": "참가자가 세션에 입장하지 않았습니다.",
       "maxPhotos": "아동당 최대 {{max}}장의 사진",
       "consentRequired": "사진 권한이 부여되지 않았습니다.",
+      "uploading": "사진 업로드 중…",
+      "uploadProgress": "사진 업로드 중… {{percent}}%",
+      "uploadSuccess": "사진이 저장되었습니다",
+      "leaveUploadConfirm": "사진이 업로드 중입니다. 지금 나가면 업로드가 취소되어 사진이 저장되지 않습니다. 페이지를 떠나시겠습니까?",
       "loadingParticipant": "참가자 데이터를 불러오는 중...",
       "childMissingTitle": "아동을 찾을 수 없음",
       "childMissingDesc": "아동 데이터를 사용할 수 없거나 삭제되었습니다.",
@@ -1285,7 +1294,8 @@
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
       "pickError": "Failed to select report photo",
-      "clearPickError": "Failed to deselect report photo"
+      "clearPickError": "Failed to deselect report photo",
+      "reportBadge": "성적표 사진"
     },
     "camera": {
       "accessing": "카메라 접근 중...",
@@ -1311,7 +1321,8 @@
     },
     "frame": {
       "none": "프레임 없음",
-      "frameWord": "프레임"
+      "frameWord": "프레임",
+      "empty": "이 프로그램에서 사용할 수 있는 프레임이 없습니다"
     },
     "group": {
       "notFound": "그룹을 찾을 수 없습니다",

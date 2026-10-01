@@ -1252,7 +1252,12 @@
       "noActiveTopic": "報告写真を選択できるアクティブなトピックがありません。",
       "topicLoadError": "トピック一覧の読み込みに失敗しました。トピック名が不完全な可能性があります。",
       "picksLoadError": "報告写真の選択状況の読み込みに失敗しました。",
-      "groupGoneDesc": "このセッションにグループが見つかりません。削除された可能性があります。"
+      "groupGoneDesc": "このセッションにグループが見つかりません。削除された可能性があります。",
+      "sortLabel": "写真を並べ替え",
+      "sortNewest": "新しい順",
+      "sortOldest": "古い順",
+      "sortLargest": "サイズが大きい順",
+      "sortSmallest": "サイズが小さい順"
     },
     "photos": {
       "emptyFor": "{{name}}の写真はまだありません",
@@ -1263,6 +1268,10 @@
       "notInSession": "参加者がまだセッションに入っていません",
       "maxPhotos": "お子様1人につき最大{{max}}枚まで",
       "consentRequired": "写真の許可がまだ与えられていません",
+      "uploading": "写真をアップロード中…",
+      "uploadProgress": "写真をアップロード中… {{percent}}%",
+      "uploadSuccess": "写真を保存しました",
+      "leaveUploadConfirm": "写真をアップロード中です。今すぐ移動するとアップロードがキャンセルされ、写真は保存されません。ページを離れてもよろしいですか？",
       "loadingParticipant": "参加者データを読み込み中...",
       "childMissingTitle": "お子様が見つかりません",
       "childMissingDesc": "お子様のデータは利用できないか、削除されています。",
@@ -1285,7 +1294,8 @@
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
       "pickError": "Failed to select report photo",
-      "clearPickError": "Failed to deselect report photo"
+      "clearPickError": "Failed to deselect report photo",
+      "reportBadge": "レポート写真"
     },
     "camera": {
       "accessing": "カメラにアクセス中...",
@@ -1311,7 +1321,8 @@
     },
     "frame": {
       "none": "フレームなし",
-      "frameWord": "フレーム"
+      "frameWord": "フレーム",
+      "empty": "このプログラムで利用可能なフレームはありません"
     },
     "group": {
       "notFound": "グループが見つかりません",

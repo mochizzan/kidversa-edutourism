@@ -1252,7 +1252,12 @@
       "noActiveTopic": "No active topic to pick a report photo for.",
       "topicLoadError": "Failed to load the topic list. Topic names may be incomplete.",
       "picksLoadError": "Failed to load report photo picks.",
-      "groupGoneDesc": "The group was not found in this session. It may have been deleted."
+      "groupGoneDesc": "The group was not found in this session. It may have been deleted.",
+      "sortLabel": "Sort photos",
+      "sortNewest": "Newest",
+      "sortOldest": "Oldest",
+      "sortLargest": "Largest Size",
+      "sortSmallest": "Smallest Size"
     },
     "photos": {
       "emptyFor": "No photos for {{name}} yet",
@@ -1263,6 +1268,10 @@
       "notInSession": "Participant has not joined the session",
       "maxPhotos": "Maximum {{max}} photos per child",
       "consentRequired": "Photo permission not granted",
+      "uploading": "Uploading photo…",
+      "uploadProgress": "Uploading photo… {{percent}}%",
+      "uploadSuccess": "Photo saved successfully",
+      "leaveUploadConfirm": "A photo is being uploaded. If you leave now, the upload will be cancelled and the photo will not be saved. Leave the page anyway?",
       "loadingParticipant": "Loading participant data...",
       "childMissingTitle": "Child Not Found",
       "childMissingDesc": "Child data is unavailable or has been deleted.",
@@ -1285,7 +1294,8 @@
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
       "pickError": "Failed to select report photo",
-      "clearPickError": "Failed to deselect report photo"
+      "clearPickError": "Failed to deselect report photo",
+      "reportBadge": "Report Photo"
     },
     "camera": {
       "accessing": "Accessing camera...",
@@ -1311,7 +1321,8 @@
     },
     "frame": {
       "none": "No Frame",
-      "frameWord": "Frame"
+      "frameWord": "Frame",
+      "empty": "No frames available for this program"
     },
     "group": {
       "notFound": "Group not found",

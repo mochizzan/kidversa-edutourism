@@ -28,12 +28,15 @@ const upload = async (
   participantId: string,
   sessionId: string,
   file: File,
+  options?: { onProgress?: (percent: number) => void },
 ): Promise<SmartPhoto> => {
   const form = new FormData()
   form.append('file', file)
   form.append('participant_id', participantId)
   form.append('session_id', sessionId)
-  return uploadMultipart<SmartPhoto>(API_ROUTES.PHOTOS.UPLOAD, form)
+  // The File is sent byte-for-byte as multipart — no re-encode. onProgress
+  // rides the shared XHR upload-progress plumbing in uploadMultipart.
+  return uploadMultipart<SmartPhoto>(API_ROUTES.PHOTOS.UPLOAD, form, options)
 }
 
 const update = async (
@@ -85,7 +88,10 @@ const clearReportPick = async (params: {
   )
 }
 
-export const photoService: PhotoService = {
+// `satisfies` (instead of a `: PhotoService` annotation) keeps the interface
+// check while preserving the concrete `upload` signature — the optional
+// `onProgress` option must stay visible to callers (useSmartPhotos).
+export const photoService = {
   getBySession,
   getByParticipant,
   upload,
@@ -95,4 +101,4 @@ export const photoService: PhotoService = {
   getReportPicks,
   setReportPick,
   clearReportPick,
-}
+} satisfies PhotoService

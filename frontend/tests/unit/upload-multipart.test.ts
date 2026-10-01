@@ -151,4 +151,40 @@ describe('uploadMultipart', () => {
 
     await expect(promise).rejects.toThrow('Network error during upload')
   })
+
+  it('rejects a 2xx with a non-JSON body (never resolves junk as success)', async () => {
+    const formData = new FormData()
+    formData.append('file', new File(['hello'], 'photo.png', { type: 'image/png' }))
+
+    const promise = uploadMultipart('/api/photos/upload', formData, {})
+
+    xhrMock.status = 200
+    xhrMock.responseText = '<html>proxy error page</html>'
+    xhrMock.onload!()
+
+    await expect(promise).rejects.toMatchObject({
+      message: 'Upload failed with status 200',
+      code: 'unexpected_response',
+      status: 200,
+    })
+  })
+
+  it('rejects a 2xx JSON body without a non-null data envelope ({} / error envelope / data:null)', async () => {
+    const formData = new FormData()
+    formData.append('file', new File(['hello'], 'photo.png', { type: 'image/png' }))
+
+    // Object body, but no `data` field — a malformed envelope on 2xx.
+    const bare = uploadMultipart('/api/photos/upload', formData, {})
+    xhrMock.status = 200
+    xhrMock.responseText = JSON.stringify({ error: { code: 'boom', message: 'puff' } })
+    xhrMock.onload!()
+    await expect(bare).rejects.toMatchObject({ code: 'unexpected_response', status: 200 })
+
+    // data:null is equally malformed for an upload that must return the record.
+    const nullData = uploadMultipart('/api/photos/upload', formData, {})
+    xhrMock.status = 200
+    xhrMock.responseText = JSON.stringify({ data: null })
+    xhrMock.onload!()
+    await expect(nullData).rejects.toMatchObject({ code: 'unexpected_response', status: 200 })
+  })
 })

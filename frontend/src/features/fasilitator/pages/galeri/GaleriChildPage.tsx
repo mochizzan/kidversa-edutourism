@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Lock, Plus } from 'lucide-react'
@@ -14,10 +14,46 @@ import { ConfirmDialog } from '../../../../shared/components/feedback/ConfirmDia
 import { PageHeader } from '../../../../shared/components/ui/PageHeader'
 import { ErrorState } from '../../../../shared/components/feedback/ErrorState'
 import { Button } from '../../../../shared/components/ui/Button'
+import { Select } from '../../../../shared/components/ui/Select'
 import { friendlyError } from '../../../../core/utils/errorMessages'
 import type { Participant, SessionGroup, SmartPhoto } from '../../../../core/types'
 
 const MAX_PHOTOS = 10
+
+export type GallerySortKey = 'newest' | 'oldest' | 'largest' | 'smallest'
+
+/**
+ * Client-side gallery ordering (K). newest = time DESC (default), oldest =
+ * time ASC; largest/smallest = file_size DESC/ASC with null file_size rows
+ * last in BOTH directions. Size ties keep time-DESC order (pre-sort by time
+ * DESC, then a stable size sort). Never mutates the input array. Time =
+ * created_at with taken_at fallback.
+ */
+export function sortPhotosForGallery(
+ photos: SmartPhoto[],
+ key: GallerySortKey,
+): SmartPhoto[] {
+ const time = (photo: SmartPhoto) => Date.parse(photo.created_at ?? photo.taken_at) || 0
+ const byTimeDesc = (a: SmartPhoto, b: SmartPhoto) => time(b) - time(a)
+
+ if (key === 'newest') return [...photos].sort(byTimeDesc)
+ if (key === 'oldest') return [...photos].sort((a, b) => -byTimeDesc(a, b))
+
+ const direction = key === 'smallest' ? -1 : 1
+ return [...photos]
+  .sort(byTimeDesc)
+  .sort((a, b) => {
+   const sizeA = a.file_size
+   const sizeB = b.file_size
+   const missingA = sizeA === null || sizeA === undefined
+   const missingB = sizeB === null || sizeB === undefined
+   if (missingA || missingB) {
+    if (missingA && missingB) return 0
+    return missingA ? 1 : -1 // null/undefined always last
+   }
+   return direction * (sizeB - sizeA)
+  })
+}
 
 /**
  * Galeri per peserta: photo grid (reuses PhotoGallery + useSmartPhotos) with
@@ -46,12 +82,17 @@ const GaleriChildPage = () => {
  const [topics, setTopics] = useState<{ programStageId: string; name: string }[]>([])
  const [activeStageId, setActiveStageId] = useState<string | null>(null)
  const [photosError, setPhotosError] = useState<string | null>(null)
+ const [sortKey, setSortKey] = useState<GallerySortKey>('newest')
 
  const [fullscreenPhoto, setFullscreenPhoto] = useState<SmartPhoto | null>(null)
  const [confirmDeletePhoto, setConfirmDeletePhoto] = useState<SmartPhoto | null>(null)
 
  const { photos, loadPhotos, picks, loadPicks, setPick, clearPick, deletePhoto } =
   useSmartPhotos(childId, participant)
+
+ // Urutan galeri (K) — client-side; photos sudah difilter server per
+ // participant (GET /api/photos?participant_id=), tak ada filter topik di sini.
+ const sortedPhotos = useMemo(() => sortPhotosForGallery(photos, sortKey), [photos, sortKey])
 
  const fetchData = useCallback(async (silent = false) => {
   if (!childId) {
@@ -251,6 +292,18 @@ const GaleriChildPage = () => {
     <span className="text-xs text-on-surface-variant">
      {t('fasilitator.photos.photoCount', { count: photos.length, max: MAX_PHOTOS })}
     </span>
+    <Select
+     className="w-44"
+     aria-label={t('fasilitator.galeri.sortLabel')}
+     value={sortKey}
+     onChange={(e) => setSortKey(e.target.value as GallerySortKey)}
+     options={[
+      { value: 'newest', label: t('fasilitator.galeri.sortNewest') },
+      { value: 'oldest', label: t('fasilitator.galeri.sortOldest') },
+      { value: 'largest', label: t('fasilitator.galeri.sortLargest') },
+      { value: 'smallest', label: t('fasilitator.galeri.sortSmallest') },
+     ]}
+    />
    </div>
 
    {pickDisabledReason && isMine && consentOk && (
@@ -280,7 +333,7 @@ const GaleriChildPage = () => {
      <ErrorState message={photosError} onRetry={retryLoadPhotos} />
     ) : (
      <PhotoGallery
-      photos={photos}
+      photos={sortedPhotos}
       participant={participant}
       onPhotoClick={setFullscreenPhoto}
       activeStageId={activeStageId}

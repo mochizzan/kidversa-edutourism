@@ -1252,7 +1252,12 @@
       "noActiveTopic": "Không có chủ đề đang hoạt động để chọn ảnh báo cáo.",
       "topicLoadError": "Không tải được danh sách chủ đề. Tên chủ đề có thể chưa đầy đủ.",
       "picksLoadError": "Không tải được lựa chọn ảnh báo cáo.",
-      "groupGoneDesc": "Không tìm thấy nhóm trong phiên này. Có thể đã bị xóa."
+      "groupGoneDesc": "Không tìm thấy nhóm trong phiên này. Có thể đã bị xóa.",
+      "sortLabel": "Sắp xếp ảnh",
+      "sortNewest": "Mới nhất",
+      "sortOldest": "Cũ nhất",
+      "sortLargest": "Kích thước lớn nhất",
+      "sortSmallest": "Kích thước nhỏ nhất"
     },
     "photos": {
       "emptyFor": "Chưa có ảnh cho {{name}}",
@@ -1263,6 +1268,10 @@
       "notInSession": "Người tham gia chưa vào phiên",
       "maxPhotos": "Tối đa {{max}} ảnh mỗi trẻ",
       "consentRequired": "Chưa cấp quyền chụp ảnh",
+      "uploading": "Đang tải lên ảnh…",
+      "uploadProgress": "Đang tải lên ảnh… {{percent}}%",
+      "uploadSuccess": "Ảnh đã được lưu thành công",
+      "leaveUploadConfirm": "Ảnh đang được tải lên. Nếu rời đi bây giờ, quá trình tải lên sẽ bị hủy và ảnh sẽ không được lưu. Vẫn rời trang?",
       "loadingParticipant": "Đang tải dữ liệu người tham gia...",
       "childMissingTitle": "Không tìm thấy trẻ",
       "childMissingDesc": "Dữ liệu trẻ không khả dụng hoặc đã bị xóa.",
@@ -1285,7 +1294,8 @@
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
       "pickError": "Failed to select report photo",
-      "clearPickError": "Failed to deselect report photo"
+      "clearPickError": "Failed to deselect report photo",
+      "reportBadge": "Ảnh báo cáo"
     },
     "camera": {
       "accessing": "Mengakses kamera...",
@@ -1311,7 +1321,8 @@
     },
     "frame": {
       "none": "Tanpa Bingkai",
-      "frameWord": "Bingkai"
+      "frameWord": "Bingkai",
+      "empty": "Không có khung hình nào cho chương trình này"
     },
     "group": {
       "notFound": "Kelompok tidak ditemukan",

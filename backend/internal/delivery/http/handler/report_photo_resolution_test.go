@@ -106,12 +106,12 @@ func (f *fakeResolutionPhotoRepo) DeleteReportPhotoPick(_ context.Context, parti
 	return nil
 }
 
-// TestResolveReportPhoto pins the four resolution behaviours of the report
-// photo helper (spec §4.1 / §5.4): an explicit pick wins over the
-// is_report_photo default; a pick whose photo was deleted resolves to nil
-// WITHOUT falling back (listCalls stays 0 — no dangling reference, no surprise
-// default); with no pick row the session's exclusive default is the fallback;
-// nothing resolvable yields nil.
+// TestResolveReportPhoto pins the resolution behaviours of the report photo
+// helper (spec §4.1): an explicit pick whose photo still exists wins over the
+// is_report_photo default; a pick whose photo was deleted falls through to the
+// is_report_photo default (foto rapor must replace the mini-raport placeholder
+// — no dangling reference, no stale nil); with no pick row the session's
+// exclusive default is the fallback; nothing resolvable yields nil.
 func TestResolveReportPhoto(t *testing.T) {
 	const (
 		participantID  = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -145,12 +145,21 @@ func TestResolveReportPhoto(t *testing.T) {
 			wantListCalls: 0,
 		},
 		{
-			name:        "deleted pick photo resolves to nil without fallback",
+			name:        "deleted pick photo falls back to is_report_photo",
 			pickPhotoID: pickedPhotoID,
-			// The default EXISTS here: a fallback would wrongly return it.
+			// Pick's photo is gone; the flagged default exists → foto rapor
+			// menggantikan placeholder (spec §4.1), so the list fallback runs.
 			photos:        map[string]*entity.SmartPhoto{defaultPhotoID: newPhoto(defaultPhotoID, true)},
+			wantID:        defaultPhotoID,
+			wantListCalls: 1,
+		},
+		{
+			name:        "deleted pick photo without flagged default resolves to nil",
+			pickPhotoID: pickedPhotoID,
+			// Nothing flagged to fall back to → nil after the fallback attempt.
+			photos:        map[string]*entity.SmartPhoto{defaultPhotoID: newPhoto(defaultPhotoID, false)},
 			wantID:        "",
-			wantListCalls: 0,
+			wantListCalls: 1,
 		},
 		{
 			name:          "no pick row falls back to is_report_photo",
@@ -203,7 +212,7 @@ func TestResolveReportPhoto(t *testing.T) {
 				}
 			}
 			if repo.listCalls != tt.wantListCalls {
-				t.Fatalf("ListPhotos called %d time(s), want %d (fallback must not run when a pick row exists)", repo.listCalls, tt.wantListCalls)
+				t.Fatalf("ListPhotos called %d time(s), want %d", repo.listCalls, tt.wantListCalls)
 			}
 		})
 	}

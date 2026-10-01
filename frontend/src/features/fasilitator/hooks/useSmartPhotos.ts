@@ -114,12 +114,21 @@ export function useSmartPhotos(
   )
 
   const uploadPhoto = useCallback(
-    async ({ childId: id, participant, takenBy, blob, frameId, isReportPhoto }: UploadOptions) => {
+    async (
+      { childId: id, participant, takenBy, blob, frameId, isReportPhoto }: UploadOptions,
+      opts?: { onProgress?: (percent: number) => void },
+    ) => {
       if (!participant.session_id) {
         throw new Error('NO_SESSION')
       }
-      const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' })
-      const photo = await photoService.upload(id, participant.session_id, file)
+      // Upload the canvas blob as-is (PNG full size, tanpa kompresi/re-encode);
+      // only the container name/MIME follow the blob's type — .jpg for
+      // image/jpeg, .png for image/png and everything else.
+      const ext = blob.type === 'image/jpeg' ? 'jpg' : 'png'
+      const file = new File([blob], `photo-${Date.now()}.${ext}`, {
+        type: blob.type || 'image/png',
+      })
+      const photo = await photoService.upload(id, participant.session_id, file, opts)
 
       if (frameId || isReportPhoto) {
         const updateData: Partial<SmartPhoto> = {}
@@ -132,9 +141,15 @@ export function useSmartPhotos(
         }
       }
 
+      // Refresh from the server so the gallery counter reflects the new photo.
+      // Every step above surfaces its own failure: any error (upload, follow-up
+      // update, report flag, refresh) propagates — uploadPhoto only resolves
+      // once the server confirmed all of them (status akhir dari server).
+      await loadPhotos()
+
       return photo
     },
-    [],
+    [loadPhotos],
   )
 
   return {

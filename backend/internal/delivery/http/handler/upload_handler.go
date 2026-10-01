@@ -116,7 +116,7 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 		return appresp.Fail(c, http.StatusForbidden, "consent_required")
 	}
 
-	_, storedRel, err := h.persistFile(c, "photos")
+	fileSize, storedRel, err := h.persistFile(c, "photos")
 	if err != nil {
 		return err
 	}
@@ -139,6 +139,7 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 		ParticipantID:   participantID,
 		SessionID:       sessionID,
 		OriginalFileURL: storedRel,
+		FileSize:        &fileSize,
 		TakenBy:         takenBy,
 		TakenAt:         takenAt,
 	}

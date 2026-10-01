@@ -1252,7 +1252,12 @@
       "noActiveTopic": "ไม่มีหัวข้อที่ใช้งานอยู่สำหรับเลือกรูปภาพรายงาน",
       "topicLoadError": "โหลดรายการหัวข้อไม่สำเร็จ ชื่อหัวข้ออาจไม่ครบถ้วน",
       "picksLoadError": "โหลดตัวเลือกรูปภาพรายงานไม่สำเร็จ",
-      "groupGoneDesc": "ไม่พบกลุ่มในเซสชันนี้ อาจถูกลบไปแล้ว"
+      "groupGoneDesc": "ไม่พบกลุ่มในเซสชันนี้ อาจถูกลบไปแล้ว",
+      "sortLabel": "เรียงลำดับรูปภาพ",
+      "sortNewest": "ใหม่สุด",
+      "sortOldest": "เก่าสุด",
+      "sortLargest": "ขนาดใหญ่สุด",
+      "sortSmallest": "ขนาดเล็กสุด"
     },
     "photos": {
       "emptyFor": "ยังไม่มีรูปภาพสำหรับ {{name}}",
@@ -1263,6 +1268,10 @@
       "notInSession": "ผู้เข้าร่วมยังไม่ได้เข้าสู่เซสชัน",
       "maxPhotos": "สูงสุด {{max}} รูปต่อเด็กหนึ่งคน",
       "consentRequired": "ยังไม่ได้รับสิทธิ์การถ่ายภาพ",
+      "uploading": "กำลังอัปโหลดรูปภาพ…",
+      "uploadProgress": "กำลังอัปโหลดรูปภาพ… {{percent}}%",
+      "uploadSuccess": "บันทึกรูปภาพสำเร็จแล้ว",
+      "leaveUploadConfirm": "กำลังอัปโหลดรูปภาพ หากออกตอนนี้ การอัปโหลดจะถูกระงับและรูปภาพจะไม่ถูกบันทึก ยังคงออกจากหน้านี้หรือไม่",
       "loadingParticipant": "กำลังโหลดข้อมูลผู้เข้าร่วม...",
       "childMissingTitle": "ไม่พบข้อมูลเด็ก",
       "childMissingDesc": "ข้อมูลเด็กไม่พร้อมใช้งานหรือถูกลบไปแล้ว",
@@ -1285,7 +1294,8 @@
       "pickPhoto": "Select as report photo",
       "unpickPhoto": "Deselect report photo",
       "pickError": "Failed to select report photo",
-      "clearPickError": "Failed to deselect report photo"
+      "clearPickError": "Failed to deselect report photo",
+      "reportBadge": "รูปภาพรายงาน"
     },
     "camera": {
       "accessing": "กำลังเข้าถึงกล้อง...",
@@ -1311,7 +1321,8 @@
     },
     "frame": {
       "none": "ไม่มีเฟรม",
-      "frameWord": "เฟรม"
+      "frameWord": "เฟรม",
+      "empty": "ไม่มีเฟรมที่ใช้ได้สำหรับโปรแกรมนี้"
     },
     "group": {
       "notFound": "ไม่พบกลุ่ม",

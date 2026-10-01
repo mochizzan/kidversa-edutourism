@@ -27,6 +27,10 @@ type SmartPhoto struct {
 	IsReportPhoto   bool      `json:"is_report_photo"`
 	TakenBy         string    `json:"taken_by"`
 	TakenAt         time.Time `json:"taken_at"`
+	// FileSize is the uploaded file's byte size from the multipart header
+	// (requirement K: sort gallery by photo size). Nil for legacy rows created
+	// before size tracking — serialized as JSON null, never 0.
+	FileSize *int64 `json:"file_size"`
 }
 
 // ReportPhotoPick is one participant's chosen report photo for one topic

@@ -76,13 +76,18 @@ function sendMultipart<T>(
     // keep defaults — the error path below builds a status-based message
    }
    if (xhr.status >= 200 && xhr.status < 300) {
-    if (bodyInvalid) {
-     // A 2xx with a non-JSON body is a malformed envelope: reject loudly so
-     // the caller shows an error instead of treating junk as a success.
+    // Every backend upload endpoint answers with the { data } envelope
+    // (appresp.Created/OK). A 2xx body that is NOT that envelope — non-JSON
+    // or a scalar (bodyInvalid, incl. a JSON.parse throw which keeps the
+    // empty default), or an object without a non-null data field ({} or an
+    // error envelope on 2xx) — is a malformed response: reject loudly so
+    // junk can never resolve as a fake success.
+    const payload = parsed.data
+    if (bodyInvalid || payload === undefined || payload === null) {
      reject(new ApiError(`Upload failed with status ${xhr.status}`, 'unexpected_response', xhr.status))
      return
     }
-    resolve((parsed.data ?? parsed) as T)
+    resolve(payload as T)
     return
    }
    // Backend errors use the envelope shape { error: { code, message } };
