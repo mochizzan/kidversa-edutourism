@@ -141,7 +141,8 @@ func (h *BadgeHandler) List(c *echo.Context) error {
 	if participantID == "" {
 		return appresp.Fail(c, http.StatusBadRequest, "bad_request")
 	}
-	items, err := h.substageRepo.ListBadgesByParticipant((*c).Request().Context(), participantID)
+	tenantID := appmiddleware.GetTenantID(c)
+	items, err := h.substageRepo.ListBadgesByParticipant((*c).Request().Context(), participantID, tenantID)
 	if err != nil {
 		return err
 	}

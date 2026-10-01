@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { sessionService } from '../../../core/services/sessions'
 import { reportService } from '../../../core/services/reports'
 import { assessmentService } from '../../../core/services/assessments'
+import { attendanceService } from '../../../core/services/attendance'
 import { programService } from '../../../core/services/programs'
 import { i18n } from '../../../core/i18n'
 import { isSendableReportStatus } from '../../../core/constants/reportStatus'
@@ -22,6 +23,7 @@ export type ParticipantReportStatus =
  | 'no_assessment'
  | 'ready_to_generate'
  | 'incomplete'
+ | 'absent'
 
 /** Outcome of a Send All run: counts drive the success/partial toast. */
 export interface SendAllResult {
@@ -44,10 +46,11 @@ export interface TopicTab {
 }
 
 const STATUS_ORDER: Record<ParticipantReportStatus, number> = {
- has_report: 0,
- ready_to_generate: 1,
- no_assessment: 2,
- incomplete: 3,
+ absent: 0,
+ has_report: 1,
+ ready_to_generate: 2,
+ no_assessment: 3,
+ incomplete: 4,
 }
 
 /** Poll cadence while a server-side operation (active_generate/active_send) runs. */
@@ -94,17 +97,30 @@ function sendSettled(watched: string[], items: Report[]): boolean {
 /**
  * Static join inputs captured by the initial load so a poll tick can rebuild
  * the (participant × topic) row grid from fresh report entities alone —
- * participants/assessments/topics never change while an operation runs.
+ * participants/assessments/topics/attendance never change while an operation
+ * runs.
  */
 interface ReportJoinInputs {
  participants: Participant[]
  assessments: Assessment[]
  topicTabs: TopicTab[]
  topicSubIds: Map<string, Set<string>>
+ /** Participants with an EXPLICIT attendance row is_present=false (absent). */
+ absentIds: ReadonlySet<string>
 }
 
-/** Pure row builder — same grid as the initial load, fed fresh report entities. */
-function buildReportListItems(
+/**
+ * Pure row builder — same grid as the initial load, fed fresh report entities.
+ * Exported for unit tests.
+ *
+ * Status precedence: `absent` is UNCONDITIONAL and outranks everything,
+ * including `has_report` — a later-absentee with a pre-existing report still
+ * shows the absent tag (the report badge next to it remains from the persisted
+ * entity), while generation for that participant stays blocked server-side.
+ * `absent` requires an EXPLICIT attendance row with is_present=false; an
+ * unmarked participant (no row) keeps its normal statuses.
+ */
+export function buildReportListItems(
  rawReports: Report[],
  inputs: ReportJoinInputs,
 ): ReportListItem[] {
@@ -125,7 +141,9 @@ function buildReportListItems(
      : 0
 
    let status: ParticipantReportStatus
-   if (report && assessmentCount > 0) {
+   if (inputs.absentIds.has(p.id)) {
+    status = 'absent'
+   } else if (report && assessmentCount > 0) {
     status = 'has_report'
    } else if (report && assessmentCount === 0) {
     status = 'no_assessment'
@@ -352,12 +370,14 @@ export function useReportSession(sessionId: string | undefined) {
   setLoading(true)
   setError(null)
   try {
-   const [sess, sessParticipants, sessAssessments, sessReports, sessStages] = await Promise.all([
+   const [sess, sessParticipants, sessAssessments, sessReports, sessStages, sessAttendance] = await Promise.all([
     sessionService.getById(sessionId),
     sessionService.getParticipants(sessionId),
     assessmentService.getBySession(sessionId),
     reportService.getBySession(sessionId),
     sessionService.getStages(sessionId),
+    // Attendance drives the absent marking (fatal on failure, like the other inputs).
+    attendanceService.getBySession(sessionId),
    ])
 
    if (!sess) {
@@ -390,11 +410,18 @@ export function useReportSession(sessionId: string | undefined) {
 
    // Static join inputs stay available so later poll ticks can rebuild rows
    // from a reports-only refetch (no loading skeleton during operations).
+   // Absence = EXPLICIT row is_present=false; participants without a row are
+   // unmarked and stay out of absentIds.
+   const absentIds = new Set<string>()
+   for (const a of sessAttendance) {
+    if (!a.is_present) absentIds.add(a.participant_id)
+   }
    const inputs: ReportJoinInputs = {
     participants: sessParticipants,
     assessments: sessAssessments,
     topicTabs,
     topicSubIds,
+    absentIds,
    }
    joinInputsRef.current = inputs
 
@@ -594,8 +621,10 @@ export function useReportSession(sessionId: string | undefined) {
   setGenError(null)
 
   const eligible = reports.filter((r) => r.status === 'ready_to_generate')
+  // Absent rows join the skipped set: they can never be generated (the server
+  // excludes them), so the result toast must list them with the others.
   const skipped = reports
-   .filter((r) => r.status === 'incomplete' || r.status === 'no_assessment')
+   .filter((r) => r.status === 'incomplete' || r.status === 'no_assessment' || r.status === 'absent')
    .map((r) => r.participant)
 
   if (eligible.length === 0) {

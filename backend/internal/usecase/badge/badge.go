@@ -3,6 +3,7 @@ package badge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -18,6 +19,7 @@ type Usecase struct {
 	programRepo         repository.ProgramRepository
 	assessmentRepo      repository.AssessmentRepository
 	sessionRepo         repository.SessionRepository
+	attendanceRepo      repository.AttendanceRepository
 }
 
 // NewUsecase builds the badge usecase.
@@ -27,6 +29,7 @@ func NewUsecase(
 	programRepo repository.ProgramRepository,
 	assessmentRepo repository.AssessmentRepository,
 	sessionRepo repository.SessionRepository,
+	attendanceRepo repository.AttendanceRepository,
 ) *Usecase {
 	return &Usecase{
 		substageRepo:        substageRepo,
@@ -34,6 +37,7 @@ func NewUsecase(
 		programRepo:         programRepo,
 		assessmentRepo:      assessmentRepo,
 		sessionRepo:         sessionRepo,
+		attendanceRepo:      attendanceRepo,
 	}
 }
 
@@ -57,7 +61,9 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 		return &existing[0], nil
 	}
 	if eerr != nil {
-		log.Printf("badge: list SUBTOPIK badges participant=%s stage=%s failed: %v", participantID, programStageID, eerr)
+		// A failed idempotency pre-check must not be ignored: continuing would
+		// risk a duplicate award and hides a real repo failure.
+		return nil, fmt.Errorf("badge: list SUBTOPIK badges participant=%s stage=%s: %w", participantID, programStageID, eerr)
 	}
 	// Empty name template → no row (log, not an error): the award is simply
 	// not configurable for this Topik yet.
@@ -104,7 +110,9 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 		return &existing[0], nil
 	}
 	if eerr != nil {
-		log.Printf("badge: list FINAL badges participant=%s program=%s failed: %v", participantID, programID, eerr)
+		// A failed idempotency pre-check must not be ignored: continuing would
+		// risk a duplicate award and hides a real repo failure.
+		return nil, fmt.Errorf("badge: list FINAL badges participant=%s program=%s: %w", participantID, programID, eerr)
 	}
 	stages, err := u.programRepo.ListStages(ctx, programID)
 	if err != nil {
@@ -116,8 +124,9 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 	for i := range stages {
 		got, gerr := u.substageRepo.ListBadgesByParticipantStage(ctx, participantID, stages[i].ID)
 		if gerr != nil {
-			log.Printf("badge: list SUBTOPIK badge participant=%s stage=%s failed: %v (treating as not awarded)", participantID, stages[i].ID, gerr)
-			return nil, nil
+			// A lookup failure must not be treated as "not awarded": that would
+			// silently withhold the FINAL badge on a repo error.
+			return nil, fmt.Errorf("badge: list SUBTOPIK badge participant=%s stage=%s: %w", participantID, stages[i].ID, gerr)
 		}
 		if len(got) == 0 {
 			// Not all Kegiatan completed yet.
@@ -162,9 +171,15 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 // session Topik) are now scored (star >= 1) for the participant, and if so
 // awards the Kegiatan badge and recomputes the cross-session Final badge.
 // Errors are returned so the caller may log; the assessment itself already saved.
-func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, sessionSubstageID string) error {
+// tenantID scopes the per-Topik assessment queries (assessmentRepo.List rejects
+// an empty tenant). Unreachable empty-tenant in production (both trigger paths
+// resolve a non-empty tenant), but kept as a defensive BadRequest.
+func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, sessionSubstageID, tenantID string) error {
 	if participantID == "" || sessionSubstageID == "" {
-		return nil
+		return apperrors.BadRequest("validation_error", nil)
+	}
+	if tenantID == "" {
+		return apperrors.BadRequest("tenant_required", nil)
 	}
 	sub, err := u.substageRepo.GetSessionSubstage(ctx, sessionSubstageID)
 	if err != nil {
@@ -189,11 +204,12 @@ func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, se
 		scored, lerr := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
 			ParticipantID:     participantID,
 			SessionSubstageID: allSubs[i].ID,
+			TenantID:          tenantID,
 		}, 1, 10)
 		if lerr != nil {
-			log.Printf("badge: list assessments participant=%s substage=%s failed: %v (treating as unscored)", participantID, allSubs[i].ID, lerr)
-			allScored = false
-			break
+			// A lookup failure must not masquerade as "not scored": return an
+			// explicit error so the badge gap is never silently swallowed.
+			return fmt.Errorf("badge: list assessments failed for participant=%s substage=%s: %w", participantID, allSubs[i].ID, lerr)
 		}
 		if len(scored.Items) == 0 {
 			allScored = false
@@ -211,6 +227,8 @@ func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, se
 			break
 		}
 	}
+	// Reaching here means every per-Kegiatan query above succeeded: this is the
+	// genuine "not all scored yet" policy outcome, not a swallowed failure.
 	if !allScored {
 		return nil
 	}
@@ -254,11 +272,100 @@ func (u *Usecase) CompleteSessionSubstage(ctx context.Context, sessionSubstageID
 	if err != nil {
 		return err
 	}
+	var failures []error
 	for i := range participants {
-		// Best-effort: a single participant error must not block the others —
-		// it is logged and the loop moves on to the next participant.
-		if err := u.EvaluateAfterAssessment(ctx, participants[i].ID, sessionSubstageID); err != nil {
+		// Best-effort per participant: a single failure must not block the
+		// others — it is logged and the loop moves on — but every failure is
+		// aggregated so the caller never sees a silent 204 on total failure.
+		if err := u.EvaluateAfterAssessment(ctx, participants[i].ID, sessionSubstageID, callerTenant); err != nil {
 			log.Printf("badge: evaluate after session-substage %s failed for participant %s: %v (continuing with remaining participants)", sessionSubstageID, participants[i].ID, err)
+			failures = append(failures, fmt.Errorf("participant %s: %w", participants[i].ID, err))
+		}
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("badge: evaluation after session-substage %s failed for %d of %d participant(s): %w", sessionSubstageID, len(failures), len(participants), errors.Join(failures...))
+	}
+	return nil
+}
+
+// ValidateGroupCompletion enforces the attendance-aware grading gate for
+// group completion: it returns an explicit present_participants_unassessed
+// error while any participant marked PRESENT (attendance is_present=true) for
+// the session has not scored (star_rating >= 1) every Kegiatan leaf in scope.
+// Participants with no attendance row (belum absen) and explicitly absent
+// participants are exempt — they are not required to be graded and never
+// block completion. Scope mirrors the fasilitator frontend gate: the leaves
+// of the group's current session stage, falling back to every session
+// Kegiatan when no current stage is set. An unwired attendance repo
+// conservatively falls back to grading every participant (the
+// pre-attendance rule), so the gate can never be silently waived. Every
+// lookup failure other than "not found" (never graded) is returned wrapped.
+func (u *Usecase) ValidateGroupCompletion(ctx context.Context, group *entity.SessionGroup, tenantID string) error {
+	if group == nil {
+		return apperrors.Internal("internal_error", fmt.Errorf("badge: ValidateGroupCompletion called with nil group"))
+	}
+	// Present set: participant IDs with an explicit attendance row. A nil map
+	// (repo unwired) means every participant must be graded.
+	var present map[string]bool
+	if u.attendanceRepo != nil {
+		rows, err := u.attendanceRepo.ListBySession(ctx, group.SessionID, tenantID)
+		if err != nil {
+			return fmt.Errorf("badge: list attendance session=%s group=%s: %w", group.SessionID, group.ID, err)
+		}
+		present = make(map[string]bool, len(rows))
+		for i := range rows {
+			present[rows[i].ParticipantID] = rows[i].IsPresent
+		}
+		markedPresent := false
+		for _, isPresent := range present {
+			if isPresent {
+				markedPresent = true
+				break
+			}
+		}
+		// Nobody marked present → nobody must be graded.
+		if !markedPresent {
+			return nil
+		}
+	}
+	subs, err := u.substageRepo.ListSessionSubstages(ctx, group.SessionID)
+	if err != nil {
+		return fmt.Errorf("badge: list substages session=%s: %w", group.SessionID, err)
+	}
+	subIDs := make([]string, 0, len(subs))
+	for i := range subs {
+		if group.CurrentSessionStageID == nil || *group.CurrentSessionStageID == "" ||
+			subs[i].SessionStageID == *group.CurrentSessionStageID {
+			subIDs = append(subIDs, subs[i].ID)
+		}
+	}
+	if len(subIDs) == 0 {
+		// No Kegiatan in scope → nothing to grade.
+		return nil
+	}
+	participants, err := u.sessionRepo.ListParticipants(ctx, group.SessionID, group.ID, tenantID)
+	if err != nil {
+		return fmt.Errorf("badge: list participants group=%s: %w", group.ID, err)
+	}
+	for i := range participants {
+		id := participants[i].ID
+		if present != nil && !present[id] {
+			// Unmarked (belum absen) or explicitly absent → exempt from the gate.
+			continue
+		}
+		for k := range subIDs {
+			a, lerr := u.assessmentRepo.GetByParticipantStage(ctx, id, subIDs[k], tenantID)
+			if lerr != nil {
+				if _, code, ok := apperrors.AsAppError(lerr); ok && code == "not_found" {
+					return apperrors.BadRequest("present_participants_unassessed",
+						fmt.Errorf("participant %s has not been scored on Kegiatan %s", id, subIDs[k]))
+				}
+				return fmt.Errorf("badge: get assessment participant=%s substage=%s: %w", id, subIDs[k], lerr)
+			}
+			if a.StarRating < 1 {
+				return apperrors.BadRequest("present_participants_unassessed",
+					fmt.Errorf("participant %s has no score (star_rating < 1) on Kegiatan %s", id, subIDs[k]))
+			}
 		}
 	}
 	return nil
@@ -266,8 +373,11 @@ func (u *Usecase) CompleteSessionSubstage(ctx context.Context, sessionSubstageID
 
 // CheckAndCompleteGroup validates that all group_stage_progress rows for the
 // group are COMPLETED or SKIPPED, and if so updates session_groups.status to
-// COMPLETED. Idempotent: already COMPLETED groups are no-ops. Returns nil when
-// progress is incomplete (caller decides policy).
+// COMPLETED. Idempotent: already COMPLETED groups only re-run the badge
+// backfill (heal-on-re-PUT). Returns nil when progress is incomplete (caller
+// decides policy). Every explicit completion attempt first runs the
+// attendance-aware grading gate (ValidateGroupCompletion): a present but
+// ungraded participant rejects the completion with an explicit error.
 func (u *Usecase) CheckAndCompleteGroup(ctx context.Context, sessionID, groupID, tenantID string) error {
 	if groupID == "" {
 		return nil
@@ -276,9 +386,16 @@ func (u *Usecase) CheckAndCompleteGroup(ctx context.Context, sessionID, groupID,
 	if err != nil {
 		return err
 	}
-	// Already completed — idempotent no-op.
+	// Already completed — heal any missing badges from existing scores, then
+	// treat the completion itself as a no-op.
 	if group.Status == entity.GroupCompleted {
-		return nil
+		return u.backfillGroupBadges(ctx, group, tenantID)
+	}
+	// Attendance-aware grading gate: runs before the progress checks so the
+	// PUT /groups/:groupId status=COMPLETED path can never complete a group
+	// while a participant marked present is still ungraded.
+	if err := u.ValidateGroupCompletion(ctx, group, tenantID); err != nil {
+		return err
 	}
 	progress, err := u.sessionRepo.ListGroupStageProgressByGroup(ctx, groupID)
 	if err != nil {
@@ -296,7 +413,56 @@ func (u *Usecase) CheckAndCompleteGroup(ctx context.Context, sessionID, groupID,
 	}
 	// All done — update group status.
 	group.Status = entity.GroupCompleted
-	return u.sessionRepo.UpdateSessionGroup(ctx, group)
+	if err := u.sessionRepo.UpdateSessionGroup(ctx, group); err != nil {
+		return err
+	}
+	return u.backfillGroupBadges(ctx, group, tenantID)
+}
+
+// backfillGroupBadges creates any missing SUBTOPIK/FINAL badges from scores
+// that already exist — no new scoring event is required. For every participant
+// of the group it re-runs badge evaluation once per session Topik (the first
+// session Kegiatan of each session stage is enough: evaluation checks all
+// Kegiatan of that Topik anyway). Idempotent: the award pre-checks make
+// re-running a no-op when the rows already exist. Failures are logged with
+// context and aggregated into one returned error.
+func (u *Usecase) backfillGroupBadges(ctx context.Context, group *entity.SessionGroup, tenantID string) error {
+	participants, err := u.sessionRepo.ListParticipants(ctx, group.SessionID, group.ID, tenantID)
+	if err != nil {
+		log.Printf("badge: backfill list participants group=%s failed: %v", group.ID, err)
+		return fmt.Errorf("badge: backfill list participants group=%s: %w", group.ID, err)
+	}
+	if len(participants) == 0 {
+		return nil
+	}
+	subs, err := u.substageRepo.ListSessionSubstages(ctx, group.SessionID)
+	if err != nil {
+		log.Printf("badge: backfill list substages session=%s failed: %v", group.SessionID, err)
+		return fmt.Errorf("badge: backfill list substages session=%s: %w", group.SessionID, err)
+	}
+	// One sample Kegiatan per session Topik (first per session stage).
+	sampleByStage := make(map[string]string, len(subs))
+	stageOrder := make([]string, 0, len(subs))
+	for i := range subs {
+		stage := subs[i].SessionStageID
+		if _, seen := sampleByStage[stage]; !seen {
+			sampleByStage[stage] = subs[i].ID
+			stageOrder = append(stageOrder, stage)
+		}
+	}
+	var failures []error
+	for i := range participants {
+		for _, stage := range stageOrder {
+			if err := u.EvaluateAfterAssessment(ctx, participants[i].ID, sampleByStage[stage], tenantID); err != nil {
+				log.Printf("badge: backfill evaluate participant=%s substage=%s group=%s failed: %v", participants[i].ID, sampleByStage[stage], group.ID, err)
+				failures = append(failures, fmt.Errorf("participant %s stage %s: %w", participants[i].ID, stage, err))
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("badge: backfill failed for group=%s: %w", group.ID, errors.Join(failures...))
+	}
+	return nil
 }
 
 // isBadgeConflict reports whether err is an app conflict (duplicate-key) error.

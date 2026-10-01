@@ -105,7 +105,7 @@ func markTopicScoped(repo *genRepo, stageID string) {
 // dependencies (LLM client left nil → deterministic heuristic path).
 func newMissionUsecase(repo *genRepo, gen *blockingGen, sess *genSessionRepo, bank repository.MissionBankRepository, pm repository.ParticipantMissionRepository) *reports.Usecase {
 	cfg := &config.Config{ParentReportBaseURL: "http://localhost/parent/report", ReportTokenTTL: 168 * time.Hour}
-	return reports.NewUsecase(repo, gen, nil, bank, &assessmentListFake{}, sess, nil, pm, nil, nil, nil, cfg, nil, nil)
+	return reports.NewUsecase(repo, gen, nil, bank, &assessmentListFake{}, sess, nil, pm, nil, nil, nil, cfg, nil, nil, &attendanceRowsFake{})
 }
 
 // waitMissionPersist waits until every wanted report has at least one
@@ -390,7 +390,7 @@ func newMissionUsecaseWithAI(
 	prog := &viewProgramRepo{stages: map[string]*entity.ProgramStage{
 		"stage1": {BaseModel: entity.BaseModel{ID: "stage1"}, Name: "Topik 1", SequenceOrder: 1},
 	}}
-	return reports.NewUsecase(repo, gen, llm, bank, &assessmentListFake{}, sess, prog, pm, nil, nil, nil, cfg, nil, nil)
+	return reports.NewUsecase(repo, gen, llm, bank, &assessmentListFake{}, sess, prog, pm, nil, nil, nil, cfg, nil, nil, &attendanceRowsFake{})
 }
 
 // TestGenerateMissionPhaseLLMFallback: an LLM upstream failure (error/timeout)

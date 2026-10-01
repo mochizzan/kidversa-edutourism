@@ -198,7 +198,7 @@ func TestListGroupsIsOwner(t *testing.T) {
 // TestLiveGroupsIsOwner: GET /api/live/:sessionId/groups returns ALL groups
 // (server never filters by owner) with an additive is_owner flag.
 func TestLiveGroupsIsOwner(t *testing.T) {
-	svc := live.NewService(&fakeOwnerLiveRepo{groups: twoGroups()}, nil, nil)
+	svc := live.NewService(&fakeOwnerLiveRepo{groups: twoGroups()}, nil, nil, nil)
 	h := handler.NewLiveHandler(svc, nil, 15)
 
 	cases := []struct {
@@ -246,7 +246,7 @@ func TestLiveGroupsIsOwner(t *testing.T) {
 // {group, progress, participants} shape every existing consumer relies on must
 // be byte-identical in structure, just with one extra sibling key.
 func TestLiveGroupsKeepsAllFieldsAndShape(t *testing.T) {
-	svc := live.NewService(&fakeOwnerLiveRepo{groups: twoGroups()}, nil, nil)
+	svc := live.NewService(&fakeOwnerLiveRepo{groups: twoGroups()}, nil, nil, nil)
 	h := handler.NewLiveHandler(svc, nil, 15)
 
 	e := echo.New()

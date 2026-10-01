@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"strings"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -40,6 +42,7 @@ type SessionUsecase struct {
 	programSubstages ProgramSubstageReader
 	sessionSubstages repository.SessionSubstageRepository
 	assessmentRepo   repository.AssessmentRepository
+	attendanceRepo   repository.AttendanceRepository
 	userRepo         repository.UserRepository
 }
 
@@ -64,6 +67,12 @@ func (u *SessionUsecase) SetProgramReader(p ProgramReader) { u.programs = p }
 // when a participant migrates to a new session (LinkParticipant).
 func (u *SessionUsecase) SetAssessmentRepo(assessmentRepo repository.AssessmentRepository) {
 	u.assessmentRepo = assessmentRepo
+}
+
+// SetAttendanceRepo injects the attendance repo used to carry the participant's
+// attendance row to the new session when a participant migrates (LinkParticipant).
+func (u *SessionUsecase) SetAttendanceRepo(attendanceRepo repository.AttendanceRepository) {
+	u.attendanceRepo = attendanceRepo
 }
 
 // SetUserRepo injects the user repo used to resolve a group's facilitator name
@@ -746,11 +755,21 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 // The target session must be DRAFT/ACTIVE, the group (when given) must belong to
 // it and have capacity, and a participant already in THIS session is rejected
 // with participant_already_in_session instead of being re-linked.
-// If the participant was already linked to another session, the previous session info
-// is returned so the caller can display migration context.
+// Migration policy: when the participant already belongs to ANOTHER session,
+// source and target must be sessions of the SAME program — anything else is a
+// 400 program_mismatch before any data is copied. On a valid migration ALL of
+// the source session's assessments (including star = 0 rows) and the attendance
+// row are carried to the target session, and the participant remains
+// re-scored-able there. Every failure (duplicate, program mismatch, missing or
+// foreign-tenant source session, clone/carry failure) surfaces as an explicit
+// error; nothing is swallowed. If the participant was already linked to another
+// session, the previous session info is returned so the caller can display
+// migration context.
 func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, participantID, groupID, tenantID string) (*repository.LinkParticipantResult, error) {
-	// Session-scoped write: closed sessions reject new participants.
-	if _, err := u.requireEditableSession(ctx, sessionID, tenantID); err != nil {
+	// Session-scoped write: closed sessions reject new participants. The loaded
+	// target session feeds the same-program migration gate below.
+	targetS, err := u.requireEditableSession(ctx, sessionID, tenantID)
+	if err != nil {
 		return nil, err
 	}
 	p, err := u.sessionRepo.GetParticipantByID(ctx, participantID, tenantID)
@@ -775,15 +794,38 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 		}
 	}
 
-	// Capture previous session info before overwrite.
+	// Capture the source session before overwrite. The load is tenant-scoped:
+	// a missing or foreign-tenant source session is an explicit error, never a
+	// silent skip. The program gate runs HERE, before any assessment, attendance
+	// or participant write — a cross-program link copies and moves nothing.
 	var prevSessionID, prevSessionName, prevProgramID string
 	if p.SessionID != nil && *p.SessionID != "" {
 		prevSessionID = *p.SessionID
-		prevS, serr := u.sessionRepo.GetSessionByID(ctx, prevSessionID, "")
-		if serr == nil {
-			prevSessionName = prevS.Name
-			prevProgramID = prevS.ProgramID
+		prevS, serr := u.sessionRepo.GetSessionByID(ctx, prevSessionID, tenantID)
+		if serr != nil {
+			return nil, serr
 		}
+		prevSessionName = prevS.Name
+		prevProgramID = prevS.ProgramID
+		if prevS.ProgramID != targetS.ProgramID {
+			return nil, apperrors.BadRequest("program_mismatch", nil)
+		}
+	}
+
+	// Migration ordering: the repos share no transaction, so failure safety is
+	// ordering + idempotency instead of a cross-repo BEGIN/COMMIT.
+	//  1. Clone ALL source assessments (star = 0 included) onto the target
+	//     session's Kegiatan leaves — a failure aborts while the participant is
+	//     still in the source session.
+	//  2. Carry the attendance row (idempotent upsert on participant+session).
+	//  3. Move the participant LAST (the commit step): if it fails after 1/2, a
+	//     retry converges because the clone skips already-existing rows and the
+	//     attendance upsert is idempotent.
+	if err := u.cloneScoredAssessments(ctx, participantID, prevSessionID, sessionID, tenantID); err != nil {
+		return nil, err
+	}
+	if err := u.carryAttendance(ctx, participantID, prevSessionID, sessionID, tenantID); err != nil {
+		return nil, err
 	}
 
 	sid := sessionID
@@ -795,12 +837,6 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	if err := u.sessionRepo.UpdateParticipant(ctx, p); err != nil {
 		return nil, err
 	}
-	// Audit-friendly migration: clone the old participant's already-scored
-	// (star >= 1) assessments onto the new participant in the new session,
-	// remapped to the new session's session Kegiatan (same Kegiatan leaf).
-	// Best-effort and non-fatal: the link already succeeded, so a clone error
-	// must not lose the result. Only runs when both repos are wired.
-	_ = u.cloneScoredAssessments(ctx, participantID, prevSessionID, sessionID)
 	return &repository.LinkParticipantResult{
 		Participant:         *p,
 		PreviousSessionID:   prevSessionID,
@@ -973,35 +1009,40 @@ func (u *SessionUsecase) cloneSubstages(ctx context.Context, sessionID, programI
 	return nil
 }
 
-// cloneScoredAssessments copies the old participant's scored (star >= 1)
-// assessments from the previous session onto the same participant in the new
-// session (LinkParticipant moves the participant, not a different child). Each
-// old session_substage is resolved to its program_substage, then mapped to the
-// new session's session_substage (same Kegiatan leaf). Duplicate-key conflicts
-// (the participant already has a score for that leaf) are skipped.
-func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participantID, oldSessionID, newSessionID string) error {
+// cloneScoredAssessments copies ALL of the old participant's assessments from
+// the previous session onto the same participant in the new session
+// (LinkParticipant moves the participant, not a different child). Every row is
+// carried — including star = 0 rows — so an unscored Kegiatan in the source
+// stays explicitly unscored in the target and the participant remains
+// re-scored-able there. Each old session_substage is resolved to its
+// program_substage, then mapped to the new session's session_substage (same
+// Kegiatan leaf), so cloned rows always carry TARGET-session substage IDs (the
+// unique (participant, session_substage) key never collides with source rows).
+// tenantID scopes the source read (required by the assessment repo). Any
+// failure — list, substage remap, create — is returned to the caller; only a
+// duplicate-key conflict (target row already exists, e.g. a retry after a
+// partially applied migration) is logged and skipped for idempotency.
+func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participantID, oldSessionID, newSessionID, tenantID string) error {
 	if u.assessmentRepo == nil || u.sessionSubstages == nil || oldSessionID == "" {
 		return nil
 	}
 	scored, err := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
 		ParticipantID: participantID,
 		SessionID:     oldSessionID,
+		TenantID:      tenantID,
 	}, 1, 1000)
 	if err != nil {
 		return err
 	}
 	for i := range scored.Items {
 		a := scored.Items[i]
-		if a.StarRating < 1 {
-			continue
-		}
 		oldSub, gerr := u.sessionSubstages.GetSessionSubstage(ctx, a.SessionSubstageID)
 		if gerr != nil {
-			continue
+			return gerr
 		}
 		newSub, nerr := u.sessionSubstages.GetSessionSubstageByKeys(ctx, newSessionID, oldSub.ProgramSubstageID)
 		if nerr != nil {
-			continue
+			return nerr
 		}
 		clone := &entity.Assessment{
 			ParticipantID:     participantID,
@@ -1012,20 +1053,54 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 			AssessedBy:        a.AssessedBy,
 			AssessedAt:        a.AssessedAt,
 		}
-		if cerr := u.assessmentRepo.Create(ctx, clone); cerr != nil && !isConflict(cerr) {
+		if cerr := u.assessmentRepo.Create(ctx, clone); cerr != nil {
+			if isConflict(cerr) {
+				log.Printf("link_participant: skip existing assessment clone participant=%s session_substage=%s", participantID, newSub.ID)
+				continue
+			}
 			return cerr
 		}
 	}
 	return nil
 }
 
-// firstUngradedGroup reports whether the session has an ungraded participant.
-// It returns the name of the first group containing an ungraded participant
-// (empty when every participant across every group is fully graded). A
-// participant is "fully graded" when a scored assessment (star_rating >= 1)
-// exists for every session Kegiatan leaf of the session. tenantID is the
-// session's tenant used to scope the assessment lookups (empty only when the
-// session itself is tenant-less).
+// carryAttendance copies the participant's attendance row from the source
+// session to the target session during LinkParticipant. A missing source row
+// means there is nothing to carry and is not an error; every other failure is
+// returned so the migration aborts before the participant moves. The write is
+// an Upsert keyed on (participant, session), keeping retries idempotent.
+func (u *SessionUsecase) carryAttendance(ctx context.Context, participantID, oldSessionID, newSessionID, tenantID string) error {
+	if u.attendanceRepo == nil || oldSessionID == "" {
+		return nil
+	}
+	src, err := u.attendanceRepo.GetByParticipantSession(ctx, participantID, oldSessionID, tenantID)
+	if err != nil {
+		if _, code, _ := apperrors.AsAppError(err); code == "not_found" {
+			return nil
+		}
+		return err
+	}
+	dst := &entity.ParticipantAttendance{
+		ParticipantID: participantID,
+		SessionID:     newSessionID,
+		IsPresent:     src.IsPresent,
+		MarkedAt:      src.MarkedAt,
+		MarkedBy:      src.MarkedBy,
+	}
+	return u.attendanceRepo.Upsert(ctx, dst)
+}
+
+// firstUngradedGroup reports whether the session has an ungraded PRESENT
+// participant. It returns the name of the first group containing an ungraded
+// present participant (empty when every present participant across every
+// group is fully graded). A participant is "fully graded" when a scored
+// assessment (star_rating >= 1) exists for every session Kegiatan leaf of the
+// session. Participants without an attendance row (belum absen) and
+// explicitly absent participants are exempt — they are not required to be
+// graded and never block completion; an unwired attendance repo conservatively
+// grades everyone (the pre-attendance rule). tenantID is the session's tenant
+// used to scope the lookups (empty only when the session itself is
+// tenant-less).
 func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID, tenantID string) (string, error) {
 	if u.assessmentRepo == nil || u.sessionSubstages == nil {
 		// Repos unwired (defensive): do not block completion when we cannot verify.
@@ -1043,12 +1118,30 @@ func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID, tena
 	for i := range subs {
 		subIDs = append(subIDs, subs[i].ID)
 	}
+	// Present set for the attendance-aware gate: participant IDs with an
+	// explicit is_present=true row. A nil map (repo unwired) means every
+	// participant is checked (fail-closed, pre-attendance behavior).
+	var present map[string]bool
+	if u.attendanceRepo != nil {
+		rows, aerr := u.attendanceRepo.ListBySession(ctx, sessionID, tenantID)
+		if aerr != nil {
+			return "", fmt.Errorf("session: list attendance session=%s: %w", sessionID, aerr)
+		}
+		present = make(map[string]bool, len(rows))
+		for i := range rows {
+			present[rows[i].ParticipantID] = rows[i].IsPresent
+		}
+	}
 	for i := range groups {
 		participants, perr := u.sessionRepo.ListParticipants(ctx, sessionID, groups[i].ID, "")
 		if perr != nil {
 			return "", perr
 		}
 		for j := range participants {
+			if present != nil && !present[participants[j].ID] {
+				// Unmarked (belum absen) or explicitly absent → exempt from the gate.
+				continue
+			}
 			if !u.participantFullyGraded(ctx, participants[j].ID, subIDs, tenantID) {
 				return groups[i].Name, nil
 			}

@@ -26,6 +26,7 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { ChildListItem } from '../components/ChildListItem'
 import { GroupCompleteButton } from '../components/GroupCompleteButton'
+import { evaluateGroupCompletion } from '../utils/groupCompletion'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type {
   Session,
@@ -217,29 +218,35 @@ const GroupPage = () => {
     return set
   }, [assessments])
 
-  // Check if a participant is present for this session
+  // Check if a participant is present for this session (explicit attendance
+  // row only — unmarked participants are handled by evaluateGroupCompletion).
   const isPresent = useCallback((participantId: string): boolean => {
     return attendanceMap.get(participantId) ?? false
   }, [attendanceMap])
 
   // C7 all-or-nothing: a child counts as assessed for the active SubTopik only
   // when EVERY Kegiatan leaf has an assessment (star_rating >= 1) for them.
-  // Also requires the child to be present.
+  // No presence gate here — completion presence semantics live in
+  // evaluateGroupCompletion (only explicitly-present participants are required;
+  // absent and unmarked participants never block).
   const isAssessed = (participantId: string): boolean => {
-    if (!isPresent(participantId)) return false
     if (!groupDetail?.sessionStage || activeLeaves.length === 0) return false
     return activeLeaves.every((leaf) =>
       scoredPairs.has(`${participantId}|${leaf.id}`),
     )
   }
 
-  const assessedCount = groupDetail
-    ? groupDetail.participants.filter((p) => isAssessed(p.id)).length
-    : 0
+  // Completion rule: every explicitly-present participant fully assessed.
+  // Explicit absentees and unmarked participants (belum absen) do not block.
+  const completion = evaluateGroupCompletion({
+    participantIds: groupDetail ? groupDetail.participants.map((p) => p.id) : [],
+    attendance: attendanceMap,
+    isFullyAssessed: isAssessed,
+  })
 
   const handleComplete = () => {
     if (!groupDetail) return
-    if (assessedCount < groupDetail.participants.length) return
+    if (!completion.canComplete) return
     confirm.requestConfirm(groupId!)
   }
 
@@ -486,8 +493,10 @@ const GroupPage = () => {
           can never be clicked repeatedly after success. */}
       {participants.length > 0 && !isGroupCompleted && (
         <GroupCompleteButton
-          totalChildren={participants.length}
-          assessedCount={assessedCount}
+          canComplete={completion.canComplete}
+          assessedCount={completion.assessedPresentCount}
+          presentCount={completion.presentCount}
+          remainingCount={completion.remainingCount}
           onComplete={handleComplete}
           loading={completing}
           disabled={!isMine}

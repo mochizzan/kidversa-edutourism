@@ -231,7 +231,7 @@ func allReportIDs() []string {
 
 func newUsecaseFixture(repo repository.ReportRepository, gen reports.NarrativeGenerator, sess repository.SessionRepository, msg repository.MessagingService) *reports.Usecase {
 	cfg := &config.Config{ParentReportBaseURL: "http://localhost/parent/report", ReportTokenTTL: 168 * time.Hour}
-	return reports.NewUsecase(repo, gen, nil, nil, nil, sess, nil, nil, nil, nil, nil, cfg, msg, nil)
+	return reports.NewUsecase(repo, gen, nil, nil, nil, sess, nil, nil, nil, nil, nil, cfg, msg, nil, &attendanceRowsFake{})
 }
 
 func newDeliveryHandlerFixture(repo *genRepo, gen *blockingGen, sess *genSessionRepo, msg repository.MessagingService) (*handler.ReportHandler, *echo.Echo) {

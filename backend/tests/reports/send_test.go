@@ -90,7 +90,7 @@ func newSendFixture(messenger repository.MessagingService) (*reports.Usecase, *f
 		session: &entity.Session{Name: "Petualangan Sains"},
 	}
 	cfg := &config.Config{ParentReportBaseURL: testBaseURL}
-	uc := reports.NewUsecase(reportRepo, nil, nil, nil, nil, sessionRepo, nil, nil, nil, nil, nil, cfg, messenger, nil)
+	uc := reports.NewUsecase(reportRepo, nil, nil, nil, nil, sessionRepo, nil, nil, nil, nil, nil, cfg, messenger, nil, nil)
 	return uc, reportRepo, sessionRepo
 }
 

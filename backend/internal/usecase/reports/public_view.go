@@ -300,7 +300,7 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 
 	// Badges (badgeService.listByParticipant): full list, created_at ASC; the
 	// image id is translated to the public kiosk content route.
-	badges, berr := u.sessionSubstageRepo.ListBadgesByParticipant(ctx, r.ParticipantID)
+	badges, berr := u.sessionSubstageRepo.ListBadgesByParticipant(ctx, r.ParticipantID, tenant)
 	if berr != nil {
 		return nil, berr
 	}

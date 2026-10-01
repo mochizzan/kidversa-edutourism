@@ -51,6 +51,9 @@ type Usecase struct {
 	programSubstageRepo    repository.ProgramSubstageRepository
 	sessionSubstageRepo    repository.SessionSubstageRepository
 	galleryRepo            repository.GalleryTokenRepository
+	// attendanceRepo gates GenerateForSession: a participant with an EXPLICIT
+	// attendance row is_present=false is absent and must never get a rapor.
+	attendanceRepo repository.AttendanceRepository
 	// messaging delivers the report link to the parent's WhatsApp on Send.
 	messaging repository.MessagingService
 	// userRepo resolves facilitator names for the public parent payload
@@ -78,6 +81,7 @@ func NewUsecase(
 	cfg *config.Config,
 	messaging repository.MessagingService,
 	userRepo repository.UserRepository,
+	attendanceRepo repository.AttendanceRepository,
 ) *Usecase {
 	return &Usecase{
 		repo:                   repo,
@@ -91,6 +95,7 @@ func NewUsecase(
 		programSubstageRepo:    programSubstageRepo,
 		sessionSubstageRepo:    sessionSubstageRepo,
 		galleryRepo:            galleryRepo,
+		attendanceRepo:         attendanceRepo,
 		messaging:              messaging,
 		userRepo:               userRepo,
 		cfg:                    cfg,
@@ -372,9 +377,43 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 // sessionRepo.ListSessionStages). Passing an empty topicIDs creates only the
 // legacy whole-session report (program_stage_id = "") for backward
 // compatibility. Returns the full list of reports after generation.
+//
+// Attendance gate: a participant with an EXPLICIT attendance row
+// is_present=false (absent) is excluded BEFORE GetOrCreateDraft, so an absent
+// participant never receives a report/draft. A participant with NO attendance
+// row is UNMARKED (attendance never used for the session) and stays eligible —
+// sessions that never marked attendance keep working exactly as before. When
+// EVERY requested participant is absent, the whole run is rejected with
+// BadRequest("participant_absent") before anything is created.
 func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID string, participants []entity.Participant, topicIDs []string) ([]entity.Report, error) {
-	targetIDs := make(map[string]bool, len(participants))
+	attendance, err := u.attendanceRepo.ListBySession(ctx, sessionID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	absent := make(map[string]bool, len(attendance))
+	for _, a := range attendance {
+		// Absence = explicit is_present=false; missing row = unmarked (eligible).
+		if !a.IsPresent {
+			absent[a.ParticipantID] = true
+		}
+	}
+	eligible := make([]entity.Participant, 0, len(participants))
 	for _, p := range participants {
+		if absent[p.ID] {
+			continue
+		}
+		eligible = append(eligible, p)
+	}
+	if len(participants) > 0 && len(eligible) == 0 {
+		return nil, apperrors.BadRequest("participant_absent", nil)
+	}
+	for _, p := range participants {
+		if absent[p.ID] {
+			log.Printf("reports: participant %s excluded from generate for session %s: absent (is_present=false)", p.ID, sessionID)
+		}
+	}
+	targetIDs := make(map[string]bool, len(eligible))
+	for _, p := range eligible {
 		targetIDs[p.ID] = true
 	}
 	if _, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, constants.MaxSessionReports); err != nil {
@@ -383,8 +422,9 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 
 	// Atomic per (participant, topic) via GetOrCreateDraft; soft-delete invariant
 	// documented in report_repo.go. Legacy rows (empty topicID) and per-Topic rows
-	// coexist under uq_reports_session_participant_topic.
-	for _, p := range participants {
+	// coexist under uq_reports_session_participant_topic. Only eligible (non-absent)
+	// participants get drafts — the gate above runs BEFORE this loop.
+	for _, p := range eligible {
 		for _, tid := range topicIDs {
 			if _, err := u.repo.GetOrCreateDraft(ctx, p.ID, sessionID, tid); err != nil {
 				return nil, err

@@ -20,8 +20,10 @@ type Usecase struct {
 
 // BadgeEvaluator is the minimal contract the assessment usecase needs to trigger
 // badge recomputation after a scored upsert (kept narrow to avoid an import cycle).
+// tenantID is the caller-resolved tenant (from Upsert) and scopes the badge
+// evaluation's assessment queries.
 type BadgeEvaluator interface {
-	EvaluateAfterAssessment(ctx context.Context, participantID, sessionSubstageID string) error
+	EvaluateAfterAssessment(ctx context.Context, participantID, sessionSubstageID, tenantID string) error
 }
 
 // NewUsecase builds the assessment usecase. badgeUC may be nil (badge
@@ -89,7 +91,7 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 			if err := u.repo.Revive(ctx, soft); err != nil {
 				return nil, err
 			}
-			return u.afterUpsert(ctx, soft)
+			return u.afterUpsert(ctx, soft, tenantID)
 		}
 		// NotFound entirely -> fall through to Create (upsert semantics).
 	}
@@ -107,7 +109,7 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 		if err := u.repo.Update(ctx, existing); err != nil {
 			return nil, err
 		}
-		return u.afterUpsert(ctx, existing)
+		return u.afterUpsert(ctx, existing, tenantID)
 	}
 	a := &entity.Assessment{
 		ParticipantID:     req.ParticipantID,
@@ -124,17 +126,19 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	if err := u.repo.Create(ctx, a); err != nil {
 		return nil, err
 	}
-	return u.afterUpsert(ctx, a)
+	return u.afterUpsert(ctx, a, tenantID)
 }
 
 // afterUpsert triggers badge recomputation when the upsert is a scored (star>=1)
-// assessment and a badge evaluator is wired. A badge error is returned so the
-// caller (handler) can log it; the assessment itself already persisted.
-func (u *Usecase) afterUpsert(ctx context.Context, a *entity.Assessment) (*entity.Assessment, error) {
+// assessment and a badge evaluator is wired. tenantID (the caller-resolved
+// tenant from Upsert) scopes the badge evaluation's assessment queries. A badge
+// error is returned so the caller (handler) surfaces it as an explicit HTTP
+// error; the assessment itself already persisted.
+func (u *Usecase) afterUpsert(ctx context.Context, a *entity.Assessment, tenantID string) (*entity.Assessment, error) {
 	if u.badgeUC == nil || a.StarRating < 1 {
 		return a, nil
 	}
-	if err := u.badgeUC.EvaluateAfterAssessment(ctx, a.ParticipantID, a.SessionSubstageID); err != nil {
+	if err := u.badgeUC.EvaluateAfterAssessment(ctx, a.ParticipantID, a.SessionSubstageID, tenantID); err != nil {
 		return a, err
 	}
 	return a, nil

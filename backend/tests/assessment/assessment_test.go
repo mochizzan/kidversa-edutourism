@@ -149,7 +149,7 @@ func (r *fakeSessionRepo) FacilitatorOwnsAnyGroup(ctx context.Context, sessionID
 
 type fakeBadgeEvaluator struct{}
 
-func (b *fakeBadgeEvaluator) EvaluateAfterAssessment(ctx context.Context, participantID, sessionSubstageID string) error {
+func (b *fakeBadgeEvaluator) EvaluateAfterAssessment(ctx context.Context, participantID, sessionSubstageID, tenantID string) error {
 	return nil
 }
 

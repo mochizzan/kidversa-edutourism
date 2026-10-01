@@ -42,6 +42,16 @@ export const NO_ASSESSMENT_BADGE: ReportStatusBadge = 'warning'
 export const NO_REPORT_LABEL = 'admin.reportStatus.noReport'
 export const NO_REPORT_BADGE: ReportStatusBadge = 'neutral'
 
+/**
+ * Absent row status (Perbaikan-3) reuses the SAME "Belum Ada Laporan" tag —
+ * user-approved, deliberately no new locale key. Absence = an EXPLICIT
+ * attendance row with is_present=false; generation for absent participants is
+ * blocked server-side (per-participant exclusion, participant_absent when all
+ * targets are absent). Unmarked participants are NOT absent.
+ */
+export const ABSENT_LABEL = NO_REPORT_LABEL
+export const ABSENT_BADGE: ReportStatusBadge = NO_REPORT_BADGE
+
 // ---------------------------------------------------------------------------
 // Per-row delivery overlay (server operation registries)
 // ---------------------------------------------------------------------------

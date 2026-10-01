@@ -44,7 +44,7 @@ func newGalleryFixture(rep *entity.Report) (*reports.Usecase, *fakeReportRepo, *
 	reportRepo := &fakeReportRepo{report: rep}
 	galleryRepo := &fakeGalleryRepo{}
 	cfg := &config.Config{GalleryTokenTTL: galleryTestTTL}
-	uc := reports.NewUsecase(reportRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, galleryRepo, cfg, nil, nil)
+	uc := reports.NewUsecase(reportRepo, nil, nil, nil, nil, nil, nil, nil, nil, nil, galleryRepo, cfg, nil, nil, nil)
 	return uc, reportRepo, galleryRepo
 }
 
@@ -179,7 +179,7 @@ func TestApproveMintsGalleryToken(t *testing.T) {
 		session:     &entity.Session{Name: "Sesi Pagi"},
 	}
 	cfg := &config.Config{GalleryTokenTTL: galleryTestTTL}
-	uc := reports.NewUsecase(reportRepo, nil, nil, nil, nil, sessionRepo, nil, nil, nil, nil, galleryRepo, cfg, nil, nil)
+	uc := reports.NewUsecase(reportRepo, nil, nil, nil, nil, sessionRepo, nil, nil, nil, nil, galleryRepo, cfg, nil, nil, nil)
 
 	r, err := uc.Approve(context.Background(), testReportID, testTenantID, "user-1", "", nil)
 	if err != nil {

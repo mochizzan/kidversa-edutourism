@@ -32,6 +32,8 @@ import {
   REPORT_DELIVERY_LABEL,
   NO_ASSESSMENT_LABEL,
   NO_REPORT_LABEL,
+  ABSENT_LABEL,
+  ABSENT_BADGE,
   getGenerateRowState,
   GENERATE_ROW_LABEL,
   GENERATE_PHASE_LABEL,
@@ -346,6 +348,7 @@ const ReportSessionPage = () => {
             const showGenerateBtn = item.status === 'ready_to_generate'
             const isIncomplete = item.status === 'incomplete'
             const isNoAssessment = item.status === 'no_assessment'
+            const isAbsent = item.status === 'absent'
             // Send overlay: the server send flags (mapping in reportStatus.ts).
             const sendState = getReportDeliveryState(item.report?.id ?? null, {
               activeSend,
@@ -415,6 +418,13 @@ const ReportSessionPage = () => {
                         <Tooltip content={t('admin.reports.incompleteTip')}>
                           <Badge variant="neutral" size="sm">
                             {t(NO_REPORT_LABEL)}
+                          </Badge>
+                        </Tooltip>
+                      )}
+                      {isAbsent && (
+                        <Tooltip content={t('admin.reports.incompleteTip')}>
+                          <Badge variant={ABSENT_BADGE} size="sm">
+                            {t(ABSENT_LABEL)}
                           </Badge>
                         </Tooltip>
                       )}

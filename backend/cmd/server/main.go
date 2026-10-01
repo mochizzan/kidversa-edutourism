@@ -84,12 +84,13 @@ func main() {
 	sessionUC.SetSubstageRepos(programSubstageRepo, sessionSubstageRepo)
 	sessionUC.SetProgramReader(programRepo)
 	sessionUC.SetAssessmentRepo(assessmentRepo)
+	sessionUC.SetAttendanceRepo(attendanceRepo)
 	sessionUC.SetUserRepo(userRepo)
-	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub)
-	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo)
+	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo, attendanceRepo)
+	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub, badgeUC)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, sessionRepo, badgeUC)
 	attendanceUC := attendanceuc.NewUsecase(attendanceRepo)
-	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg, waGateway, userRepo)
+	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg, waGateway, userRepo, attendanceRepo)
 
 	// Handlers.
 	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite, sessionRepo)

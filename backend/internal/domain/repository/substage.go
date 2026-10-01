@@ -38,7 +38,9 @@ type SessionSubstageRepository interface {
 	// Participant badges.
 	CreateBadge(ctx context.Context, b *entity.ParticipantBadge) error
 	GetBadge(ctx context.Context, id string) (*entity.ParticipantBadge, error)
-	ListBadgesByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantBadge, error)
+	// ListBadgesByParticipant returns every badge of a participant, optionally
+	// scoped to the tenant that owns the participant (empty = tenant-less path).
+	ListBadgesByParticipant(ctx context.Context, participantID, tenantID string) ([]entity.ParticipantBadge, error)
 	// ListBadgesByParticipantStage returns the Kegiatan badge for a participant
 	// on a specific Topik (unique per the uq_participant_subtopik_badge index).
 	ListBadgesByParticipantStage(ctx context.Context, participantID, programStageID string) ([]entity.ParticipantBadge, error)

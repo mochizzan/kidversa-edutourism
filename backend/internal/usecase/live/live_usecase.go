@@ -3,6 +3,7 @@ package live
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -12,16 +13,27 @@ import (
 	apputil "kidversa-edutourism-backend/internal/pkg/util"
 )
 
+// GroupCompletionValidator gates promoting a group to COMPLETED. It mirrors
+// the attendance-aware grading rule of the fasilitator UI: it must return an
+// explicit error while a participant marked present for the session has not
+// been fully graded; participants not marked present (belum absen/absent)
+// never block. badge.Usecase.ValidateGroupCompletion provides the
+// implementation.
+type GroupCompletionValidator interface {
+	ValidateGroupCompletion(ctx context.Context, group *entity.SessionGroup, tenantID string) error
+}
+
 // Service implements live session + notification business logic.
 type Service struct {
-	repo  repository.LiveRepository
-	notif repository.NotificationRepository
-	hub   *sse.Hub
+	repo                repository.LiveRepository
+	notif               repository.NotificationRepository
+	hub                 *sse.Hub
+	completionValidator GroupCompletionValidator
 }
 
 // NewService builds the live service.
-func NewService(repo repository.LiveRepository, notif repository.NotificationRepository, hub *sse.Hub) *Service {
-	return &Service{repo: repo, notif: notif, hub: hub}
+func NewService(repo repository.LiveRepository, notif repository.NotificationRepository, hub *sse.Hub, completionValidator GroupCompletionValidator) *Service {
+	return &Service{repo: repo, notif: notif, hub: hub, completionValidator: completionValidator}
 }
 
 // GroupWithProgress bundles a session group with its live progress and
@@ -143,6 +155,18 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, substageID string,
 					}
 				}
 				if done {
+					// Attendance-aware grading gate: reject the promotion while a
+					// participant marked present for the session is still ungraded
+					// (belum absen/absent participants are exempt). A missing
+					// validator is an explicit wiring error — the gate must never
+					// be silently skipped.
+					if s.completionValidator == nil {
+						return nil, apperrors.Internal("internal_error",
+							fmt.Errorf("live: group completion validator not wired (group=%s)", g.ID))
+					}
+					if verr := s.completionValidator.ValidateGroupCompletion(ctx, g, callerTenant); verr != nil {
+						return nil, verr
+					}
 					g.Status = entity.GroupCompleted
 					if uerr := s.repo.UpdateGroup(ctx, g); uerr != nil {
 						return nil, uerr

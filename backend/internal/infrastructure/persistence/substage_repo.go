@@ -205,10 +205,17 @@ func (r *GormSessionSubstageRepository) GetBadge(ctx context.Context, id string)
 	return m.ToEntity(), nil
 }
 
-func (r *GormSessionSubstageRepository) ListBadgesByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantBadge, error) {
+// ListBadgesByParticipant returns a participant's badges. When tenantID is
+// non-empty the result is restricted to participants owned by that tenant
+// (participant_badges carries no tenant_id, so the scope is resolved through
+// participants); an empty tenantID keeps the legacy tenant-less path.
+func (r *GormSessionSubstageRepository) ListBadgesByParticipant(ctx context.Context, participantID, tenantID string) ([]entity.ParticipantBadge, error) {
 	var models []ParticipantBadgeModel
-	if err := r.db.WithContext(ctx).
-		Where("participant_id = ?", participantID).
+	q := r.db.WithContext(ctx).Where("participant_id = ?", participantID)
+	if tenantID != "" {
+		q = q.Where("participant_id IN (SELECT id FROM participants WHERE tenant_id = ?)", tenantID)
+	}
+	if err := q.
 		Order("created_at ASC").
 		Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)

@@ -99,7 +99,7 @@ func (f *viewSubstageRepo) ListSessionSubstages(ctx context.Context, sessionID s
 	return f.substages, nil
 }
 
-func (f *viewSubstageRepo) ListBadgesByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantBadge, error) {
+func (f *viewSubstageRepo) ListBadgesByParticipant(ctx context.Context, participantID, tenantID string) ([]entity.ParticipantBadge, error) {
 	return f.badges, nil
 }
 
@@ -214,7 +214,7 @@ func newViewFixture() *viewFixture {
 	}
 	users := &viewUserRepo{users: map[string]entity.User{"u1": {BaseModel: entity.BaseModel{ID: "u1"}, Name: "Bu Sari"}}}
 
-	uc := reports.NewUsecase(nil, nil, nil, missions, assessments, sessRepo, progRepo, nil, progSubs, sessSubs, nil, (*config.Config)(nil), nil, users)
+	uc := reports.NewUsecase(nil, nil, nil, missions, assessments, sessRepo, progRepo, nil, progSubs, sessSubs, nil, (*config.Config)(nil), nil, users, nil)
 	return &viewFixture{uc: uc, assessments: assessments, missions: missions}
 }
 

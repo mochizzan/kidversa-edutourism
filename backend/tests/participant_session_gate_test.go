@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -28,24 +29,35 @@ import (
 type fakeSessionFlowRepo struct {
 	repository.SessionRepository
 
-	session     *entity.Session
-	sessionGets int
-	groups      map[string]*entity.SessionGroup
-	members     map[string][]entity.Participant // groupID -> existing members
-	participant *entity.Participant
-	nameExists  bool
+	session        *entity.Session
+	sessionGets    int
+	extraSessions  map[string]*entity.Session // secondary sessions (link-migration sources)
+	sessionTenants map[string]string          // sessionID -> owning tenant (unset = unscoped)
+	groups         map[string]*entity.SessionGroup
+	members        map[string][]entity.Participant // groupID -> existing members
+	participant    *entity.Participant
+	nameExists     bool
 
 	created        []*entity.Participant
 	updated        *entity.Participant
 	transactionRan bool
 }
 
-func (r *fakeSessionFlowRepo) GetSessionByID(_ context.Context, id, _ string) (*entity.Session, error) {
+func (r *fakeSessionFlowRepo) GetSessionByID(_ context.Context, id, tenantID string) (*entity.Session, error) {
 	r.sessionGets++
-	if r.session == nil || r.session.ID != id {
+	s := r.session
+	if s == nil || s.ID != id {
+		s = r.extraSessions[id]
+	}
+	if s == nil {
 		return nil, apperrors.NotFound("not_found", nil)
 	}
-	cp := *r.session
+	if tenantID != "" {
+		if want, ok := r.sessionTenants[id]; ok && want != tenantID {
+			return nil, apperrors.NotFound("not_found", nil)
+		}
+	}
+	cp := *s
 	return &cp, nil
 }
 
@@ -390,5 +402,331 @@ func TestImportParticipantsHandlerKeepsRowGroupID(t *testing.T) {
 	}
 	if got.SessionID == nil || *got.SessionID != sessionUUID {
 		t.Fatalf("imported row session_id = %v, want %s", got.SessionID, sessionUUID)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// LinkParticipant migration fakes (Perbaikan-2): assessment, session-substage
+// and attendance fakes covering the same-program carry path. Unused interface
+// methods panic through the embedded nil interface.
+// ---------------------------------------------------------------------------
+
+// fakeLinkAssessmentRepo serves source rows and records clones; List mirrors
+// the production tenant_required guard so a missing TenantID fails loudly.
+type fakeLinkAssessmentRepo struct {
+	repository.AssessmentRepository
+	rows      []entity.Assessment
+	listErr   error
+	createErr error
+	listCalls []repository.AssessmentFilter
+	created   []*entity.Assessment
+}
+
+func (r *fakeLinkAssessmentRepo) List(_ context.Context, f repository.AssessmentFilter, _, _ int) (*repository.Paginated[entity.Assessment], error) {
+	r.listCalls = append(r.listCalls, f)
+	if r.listErr != nil {
+		return nil, r.listErr
+	}
+	if f.TenantID == "" {
+		return nil, apperrors.BadRequest("tenant_required", nil)
+	}
+	var items []entity.Assessment
+	for _, a := range r.rows {
+		if a.ParticipantID == f.ParticipantID && a.SessionID == f.SessionID {
+			items = append(items, a)
+		}
+	}
+	return &repository.Paginated[entity.Assessment]{Items: items, Total: len(items)}, nil
+}
+
+func (r *fakeLinkAssessmentRepo) Create(_ context.Context, a *entity.Assessment) error {
+	if r.createErr != nil {
+		return r.createErr
+	}
+	cp := *a
+	r.created = append(r.created, &cp)
+	return nil
+}
+
+// fakeLinkSubstageRepo resolves session Kegiatan by ID and by
+// (session, program Kegiatan) keys.
+type fakeLinkSubstageRepo struct {
+	repository.SessionSubstageRepository
+	byID   map[string]*entity.SessionSubstage
+	byKeys map[string]*entity.SessionSubstage // "<sessionID>|<programSubstageID>"
+}
+
+func (r *fakeLinkSubstageRepo) GetSessionSubstage(_ context.Context, id string) (*entity.SessionSubstage, error) {
+	if s, ok := r.byID[id]; ok {
+		cp := *s
+		return &cp, nil
+	}
+	return nil, apperrors.NotFound("not_found", nil)
+}
+
+func (r *fakeLinkSubstageRepo) GetSessionSubstageByKeys(_ context.Context, sessionID, programSubstageID string) (*entity.SessionSubstage, error) {
+	if s, ok := r.byKeys[sessionID+"|"+programSubstageID]; ok {
+		cp := *s
+		return &cp, nil
+	}
+	return nil, apperrors.NotFound("not_found", nil)
+}
+
+// fakeLinkAttendanceRepo stores attendance rows keyed "participantID|sessionID".
+type fakeLinkAttendanceRepo struct {
+	repository.AttendanceRepository
+	rows      map[string]*entity.ParticipantAttendance
+	getErr    error
+	upsertErr error
+	upserts   []*entity.ParticipantAttendance
+}
+
+func (r *fakeLinkAttendanceRepo) GetByParticipantSession(_ context.Context, participantID, sessionID, _ string) (*entity.ParticipantAttendance, error) {
+	if r.getErr != nil {
+		return nil, r.getErr
+	}
+	if a, ok := r.rows[participantID+"|"+sessionID]; ok {
+		cp := *a
+		return &cp, nil
+	}
+	return nil, apperrors.NotFound("not_found", nil)
+}
+
+func (r *fakeLinkAttendanceRepo) Upsert(_ context.Context, a *entity.ParticipantAttendance) error {
+	if r.upsertErr != nil {
+		return r.upsertErr
+	}
+	cp := *a
+	r.rows[a.ParticipantID+"|"+a.SessionID] = &cp
+	r.upserts = append(r.upserts, &cp)
+	return nil
+}
+
+// linkMigrationFixture wires a usecase for participant-migration links:
+// target session "sess-1", source session "sess-src", participant pid-1 in the
+// source, two source assessments (star 5 and star 0), and one attendance row.
+// targetProgram/srcProgram differ to exercise the program_mismatch gate.
+type linkMigrationFixture struct {
+	repo *fakeSessionFlowRepo
+	asmt *fakeLinkAssessmentRepo
+	sub  *fakeLinkSubstageRepo
+	att  *fakeLinkAttendanceRepo
+	uc   *usecase.SessionUsecase
+}
+
+func newLinkMigrationFixture(targetProgram, srcProgram string) *linkMigrationFixture {
+	repo := newFlowRepo()
+	repo.session.ProgramID = targetProgram
+	repo.extraSessions = map[string]*entity.Session{
+		"sess-src": {BaseModel: entity.BaseModel{ID: "sess-src"}, ProgramID: srcProgram, Status: entity.SessionCompleted},
+	}
+	src := "sess-src"
+	repo.participant = &entity.Participant{BaseModel: entity.BaseModel{ID: "pid-1"}, SessionID: &src}
+
+	asmt := &fakeLinkAssessmentRepo{rows: []entity.Assessment{
+		{ParticipantID: "pid-1", SessionID: "sess-src", SessionSubstageID: "ssub-src-1", StarRating: 5, AssessedBy: "fas-1"},
+		{ParticipantID: "pid-1", SessionID: "sess-src", SessionSubstageID: "ssub-src-2", StarRating: 0, AssessedBy: "fas-1"},
+	}}
+	sub := &fakeLinkSubstageRepo{
+		byID: map[string]*entity.SessionSubstage{
+			"ssub-src-1": {BaseModel: entity.BaseModel{ID: "ssub-src-1"}, SessionID: "sess-src", ProgramSubstageID: "psub-1"},
+			"ssub-src-2": {BaseModel: entity.BaseModel{ID: "ssub-src-2"}, SessionID: "sess-src", ProgramSubstageID: "psub-2"},
+		},
+		byKeys: map[string]*entity.SessionSubstage{
+			"sess-1|psub-1": {BaseModel: entity.BaseModel{ID: "ssub-tgt-1"}, SessionID: "sess-1", ProgramSubstageID: "psub-1"},
+			"sess-1|psub-2": {BaseModel: entity.BaseModel{ID: "ssub-tgt-2"}, SessionID: "sess-1", ProgramSubstageID: "psub-2"},
+		},
+	}
+	markedBy := "fas-1"
+	markedAt := time.Date(2026, 1, 15, 9, 30, 0, 0, time.UTC)
+	att := &fakeLinkAttendanceRepo{rows: map[string]*entity.ParticipantAttendance{
+		"pid-1|sess-src": {
+			ParticipantID: "pid-1", SessionID: "sess-src", IsPresent: true,
+			MarkedAt: markedAt, MarkedBy: &markedBy,
+		},
+	}}
+
+	uc := usecase.NewSessionUsecase(repo, nil)
+	uc.SetSubstageRepos(nil, sub)
+	uc.SetAssessmentRepo(asmt)
+	uc.SetAttendanceRepo(att)
+	return &linkMigrationFixture{repo: repo, asmt: asmt, sub: sub, att: att, uc: uc}
+}
+
+// TestLinkParticipantSameProgramCarriesAllAssessmentsAndAttendance: a link
+// between two sessions of the SAME program must carry EVERY source assessment
+// (star = 0 included) remapped onto the TARGET session's Kegiatan IDs — which
+// are distinct from the source IDs, so the unique (participant,
+// session_substage) key stays free and the participant remains re-scored-able
+// — plus the attendance row under the new session_id, and finally move the
+// participant.
+func TestLinkParticipantSameProgramCarriesAllAssessmentsAndAttendance(t *testing.T) {
+	f := newLinkMigrationFixture("prog-A", "prog-A")
+
+	res, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1")
+	if err != nil {
+		t.Fatalf("same-program link must succeed, got: %v", err)
+	}
+	if f.repo.updated == nil || f.repo.updated.SessionID == nil || *f.repo.updated.SessionID != "sess-1" {
+		t.Fatalf("participant must be moved to sess-1, got %+v", f.repo.updated)
+	}
+	if res.PreviousSessionID != "sess-src" || res.PreviousProgramID != "prog-A" {
+		t.Fatalf("migration context lost: %+v", res)
+	}
+
+	// The source assessment read must carry the caller's tenant — without it the
+	// production repo rejects with tenant_required and the clone silently dies.
+	if len(f.asmt.listCalls) != 1 {
+		t.Fatalf("expected exactly one source assessment list, got %d", len(f.asmt.listCalls))
+	}
+	if f.asmt.listCalls[0].TenantID != "tenant-1" {
+		t.Fatalf("assessment list tenant = %q, want tenant-1", f.asmt.listCalls[0].TenantID)
+	}
+
+	// BOTH source rows cloned, onto TARGET-session substage IDs.
+	if len(f.asmt.created) != 2 {
+		t.Fatalf("expected both source assessments cloned (star 5 and star 0), got %d", len(f.asmt.created))
+	}
+	var sawStar0, sawStar5 bool
+	for _, c := range f.asmt.created {
+		if c.SessionID != "sess-1" {
+			t.Fatalf("clone session_id = %q, want sess-1", c.SessionID)
+		}
+		switch c.SessionSubstageID {
+		case "ssub-tgt-1":
+			sawStar5 = c.StarRating == 5
+		case "ssub-tgt-2":
+			sawStar0 = c.StarRating == 0
+		case "ssub-src-1", "ssub-src-2":
+			t.Fatalf("clone reused source substage ID %q (re-score would collide)", c.SessionSubstageID)
+		default:
+			t.Fatalf("clone carries unexpected substage ID %q", c.SessionSubstageID)
+		}
+	}
+	if !sawStar0 {
+		t.Fatal("star = 0 assessment must be carried to the target session")
+	}
+	if !sawStar5 {
+		t.Fatal("star = 5 assessment must be carried with its rating")
+	}
+
+	// Attendance carried to the new session_id with identical content.
+	if len(f.att.upserts) != 1 {
+		t.Fatalf("expected exactly one attendance upsert, got %d", len(f.att.upserts))
+	}
+	carried := f.att.rows["pid-1|sess-1"]
+	if carried == nil {
+		t.Fatal("attendance row must exist under the new session_id")
+	}
+	if !carried.IsPresent {
+		t.Fatal("attendance IsPresent must be carried")
+	}
+	if !carried.MarkedAt.Equal(time.Date(2026, 1, 15, 9, 30, 0, 0, time.UTC)) {
+		t.Fatalf("attendance MarkedAt = %v, want the source value", carried.MarkedAt)
+	}
+	if carried.MarkedBy == nil || *carried.MarkedBy != "fas-1" {
+		t.Fatalf("attendance MarkedBy = %v, want fas-1", carried.MarkedBy)
+	}
+}
+
+// TestLinkParticipantRejectsCrossProgramMigration: sessions of DIFFERENT
+// programs must fail with 400 program_mismatch before anything is copied or
+// moved — no assessment read/write, no attendance write, no participant move.
+func TestLinkParticipantRejectsCrossProgramMigration(t *testing.T) {
+	f := newLinkMigrationFixture("prog-A", "prog-B")
+
+	_, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1")
+	requireAppErrorCode(t, err, "program_mismatch")
+
+	if f.repo.updated != nil {
+		t.Fatal("cross-program link must not move the participant")
+	}
+	if len(f.asmt.listCalls) != 0 || len(f.asmt.created) != 0 {
+		t.Fatalf("cross-program link must not touch assessments: list=%d created=%d",
+			len(f.asmt.listCalls), len(f.asmt.created))
+	}
+	if len(f.att.upserts) != 0 || len(f.att.rows) != 1 {
+		t.Fatalf("cross-program link must not carry attendance: upserts=%d rows=%d",
+			len(f.att.upserts), len(f.att.rows))
+	}
+}
+
+// TestLinkParticipantMigrationFailuresPropagateAndDoNotMove: every failure in
+// the carry steps (assessment list, assessment write, attendance read/write)
+// surfaces as an explicit error and leaves the participant in the source
+// session — error swallowing would move the participant and lose data.
+func TestLinkParticipantMigrationFailuresPropagateAndDoNotMove(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("assessment_list_failure", func(t *testing.T) {
+		f := newLinkMigrationFixture("prog-A", "prog-A")
+		f.asmt.listErr = apperrors.Internal("internal_error", nil)
+
+		_, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1")
+		requireAppErrorCode(t, err, "internal_error")
+		if f.repo.updated != nil {
+			t.Fatal("participant must stay in the source session when the assessment list fails")
+		}
+		if len(f.att.upserts) != 0 {
+			t.Fatal("attendance must not be carried when the clone fails")
+		}
+	})
+
+	t.Run("assessment_create_failure", func(t *testing.T) {
+		f := newLinkMigrationFixture("prog-A", "prog-A")
+		f.asmt.createErr = apperrors.Internal("internal_error", nil)
+
+		_, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1")
+		requireAppErrorCode(t, err, "internal_error")
+		if f.repo.updated != nil {
+			t.Fatal("participant must stay in the source session when the assessment write fails")
+		}
+		if len(f.att.upserts) != 0 {
+			t.Fatal("attendance must not be carried when the clone fails")
+		}
+	})
+
+	t.Run("attendance_read_failure", func(t *testing.T) {
+		f := newLinkMigrationFixture("prog-A", "prog-A")
+		f.att.getErr = apperrors.Internal("internal_error", nil)
+
+		_, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1")
+		requireAppErrorCode(t, err, "internal_error")
+		if f.repo.updated != nil {
+			t.Fatal("participant must stay in the source session when the attendance read fails")
+		}
+	})
+
+	t.Run("attendance_upsert_failure", func(t *testing.T) {
+		f := newLinkMigrationFixture("prog-A", "prog-A")
+		f.att.upsertErr = apperrors.Internal("internal_error", nil)
+
+		_, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1")
+		requireAppErrorCode(t, err, "internal_error")
+		if f.repo.updated != nil {
+			t.Fatal("participant must stay in the source session when the attendance upsert fails")
+		}
+	})
+}
+
+// TestLinkParticipantRejectsForeignTenantSourceSession: a source session
+// outside the caller's tenant is a plain 404 (no existence oracle) raised
+// before any copy or move.
+func TestLinkParticipantRejectsForeignTenantSourceSession(t *testing.T) {
+	f := newLinkMigrationFixture("prog-A", "prog-A")
+	f.repo.sessionTenants = map[string]string{"sess-1": "tenant-1", "sess-src": "tenant-2"}
+
+	_, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1")
+	requireAppErrorCode(t, err, "not_found")
+
+	if f.repo.updated != nil {
+		t.Fatal("participant must not move when the source session is foreign-tenant")
+	}
+	if len(f.asmt.listCalls) != 0 || len(f.asmt.created) != 0 {
+		t.Fatalf("foreign-tenant source must not be read or cloned: list=%d created=%d",
+			len(f.asmt.listCalls), len(f.asmt.created))
+	}
+	if len(f.att.upserts) != 0 {
+		t.Fatal("foreign-tenant source must not carry attendance")
 	}
 }

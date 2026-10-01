@@ -115,7 +115,9 @@ func (s *badgeStore) CreateBadge(ctx context.Context, b *entity.ParticipantBadge
 	return nil
 }
 
-func (s *badgeStore) ListBadgesByParticipant(ctx context.Context, participantID string) ([]entity.ParticipantBadge, error) {
+func (s *badgeStore) ListBadgesByParticipant(ctx context.Context, participantID, tenantID string) ([]entity.ParticipantBadge, error) {
+	// Signature mirrors the repo; the fixture's badges are always in-tenant so
+	// no tenant filtering is applied here.
 	out := make([]entity.ParticipantBadge, 0, len(s.badges))
 	for i := range s.badges {
 		if s.badges[i].ParticipantID == participantID {
@@ -214,6 +216,11 @@ func (r *fakeAssessmentRepo) score(participantID, sessionSubstageID string) {
 }
 
 func (r *fakeAssessmentRepo) List(ctx context.Context, flt repository.AssessmentFilter, page, limit int) (*repository.Paginated[entity.Assessment], error) {
+	// Replicates the production repo guard (assessment_repo.go): an empty
+	// TenantID is rejected as a required scope.
+	if flt.TenantID == "" {
+		return nil, apperrors.BadRequest("tenant_required", errors.New("tenant ID is required"))
+	}
 	if err := r.listErr[flt.ParticipantID]; err != nil {
 		return nil, err
 	}
@@ -240,6 +247,15 @@ type fakeSessionRepo struct {
 	session      *entity.Session
 	stages       []entity.SessionStage
 	participants []entity.Participant
+	group        *entity.SessionGroup
+	progress     []entity.GroupStageProgress
+}
+
+func (r *fakeSessionRepo) GetSessionGroupByID(ctx context.Context, id, tenantID string) (*entity.SessionGroup, error) {
+	if r.group == nil {
+		return nil, apperrors.NotFound("not_found", nil)
+	}
+	return r.group, nil
 }
 
 func (r *fakeSessionRepo) GetParticipantByID(ctx context.Context, id, tenantID string) (*entity.Participant, error) {
@@ -274,6 +290,7 @@ type fixture struct {
 	store    *badgeStore
 	assess   *fakeAssessmentRepo
 	sessRepo *fakeSessionRepo
+	att      *fakeAttendanceRepo
 	program  *entity.Program
 	stageA   *entity.ProgramStage
 	stageB   *entity.ProgramStage
@@ -347,8 +364,9 @@ func newFixture() *fixture {
 		},
 	}
 
-	badgeUC := badgeuc.NewUsecase(store, progSubs, progRepo, assess, sessRepo)
-	viewUC := reports.NewUsecase(nil, nil, nil, &fakeMissionRepo{}, assess, sessRepo, progRepo, nil, progSubs, store, nil, (*config.Config)(nil), nil, nil)
+	att := &fakeAttendanceRepo{}
+	badgeUC := badgeuc.NewUsecase(store, progSubs, progRepo, assess, sessRepo, att)
+	viewUC := reports.NewUsecase(nil, nil, nil, &fakeMissionRepo{}, assess, sessRepo, progRepo, nil, progSubs, store, nil, (*config.Config)(nil), nil, nil, nil)
 
 	return &fixture{
 		badgeUC:  badgeUC,
@@ -356,6 +374,7 @@ func newFixture() *fixture {
 		store:    store,
 		assess:   assess,
 		sessRepo: sessRepo,
+		att:      att,
 		program:  program,
 		stageA:   stageA,
 		stageB:   stageB,
@@ -369,7 +388,7 @@ func (f *fixture) completeTopic(t *testing.T, substageIDs ...string) {
 	ctx := context.Background()
 	for _, id := range substageIDs {
 		f.assess.score(testParticipantID, id)
-		if err := f.badgeUC.EvaluateAfterAssessment(ctx, testParticipantID, id); err != nil {
+		if err := f.badgeUC.EvaluateAfterAssessment(ctx, testParticipantID, id, testTenant); err != nil {
 			t.Fatalf("EvaluateAfterAssessment(%s): %v", id, err)
 		}
 	}
@@ -377,7 +396,7 @@ func (f *fixture) completeTopic(t *testing.T, substageIDs ...string) {
 
 func (f *fixture) badges(t *testing.T) []entity.ParticipantBadge {
 	t.Helper()
-	rows, err := f.store.ListBadgesByParticipant(context.Background(), testParticipantID)
+	rows, err := f.store.ListBadgesByParticipant(context.Background(), testParticipantID, testTenant)
 	if err != nil {
 		t.Fatalf("ListBadgesByParticipant: %v", err)
 	}
@@ -492,7 +511,7 @@ func TestBadgeFlowEvaluateIsIdempotent(t *testing.T) {
 	// Evaluate a second time (both topics) → still exactly 3 rows.
 	ctx := context.Background()
 	for _, id := range []string{"subA2", "subB2"} {
-		if err := f.badgeUC.EvaluateAfterAssessment(ctx, testParticipantID, id); err != nil {
+		if err := f.badgeUC.EvaluateAfterAssessment(ctx, testParticipantID, id, testTenant); err != nil {
 			t.Fatalf("second EvaluateAfterAssessment(%s): %v", id, err)
 		}
 	}
@@ -630,8 +649,25 @@ func TestBadgeFlowEmptyNameTemplateSkipsAward(t *testing.T) {
 	}
 }
 
-// ── D1-3: live-monitor completion keeps going past a failing participant and
-// never swallows the error silently ──
+// requireAppErrorCode asserts err is an app error carrying want (hand-rolled,
+// repo convention — no testify).
+func requireAppErrorCode(t *testing.T, err error, want string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected error with code %q, got nil", want)
+	}
+	_, code, ok := apperrors.AsAppError(err)
+	if !ok {
+		t.Fatalf("expected app error, got %v", err)
+	}
+	if code != want {
+		t.Fatalf("expected error code %q, got %q", want, code)
+	}
+}
+
+// ── D1-3: live-monitor completion keeps going past a failing participant,
+// never swallows the error silently, AND surfaces an explicit aggregate error
+// (no more silent 204 on total failure) ──
 
 func TestCompleteSessionSubstageLogsAndContinues(t *testing.T) {
 	buf := captureLogs(t)
@@ -647,12 +683,18 @@ func TestCompleteSessionSubstageLogsAndContinues(t *testing.T) {
 		f.assess.score("p2", id)
 	}
 	// p2 already earned Topik A through the normal assessment path.
-	if err := f.badgeUC.EvaluateAfterAssessment(context.Background(), "p2", "subA1"); err != nil {
+	if err := f.badgeUC.EvaluateAfterAssessment(context.Background(), "p2", "subA1", testTenant); err != nil {
 		t.Fatalf("pre-evaluate p2 Topik A: %v", err)
 	}
 
-	if err := f.badgeUC.CompleteSessionSubstage(context.Background(), "subB2", testTenant); err != nil {
-		t.Fatalf("CompleteSessionSubstage must stay best-effort, got %v", err)
+	// NEW contract: the loop still continues past the failing participant, but
+	// the failures are aggregated into an explicit returned error.
+	err := f.badgeUC.CompleteSessionSubstage(context.Background(), "subB2", testTenant)
+	if err == nil {
+		t.Fatal("CompleteSessionSubstage must return an explicit error when a participant evaluation fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "participant p1") || !strings.Contains(err.Error(), "badge write failed") {
+		t.Errorf("error must aggregate failing participants with cause, got: %v", err)
 	}
 
 	out := buf.String()
@@ -662,46 +704,94 @@ func TestCompleteSessionSubstageLogsAndContinues(t *testing.T) {
 	}
 
 	// p1 errored → no badges; p2 still got all three (loop continued).
-	p1Rows, err := f.store.ListBadgesByParticipant(context.Background(), "p1")
-	if err != nil || len(p1Rows) != 0 {
-		t.Errorf("p1 badges = %+v (err %v), want none", p1Rows, err)
+	p1Rows, err2 := f.store.ListBadgesByParticipant(context.Background(), "p1", testTenant)
+	if err2 != nil || len(p1Rows) != 0 {
+		t.Errorf("p1 badges = %+v (err %v), want none", p1Rows, err2)
 	}
-	p2Rows, err := f.store.ListBadgesByParticipant(context.Background(), "p2")
-	if err != nil || len(p2Rows) != 3 {
-		t.Fatalf("p2 badges = %d (err %v), want 3 (loop continued)", len(p2Rows), err)
+	p2Rows, err2 := f.store.ListBadgesByParticipant(context.Background(), "p2", testTenant)
+	if err2 != nil || len(p2Rows) != 3 {
+		t.Fatalf("p2 badges = %d (err %v), want 3 (loop continued)", len(p2Rows), err2)
 	}
 
 	// The completion itself was persisted.
-	sub, err := f.store.GetSessionSubstage(context.Background(), "subB2")
-	if err != nil || sub.Status != entity.SessionSubstageCompleted {
-		t.Errorf("subB2 status = %v (err %v), want COMPLETED", sub.Status, err)
+	sub, err2 := f.store.GetSessionSubstage(context.Background(), "subB2")
+	if err2 != nil || sub.Status != entity.SessionSubstageCompleted {
+		t.Errorf("subB2 status = %v (err %v), want COMPLETED", sub.Status, err2)
 	}
 }
 
-// ── D1-4: a failing assessment lookup during evaluation is logged, not
-// silently treated as unscored ──
+// ── D1-4 regression: a failing assessment lookup during evaluation surfaces
+// as an EXPLICIT error — never silently treated as unscored ──
 
-func TestEvaluateAfterAssessmentLogsAssessmentListError(t *testing.T) {
-	buf := captureLogs(t)
+func TestEvaluateAfterAssessmentReturnsAssessmentListError(t *testing.T) {
 	f := newFixture()
 	f.assess.listErr[testParticipantID] = errors.New("assessment db down")
 	for _, id := range []string{"subA1", "subA2", "subB1", "subB2"} {
 		f.assess.score(testParticipantID, id)
 	}
 
-	// The error must not fail the caller (treated as unscored), but it must
-	// leave the log instead of vanishing.
-	if err := f.badgeUC.EvaluateAfterAssessment(context.Background(), testParticipantID, "subB2"); err != nil {
-		t.Fatalf("evaluation must stay non-fatal on a lookup error, got %v", err)
+	err := f.badgeUC.EvaluateAfterAssessment(context.Background(), testParticipantID, "subB2", testTenant)
+	if err == nil {
+		t.Fatal("evaluation must return an explicit error on a lookup failure, got nil")
+	}
+	if !strings.Contains(err.Error(), "assessment db down") ||
+		!strings.Contains(err.Error(), "participant=p1") ||
+		!strings.Contains(err.Error(), "substage=subB1") {
+		t.Errorf("error must carry participant/substage context, got: %v", err)
 	}
 	if rows := f.badges(t); len(rows) != 0 {
-		t.Fatalf("badges = %+v, want none (treated as unscored)", rows)
+		t.Fatalf("badges = %+v, want none (no award on error)", rows)
 	}
-	out := buf.String()
-	if !strings.Contains(out, "badge: list assessments participant=p1 substage=subB1 failed: assessment db down") ||
-		!strings.Contains(out, "treating as unscored") {
-		t.Errorf("missing swallowed assessment-error log, got:\n%s", out)
+}
+
+// ── Empty tenant at the evaluation boundary → explicit tenant_required ──
+
+func TestEvaluateAfterAssessmentEmptyTenantReturnsTenantRequired(t *testing.T) {
+	f := newFixture()
+	f.assess.score(testParticipantID, "subA1")
+
+	err := f.badgeUC.EvaluateAfterAssessment(context.Background(), testParticipantID, "subA1", "")
+	requireAppErrorCode(t, err, "tenant_required")
+	if rows := f.badges(t); len(rows) != 0 {
+		t.Fatalf("badges = %+v, want none", rows)
 	}
+}
+
+// ── Backfill: an already-COMPLETED group heals missing badges from existing
+// scores (no new scoring event) and is idempotent on re-run ──
+
+func TestCheckAndCompleteGroupBackfillsMissingBadges(t *testing.T) {
+	f := newFixture()
+	// Fully scored but ZERO badge rows (evaluation previously failed/was skipped).
+	for _, id := range []string{"subA1", "subA2", "subB1", "subB2"} {
+		f.assess.score(testParticipantID, id)
+	}
+	if rows := f.badges(t); len(rows) != 0 {
+		t.Fatalf("precondition: badges = %+v, want none", rows)
+	}
+	f.sessRepo.group = &entity.SessionGroup{
+		BaseModel: entity.BaseModel{ID: "g1"},
+		SessionID: testSessionID,
+		Status:    entity.GroupCompleted,
+	}
+
+	ctx := context.Background()
+	// Heal path (already-COMPLETED): backfill runs before the early return.
+	if err := f.badgeUC.CheckAndCompleteGroup(ctx, testSessionID, "g1", testTenant); err != nil {
+		t.Fatalf("CheckAndCompleteGroup heal path: %v", err)
+	}
+	want := []wantBadge{
+		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
+		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
+		{badgeType: entity.BadgeTypeFinal, stageID: "", name: "Juara Akhir"},
+	}
+	assertBadges(t, f.badges(t), want)
+
+	// Second run: idempotent, no duplicates.
+	if err := f.badgeUC.CheckAndCompleteGroup(ctx, testSessionID, "g1", testTenant); err != nil {
+		t.Fatalf("second CheckAndCompleteGroup: %v", err)
+	}
+	assertBadges(t, f.badges(t), want)
 }
 
 // ── D2-1: GET /api/badges items always carry program_stage_id ("" for FINAL) ──

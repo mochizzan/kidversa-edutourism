@@ -35,11 +35,19 @@ vi.mock('@/core/services/reports', () => ({
  },
 }))
 
+vi.mock('@/core/services/attendance', () => ({
+ attendanceService: {
+  getBySession: vi.fn(),
+  upsert: vi.fn(),
+ },
+}))
+
 // Import after mocks are registered
 import ReportSessionPage from '@/features/admin/pages/ReportSessionPage'
 import { sessionService } from '@/core/services/sessions'
 import { assessmentService } from '@/core/services/assessments'
 import { programService } from '@/core/services/programs'
+import { attendanceService } from '@/core/services/attendance'
 import { reportService } from '@/core/services/reports'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
@@ -141,6 +149,7 @@ function setupMocks(getBySession: () => Promise<ReportSessionResult>): void {
  vi.mocked(sessionService.getStages).mockResolvedValue([sessionStage] as never)
  vi.mocked(sessionService.getSubstages).mockResolvedValue([] as never)
  vi.mocked(assessmentService.getBySession).mockResolvedValue([] as never)
+ vi.mocked(attendanceService.getBySession).mockResolvedValue([] as never)
  vi.mocked(programService.getStages).mockResolvedValue([programStage] as never)
  vi.mocked(reportService.getBySession).mockImplementation(getBySession)
 }

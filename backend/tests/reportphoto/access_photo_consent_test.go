@@ -78,7 +78,7 @@ func (f *accessSubstageRepo) ListSessionSubstages(context.Context, string) ([]en
 	return nil, nil
 }
 
-func (f *accessSubstageRepo) ListBadgesByParticipant(context.Context, string) ([]entity.ParticipantBadge, error) {
+func (f *accessSubstageRepo) ListBadgesByParticipant(context.Context, string, string) ([]entity.ParticipantBadge, error) {
 	return nil, nil
 }
 
@@ -141,6 +141,7 @@ func newAccessHandler(consentGranted bool) (*handler.ReportHandler, *echo.Echo) 
 		cfg,
 		nil, // messaging
 		nil, // userRepo (facilitator name sudah terisi report)
+		nil, // attendanceRepo (rute akses tidak memakai generate)
 	)
 	h := handler.NewReportHandler(uc, cfg, &accessSessionRepo{}, sse.NewHub(),
 		&accessConsentRepo{granted: consentGranted}, &accessPhotoPanicRepo{})
