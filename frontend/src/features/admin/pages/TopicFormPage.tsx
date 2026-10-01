@@ -232,19 +232,6 @@ const TopicFormPage = () => {
             placeholder={t('admin.topic.descPlaceholder')}
           />
 
-          <div className="flex items-center gap-3">
-            <input
-              id="isPhotoStage"
-              type="checkbox"
-              checked={isPhotoStage}
-              onChange={(e) => setIsPhotoStage(e.target.checked)}
-              className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
-            />
-            <label htmlFor="isPhotoStage" className="text-sm text-on-surface">
-              {t('admin.topic.photoStageLabel')}
-            </label>
-          </div>
-
           <BadgeEditor
             title={t('admin.topic.badgeTitle')}
             variant="subtopik"
