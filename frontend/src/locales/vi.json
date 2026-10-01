@@ -364,6 +364,9 @@
       "imageLabel": "Hình ảnh",
       "removeImageAria": "Xóa hình ảnh huy hiệu",
       "uploading": "Đang tải lên...",
+      "uploadingPercent": "Đang tải lên... {{percent}}%",
+      "uploadRetry": "Đang thử lại ({{attempt}}/{{max}})...",
+      "uploadSuccess": "Tải lên thành công",
       "uploadBtn": "Tải ảnh lên"
     },
     "col": {

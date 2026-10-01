@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
-import { Award, Image, Loader2, Upload, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Award, Check, Image, Loader2, Upload, X } from 'lucide-react'
 import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
 import { getMediaUrl } from '../../../core/utils/media'
-import { uploadBadgeImage } from '../../../core/utils/badgeImage'
+import { uploadBadgeImage, BADGE_UPLOAD_TIMEOUT_MS } from '../../../core/utils/badgeImage'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { useTranslation } from 'react-i18next'
@@ -44,21 +44,60 @@ export function BadgeEditor({
   const { t } = useTranslation()
   const { addToast } = useGlobalToast()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
+  // D4 state machine: idle → uploading (real XHR transfer percent) →
+  // retrying (honest attempt n/max) → success ONLY after a valid server
+  // response with content.id. A failure surfaces as a toast and returns the
+  // state to idle so the button is usable again.
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'retrying' | 'success'>('idle')
+  const [percent, setPercent] = useState<number | null>(null)
+  const [retry, setRetry] = useState<{ attempt: number; max: number } | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Abort the in-flight upload on unmount — no state updates or toasts from a
+  // component that is gone.
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setUploading(true)
+    const controller = new AbortController()
+    abortRef.current = controller
+    setStatus('uploading')
+    setPercent(null)
+    setRetry(null)
     try {
-      const id = await uploadBadgeImage(file)
+      const id = await uploadBadgeImage(file, {
+        signal: controller.signal,
+        timeoutMs: BADGE_UPLOAD_TIMEOUT_MS,
+        onProgress: setPercent,
+        onRetry: (attempt, max) => {
+          setRetry({ attempt, max })
+          setStatus('retrying')
+        },
+      })
       onImageChange(id)
+      setStatus('success')
     } catch (err) {
-      addToast({ type: 'error', message: friendlyError(err) })
+      // Abort = deliberate cancellation (unmount), not a user-facing failure.
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        addToast({ type: 'error', message: friendlyError(err) })
+      }
+      setStatus('idle')
     } finally {
-      setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
     }
+  }
+
+  const busy = status === 'uploading' || status === 'retrying'
+  const uploadLabel = () => {
+    if (status === 'retrying' && retry) return t('admin.badge.uploadRetry', retry)
+    if (status === 'uploading') {
+      return percent === null
+        ? t('admin.badge.uploading')
+        : t('admin.badge.uploadingPercent', { percent })
+    }
+    if (status === 'success') return t('admin.badge.uploadSuccess')
+    return t('admin.badge.uploadBtn')
   }
 
   return (
@@ -104,7 +143,10 @@ export function BadgeEditor({
             {imageUrl && (
               <button
                 type="button"
-                onClick={() => onImageChange('')}
+                onClick={() => {
+                  onImageChange('')
+                  setStatus('idle')
+                }}
                 className="absolute right-1 top-1 rounded-full bg-surface/80 p-1 text-on-surface hover:bg-surface"
                 aria-label={t('admin.badge.removeImageAria')}
               >
@@ -125,10 +167,18 @@ export function BadgeEditor({
             size="sm"
             className="mt-2 w-full"
             onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            icon={uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            disabled={busy}
+            icon={
+              busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : status === 'success' ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )
+            }
           >
-            {uploading ? t('admin.badge.uploading') : t('admin.badge.uploadBtn')}
+            {uploadLabel()}
           </Button>
         </div>
       </div>

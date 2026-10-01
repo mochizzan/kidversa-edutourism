@@ -126,6 +126,15 @@ func NewBadgeHandler(substageRepo repository.SessionSubstageRepository) *BadgeHa
 	return &BadgeHandler{substageRepo: substageRepo}
 }
 
+// BadgeResponse is one GET /api/badges item: the awarded badge entity plus an
+// always-present program_stage_id string ("" for FINAL badges, which are
+// program-level and carry no Topik). The explicit field shadows the entity's
+// omitempty pointer field, so clients always receive program_stage_id.
+type BadgeResponse struct {
+	*entity.ParticipantBadge
+	ProgramStageID string `json:"program_stage_id"`
+}
+
 // List handles GET /api/badges?participant_id= (lists all badges for a participant).
 func (h *BadgeHandler) List(c *echo.Context) error {
 	participantID := (*c).QueryParam("participant_id")
@@ -136,7 +145,15 @@ func (h *BadgeHandler) List(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return appresp.OK(c, items)
+	resp := make([]BadgeResponse, 0, len(items))
+	for i := range items {
+		stageID := ""
+		if items[i].ProgramStageID != nil {
+			stageID = *items[i].ProgramStageID
+		}
+		resp = append(resp, BadgeResponse{ParticipantBadge: &items[i], ProgramStageID: stageID})
+	}
+	return appresp.OK(c, resp)
 }
 
 // SessionSubstageHandler serves the Live Monitor "Selesaikan Kegiatan" override at

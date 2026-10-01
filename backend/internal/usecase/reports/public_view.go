@@ -39,9 +39,14 @@ type PublicMission struct {
 
 // PublicBadge is an awarded badge. BadgeImageURL is already translated to the
 // PUBLIC kiosk media route — parents have no JWT for /api/media/content.
+// BadgeType discriminates SUBTOPIK (per-Topik) from FINAL (program) awards and
+// ProgramStageID is the awarded Topik ("" for FINAL or legacy rows), so the
+// client can split the list without extra requests.
 type PublicBadge struct {
-	BadgeName     string `json:"badge_name"`
-	BadgeImageURL string `json:"badge_image_url,omitempty"`
+	BadgeName      string `json:"badge_name"`
+	BadgeImageURL  string `json:"badge_image_url,omitempty"`
+	BadgeType      string `json:"badge_type"`
+	ProgramStageID string `json:"program_stage_id"`
 }
 
 // PublicReportView is the assembled mini-raport content for one report. Core
@@ -305,7 +310,12 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 		if b.BadgeImageURL != "" {
 			img = "/api/media/kiosk/content/" + b.BadgeImageURL
 		}
-		view.Badges = append(view.Badges, PublicBadge{BadgeName: b.BadgeName, BadgeImageURL: img})
+		view.Badges = append(view.Badges, PublicBadge{
+			BadgeName:      b.BadgeName,
+			BadgeImageURL:  img,
+			BadgeType:      b.BadgeType,
+			ProgramStageID: derefStr(b.ProgramStageID),
+		})
 	}
 	return view, nil
 }

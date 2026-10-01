@@ -364,6 +364,9 @@
       "imageLabel": "รูปภาพ",
       "removeImageAria": "ลบรูปภาพตราสัญลักษณ์",
       "uploading": "กำลังอัปโหลด...",
+      "uploadingPercent": "กำลังอัปโหลด... {{percent}}%",
+      "uploadRetry": "กำลังลองใหม่ ({{attempt}}/{{max}})...",
+      "uploadSuccess": "อัปโหลดสำเร็จ",
       "uploadBtn": "อัปโหลดรูปภาพ"
     },
     "col": {

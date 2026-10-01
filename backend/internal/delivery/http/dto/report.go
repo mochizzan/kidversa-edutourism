@@ -118,6 +118,7 @@ type PublicReportDTO struct {
 	ID               string   `json:"id"`
 	ParticipantID    string   `json:"participant_id"`
 	SessionID        string   `json:"session_id"`
+	ProgramStageID   string   `json:"program_stage_id"`
 	Status           string   `json:"status"`
 	AINarrativeFinal string   `json:"ai_narrative_final,omitempty"`
 	MissionIDs       []string `json:"mission_ids,omitempty"`
@@ -150,6 +151,7 @@ func NewPublicReportDTO(r *entity.Report, view *reportsuc.PublicReportView, phot
 		ID:                 r.ID,
 		ParticipantID:      r.ParticipantID,
 		SessionID:          r.SessionID,
+		ProgramStageID:     r.ProgramStageID,
 		Status:             string(r.Status),
 		AINarrativeFinal:   r.AINarrativeFinal,
 		MissionIDs:         r.MissionIDs,

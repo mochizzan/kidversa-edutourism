@@ -18,7 +18,8 @@ export interface MiniRaportData {
  extraTopicsCount?: number
  narrative: string
  missions: string[]
- badges: { badgeName: string; badgeImageUrl?: string }[]
+ badgeTopics: { badgeName: string; badgeImageUrl?: string }[]
+ badgeFinal?: { badgeName: string; badgeImageUrl?: string }
  facilitatorName: string
  galleryUrl?: string
  partnerLogoUrl?: string
@@ -94,24 +95,42 @@ function missionsHTML(missions: string[]): string {
   .join('')
 }
 
-function badgeHTML(badges: { badgeName: string; badgeImageUrl?: string }[]): string {
- if (!badges || badges.length === 0)
-  return '<p class="text-[12px] text-gray-500 italic">Belum ada badge yang diraih.</p>'
- const items = badges
-  .slice(0, 4)
-  .map((b) => {
-   const inner = b.badgeImageUrl
-    ? `<img src="${esc(b.badgeImageUrl)}" alt="${esc(b.badgeName)}" class="w-8 h-8 object-contain rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" />
+/** Satu baris badge: gambar dinamis (object-contain + dimensi auto, rasio
+ *  terjaga saat membesar/mengecil mengikuti ruang slot) atau ikon fallback
+ *  bila URL kosong; onerror → ikon. Nama kosong ditampilkan aman ("—"). */
+function badgeItemHTML(b: { badgeName: string; badgeImageUrl?: string }): string {
+ const inner = b.badgeImageUrl
+  ? `<img src="${esc(b.badgeImageUrl)}" alt="${esc(b.badgeName)}" class="max-w-full max-h-10 w-auto h-auto object-contain rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" />
            <i class="fas fa-award text-brand-badge text-xl hidden"></i>`
-    : '<i class="fas fa-award text-brand-badge text-xl"></i>'
-   return `
+  : '<i class="fas fa-award text-brand-badge text-xl"></i>'
+ return `
         <div class="flex items-center gap-2 min-w-0">
-          <div class="w-8 h-8 flex items-center justify-center shrink-0">${inner}</div>
-          <span class="text-[11px] font-semibold text-gray-700 truncate">${esc(b.badgeName)}</span>
+          <div class="flex items-center justify-center shrink-0">${inner}</div>
+          <span class="text-[11px] font-semibold text-gray-700 truncate">${b.badgeName ? esc(b.badgeName) : '—'}</span>
         </div>`
-  })
-  .join('')
+}
+
+/** Isi satu slot: flex-wrap berisi baris badge (cap 4), '' bila kosong. */
+function badgeSlotHTML(badges: { badgeName: string; badgeImageUrl?: string }[] | undefined): string {
+ if (!badges || badges.length === 0) return ''
+ const items = badges.slice(0, 4).map(badgeItemHTML).join('')
  return `<div class="flex flex-wrap gap-3">${items}</div>`
+}
+
+/** Section isi BADGE PENCAPAIAN (kontrak Fase 2 D3): DUA SLOT berdampingan —
+ *  kiri `badgeTopics`, kanan `badgeFinal`, dipisah divider. KEDUA kosong →
+ *  empty-state; salah satu kosong → slot itu dibiarkan kosong (data opsional). */
+function badgeSectionHTML(data: MiniRaportData): string {
+ const topics = badgeSlotHTML(data.badgeTopics)
+ const finalHTML = badgeSlotHTML(data.badgeFinal ? [data.badgeFinal] : undefined)
+ if (!topics && !finalHTML)
+  return '<p class="text-[12px] text-gray-500 italic">Belum ada badge yang diraih.</p>'
+ return `
+            <div class="flex gap-3">
+              <div class="flex-1 min-w-0 flex items-center" data-badge-slot="topik">${topics}</div>
+              <div class="w-px bg-gray-200 shrink-0"></div>
+              <div class="flex-1 min-w-0 flex items-center" data-badge-slot="final">${finalHTML}</div>
+            </div>`
 }
 
 function narrativeBlock(data: MiniRaportData): string {
@@ -514,9 +533,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
                     <i class="fas fa-award text-xs"></i> BADGE PENCAPAIAN
                 </div>
-                <div class="flex flex-wrap gap-3">
-                    ${badgeHTML(data.badges)}
-                </div>
+                ${badgeSectionHTML(data)}
             </div>
 
             <!-- 5. RINGKASAN (full-width, max-height dengan auto-scale) -->

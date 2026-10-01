@@ -364,6 +364,9 @@
       "imageLabel": "Gambar",
       "removeImageAria": "Padam gambar lencana",
       "uploading": "Sedang memuat naik…",
+      "uploadingPercent": "Sedang memuat naik… {{percent}}%",
+      "uploadRetry": "Mencuba semula ({{attempt}}/{{max}})…",
+      "uploadSuccess": "Berjaya dimuat naik",
       "uploadBtn": "Muat Naik Gambar"
     },
     "col": {

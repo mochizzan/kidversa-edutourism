@@ -3,6 +3,7 @@ package badge
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -39,6 +40,9 @@ func NewUsecase(
 // AwardSubtopikBadge awards (idempotently) a Kegiatan badge for the participant
 // on the given Topik, using the Topik's badge_name/badge_image_url. The
 // unique index uq_participant_subtopik_badge makes re-awarding a no-op.
+// When the Topik's badge_name template is empty no row is created — the skip
+// is logged at info level and (nil, nil) is returned so a blank badge never
+// reaches the report.
 func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, programStageID string) (*entity.ParticipantBadge, error) {
 	if participantID == "" || programStageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
@@ -51,6 +55,15 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 	existing, eerr := u.substageRepo.ListBadgesByParticipantStage(ctx, participantID, programStageID)
 	if eerr == nil && len(existing) > 0 {
 		return &existing[0], nil
+	}
+	if eerr != nil {
+		log.Printf("badge: list SUBTOPIK badges participant=%s stage=%s failed: %v", participantID, programStageID, eerr)
+	}
+	// Empty name template → no row (log, not an error): the award is simply
+	// not configurable for this Topik yet.
+	if prog.BadgeName == "" {
+		log.Printf("badge: skip SUBTOPIK award participant=%s stage=%s: program_stages.badge_name is empty", participantID, programStageID)
+		return nil, nil
 	}
 	b := &entity.ParticipantBadge{
 		ParticipantID:  participantID,
@@ -66,6 +79,9 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 			if gerr == nil && len(got) > 0 {
 				return &got[0], nil
 			}
+			if gerr != nil {
+				log.Printf("badge: duplicate-recovery list SUBTOPIK badges participant=%s stage=%s failed: %v", participantID, programStageID, gerr)
+			}
 		}
 		return nil, err
 	}
@@ -76,7 +92,8 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 // once every Kegiatan of the program has an awarded Kegiatan badge for the
 // participant. Enforces exactly one FINAL per (participant, program). Returns
 // the badge (existing or newly created). Returns (nil, nil) when not all
-// Kegiatan are completed yet (not an error).
+// Kegiatan are completed yet (not an error). When the program's final_badge_name
+// template is empty no row is created — the skip is logged at info level.
 func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, programID string) (*entity.ParticipantBadge, error) {
 	if participantID == "" || programID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
@@ -85,6 +102,9 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 	existing, eerr := u.substageRepo.ListFinalBadgesByParticipant(ctx, participantID, programID)
 	if eerr == nil && len(existing) > 0 {
 		return &existing[0], nil
+	}
+	if eerr != nil {
+		log.Printf("badge: list FINAL badges participant=%s program=%s failed: %v", participantID, programID, eerr)
 	}
 	stages, err := u.programRepo.ListStages(ctx, programID)
 	if err != nil {
@@ -95,7 +115,11 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 	}
 	for i := range stages {
 		got, gerr := u.substageRepo.ListBadgesByParticipantStage(ctx, participantID, stages[i].ID)
-		if gerr != nil || len(got) == 0 {
+		if gerr != nil {
+			log.Printf("badge: list SUBTOPIK badge participant=%s stage=%s failed: %v (treating as not awarded)", participantID, stages[i].ID, gerr)
+			return nil, nil
+		}
+		if len(got) == 0 {
 			// Not all Kegiatan completed yet.
 			return nil, nil
 		}
@@ -103,6 +127,11 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 	prog, perr := u.programRepo.GetProgramByID(ctx, programID)
 	if perr != nil {
 		return nil, perr
+	}
+	// Empty name template → no row (log, not an error).
+	if prog.FinalBadgeName == "" {
+		log.Printf("badge: skip FINAL award participant=%s program=%s: programs.final_badge_name is empty", participantID, programID)
+		return nil, nil
 	}
 	b := &entity.ParticipantBadge{
 		ParticipantID:  participantID,
@@ -117,6 +146,9 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 			got, gerr := u.substageRepo.ListFinalBadgesByParticipant(ctx, participantID, programID)
 			if gerr == nil && len(got) > 0 {
 				return &got[0], nil
+			}
+			if gerr != nil {
+				log.Printf("badge: duplicate-recovery list FINAL badges participant=%s program=%s failed: %v", participantID, programID, gerr)
 			}
 		}
 		return nil, err
@@ -158,7 +190,12 @@ func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, se
 			ParticipantID:     participantID,
 			SessionSubstageID: allSubs[i].ID,
 		}, 1, 10)
-		if lerr != nil || len(scored.Items) == 0 {
+		if lerr != nil {
+			log.Printf("badge: list assessments participant=%s substage=%s failed: %v (treating as unscored)", participantID, allSubs[i].ID, lerr)
+			allScored = false
+			break
+		}
+		if len(scored.Items) == 0 {
 			allScored = false
 			break
 		}
@@ -218,8 +255,11 @@ func (u *Usecase) CompleteSessionSubstage(ctx context.Context, sessionSubstageID
 		return err
 	}
 	for i := range participants {
-		// Best-effort: a single participant error must not block the others.
-		_ = u.EvaluateAfterAssessment(ctx, participants[i].ID, sessionSubstageID)
+		// Best-effort: a single participant error must not block the others —
+		// it is logged and the loop moves on to the next participant.
+		if err := u.EvaluateAfterAssessment(ctx, participants[i].ID, sessionSubstageID); err != nil {
+			log.Printf("badge: evaluate after session-substage %s failed for participant %s: %v (continuing with remaining participants)", sessionSubstageID, participants[i].ID, err)
+		}
 	}
 	return nil
 }

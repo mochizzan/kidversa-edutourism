@@ -364,6 +364,9 @@
       "imageLabel": "图片",
       "removeImageAria": "删除徽章图片",
       "uploading": "上传中…",
+      "uploadingPercent": "上传中… {{percent}}%",
+      "uploadRetry": "正在重试（{{attempt}}/{{max}}）…",
+      "uploadSuccess": "上传成功",
       "uploadBtn": "上传图片"
     },
     "col": {

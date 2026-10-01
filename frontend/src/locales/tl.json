@@ -364,6 +364,9 @@
       "imageLabel": "Larawan",
       "removeImageAria": "Alisin ang larawan ng badge",
       "uploading": "Nag-a-upload...",
+      "uploadingPercent": "Nag-a-upload... {{percent}}%",
+      "uploadRetry": "Sinusubukang muli ({{attempt}}/{{max}})...",
+      "uploadSuccess": "Matagumpay na na-upload",
       "uploadBtn": "Mag-upload ng Larawan"
     },
     "col": {

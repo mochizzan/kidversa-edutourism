@@ -13,6 +13,7 @@ import {
 import { generateMiniRaportHTML } from '../../../shared/templates/miniRaport'
 import { formatDate } from '../../../shared/utils'
 import { captureRaportAsPdf, captureRaportAsBlob, downloadBlob } from '../../../core/utils/raportCapture'
+import { splitBadgeSlots } from '../../../core/utils/badgeSlots'
 import {
   DEFAULT_FACILITATOR_NAME,
   RAPORT_LAYOUT,
@@ -56,10 +57,26 @@ function ReportView() {
             `${window.location.origin}/gallery?token=${report.gallery_access_token}`,
             { width: 128, margin: 1, errorCorrectionLevel: 'M' },
           )
-        } catch {
-          /* leave undefined — template placeholder fallback */
+        } catch (err) {
+          // QR is decorative (gallery link) — fall back to the template
+          // placeholder — but the cause must stay diagnosable, matching
+          // useReportReview's QR handling.
+          console.warn('[ReportPage] gallery QR generation failed', err)
         }
       }
+
+      // Split DUA SLOT (kontrak D2): kiri = badge topik rapor ini, kanan =
+      // badge FINAL. Field pemisah boleh undefined (payload legacy) — util
+      // fallback toleran; report tanpa stage key → semua topik di slot kiri.
+      const { topicBadges, finalBadge } = splitBadgeSlots(
+        (report.badges ?? []).map((b) => ({
+          badgeName: b.badge_name,
+          badgeImageUrl: b.badge_image_url || undefined,
+          badge_type: b.badge_type,
+          program_stage_id: b.program_stage_id,
+        })),
+        report.program_stage_id ?? '',
+      )
 
       return generateMiniRaportHTML({
         programName: report.program_name || '',
@@ -85,12 +102,8 @@ function ReportView() {
         missions: (report.missions ?? [])
           .slice(0, RAPORT_LAYOUT.MAX_MISSIONS_PREVIEW)
           .map((m) => m.title),
-        badges: (report.badges ?? [])
-          .slice(0, RAPORT_LAYOUT.MAX_BADGES_PREVIEW)
-          .map((b) => ({
-            badgeName: b.badge_name,
-            badgeImageUrl: b.badge_image_url || undefined,
-          })),
+        badgeTopics: topicBadges.slice(0, RAPORT_LAYOUT.MAX_BADGES_PREVIEW),
+        badgeFinal: finalBadge,
         facilitatorName: report.facilitator_name?.trim() || DEFAULT_FACILITATOR_NAME,
         galleryUrl,
       })
@@ -101,8 +114,11 @@ function ReportView() {
         if (cancelled) return
         setRaportHtml(html)
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return
+        // User sees a friendly error state; the cause is logged so a broken
+        // split/template step stays diagnosable instead of vanishing.
+        console.error('[ReportPage] build mini-raport html failed', err)
         setError(t('parent.report.loadError'))
       })
       .finally(() => {
@@ -126,7 +142,9 @@ function ReportView() {
     setActionLoading('pdf')
     try {
       await captureRaportAsPdf(raportHtml, 'raport.pdf')
-    } catch {
+    } catch (err) {
+      // User-facing banner is set below; log the cause for diagnosis.
+      console.error('[ReportPage] capture raport PDF failed', err)
       setDownloadError(t('parent.report.pdfError'))
     } finally {
       setActionLoading(null)
@@ -140,7 +158,9 @@ function ReportView() {
     try {
       const blob = await captureRaportAsBlob(raportHtml)
       downloadBlob(blob, 'raport.png')
-    } catch {
+    } catch (err) {
+      // User-facing banner is set below; log the cause for diagnosis.
+      console.error('[ReportPage] capture raport PNG failed', err)
       setDownloadError(t('parent.report.pngError'))
     } finally {
       setActionLoading(null)

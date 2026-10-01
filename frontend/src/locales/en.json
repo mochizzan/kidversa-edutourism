@@ -364,6 +364,9 @@
       "imageLabel": "Image",
       "removeImageAria": "Remove badge image",
       "uploading": "Uploading...",
+      "uploadingPercent": "Uploading... {{percent}}%",
+      "uploadRetry": "Retrying ({{attempt}}/{{max}})...",
+      "uploadSuccess": "Uploaded successfully",
       "uploadBtn": "Upload Image"
     },
     "col": {

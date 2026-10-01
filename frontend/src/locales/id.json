@@ -392,6 +392,9 @@
       "imageLabel": "Gambar",
       "removeImageAria": "Hapus gambar badge",
       "uploading": "Mengunggah…",
+      "uploadingPercent": "Mengunggah… {{percent}}%",
+      "uploadRetry": "Mencoba ulang ({{attempt}}/{{max}})…",
+      "uploadSuccess": "Berhasil diunggah",
       "uploadBtn": "Unggah Gambar"
     },
     "col": {

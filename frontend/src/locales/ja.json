@@ -364,6 +364,9 @@
       "imageLabel": "画像",
       "removeImageAria": "バッジ画像を削除",
       "uploading": "アップロード中…",
+      "uploadingPercent": "アップロード中… {{percent}}%",
+      "uploadRetry": "再試行中（{{attempt}}/{{max}}）…",
+      "uploadSuccess": "アップロードしました",
       "uploadBtn": "画像をアップロード"
     },
     "col": {

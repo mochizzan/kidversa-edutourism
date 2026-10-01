@@ -364,6 +364,9 @@
       "imageLabel": "이미지",
       "removeImageAria": "배지 이미지 삭제",
       "uploading": "업로드 중…",
+      "uploadingPercent": "업로드 중… {{percent}}%",
+      "uploadRetry": "다시 시도 중 ({{attempt}}/{{max}})...",
+      "uploadSuccess": "업로드 완료",
       "uploadBtn": "이미지 업로드"
     },
     "col": {

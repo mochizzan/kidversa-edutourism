@@ -27,12 +27,18 @@ export interface PublicReportMission {
 export interface PublicReportBadge {
   badge_name: string
   badge_image_url?: string
+  /** "SUBTOPIK" | "FINAL"; absent on legacy payloads (split falls back). */
+  badge_type?: string | null
+  /** Topic FK; "" | null on FINAL/legacy rows. */
+  program_stage_id?: string | null
 }
 
 export interface PublicReport {
   id: string
   participant_id: string
   session_id: string
+  /** Topic FK this report belongs to; "" | null on legacy payloads (split treats it as legacy → all topic badges). */
+  program_stage_id?: string | null
   status: string
   ai_narrative_final?: string
   mission_ids?: string[]

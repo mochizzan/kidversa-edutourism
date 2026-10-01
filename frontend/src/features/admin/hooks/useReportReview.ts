@@ -28,6 +28,7 @@ import {
  downloadBlob,
 } from '../../../core/utils/raportCapture'
 import { substagesOfStage } from '../../../core/utils/substage'
+import { splitBadgeSlots } from '../../../core/utils/badgeSlots'
 import { programSubstageService } from '../../../core/services/program-substages'
 import type {
  Report,
@@ -484,10 +485,18 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
   const missionTitles = selectMissionTitles(assignedMissionIds, missions)
 
-  const mappedBadges = badges.slice(0, RAPORT_LAYOUT.MAX_BADGES_PREVIEW).map((b) => ({
-   badgeName: b.badge_name,
-   badgeImageUrl: b.badge_image_url ? getMediaUrl('content', b.badge_image_url) : undefined,
-  }))
+  // Split DUA SLOT (kontrak D2): kiri = badge topik yang SEDANG direview
+  // (activeTopicId), kanan = badge FINAL. Cap 4 diterapkan SETELAH split agar
+  // badge topik aktif tidak tergeser oleh daftar topik lain.
+  const { topicBadges, finalBadge } = splitBadgeSlots(
+   badges.map((b) => ({
+    badgeName: b.badge_name,
+    badgeImageUrl: b.badge_image_url ? getMediaUrl('content', b.badge_image_url) : undefined,
+    badge_type: b.badge_type,
+    program_stage_id: b.program_stage_id,
+   })),
+   activeTopicId,
+  )
 
   const topicName = topics.find((t) => t.programStageId === activeTopicId)?.name ?? ''
 
@@ -518,7 +527,8 @@ export function useReportReview(sessionId: string | undefined, participantId: st
    extraTopicsCount: extraTopicsCount > 0 ? extraTopicsCount : undefined,
    narrative,
    missions: missionTitles,
-   badges: mappedBadges,
+   badgeTopics: topicBadges.slice(0, RAPORT_LAYOUT.MAX_BADGES_PREVIEW),
+   badgeFinal: finalBadge,
    facilitatorName:
     (participant.group_id
      ? groups.find((g) => g.id === participant.group_id)?.facilitator_name
