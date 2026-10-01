@@ -11,6 +11,7 @@ import { EmptyState } from '../../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../../shared/components/feedback/ErrorState'
 import { Card } from '../../../../shared/components/ui/Card'
 import { Badge } from '../../../../shared/components/ui/Badge'
+import { Modal } from '../../../../shared/components/ui/Modal'
 import { friendlyError } from '../../../../core/utils/errorMessages'
 import type { Session, SessionGroup } from '../../../../core/types'
 
@@ -34,6 +35,7 @@ const GaleriSessionPage = () => {
  const [notFound, setNotFound] = useState(false)
  const [session, setSession] = useState<Session | null>(null)
  const [groups, setGroups] = useState<SessionGroup[]>([])
+ const [showLockedInfo, setShowLockedInfo] = useState(false)
 
  const bypass = !user || user.role !== UserRole.FASILITATOR
 
@@ -148,7 +150,9 @@ const GaleriSessionPage = () => {
     <Card padding="sm">
      <div className="space-y-2">
       {groups.map((group) => {
-       const owned = bypass || group.facilitator_id === user?.id
+       // Ownership: prefer the server's is_owner (role-aware); fall back to the
+       // legacy client-side check when the flag is absent.
+       const owned = group.is_owner ?? (bypass || group.facilitator_id === user?.id)
        const meta = (
         <div className="min-w-0">
          <p className="text-sm font-semibold text-on-surface truncate">{group.name}</p>
@@ -160,17 +164,17 @@ const GaleriSessionPage = () => {
 
        if (!owned) {
         return (
-         <div
+         <button
           key={group.id}
-          aria-disabled
-          role="button"
-          tabIndex={-1}
+          type="button"
+          onClick={() => setShowLockedInfo(true)}
+          aria-haspopup="dialog"
           title={t('fasilitator.notMyGroup')}
-          className="w-full flex items-center justify-between gap-3 py-3 px-3 rounded-xl opacity-60 cursor-not-allowed text-left"
+          className="w-full flex items-center justify-between gap-3 py-3 px-3 rounded-xl opacity-60 hover:bg-surface-container-low transition-colors text-left"
          >
           {meta}
           <Lock className="w-4 h-4 shrink-0 text-on-surface-variant" />
-         </div>
+         </button>
         )
        }
 
@@ -186,9 +190,7 @@ const GaleriSessionPage = () => {
         >
          {meta}
          <span className="flex items-center gap-2 shrink-0">
-          {!bypass && (
-           <Badge variant="primary" size="sm">{t('fasilitator.galeri.ownedBadge')}</Badge>
-          )}
+          <Badge variant="primary" size="sm">{t('fasilitator.galeri.ownedBadge')}</Badge>
           <ChevronRight className="w-4 h-4 text-on-surface-variant" />
          </span>
         </button>
@@ -197,6 +199,17 @@ const GaleriSessionPage = () => {
      </div>
     </Card>
    )}
+
+   {/* Explains why a non-owned group cannot be entered — the row itself stays
+       put (no navigation) and is reachable by keyboard. */}
+   <Modal
+    open={showLockedInfo}
+    onClose={() => setShowLockedInfo(false)}
+    title={t('fasilitator.notMyGroup')}
+    size="sm"
+   >
+    <p className="text-sm text-on-surface-variant">{t('fasilitator.galeri.lockedGroupDesc')}</p>
+   </Modal>
   </div>
  )
 }

@@ -1,120 +1,123 @@
 import type { ContentType, UserRole } from './enums'
 
 export interface PaginatedResponse<T> {
-  data: T[]
-  total: number
-  page: number
-  limit: number
-  totalPages: number
+ data: T[]
+ total: number
+ page: number
+ limit: number
+ totalPages: number
 }
 
 export interface ListParams {
-  page?: number
-  limit?: number
-  search?: string
-  sort?: string
-  order?: 'asc' | 'desc'
-  filters?: Record<string, string | boolean | undefined>
+ page?: number
+ limit?: number
+ search?: string
+ sort?: string
+ order?: 'asc' | 'desc'
+ filters?: Record<string, string | boolean | undefined>
 }
 
 export interface CreateProgramDTO {
-  name: string
-  description?: string
-  final_badge_name?: string
-  final_badge_image_url?: string
+ name: string
+ description?: string
+ final_badge_name?: string
+ final_badge_image_url?: string
 }
 
 export interface UpdateProgramDTO extends Partial<CreateProgramDTO> {
-  is_active?: boolean
-  // Badge Final Program (cross-session award) — persisted when provided.
-  final_badge_name?: string
-  final_badge_image_url?: string
+ is_active?: boolean
+ // Badge Final Program (cross-session award) — persisted when provided.
+ final_badge_name?: string
+ final_badge_image_url?: string
 }
 
 export interface CreateStageDTO {
-  sequence_order: number
-  name: string
-  description?: string
-  content_type: ContentType
-  is_photo_stage?: boolean
+ sequence_order: number
+ name: string
+ description?: string
+ content_type: ContentType
+ is_photo_stage?: boolean
 }
 
 export interface UpdateStageDTO extends Partial<CreateStageDTO> {
-  sequence_order?: number
-  // Badge SubTopik (per-SubTopik award) — persisted when provided.
-  badge_name?: string
-  badge_image_url?: string
+ sequence_order?: number
+ // Badge SubTopik (per-SubTopik award) — persisted when provided.
+ badge_name?: string
+ badge_image_url?: string
 }
 
 export interface CreateSessionDTO {
-  program_id: string
-  name: string
-  session_date: string
-  start_time?: string
-  end_time?: string
-  location: string
-  notes?: string
+ program_id: string
+ name: string
+ session_date: string
+ start_time?: string
+ end_time?: string
+ location: string
+ notes?: string
 }
 
 export interface CreateParticipantDTO {
-  child_name: string
-  child_age: number
-  school_name?: string
-  parent_name: string
-  parent_phone: string
-  parent_email?: string
-  group_id?: string
+ child_name: string
+ child_age: number
+ school_name?: string
+ parent_name: string
+ parent_phone: string
+ parent_email?: string
+ group_id?: string
+ /** When set, the backend attaches the participant to this session
+  *  (DRAFT/ACTIVE only); group_id must then belong to that session. */
+ session_id?: string
 }
 
 export interface CreateUserDTO {
-  tenant_id: string
-  email: string
-  password?: string
-  role: UserRole
-  name: string
-  phone?: string
-  avatar_url?: string
+ tenant_id: string
+ email: string
+ password?: string
+ role: UserRole
+ name: string
+ phone?: string
+ avatar_url?: string
 }
 
 export interface UpdateUserDTO extends Partial<CreateUserDTO> {
-  is_active?: boolean
-  avatar_url?: string
+ is_active?: boolean
+ avatar_url?: string
 }
 
 export interface CreateAssessmentDTO {
-  participant_id: string
-  session_id: string
-  session_substage_id: string
-  star_rating: number  // 0-4 (was 0-5)
-  comment?: string
+ participant_id: string
+ session_id: string
+ session_substage_id: string
+ star_rating: number  // 0-4 (was 0-5)
+ comment?: string
 }
 
 export interface AttendanceUpsertDTO {
-  participant_id: string
-  session_id: string
-  is_present: boolean
+ participant_id: string
+ session_id: string
+ is_present: boolean
 }
 
 // ToggleActiveResult is the minimal response returned by the program/mission
 // toggle-active endpoints (backend returns only the id + new active state).
 export interface ToggleActiveResult {
-  id: string
-  is_active: boolean
+ id: string
+ is_active: boolean
 }
 
 export interface LoginDTO {
-  email: string
-  password: string
+ email: string
+ password: string
 }
 
 export interface LoginResponse {
-  access_token: string
-  refresh_token: string
-  user: import('./entities').User
+ access_token: string
+ refresh_token: string
+ user: import('./entities').User
 }
 
 export interface CreateMissionBankDTO {
-  program_id: string
-  title: string
-  related_stage_ids?: string[]
+ program_id: string
+ title: string
+ related_stage_ids?: string[]
 }

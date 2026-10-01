@@ -26,7 +26,11 @@ type UpdateGroupRequest struct {
 	FacilitatorID *string `json:"facilitator_id,omitempty"`
 }
 
-// CreateParticipantRequest is the payload for POST /api/sessions/:id/participants.
+// CreateParticipantRequest is the payload for POST /api/participants. It also
+// doubles as the row shape for POST /api/sessions/:id/participants/import,
+// where SessionID comes from the path and any row-level session_id is ignored.
+// SessionID is optional: when present, the participant is attached to that
+// session (DRAFT/ACTIVE only) and GroupID, if present, must belong to it.
 type CreateParticipantRequest struct {
 	ChildName    string `json:"child_name" validate:"required,min=2,max=200,hasletter"`
 	ChildAge     int    `json:"child_age" validate:"gte=1,lte=120"`
@@ -34,6 +38,7 @@ type CreateParticipantRequest struct {
 	ParentName   string `json:"parent_name" validate:"required,min=2,max=200,hasletter"`
 	ParentPhone  string `json:"parent_phone" validate:"required,phone"`
 	ParentEmail  string `json:"parent_email,omitempty" validate:"omitempty,email,max=200"`
+	SessionID    string `json:"session_id,omitempty"`
 	GroupID      string `json:"group_id,omitempty"`
 	ConsentPhoto bool   `json:"consent_photo"`
 }

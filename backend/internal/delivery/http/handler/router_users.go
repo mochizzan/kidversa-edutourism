@@ -13,9 +13,13 @@ import (
 func RegisterUsersRoutes(g *echo.Group, h *UserHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin)
+	// The LIST route also serves KOORDINATOR: the session detail page needs
+	// GET /api/users?role=FASILITATOR to populate the per-group facilitator
+	// dropdowns. Detail/mutation routes below keep the stricter admin gate.
+	listRoleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator)
 	scopeMW := appmiddleware.TenantScope()
 
-	g.GET("", h.List, authMW, roleMW, scopeMW)
+	g.GET("", h.List, authMW, listRoleMW, scopeMW)
 	g.POST("", h.Create, authMW, roleMW, scopeMW)
 	g.GET("/:id", h.Get, authMW, roleMW, scopeMW)
 	// PUT has NO role gate: self-service profile updates (any role editing own

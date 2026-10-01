@@ -43,11 +43,14 @@ type ParticipantSessionInfo struct {
 
 // DuplicateParticipantInfo describes a participant that already exists
 // within the same program (matched by child_name + parent_phone).
+// Reason labels why the row was skipped in ImportResult: "duplicate" (the
+// default for dup matches) or "group_full" (target group at capacity).
 type DuplicateParticipantInfo struct {
 	ParticipantID   string `json:"participant_id"`
 	ChildName       string `json:"child_name"`
 	ParentPhone     string `json:"parent_phone"`
 	ExistingSession string `json:"existing_session"`
+	Reason          string `json:"reason,omitempty"`
 }
 
 // ImportResult bundles created participants with skipped duplicates.

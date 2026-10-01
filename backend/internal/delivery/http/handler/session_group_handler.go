@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v5"
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/usecase"
 	badgeuc "kidversa-edutourism-backend/internal/usecase/badge"
@@ -22,9 +23,18 @@ func NewSessionGroupHandler(uc *usecase.SessionUsecase, badgeUC *badgeuc.Usecase
 	return &SessionGroupHandler{uc: uc, badgeUC: badgeUC}
 }
 
+// sessionGroupItem is a session group annotated with the caller-scoped
+// ownership flag (additive — existing group fields are unchanged).
+type sessionGroupItem struct {
+	entity.SessionGroup
+	IsOwner bool `json:"is_owner"`
+}
+
 // ListGroups handles GET /api/sessions/:id/groups.
 // The owning session is verified against the caller's tenant first (§5.A) so
-// groups (incl. facilitator_id) never leak across tenants.
+// groups (incl. facilitator_id) never leak across tenants. Every group is
+// returned regardless of owner; is_owner tells a FASILITATOR which group(s)
+// they may enter (elevated roles see everything — JWT claims from authMW).
 func (h *SessionGroupHandler) ListGroups(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
@@ -34,7 +44,12 @@ func (h *SessionGroupHandler) ListGroups(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return appresp.OK(c, gs)
+	role, actorID := appmiddleware.GetRole(c), appmiddleware.GetUserID(c)
+	items := make([]sessionGroupItem, len(gs))
+	for i, g := range gs {
+		items[i] = sessionGroupItem{SessionGroup: g, IsOwner: isGroupOwner(role, actorID, g.FacilitatorID)}
+	}
+	return appresp.OK(c, items)
 }
 
 // CreateGroup handles POST /api/sessions/:id/groups.

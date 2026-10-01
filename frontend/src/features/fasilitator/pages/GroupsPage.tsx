@@ -240,6 +240,7 @@ const GroupsPage = () => {
                         : undefined
                     }
                     status={deriveGroupStatus(item.progress)}
+                    isOwner={item.is_owner}
                     facilitatorId={item.group.facilitator_id}
                     currentUserId={user?.id}
                     onClick={() => navigate(`/fasilitator/groups/${item.group.id}`)}

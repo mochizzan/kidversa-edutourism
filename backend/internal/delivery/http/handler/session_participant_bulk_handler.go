@@ -35,10 +35,18 @@ func (h *SessionParticipantBulkHandler) ImportParticipants(c *echo.Context) erro
 	rows := make([]repository.ParticipantInput, 0, len(req.Rows))
 	for i := range req.Rows {
 		r := req.Rows[i]
+		// Preserve the row's group: without it imported participants land with
+		// NULL group_id and vanish from the group tree (StartSession then fails
+		// no_participants). Empty group_id stays unassigned (nil pointer).
+		var gid *string
+		if r.GroupID != "" {
+			g := r.GroupID
+			gid = &g
+		}
 		rows = append(rows, repository.ParticipantInput{
 			ChildName: r.ChildName, ChildAge: r.ChildAge, SchoolName: r.SchoolName,
 			ParentName: r.ParentName, ParentPhone: r.ParentPhone, ParentEmail: r.ParentEmail,
-			ConsentPhoto: r.ConsentPhoto,
+			ConsentPhoto: r.ConsentPhoto, GroupID: gid,
 		})
 	}
 	out, err := h.uc.ImportParticipants((*c).Request().Context(), appmiddleware.GetTenantID(c), id, rows)

@@ -30,7 +30,8 @@ func (h *SessionParticipantHandler) ListParticipants(c *echo.Context) error {
 
 // CreateParticipantGlobal handles the global POST /api/participants (tenant-scoped
 // via TenantScope middleware; SUPER_ADMIN may pass X-Tenant-Id to scope to a tenant).
-// Creates a standalone participant not yet attached to a session.
+// Without session_id it creates a standalone participant; with session_id the
+// participant is attached to that session (validated in the usecase).
 func (h *SessionParticipantHandler) CreateParticipantGlobal(c *echo.Context) error {
 	var req dto.CreateParticipantRequest
 	if err := bindAndValidate(c, &req); err != nil {
@@ -43,7 +44,7 @@ func (h *SessionParticipantHandler) CreateParticipantGlobal(c *echo.Context) err
 		return nil
 	}
 	p, err := h.uc.CreateParticipant((*c).Request().Context(),
-		appmiddleware.GetTenantID(c), "", req.GroupID, req.ChildName, req.ChildAge,
+		appmiddleware.GetTenantID(c), req.SessionID, req.GroupID, req.ChildName, req.ChildAge,
 		req.SchoolName, req.ParentName, req.ParentPhone, req.ParentEmail, req.ConsentPhoto)
 	if err != nil {
 		return err

@@ -179,6 +179,9 @@ export interface SessionGroup {
  facilitator_id?: string
  /** Resolved name of facilitator_id; populated by the backend (Opsi B). */
  facilitator_name?: string
+ /** Caller-scoped ownership (GET /api/sessions/:id/groups): true for the owning
+  * FASILITATOR and for elevated roles that see everything. */
+ is_owner?: boolean
  created_at: string
 }
 
@@ -254,6 +257,9 @@ export interface ImportResult {
   child_name: string
   parent_phone: string
   existing_session: string
+  /** Backend skip reason: "group_full", or "duplicate" (also implied when
+   *  the field is absent). Drives the breakdown in the partial-import toast. */
+  reason?: string
  }>
 }
 

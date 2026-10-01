@@ -61,6 +61,7 @@ const SessionDetailPage = () => {
       } catch (err) {
         console.error('[SessionDetailPage] facilitators load failed', err)
         setFacilitators([])
+        addToast({ type: 'error', message: friendlyError(err) })
       }
     } finally {
       if (showLoading) setLoading(false)

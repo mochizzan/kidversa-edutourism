@@ -228,8 +228,10 @@ describe('fasilitator group card: edge props', () => {
     expect(screen.getByText('0 peserta')).toBeInTheDocument()
     expect(screen.getByText('Bukan kelompok Anda')).toBeInTheDocument()
 
+    // New contract: a non-owner card stays keyboard-accessible but never
+    // navigates — it opens an explanatory dialog instead of being disabled.
     const card = screen.getByRole('button')
-    expect(card).toBeDisabled()
+    expect(card).not.toBeDisabled()
     // The "Buka" open affordance only renders for the group owner
     expect(screen.queryByText('Buka', { exact: true })).toBeNull()
   })

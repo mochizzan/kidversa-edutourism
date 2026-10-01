@@ -95,6 +95,14 @@ func MessageForCode(code string) string {
 		return "Peserta tidak dapat dihapus"
 	case "participant_duplicate_name":
 		return "Nama peserta sudah digunakan"
+	case "session_not_editable":
+		return "Sesi sudah tidak dapat diubah"
+	case "participant_already_in_session":
+		return "Peserta sudah berada di sesi ini"
+	case "invalid_group":
+		return "Kelompok tidak valid atau bukan milik sesi ini"
+	case "group_full":
+		return "Kelompok sudah penuh (maksimal 20 peserta)"
 	case "already_generating":
 		return "Laporan untuk sesi ini sedang dibuat. Tunggu hingga proses selesai."
 	case "send_in_progress":
@@ -133,6 +141,8 @@ func MessageForCode(code string) string {
 		return "Terjadi kesalahan pada server"
 	case "facilitator_required":
 		return "Setiap kelompok harus memiliki fasilitator"
+	case "invalid_facilitator":
+		return "Fasilitator tidak valid atau tidak ditemukan"
 	case "no_groups":
 		return "Sesi harus memiliki minimal satu kelompok"
 	case "no_participants":

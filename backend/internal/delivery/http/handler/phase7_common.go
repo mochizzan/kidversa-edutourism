@@ -34,18 +34,27 @@ type consentScope interface {
 	GetConsentValue(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) (bool, error)
 }
 
+// isGroupOwner reports whether the actor may treat the group as their own: a
+// FASILITATOR owns only groups whose facilitator_id matches their user id
+// (an unassigned group is owned by no facilitator); every other role
+// (ADMIN/KOORDINATOR/SUPER_ADMIN) owns all groups. Read-side companion of
+// assertFacilitatorOwnership — powers the is_owner flag on the group lists.
+func isGroupOwner(actorRole, actorID string, groupFacilitatorID *string) bool {
+	if entity.UserRole(actorRole) != entity.RoleFasilitator {
+		return true
+	}
+	return groupFacilitatorID != nil && *groupFacilitatorID == actorID
+}
+
 // assertFacilitatorOwnership mirrors live_usecase.assertOwnership for handler
 // checks: a FASILITATOR may mutate only the group they own; ADMIN/KOORDINATOR/
 // SUPER_ADMIN bypass. An unassigned group (nil owner) denies every facilitator
 // — an admin must assign it first.
 func assertFacilitatorOwnership(actorRole, actorID string, groupFacilitatorID *string) error {
-	if entity.UserRole(actorRole) != entity.RoleFasilitator {
+	if isGroupOwner(actorRole, actorID, groupFacilitatorID) {
 		return nil
 	}
-	if groupFacilitatorID == nil || *groupFacilitatorID != actorID {
-		return apperrors.Forbidden("not_group_owner", errors.New("facilitator does not own this group"))
-	}
-	return nil
+	return apperrors.Forbidden("not_group_owner", errors.New("facilitator does not own this group"))
 }
 
 // assertParticipantGroupOwnership denies a FASILITATOR any mutation on a

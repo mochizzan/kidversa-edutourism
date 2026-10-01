@@ -27,14 +27,30 @@ func NewLiveHandler(svc *live.Service, hub *sse.Hub, keepaliveSec int) *LiveHand
 	return &LiveHandler{svc: svc, hub: hub, keepaliveSec: keepaliveSec}
 }
 
+// liveGroupItem is a snapshot group annotated with the caller-scoped
+// ownership flag. is_owner = the actor owns the group (FASILITATOR whose
+// facilitator_id matches) or has an elevated role that sees everything.
+type liveGroupItem struct {
+	live.GroupWithProgress
+	IsOwner bool `json:"is_owner"`
+}
+
 // Groups handles GET /:sessionId/groups (dashboard snapshot of groups).
+// Every group of the session is returned regardless of owner; is_owner tells
+// the client which one(s) the caller may enter (JWT claims from the bearer
+// middleware — role/user_id are always set on this route).
 func (h *LiveHandler) Groups(c *echo.Context) error {
 	sessionID := (*c).Param("sessionId")
 	snap, err := h.svc.Snapshot((*c).Request().Context(), sessionID, appmiddleware.GetTenantID(c))
 	if err != nil {
 		return err
 	}
-	return appresp.OK(c, map[string]interface{}{"groups": snap.Groups})
+	role, actorID := appmiddleware.GetRole(c), appmiddleware.GetUserID(c)
+	groups := make([]liveGroupItem, len(snap.Groups))
+	for i, g := range snap.Groups {
+		groups[i] = liveGroupItem{GroupWithProgress: g, IsOwner: isGroupOwner(role, actorID, g.Group.FacilitatorID)}
+	}
+	return appresp.OK(c, map[string]interface{}{"groups": groups})
 }
 
 // Timeline handles GET /:sessionId/timeline (recent timeline events).

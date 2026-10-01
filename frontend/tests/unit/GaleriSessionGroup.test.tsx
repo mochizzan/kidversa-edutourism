@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act } from 'react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, within } from '@testing-library/react'
 import { render, screen } from './test-utils'
 
 // ── Mocks (registered before importing the pages) ─────────────────────────
@@ -107,14 +107,45 @@ describe('GaleriSessionPage: groups list', () => {
     expect(screen.getByText('Kelompok Orang Lain')).toBeInTheDocument()
 
     const locked = screen.getByRole('button', { name: /Kelompok Orang Lain/ })
-    expect(locked).toHaveAttribute('aria-disabled', 'true')
+    // Keyboard-reachable: a real <button> (not a tabIndex=-1 div).
+    expect(locked.tagName).toBe('BUTTON')
     expect(screen.getAllByText('Bukan kelompok Anda').length).toBeGreaterThan(0)
 
     fireEvent.click(locked)
+    // Non-owner click opens the shared lock dialog instead of navigating.
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Bukan kelompok Anda')).toBeInTheDocument()
+    expect(
+      within(dialog).getByText('Hanya fasilitator kelompok ini yang dapat membuka galeri pesertanya.'),
+    ).toBeInTheDocument()
     expect(screen.queryByText('HALAMAN KELOMPOK')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: /Kelompok Milik Saya/ }))
     expect(screen.getByText('HALAMAN KELOMPOK')).toBeInTheDocument()
+  })
+
+  it('consumes the server is_owner flag over the facilitator_id match', async () => {
+    // g-mine: matches user id but server says NOT owned → locked modal.
+    // g-other: foreign facilitator but server says owned → enterable + badge.
+    vi.mocked(sessionService.getGroups).mockResolvedValue([
+      { id: 'g-mine', session_id: 's-1', name: 'Kelompok Milik Saya', status: 'IN_PROGRESS', facilitator_id: 'u1', is_owner: false, created_at: '2026-09-30T01:00:00Z' },
+      { id: 'g-other', session_id: 's-1', name: 'Kelompok Orang Lain', status: 'IN_PROGRESS', facilitator_id: 'u2', is_owner: true, created_at: '2026-09-30T01:00:00Z' },
+    ] as never)
+
+    await renderSessionPage()
+
+    const mine = screen.getByRole('button', { name: /Kelompok Milik Saya/ })
+    const other = screen.getByRole('button', { name: /Kelompok Orang Lain/ })
+
+    fireEvent.click(mine)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.queryByText('HALAMAN KELOMPOK')).toBeNull()
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(within(other).getByText('Kelompok Anda')).toBeInTheDocument()
+    fireEvent.click(other)
+    expect(screen.getByText('HALAMAN KELOMPOK')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('shows an error state with retry when the session is missing (404 → null)', async () => {

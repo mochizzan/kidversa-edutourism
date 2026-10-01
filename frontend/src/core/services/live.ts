@@ -14,70 +14,73 @@ import { apiRequest } from './backend-client'
 import { API_ROUTES } from '../constants/apiRoutes'
 
 export interface GroupStageProgressRow {
-  id: string
-  group_id: string
-  session_substage_id: string
-  status: GroupStageProgressStatus
-  entered_at?: string
-  completed_at?: string
-  unlocked_by?: string
-  unlock_reason?: string
+ id: string
+ group_id: string
+ session_substage_id: string
+ status: GroupStageProgressStatus
+ entered_at?: string
+ completed_at?: string
+ unlocked_by?: string
+ unlock_reason?: string
 }
 
 export interface TimelineEventRow {
-  id: string
-  session_id: string
-  group_id: string
-  type: 'group:progress' | 'group:completed' | 'stage:unlock' | 'stage:lock' | 'override'
-  message: string
-  user_id?: string
-  created_at: string
+ id: string
+ session_id: string
+ group_id: string
+ type: 'group:progress' | 'group:completed' | 'stage:unlock' | 'stage:lock' | 'override'
+ message: string
+ user_id?: string
+ created_at: string
 }
 
 export interface LiveGroupWithProgress {
-  group: SessionGroup
-  progress: GroupStageProgressRow[]
-  participants: Participant[]
+ group: SessionGroup
+ progress: GroupStageProgressRow[]
+ participants: Participant[]
+ /** Caller-scoped ownership (GET /api/live/:sessionId/groups): true for the
+  * owning FASILITATOR and for elevated roles that see everything. */
+ is_owner?: boolean
 }
 
 interface GroupsEnvelope {
-  data?: { groups: LiveGroupWithProgress[] }
+ data?: { groups: LiveGroupWithProgress[] }
 }
 
 interface TimelineEnvelope {
-  data?: { timeline: TimelineEventRow[] }
+ data?: { timeline: TimelineEventRow[] }
 }
 
 interface LiveSnapshot {
-  groupsWithProgress: LiveGroupWithProgress[]
-  progress: GroupStageProgressRow[]
-  timeline: TimelineEventRow[]
+ groupsWithProgress: LiveGroupWithProgress[]
+ progress: GroupStageProgressRow[]
+ timeline: TimelineEventRow[]
 }
 
 // Snapshot of a session: groups (each with progress + participants), the flat
 // progress list, and the timeline events. Drives the monitor/list pages.
 async function fetchSnapshot(sessionId: string): Promise<LiveSnapshot> {
-  const [groupsRes, timelineRes] = await Promise.all([
-    apiRequest<GroupsEnvelope>('GET', API_ROUTES.LIVE.GROUPS(sessionId)),
-    apiRequest<TimelineEnvelope>('GET', API_ROUTES.LIVE.TIMELINE(sessionId)),
-  ])
+ const [groupsRes, timelineRes] = await Promise.all([
+  apiRequest<GroupsEnvelope>('GET', API_ROUTES.LIVE.GROUPS(sessionId)),
+  apiRequest<TimelineEnvelope>('GET', API_ROUTES.LIVE.TIMELINE(sessionId)),
+ ])
 
-  // apiRequest returns the full backend envelope { data: {...} } (it does not
-  // unwrap `data` like itemRequest/listRequest do), so unwrap here.
-  const groupsWithProgress = groupsRes.data?.groups ?? []
-  // Build a flat progress list from the nested groups.
-  const progress: GroupStageProgressRow[] = []
-  for (const g of groupsWithProgress) {
-    progress.push(...(g.progress ?? []))
-  }
+ // apiRequest returns the full backend envelope { data: {...} } (it does not
+ // unwrap `data` like itemRequest/listRequest do), so unwrap here.
+ const groupsWithProgress = groupsRes.data?.groups ?? []
+ // Build a flat progress list from the nested groups.
+ const progress: GroupStageProgressRow[] = []
+ for (const g of groupsWithProgress) {
+  progress.push(...(g.progress ?? []))
+ }
 
-  return {
-    groupsWithProgress,
-    progress,
-    timeline: (timelineRes.data?.timeline ?? []).sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    ),
-  }
+ return {
+  groupsWithProgress,
+  progress,
+  timeline: (timelineRes.data?.timeline ?? []).sort(
+   (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  ),
+ }
 }
 
 // R1: getProgress/getGroupsWithProgress/getTimeline previously each triggered a
@@ -89,74 +92,74 @@ const SNAPSHOT_TTL_MS = 2000
 const snapshotCache = new Map<string, { at: number; promise: Promise<LiveSnapshot> }>()
 
 function loadSnapshot(sessionId: string): Promise<LiveSnapshot> {
-  const cached = snapshotCache.get(sessionId)
-  if (cached && Date.now() - cached.at < SNAPSHOT_TTL_MS) {
-    return cached.promise
-  }
-  const promise = fetchSnapshot(sessionId)
-  snapshotCache.set(sessionId, { at: Date.now(), promise })
-  // On failure, drop the cache entry so the next call retries.
-  promise.catch(() => snapshotCache.delete(sessionId))
-  return promise
+ const cached = snapshotCache.get(sessionId)
+ if (cached && Date.now() - cached.at < SNAPSHOT_TTL_MS) {
+  return cached.promise
+ }
+ const promise = fetchSnapshot(sessionId)
+ snapshotCache.set(sessionId, { at: Date.now(), promise })
+ // On failure, drop the cache entry so the next call retries.
+ promise.catch(() => snapshotCache.delete(sessionId))
+ return promise
 }
 
 function invalidateSnapshot(sessionId?: string): void {
-  if (sessionId) snapshotCache.delete(sessionId)
-  else snapshotCache.clear()
+ if (sessionId) snapshotCache.delete(sessionId)
+ else snapshotCache.clear()
 }
 
 export const liveService = {
-  getProgress: async (sessionId: string): Promise<GroupStageProgressRow[]> => {
-    const { progress } = await loadSnapshot(sessionId)
-    return progress
-  },
+ getProgress: async (sessionId: string): Promise<GroupStageProgressRow[]> => {
+  const { progress } = await loadSnapshot(sessionId)
+  return progress
+ },
 
-  getGroupsWithProgress: async (sessionId: string): Promise<LiveGroupWithProgress[]> => {
-    const { groupsWithProgress } = await loadSnapshot(sessionId)
-    return groupsWithProgress
-  },
+ getGroupsWithProgress: async (sessionId: string): Promise<LiveGroupWithProgress[]> => {
+  const { groupsWithProgress } = await loadSnapshot(sessionId)
+  return groupsWithProgress
+ },
 
-  getTimeline: async (sessionId: string): Promise<TimelineEventRow[]> => {
-    const { timeline } = await loadSnapshot(sessionId)
-    return timeline
-  },
+ getTimeline: async (sessionId: string): Promise<TimelineEventRow[]> => {
+  const { timeline } = await loadSnapshot(sessionId)
+  return timeline
+ },
 
-  // Facilitator overrides. Unlock/complete are stage-scoped Kegiatan routes
-  // (POST /api/live/groups/:groupId/stages/:stageId/{unlock,complete}); lock is
-  // group-scoped (POST /api/live/groups/:groupId/lock), so it takes no stageId.
-  // Actor identity is taken from the JWT server-side; no client userId is sent.
-  unlockStage: async (groupId: string, sessionStageId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.UNLOCK_STAGE(groupId, sessionStageId))
-    invalidateSnapshot()
-  },
+ // Facilitator overrides. Unlock/complete are stage-scoped Kegiatan routes
+ // (POST /api/live/groups/:groupId/stages/:stageId/{unlock,complete}); lock is
+ // group-scoped (POST /api/live/groups/:groupId/lock), so it takes no stageId.
+ // Actor identity is taken from the JWT server-side; no client userId is sent.
+ unlockStage: async (groupId: string, sessionStageId: string): Promise<void> => {
+  await apiRequest('POST', API_ROUTES.LIVE.UNLOCK_STAGE(groupId, sessionStageId))
+  invalidateSnapshot()
+ },
 
-  lockStage: async (groupId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.LOCK_STAGE(groupId))
-    invalidateSnapshot()
-  },
+ lockStage: async (groupId: string): Promise<void> => {
+  await apiRequest('POST', API_ROUTES.LIVE.LOCK_STAGE(groupId))
+  invalidateSnapshot()
+ },
 
-  completeStage: async (groupId: string, sessionStageId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.COMPLETE_STAGE(groupId, sessionStageId))
-    invalidateSnapshot()
-  },
+ completeStage: async (groupId: string, sessionStageId: string): Promise<void> => {
+  await apiRequest('POST', API_ROUTES.LIVE.COMPLETE_STAGE(groupId, sessionStageId))
+  invalidateSnapshot()
+ },
 
-  // Live Monitor "Lanjut SubTopik": marks a Kegiatan leaf (session_substage)
-  // COMPLETED and re-runs per-child badge evaluation. POST /api/session-substages/:id/complete.
-  completeSessionSubstage: async (sessionSubstageId: string): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.SESSION_SUBSTAGES.COMPLETE(sessionSubstageId))
-    invalidateSnapshot()
-  },
+ // Live Monitor "Lanjut SubTopik": marks a Kegiatan leaf (session_substage)
+ // COMPLETED and re-runs per-child badge evaluation. POST /api/session-substages/:id/complete.
+ completeSessionSubstage: async (sessionSubstageId: string): Promise<void> => {
+  await apiRequest('POST', API_ROUTES.SESSION_SUBSTAGES.COMPLETE(sessionSubstageId))
+  invalidateSnapshot()
+ },
 
-  addTimelineEvent: async (
-    sessionId: string,
-    groupId: string,
-    type: TimelineEventRow['type'],
-    message: string,
-    userId?: string,
-  ): Promise<void> => {
-    await apiRequest('POST', API_ROUTES.LIVE.EVENTS, { session_id: sessionId, group_id: groupId, type, message, user_id: userId })
-    invalidateSnapshot(sessionId)
-  },
+ addTimelineEvent: async (
+  sessionId: string,
+  groupId: string,
+  type: TimelineEventRow['type'],
+  message: string,
+  userId?: string,
+ ): Promise<void> => {
+  await apiRequest('POST', API_ROUTES.LIVE.EVENTS, { session_id: sessionId, group_id: groupId, type, message, user_id: userId })
+  invalidateSnapshot(sessionId)
+ },
 
 
 }

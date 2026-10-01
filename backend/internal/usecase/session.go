@@ -412,6 +412,24 @@ func (u *SessionUsecase) UpdateGroup(ctx context.Context, groupID, name, status,
 	if err != nil {
 		return nil, err
 	}
+	// A non-empty facilitator reference must point at an existing account with
+	// the FASILITATOR role — otherwise any user id (admin, deleted user, wrong
+	// role) could be attached to a group. Clearing (nil/empty) needs no lookup.
+	if facilitatorID != nil && *facilitatorID != "" {
+		if u.userRepo == nil {
+			return nil, apperrors.Internal("internal_error", nil)
+		}
+		target, terr := u.userRepo.GetByID(ctx, *facilitatorID)
+		if terr != nil {
+			if _, code, ok := apperrors.AsAppError(terr); ok && code == "not_found" {
+				return nil, apperrors.BadRequest("invalid_facilitator", nil)
+			}
+			return nil, terr
+		}
+		if target.Role != entity.RoleFasilitator {
+			return nil, apperrors.BadRequest("invalid_facilitator", nil)
+		}
+	}
 	if name != "" {
 		g.Name = name
 	}
@@ -448,7 +466,59 @@ func (u *SessionUsecase) GetGroupByID(ctx context.Context, groupID, tenantID str
 	return u.sessionRepo.GetSessionGroupByID(ctx, groupID, tenantID)
 }
 
+// MaxGroupParticipants caps how many participants a single session group may
+// hold. Creating/linking into a group that already has this many members
+// fails with 409 group_full; bulk import skips the overflowing rows and
+// reports them in ImportResult.Skipped instead of failing the whole batch.
+const MaxGroupParticipants = 20
+
+// requireEditableSession loads a session for a participant write and enforces
+// that it is still editable (DRAFT or ACTIVE). COMPLETED/CANCELLED sessions
+// reject every session-scoped participant write with session_not_editable.
+// Standalone (session-less) writes never call this and stay ungated.
+func (u *SessionUsecase) requireEditableSession(ctx context.Context, sessionID, tenantID string) (*entity.Session, error) {
+	s, err := u.sessionRepo.GetSessionByID(ctx, sessionID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if s.Status != entity.SessionDraft && s.Status != entity.SessionActive {
+		return nil, apperrors.BadRequest("session_not_editable", nil)
+	}
+	return s, nil
+}
+
+// requireGroupInSession rejects a group that does not exist or belongs to a
+// different session with 400 invalid_group. repo is a parameter so the import
+// path can validate through its transaction handle.
+func requireGroupInSession(ctx context.Context, repo repository.SessionRepository, groupID, sessionID, tenantID string) error {
+	g, err := repo.GetSessionGroupByID(ctx, groupID, tenantID)
+	if err != nil {
+		if _, code, _ := apperrors.AsAppError(err); code == "not_found" {
+			return apperrors.BadRequest("invalid_group", nil)
+		}
+		return err
+	}
+	if g.SessionID != sessionID {
+		return apperrors.BadRequest("invalid_group", nil)
+	}
+	return nil
+}
+
+// groupMemberCount counts participants already assigned to a group. It reuses
+// the existing ListParticipants repo helper (group_id filter) rather than a
+// dedicated count query; an empty sessionID/tenantID means "count by group
+// only", which is the membership definition used by the capacity check.
+func groupMemberCount(ctx context.Context, repo repository.SessionRepository, groupID string) (int, error) {
+	ps, err := repo.ListParticipants(ctx, "", groupID, "")
+	if err != nil {
+		return 0, err
+	}
+	return len(ps), nil
+}
+
 // CreateParticipant adds a participant to a session (and optional group).
+// With sessionID set the session must exist and be DRAFT/ACTIVE, groupID must
+// belong to that session, and the group must be under MaxGroupParticipants.
 func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessionID, groupID, childName string, childAge int, schoolName, parentName, parentPhone, parentEmail string, consentPhoto bool) (*entity.Participant, error) {
 	tp := &tenantID
 	if tenantID == "" {
@@ -462,6 +532,23 @@ func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessio
 	if groupID != "" {
 		g := groupID
 		gid = &g
+	}
+	if sessionID != "" {
+		if _, err := u.requireEditableSession(ctx, sessionID, tenantID); err != nil {
+			return nil, err
+		}
+		if groupID != "" {
+			if err := requireGroupInSession(ctx, u.sessionRepo, groupID, sessionID, tenantID); err != nil {
+				return nil, err
+			}
+			n, err := groupMemberCount(ctx, u.sessionRepo, groupID)
+			if err != nil {
+				return nil, err
+			}
+			if n >= MaxGroupParticipants {
+				return nil, apperrors.Conflict("group_full", nil)
+			}
+		}
 	}
 	childName = strings.TrimSpace(childName)
 	schoolName = strings.TrimSpace(schoolName)
@@ -521,6 +608,13 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 		Created: make([]entity.Participant, 0, len(rows)),
 		Skipped: make([]repository.DuplicateParticipantInfo, 0),
 	}
+	// Status gate: bulk import is a session-scoped write, so only DRAFT or
+	// ACTIVE sessions accept it (session-scoped import always has sessionID).
+	if sessionID != "" {
+		if _, err := u.requireEditableSession(ctx, sessionID, tenantID); err != nil {
+			return nil, err
+		}
+	}
 	err := u.sessionRepo.Transaction(ctx, func(tx repository.SessionRepository) error {
 		tp := &tenantID
 		if tenantID == "" {
@@ -529,6 +623,25 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 		sid := &sessionID
 		if sessionID == "" {
 			sid = nil
+		}
+
+		// Every distinct row group must exist and belong to this session;
+		// otherwise the row would be silently attached to a foreign group.
+		if sessionID != "" {
+			checked := make(map[string]bool)
+			for _, r := range rows {
+				if r.GroupID == nil || *r.GroupID == "" {
+					continue
+				}
+				g := *r.GroupID
+				if checked[g] {
+					continue
+				}
+				checked[g] = true
+				if err := requireGroupInSession(ctx, tx, g, sessionID, tenantID); err != nil {
+					return err
+				}
+			}
 		}
 
 		// Resolve the program_id for duplicate detection.
@@ -557,19 +670,50 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 			dupKeys[key] = true
 		}
 
+		// Seed live member counts per referenced group so rows beyond
+		// MaxGroupParticipants are skipped instead of overflowing the group.
+		groupCounts := make(map[string]int)
+		for _, r := range rows {
+			if r.GroupID == nil || *r.GroupID == "" {
+				continue
+			}
+			g := *r.GroupID
+			if _, seen := groupCounts[g]; !seen {
+				n, err := groupMemberCount(ctx, tx, g)
+				if err != nil {
+					return err
+				}
+				groupCounts[g] = n
+			}
+		}
+
 		for _, r := range rows {
 			key := r.ChildName + "|" + r.ParentPhone
 			if dupKeys[key] {
 				// Find the matching dup info to include in skipped.
 				for _, d := range dups {
 					if (d.ChildName + "|" + d.ParentPhone) == key {
+						d.Reason = "duplicate"
 						result.Skipped = append(result.Skipped, d)
 						break
 					}
 				}
 				continue
 			}
-			gid := r.GroupID
+			var gid *string
+			if r.GroupID != nil && *r.GroupID != "" {
+				g := *r.GroupID
+				// Capacity: report the overflow row as skipped, never as an error.
+				if groupCounts[g] >= MaxGroupParticipants {
+					result.Skipped = append(result.Skipped, repository.DuplicateParticipantInfo{
+						ChildName:   r.ChildName,
+						ParentPhone: r.ParentPhone,
+						Reason:      "group_full",
+					})
+					continue
+				}
+				gid = &g
+			}
 			p := &entity.Participant{
 				TenantID:     tp,
 				SessionID:    sid,
@@ -585,6 +729,9 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 			if err := tx.CreateParticipant(ctx, p); err != nil {
 				return err
 			}
+			if gid != nil {
+				groupCounts[*gid]++
+			}
 			result.Created = append(result.Created, *p)
 		}
 		return nil
@@ -596,12 +743,36 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 }
 
 // LinkParticipant attaches an existing participant to a session (and optional group).
+// The target session must be DRAFT/ACTIVE, the group (when given) must belong to
+// it and have capacity, and a participant already in THIS session is rejected
+// with participant_already_in_session instead of being re-linked.
 // If the participant was already linked to another session, the previous session info
 // is returned so the caller can display migration context.
 func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, participantID, groupID, tenantID string) (*repository.LinkParticipantResult, error) {
+	// Session-scoped write: closed sessions reject new participants.
+	if _, err := u.requireEditableSession(ctx, sessionID, tenantID); err != nil {
+		return nil, err
+	}
 	p, err := u.sessionRepo.GetParticipantByID(ctx, participantID, tenantID)
 	if err != nil {
 		return nil, err
+	}
+	// Already linked to THIS session: re-linking would silently "migrate" the
+	// participant onto itself and re-clone assessments.
+	if p.SessionID != nil && *p.SessionID == sessionID {
+		return nil, apperrors.Conflict("participant_already_in_session", nil)
+	}
+	if groupID != "" {
+		if err := requireGroupInSession(ctx, u.sessionRepo, groupID, sessionID, tenantID); err != nil {
+			return nil, err
+		}
+		n, err := groupMemberCount(ctx, u.sessionRepo, groupID)
+		if err != nil {
+			return nil, err
+		}
+		if n >= MaxGroupParticipants {
+			return nil, apperrors.Conflict("group_full", nil)
+		}
 	}
 
 	// Capture previous session info before overwrite.

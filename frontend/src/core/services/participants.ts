@@ -14,9 +14,10 @@ export const participantService: ParticipantService = {
     return nullableItemRequest<Participant>('GET', API_ROUTES.PARTICIPANTS.DETAIL(id))
   },
 
-  // Global POST /api/participants — creates a standalone participant not yet
-  // attached to a session. Consent flags default to false (the form does not
-  // collect them); they can be set later via the per-session routes.
+  // Global POST /api/participants — creates a standalone participant when no
+  // session_id is given, or attaches one to a session (DRAFT/ACTIVE) when it
+  // is. Consent flags default to false (the form does not collect them); they
+  // can be set later via the per-session routes.
   create: (data: CreateParticipantDTO) =>
     itemRequest<Participant>('POST', API_ROUTES.PARTICIPANTS.BASE, {
       child_name: data.child_name,
@@ -26,6 +27,7 @@ export const participantService: ParticipantService = {
       parent_phone: data.parent_phone,
       parent_email: data.parent_email,
       group_id: data.group_id,
+      session_id: data.session_id,
       consent_photo: false,
     }),
 

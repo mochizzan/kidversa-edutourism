@@ -10,8 +10,10 @@ import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog
 import { Trans, useTranslation } from 'react-i18next'
 import { sessionService } from '../../../core/services/sessions'
 import { participantService } from '../../../core/services/participants'
+import { ApiError } from '../../../core/services/backend-client'
 import { GroupFormModal } from './GroupFormModal'
 import { ParticipantFormModal } from './ParticipantFormModal'
+import type { ParticipantFormData } from './ParticipantFormModal'
 import { CsvImportModal } from './CsvImportModal'
 import { ROUTES } from '../../../core/constants/app'
 import type { SessionGroup, Participant, CreateParticipantDTO, User, ParticipantSessionInfo } from '../../../core/types'
@@ -44,6 +46,9 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
   const navigate = useNavigate()
   const isDraft = sessionStatus === 'DRAFT'
   const canModifyParticipants = sessionStatus === 'DRAFT' || sessionStatus === 'ACTIVE'
+  // Facilitator assignment stays editable while the session runs (DRAFT or
+  // ACTIVE); COMPLETED/CANCELLED sessions show the read-only name instead.
+  const canAssignFacilitator = sessionStatus === 'DRAFT' || sessionStatus === 'ACTIVE'
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(groups.map((g) => [g.id, true]))
@@ -181,13 +186,33 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
   }
 
   const handleLinkParticipant = async (participantId: string) => {
-    if (!selectedGroupId) return
+    if (!selectedGroupId) {
+      // Unreachable by construction (the modal always opens for one group),
+      // but never fail silently: the message renders in the picker's inline error.
+      console.error('[SessionGroupsTab] link participant aborted: no group selected')
+      throw new ApiError(t('admin.sessions.selectGroupFirst'), 'no_group_selected', 400)
+    }
     const result = await sessionService.linkParticipant(sessionId, selectedGroupId, participantId)
     if (result.previous_session_name) {
       addToast({ type: 'success', message: t('admin.sessions.participantMoved', { name: result.previous_session_name }) })
     } else {
       addToast({ type: 'success', message: t('admin.sessions.participantLinked') })
     }
+    onRefresh()
+    setRefreshKey((k) => k + 1)
+  }
+
+  // Create-new path from the add-participant modal: attaches a brand-new child
+  // to this session's group via POST /api/participants (session_id + group_id).
+  // Backend codes (participant_duplicate_name, group_full, session_not_editable,
+  // invalid_group, validation_error) propagate and render inline in the modal.
+  const handleCreateNewParticipant = async (data: ParticipantFormData) => {
+    if (!selectedGroupId) {
+      console.error('[SessionGroupsTab] create participant aborted: no group selected')
+      throw new ApiError(t('admin.sessions.selectGroupFirst'), 'no_group_selected', 400)
+    }
+    await participantService.create({ ...data, session_id: sessionId, group_id: selectedGroupId })
+    addToast({ type: 'success', message: t('admin.sessions.participantLinked') })
     onRefresh()
     setRefreshKey((k) => k + 1)
   }
@@ -210,7 +235,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
     }
   }
 
-  const handleCsvImport = async (rows: ImportRow[]) => {
+  const handleCsvImport = async (rows: ImportRow[]): Promise<{ created: number; skipped: number }> => {
     const groupMap = new Map(groups.map((g) => [g.name.toLowerCase(), g.id]))
     const newGroups: { sessionId: string; groupId: string }[] = []
 
@@ -238,13 +263,27 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
       const createdCount = result.created.length
       const skippedCount = result.skipped.length
       if (skippedCount > 0) {
+        // Skipped rows cover duplicates AND group_full overflows — counts come
+        // straight from the backend result so nothing is silently dropped.
+        // The backend's per-row reason is broken out so an admin can tell
+        // "name already used" apart from "group at capacity" (a missing
+        // reason counts as duplicate — the backend's documented default).
+        const fullCount = result.skipped.filter((s) => s.reason === 'group_full').length
+        const dupCount = skippedCount - fullCount
+        const reasons = [
+          dupCount > 0 ? t('admin.sessions.importSkippedDuplicate', { count: dupCount }) : '',
+          fullCount > 0 ? t('admin.sessions.importSkippedFull', { count: fullCount }) : '',
+        ].filter(Boolean).join(', ')
         addToast({
           type: 'warning',
-          message: t('admin.sessions.importPartial', { created: createdCount, skipped: skippedCount }),
+          message: `${t('admin.sessions.importPartial', { created: createdCount, skipped: skippedCount })} (${reasons})`,
         })
       } else {
         addToast({ type: 'success', message: t('admin.sessions.importDone', { count: createdCount }) })
       }
+      onRefresh()
+      setRefreshKey((k) => k + 1)
+      return { created: createdCount, skipped: skippedCount }
     } catch (err) {
       for (const g of newGroups) {
         await sessionService.deleteGroup(g.sessionId, g.groupId).catch((err) => { console.error('[SessionGroupsTab] rollback deleteGroup failed', err) })
@@ -374,7 +413,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
                         <span aria-hidden className="pointer-events-none absolute -left-4 top-1/2 h-px w-4 -translate-y-1/2 bg-primary-200" />
                         <UserIcon className="w-4 h-4 shrink-0 text-primary-400" />
                         <span className="text-sm font-medium text-on-surface-variant">{t('admin.sessions.fasilitatorLabel')}</span>
-                        {isDraft ? (
+                        {canAssignFacilitator ? (
                           <div className="w-auto min-w-[180px] max-w-[240px] flex-1">
                             <Select
                               value={effectiveFacilitatorId ?? ''}
@@ -480,6 +519,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
         selectOnly
         availableParticipants={availableParticipants}
         onLinkExisting={handleLinkParticipant}
+        onCreateNew={handleCreateNewParticipant}
         linkedParticipantIds={linkedParticipantIds}
         currentSessionId={sessionId}
         participantSessionInfos={linkableParticipantInfos}
