@@ -19,10 +19,11 @@
 services:
   mariadb:
     image: mariadb:12
-    environment:
-      # Overridable; defaults to a weak local-only value. Set in the environment
-      # for any real deployment.
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-admin}
+    # Single source of truth for secrets: ./backend/.env (same file as DB_PASSWORD,
+    # so MARIADB_ROOT_PASSWORD and DB_PASSWORD stay in sync automatically).
+    # If MARIADB_ROOT_PASSWORD is missing there, the MariaDB entrypoint fails
+    # loudly on first init ("Database is uninitialized and password not specified").
+    env_file: ./backend/.env
     ports:
       - "127.0.0.1:3307:3306"
     volumes:
@@ -43,6 +44,12 @@ services:
     environment:
       # Override: in Docker, DB_HOST = service name (not localhost).
       DB_HOST: mariadb
+      # Explicit gateway override: default localhost is not resolvable from
+      # inside the backend container — point at the compose service directly
+      # (backend/.env may still override with its own value).
+      WHATSAPP_GATEWAY_URL: ${WHATSAPP_GATEWAY_URL:-http://wa-engine:2785}
+      # NOTE (go-live): PARENT_*_BASE_URL values in ./backend/.env must be
+      # updated to the public production domain when enabling TLS in nginx/vps.conf.
     ports:
       - "127.0.0.1:8080:8080"
     # Relative bind mount for uploads (persisted on host).
@@ -83,6 +90,14 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      # nginx:stable-alpine ships busybox wget; /health is a static 200 from
+      # nginx/default.conf (no upstream dependency).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     deploy:
       resources:

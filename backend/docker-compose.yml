@@ -5,6 +5,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Load ./.env (JWT_SECRET, BOOTSTRAP_SUPERADMIN_PASSWORD, ...).
+    # `required: false` (Compose >= 2.24) so a missing file doesn't break
+    # `docker compose up` for fresh checkouts; when the file IS present its
+    # values are used. NOTE: values below in `environment:` override env_file.
+    env_file:
+      - path: .env
+        required: false
     # Override DB_HOST to reach the host's MariaDB via the docker bridge gateway.
     environment:
       DB_HOST: host.docker.internal
@@ -12,12 +19,16 @@ services:
       DB_USER: root
       DB_PASSWORD: admin
       DB_NAME: kidversa
-      JWT_SECRET: change-me-to-a-long-random-32-byte-secret-string
+      # JWT_SECRET intentionally NOT set here: an environment entry would
+      # override the real value from .env, and the old hardcoded placeholder
+      # (48-byte `change-me-...`) passed validation while being a public,
+      # shared secret. It now MUST come from .env — the server refuses to
+      # start with a missing/short secret (fail-closed).
       CORS_ORIGINS: http://localhost:5173
       COOKIE_SECURE: "false"
       COOKIE_SAMESITE: Lax
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - ./uploads:/app/uploads
     extra_hosts:

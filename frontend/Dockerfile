@@ -1,6 +1,11 @@
 # syntax=docker/dockerfile:1
 # Multi-stage: build the React app, serve static files with nginx (Gzip compression).
 FROM node:22-alpine AS build
+# pnpm version intentionally NOT pinned to an exact release: neither
+# package.json carries a `packageManager` field, nor does pnpm-lock.yaml
+# (lockfileVersion '9.0' is shared by pnpm 9.x and 10.x) — the exact version
+# is not derivable from this repo, and guessing would risk a mismatched pin.
+# Add `"packageManager": "pnpm@<version>"` to package.json to pin it here.
 RUN corepack enable && corepack prepare pnpm@latest --activate
 # pnpm non-interactive mode — respects allowBuilds in pnpm-workspace.yaml
 ENV CI=true
