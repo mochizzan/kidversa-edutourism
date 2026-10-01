@@ -84,12 +84,14 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
   it('D5-3 badge lama tanpa badge_type/program_stage_id → split fallback tetap memilih slot', async () => {
     // Row legacy: punya stage id tapi tanpa type → diperlakukan SUBTOPIK;
     // row tanpa stage id dan tanpa type → diperlakukan FINAL.
+    // Catatan: isi section kini hanya <img> (tanpa ikon/nama) — badge_image_url
+    // disertakan agar pemilihan slot split tetap teramati lewat gambar.
     const container = await renderReport(
       report({
         program_stage_id: 'stage-a',
         badges: [
-          { badge_name: 'Badge Topik A', program_stage_id: 'stage-a' },
-          { badge_name: 'Badge Final' },
+          { badge_name: 'Badge Topik A', badge_image_url: 'badge-topik-a.png', program_stage_id: 'stage-a' },
+          { badge_name: 'Badge Final', badge_image_url: 'badge-final.png' },
         ],
       }),
     )
@@ -99,6 +101,9 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
     expect(html).toContain('data-badge-slot="final">')
     expect(html).toContain('Badge Topik A')
     expect(html).toContain('Badge Final')
+    // Section menampilkan gambar badge saja, maksimal 2 (topik pertama + final).
+    const badgeImgs = (html ?? '').match(/<img[^>]*src="[^"]*badge-[^"]*"/g) ?? []
+    expect(badgeImgs.length).toBeLessThanOrEqual(2)
     expect(html).not.toContain('Belum ada badge yang diraih.')
   })
 
@@ -106,7 +111,14 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
     const container = await renderReport(
       report({
         program_stage_id: 'stage-a',
-        badges: [{ badge_name: 'Badge Topik A', badge_type: 'SUBTOPIK', program_stage_id: 'stage-a' }],
+        badges: [
+          {
+            badge_name: 'Badge Topik A',
+            badge_image_url: 'badge-topik-a.png',
+            badge_type: 'SUBTOPIK',
+            program_stage_id: 'stage-a',
+          },
+        ],
       }),
     )
     const html = builtHtml(container)
@@ -120,7 +132,14 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
     const container = await renderReport(
       report({
         program_stage_id: 'stage-a',
-        badges: [{ badge_name: 'Badge Final Program', badge_type: 'FINAL', program_stage_id: null }],
+        badges: [
+          {
+            badge_name: 'Badge Final Program',
+            badge_image_url: 'badge-final-program.png',
+            badge_type: 'FINAL',
+            program_stage_id: null,
+          },
+        ],
       }),
     )
     const html = builtHtml(container)

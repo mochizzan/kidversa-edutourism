@@ -99,41 +99,47 @@ function missionsHTML(missions: string[] | null | undefined): string {
   .join('')
 }
 
-/** Satu baris badge: gambar dinamis (object-contain + dimensi auto, rasio
- *  terjaga saat membesar/mengecil mengikuti ruang slot) atau ikon fallback
- *  bila URL kosong; onerror → ikon. Nama kosong ditampilkan aman ("—"). */
-function badgeItemHTML(b: { badgeName: string; badgeImageUrl?: string }): string {
- const inner = b.badgeImageUrl
-  ? `<img src="${esc(b.badgeImageUrl)}" alt="${esc(b.badgeName)}" class="max-w-full max-h-10 w-auto h-auto object-contain rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" />
-           <i class="fas fa-award text-brand-badge text-xl hidden"></i>`
-  : '<i class="fas fa-award text-brand-badge text-xl"></i>'
- return `
-        <div class="flex items-center gap-2 min-w-0">
-          <div class="flex items-center justify-center shrink-0">${inner}</div>
-          <span class="text-[11px] font-semibold text-gray-700 truncate">${b.badgeName ? esc(b.badgeName) : '—'}</span>
-        </div>`
+/** Satu gambar badge — section ini hanya menampilkan GAMBAR (maksimal 2:
+ *  badge topik pertama + badge final). Tanpa ikon fallback & tanpa nama
+ *  terlihat; nama tetap di `alt`. URL kosong → ''; gambar gagal dimuat
+ *  disembunyikan oleh onerror (tanpa swap ikon) agar capture/PDF tidak
+ *  menampilkan ikon/gambar rusak. */
+function badgeImageHTML(b?: { badgeName: string; badgeImageUrl?: string }): string {
+ if (!b || !b.badgeImageUrl) return ''
+ // `block w-full h-full` → kotak <img> PERSIS seukuran slot (fill), sehingga
+ // objek contain yang me-letterbox membuat gambar memenuhi area isi section;
+ // tanpa cap maksimum (max-h-10 dkk) dan tanpa object-cover (crop/stretch).
+ return `<img src="${esc(b.badgeImageUrl)}" alt="${esc(b.badgeName)}" class="block w-full h-full object-contain rounded" onerror="this.style.display='none'" />`
 }
 
-/** Isi satu slot: flex-wrap berisi baris badge (cap 4), '' bila kosong. */
-function badgeSlotHTML(badges: { badgeName: string; badgeImageUrl?: string }[] | undefined): string {
- if (!badges || badges.length === 0) return ''
- const items = badges.slice(0, 4).map(badgeItemHTML).join('')
- return `<div class="flex flex-wrap gap-3">${items}</div>`
-}
-
-/** Section isi BADGE PENCAPAIAN (kontrak Fase 2 D3): DUA SLOT berdampingan —
- *  kiri `badgeTopics`, kanan `badgeFinal`, dipisah divider. KEDUA kosong →
- *  empty-state; salah satu kosong → slot itu dibiarkan kosong (data opsional). */
+/** Section isi BADGE PENCAPAIAN: MAKSIMAL 2 gambar — slot kiri `badgeTopics[0]`,
+ *  slot kanan `badgeFinal`. Kedua `data-badge-slot` tetap dirender sebagai anchor
+ *  struktural (boleh kosong bila badge itu tidak ada/tidak bergambar), TANPA
+ *  divider. Slot terisi memakai `flex-1 min-w-0` sehingga kotak gambar MENGISI
+ *  area isi kartu: 2 badge → masing-masing setengah lebar (gap kecil di
+ *  antaranya), 1 badge → lebar penuh; tinggi kedua kasus sama karena grup
+ *  `items-stretch` mengikuti tinggi konten kartu (letterboxing diserap contain).
+ *  Inline `min-height:0` menetralkan auto-minimum flex item agar tinggi gambar
+ *  alami tidak membengkakkan kartu. Grup di-center (gap hanya saat keduanya
+ *  terisi). Tidak ada satu pun gambar → empty-state (tanpa slot, persis seperti
+ *  format lama). */
 function badgeSectionHTML(data: MiniRaportData): string {
- const topics = badgeSlotHTML(data.badgeTopics)
- const finalHTML = badgeSlotHTML(data.badgeFinal ? [data.badgeFinal] : undefined)
- if (!topics && !finalHTML)
+ const topik = badgeImageHTML(data.badgeTopics?.[0])
+ const finalHTML = badgeImageHTML(data.badgeFinal)
+ if (!topik && !finalHTML)
   return '<p class="text-[12px] text-gray-500 italic">Belum ada badge yang diraih.</p>'
+ const groupClass =
+  topik && finalHTML
+   ? 'flex items-stretch gap-3 justify-center'
+   : 'flex items-stretch justify-center'
+ const slot = (name: 'topik' | 'final', content: string): string =>
+  content
+   ? `<div class="flex-1 min-w-0" data-badge-slot="${name}">${content}</div>`
+   : `<div data-badge-slot="${name}"></div>`
  return `
-            <div class="flex gap-3">
-              <div class="flex-1 min-w-0 flex items-center" data-badge-slot="topik">${topics}</div>
-              <div class="w-px bg-gray-200 shrink-0"></div>
-              <div class="flex-1 min-w-0 flex items-center" data-badge-slot="final">${finalHTML}</div>
+            <div class="${groupClass}" style="min-height:0">
+              ${slot('topik', topik)}
+              ${slot('final', finalHTML)}
             </div>`
 }
 
@@ -362,6 +368,39 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             }
         }
 
+        /* ===== Skala dinamis label "BADGE PENCAPAIAN" (selalu satu baris) =====
+           Pill (id badge-achievement-label) adalah flex shrink-to-fit di dalam
+           kartu section 4 (position:relative = containing block = offsetParent);
+           lebar alami teksnya bisa melampaui ruang sisa sehingga patah dua baris.
+           Rumusnya murni fungsi geometri terukur (tanpa angka tetap):
+             natural   = pill.offsetWidth
+                         // lebar max-content SATU baris (white-space:nowrap;
+                         // transform di-reset dulu agar ukuran alami murni)
+             available = card.clientWidth - 2 * pill.offsetLeft
+                         // gutter kiri = pill.offsetLeft (left-5), gutter
+                         // kanan simetris dari geometri kartu yang sama
+             scale     = Math.min(1, available / natural)
+           transform-origin 'left center': tepi kiri tetap anchor di left-5 DAN
+           titik tengah vertikal pill tetap pada tepi atas kartu (offset -top-3,
+           pill selalu “menumpang” seimbang di atas border kartu). Tanpa
+           overflow:hidden/pemotongan — teks "BADGE PENCAPAIAN" selalu utuh,
+           hanya diskalakan. Aman dipanggil berulang (idempoten) & no-op bila
+           elemennya tidak ada. */
+        function __fitBadgeLabel() {
+            var pill = document.getElementById('badge-achievement-label')
+            if (!pill) return
+            var card = pill.offsetParent
+            if (!card) return
+            pill.style.whiteSpace = 'nowrap'
+            pill.style.transform = 'none' // reset → pengukuran alami murni
+            var natural = pill.offsetWidth
+            var available = card.clientWidth - 2 * pill.offsetLeft
+            if (natural <= 0 || available <= 0) return
+            var s = Math.min(1, available / natural)
+            pill.style.transformOrigin = 'left center'
+            pill.style.transform = s < 1 ? 'scale(' + s + ')' : ''
+        }
+
         /* ===== Skala dinamis isi lembar (container fixed 210mm × 297mm) =====
            Geometri kertas TIDAK berubah: .a4-sheet tetap 210mm × 297mm dan
            .raport-main tetap flex item berukuran sisa ruang. #raport-scale
@@ -401,7 +440,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
         function __scheduleFit() {
             if (__fitQueued) return
             __fitQueued = true
-            setTimeout(function () { __fitQueued = false; __fitRaport() }, 0)
+            setTimeout(function () { __fitQueued = false; __fitRaport(); __fitBadgeLabel() }, 0)
         }
 
         function __initFit() {
@@ -432,6 +471,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             // Cetak (Ctrl+P / window.print) mengukur ulang tepat sebelum kertas.
             if (window.addEventListener) {
                 window.addEventListener('beforeprint', __fitRaport)
+                window.addEventListener('beforeprint', __fitBadgeLabel)
             }
         }
 
@@ -441,11 +481,13 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
         if (window.addEventListener) {
             window.addEventListener('DOMContentLoaded', function () {
                 __scaleRingkasan()
+                __fitBadgeLabel()
                 __initFit()
             })
         } else if (window.attachEvent) {
             window.attachEvent('onload', function () {
                 __scaleRingkasan()
+                __fitBadgeLabel()
                 __initFit()
             })
         }
@@ -535,8 +577,11 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
 
             <!-- 4. BADGE PENCAPAIAN (auto-placement menaruhnya di baris 4 kolom kiri,
                  tepat di bawah kartu Momen Terbaik; kolom kanan diisi LEVEL KEGIATAN) -->
-            <div class="col-span-4 bg-white border-2 border-brand-badge rounded-[1.25rem] p-3 pt-5 shadow-sm relative min-h-[100px] mt-2">
-                <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
+            <div class="col-span-4 bg-white border-2 border-brand-badge rounded-[1.25rem] p-3 flex flex-col shadow-sm relative min-h-[100px] mt-2">
+                <!-- padding seragam p-3 (12px) di SEMUA sisi: tinggi konten =
+                     100px (min-h) − 4px border − 24px padding = 72px, dipakai
+                     penuh oleh grup gambar (flex-1) berapa pun tinggi baris grid. -->
+                <div id="badge-achievement-label" class="absolute left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10 whitespace-nowrap" style="top:-20px">
                     <i class="fas fa-award text-xs"></i> BADGE PENCAPAIAN
                 </div>
                 ${badgeSectionHTML(data)}

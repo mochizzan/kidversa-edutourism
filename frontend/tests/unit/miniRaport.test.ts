@@ -334,30 +334,45 @@ function badgeSlotContent(html: string, slot: 'topik' | 'final'): string {
 }
 
 describe('generateMiniRaportHTML — section BADGE PENCAPAIAN dua slot (kiri topik, kanan final)', () => {
- it('badgeTopics + badgeFinal terisi → dua slot berdampingan, nama badge masing-masing di slotnya', () => {
+ it('badgeTopics[0] + badgeFinal → dua slot berdampingan: hanya <img> per slot (nama di alt saja), tanpa divider', () => {
   const html = generateMiniRaportHTML(
    baseData({
-    badgeTopics: [{ badgeName: 'Badge Topik A' }],
-    badgeFinal: { badgeName: 'Badge Final Program' },
+    badgeTopics: [{ badgeName: 'Badge Topik A', badgeImageUrl: 'https://cdn.example.com/badge-topik-a.png' }],
+    badgeFinal: { badgeName: 'Badge Final Program', badgeImageUrl: 'https://cdn.example.com/badge-final.png' },
    }),
   )
-  // Struktur: DUA slot + divider pemisah antar slot.
+  // Struktur: DUA slot tetap sebagai anchor struktural — TANPA divider pemisah.
   expect(html).toContain('data-badge-slot="topik">')
   expect(html).toContain('data-badge-slot="final">')
-  expect(html).toMatch(/<div class="w-px bg-gray-200 shrink-0"><\/div>/)
+  expect(html).not.toMatch(/w-px bg-gray-200/)
+  // Slot terisi mengisi SETENGAH lebar (flex-1) dan grup ter-stretch penuh;
+  // inline min-height:0 mencegah auto-minimum flex membengkakkan kartu.
+  expect(html).toContain('<div class="flex-1 min-w-0" data-badge-slot="topik">')
+  expect(html).toContain('<div class="flex-1 min-w-0" data-badge-slot="final">')
+  expect(html).toContain('class="flex items-stretch gap-3 justify-center" style="min-height:0"')
   const left = badgeSlotContent(html, 'topik')
   const right = badgeSlotContent(html, 'final')
-  expect(left).toContain('Badge Topik A')
+  // Nama badge hanya muncul sebagai alt <img> — bukan <span> nama terlihat.
+  expect(left).toContain('alt="Badge Topik A"')
   expect(left).not.toContain('Badge Final Program')
-  expect(right).toContain('Badge Final Program')
+  expect(right).toContain('alt="Badge Final Program"')
   expect(right).not.toContain('Badge Topik A')
-  // Empty-state tidak muncul saat salah satu slot terisi.
+  // Isi section = hanya <img>: tanpa ikon <i> dan tanpa span nama di dalam slot.
+  expect(left).not.toContain('<i')
+  expect(left).not.toContain('<span')
+  expect(right).not.toContain('<i')
+  expect(right).not.toContain('<span')
+  // Empty-state tidak muncul saat ada gambar.
   expect(html).not.toContain('Belum ada badge yang diraih.')
  })
 
  it('badgeTopics terisi + badgeFinal undefined → slot kanan kosong tanpa error', () => {
   const html = generateMiniRaportHTML(
-   baseData({ badgeTopics: [{ badgeName: 'Badge Topik A' }] }),
+   baseData({
+    badgeTopics: [
+     { badgeName: 'Badge Topik A', badgeImageUrl: 'https://cdn.example.com/badge-topik-a.png' },
+    ],
+   }),
   )
   expect(html).toContain('data-badge-slot="topik">')
   expect(badgeSlotContent(html, 'topik')).toContain('Badge Topik A')
@@ -371,14 +386,18 @@ describe('generateMiniRaportHTML — section BADGE PENCAPAIAN dua slot (kiri top
   expect(html).not.toContain('data-badge-slot=')
  })
 
- it('badgeImageUrl kosong → ikon fallback, tanpa <img> bersumber kosong', () => {
+ it('badgeImageUrl kosong → tanpa <img> dan tanpa ikon fallback: empty-state byte-identical', () => {
   const html = generateMiniRaportHTML(
    baseData({ badgeTopics: [{ badgeName: 'Badge Tanpa Gambar' }] }),
   )
-  const left = badgeSlotContent(html, 'topik')
-  expect(left).toContain('fa-award')
-  expect(left).not.toContain('<img')
+  // Tidak ada gambar → empty-state default; elemen, kelas, dan teks persis
+  // seperti format lama (tanpa slot, tanpa ikon).
+  expect(html).toContain('<p class="text-[12px] text-gray-500 italic">Belum ada badge yang diraih.</p>')
+  expect(html).not.toContain('data-badge-slot=')
   expect(html).not.toContain('src=""')
+  // Ikon fallback <i> lama (fa-award text-xl) hilang dari isi section;
+  // pill header memakai fa-award text-xs dan tidak disentuh perbaikan ini.
+  expect(html).not.toContain('fa-award text-xl')
  })
 
  it('badgeImageUrl ada → <img> memakai object-contain dan TIDAK object-cover', () => {
@@ -393,31 +412,71 @@ describe('generateMiniRaportHTML — section BADGE PENCAPAIAN dua slot (kiri top
   for (const img of imgs) {
    expect(img).toContain('object-contain')
    expect(img).not.toContain('object-cover')
-   // Dimensi auto (bukan width+height kaku yang mendistorsi).
-   expect(img).toContain('w-auto')
-   expect(img).toContain('h-auto')
-   expect(img).toContain('max-w-full')
+   // Kotak <img> mengisi slot (fill): block + w-full h-full, object-contain
+   // yang me-letterbox aspek gambar — bukan dimensi auto.
+   expect(img).toContain('block')
+   expect(img).toContain('w-full')
+   expect(img).toContain('h-full')
+   // Cap maksimum dilarang: gambar harus memenuhi section, bukan thumbnail.
+   expect(img).not.toContain('max-h-10')
+   expect(img).not.toContain('w-auto')
   }
  })
 
- it('badgeName kosong → render aman tanpa crash (nama ditampilkan aman)', () => {
+ it('banyak badge topik + final → HANYA 2 gambar tampil (badgeTopics[0] + badgeFinal), sisanya gugur', () => {
   const html = generateMiniRaportHTML(
-   baseData({ badgeTopics: [{ badgeName: '' }], badgeFinal: { badgeName: '' } }),
+   baseData({
+    badgeTopics: [
+     { badgeName: 'Topik 1', badgeImageUrl: 'https://cdn.example.com/badge-t1.png' },
+     { badgeName: 'Topik 2', badgeImageUrl: 'https://cdn.example.com/badge-t2.png' },
+     { badgeName: 'Topik 3', badgeImageUrl: 'https://cdn.example.com/badge-t3.png' },
+     { badgeName: 'Topik 4', badgeImageUrl: 'https://cdn.example.com/badge-t4.png' },
+    ],
+    badgeFinal: { badgeName: 'Final', badgeImageUrl: 'https://cdn.example.com/badge-fin.png' },
+   }),
+  )
+  const badgeImgs = html.match(/<img[^>]*src="[^"]*badge-[^"]*"/g) ?? []
+  expect(badgeImgs.length).toBe(2)
+  expect(badgeImgs[0]).toContain('badge-t1.png')
+  expect(badgeImgs[1]).toContain('badge-fin.png')
+  expect(html).not.toContain('badge-t2.png')
+  expect(html).not.toContain('badge-t4.png')
+ })
+
+ it('badgeName kosong → render aman tanpa crash (nama hanya di alt yang kosong)', () => {
+  const html = generateMiniRaportHTML(
+   baseData({
+    badgeTopics: [{ badgeName: '', badgeImageUrl: 'https://cdn.example.com/badge-a.png' }],
+    badgeFinal: { badgeName: '', badgeImageUrl: 'https://cdn.example.com/badge-f.png' },
+   }),
   )
   expect(html).toContain('data-badge-slot="topik">')
   expect(html).toContain('data-badge-slot="final">')
-  // Nama kosong dirender aman sebagai "—", bukan crash/kosong.
-  expect(html).toContain('>—</span>')
+  // Nama kosong → alt="" tanpa crash; nama TIDAK dirender sebagai teks "—"
+  // yang terlihat lagi (span nama sudah dihapus dari section).
+  expect(html).toContain('alt=""')
+  expect(badgeSlotContent(html, 'topik')).not.toContain('—')
+  expect(badgeSlotContent(html, 'final')).not.toContain('—')
   expect(html).not.toContain('Belum ada badge yang diraih.')
  })
 
  it('D5-2 topik tanpa badge: badgeFinal terisi + badgeTopics kosong → slot kiri kosong tanpa crash', () => {
   const html = generateMiniRaportHTML(
-   baseData({ badgeTopics: [], badgeFinal: { badgeName: 'Badge Final Program' } }),
+   baseData({
+    badgeTopics: [],
+    badgeFinal: {
+     badgeName: 'Badge Final Program',
+     badgeImageUrl: 'https://cdn.example.com/badge-final.png',
+    },
+   }),
   )
   expect(html).toContain('data-badge-slot="topik">')
+  // Slot topik kosong tetap BARE (tanpa class) — regex ini mengunci kontrak:
   expect(html).toMatch(/data-badge-slot="topik">\s*<\/div>/)
   expect(badgeSlotContent(html, 'final')).toContain('Badge Final Program')
+  // Slot terisi mengisi LEBAR PENUH pada kasus 1 badge (flex-1), slot kosong
+  // tetap bare agar tidak menggeser gambar.
+  expect(html).toContain('<div class="flex-1 min-w-0" data-badge-slot="final">')
   // Salah satu slot terisi → empty-state tidak muncul.
   expect(html).not.toContain('Belum ada badge yang diraih.')
  })
@@ -463,6 +522,25 @@ describe('generateMiniRaportHTML — urutan section: BADGE setelah Momen, sebelu
   // BADGE memakai col-span-4 sehingga jatuh ke baris 4 kolom kiri (di bawah foto).
   expect(html).toContain('class="col-span-8 row-span-3 ')
   expect(html).toContain('class="col-span-4 bg-white border-2 border-brand-badge')
+  // Kartu BADGE: padding seragam p-3 (12px) di KEEMPAT sisi (tanpa pt-5) dan
+  // flex-col sehingga grup gambar (flex-1) mengisi tinggi konten penuh:
+  // 100px (min-h) − 4px border − 24px padding = 72px untuk 1 maupun 2 badge.
+  expect(html).toContain('rounded-[1.25rem] p-3 flex flex-col shadow-sm relative min-h-[100px] mt-2')
+  expect(html).not.toContain('p-3 pt-5')
+ })
+
+ it('label pill BADGE punya hook id + whitespace-nowrap (kontrak __fitBadgeLabel: satu baris)', () => {
+  const html = generateMiniRaportHTML(baseData())
+  // Hook id dipakai skrip inline __fitBadgeLabel; nowrap menjamin pengukuran
+  // natural satu baris. Teks label harus utuh (tanpa truncation/overflow-hidden).
+  expect(html).toMatch(/id="badge-achievement-label" class="[^"]*whitespace-nowrap/)
+  expect(html).toContain('</i> BADGE PENCAPAIAN')
+  // Offset vertikal pill memakai inline top:-20px (utilitas -top-5 tidak ada
+  // di CSS hasil build): tinggi pill 32px (teks 16px × line-height 1.5 +
+  // py-1 4+4) sehingga tepi bawahnya tepat berhenti di batas area isi kartu
+  // (border 2px + padding 12px = 14px dari tepi luar) — tanpa menimpa piksel
+  // gambar; __fitBadgeLabel hanya membaca offsetLeft (left-5) — tidak berubah.
+  expect(html).toContain('whitespace-nowrap" style="top:-20px"')
  })
 
  it('grid BADGE/LEVEL tidak merusak section MISI: Momen < BADGE < RINGKASAN < MISI < PENGESAHAN', () => {
