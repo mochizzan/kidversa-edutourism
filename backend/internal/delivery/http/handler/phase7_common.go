@@ -84,6 +84,9 @@ func assertParticipantGroupOwnership(ctx context.Context, sessions sessionScope,
 // when no pick row exists — or the pick's photo was deleted — the session's
 // exclusive is_report_photo default is the fallback, so the mini-raport photo
 // always replaces the placeholder whenever a flagged photo exists (spec §4.1).
+// Two-tier form only: the public gallery's computed report_photo (gallery_handler)
+// uses it as-is — tier 3 below must never mark a plain gallery photo as the
+// report photo there.
 func resolveReportPhoto(ctx context.Context, photos repository.PhotoRepository,
 	participantID, sessionID, programStageID string) (*entity.SmartPhoto, error) {
 	pick, err := photos.GetReportPhotoPick(ctx, participantID, sessionID, programStageID)
@@ -113,6 +116,45 @@ func resolveReportPhoto(ctx context.Context, photos repository.PhotoRepository,
 		return nil, nil
 	}
 	return &page.Items[0], nil // Paginated.Items bersifat nilai (T, bukan *T)
+}
+
+// resolveReportPhotoWithFallback = resolveReportPhoto (spec §4.1, tier pick →
+// is_report_photo) plus Fase-2 tier 3 for the parent mini-raport: when neither
+// a pick nor a flagged photo exists, the participant's newest gallery photo in
+// the session wins (ListPhotos orders created_at DESC, tie-break taken_at lalu
+// id), so "Momen Terbaik Hari Ini" falls back to a real photo before the
+// placeholder. The photo must belong to this participant+session (PhotoFilter
+// scoping); no photo at all → (nil, nil) → placeholder. Report routes ONLY
+// (GetByAccessToken/GetAccessPhoto, after the ConsentPhoto gate) — the public
+// gallery keeps resolveReportPhoto so its computed report_photo is unchanged.
+func resolveReportPhotoWithFallback(ctx context.Context, photos repository.PhotoRepository,
+	participantID, sessionID, programStageID string) (*entity.SmartPhoto, error) {
+	rec, err := resolveReportPhoto(ctx, photos, participantID, sessionID, programStageID)
+	if err != nil {
+		// Repo failure (not "no photo"): log the cause before returning —
+		// middleware.ErrorHandler renders a generic internal_error envelope
+		// WITHOUT logging, so without this line the reason would be silent.
+		log.Printf("handler: report photo resolve failed (participant=%s session=%s stage=%s): %v",
+			participantID, sessionID, programStageID, err)
+		return nil, err
+	}
+	if rec != nil {
+		return rec, nil
+	}
+	page, err := photos.ListPhotos(ctx, repository.PhotoFilter{
+		ParticipantID: participantID, SessionID: sessionID,
+	}, 1, 1)
+	if err != nil {
+		// Tier-3 gallery fallback failed: never degrade silently into a nil
+		// (placeholder) as if the gallery were empty — log and surface.
+		log.Printf("handler: report photo gallery fallback failed (participant=%s session=%s): %v",
+			participantID, sessionID, err)
+		return nil, err
+	}
+	if len(page.Items) == 0 {
+		return nil, nil
+	}
+	return &page.Items[0], nil
 }
 
 // bindUUID pulls a path param, validates it is a UUID, and responds 400 if not.

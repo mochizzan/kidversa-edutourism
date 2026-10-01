@@ -64,7 +64,8 @@ func tenantGuard(c *echo.Context, tenantID string) error {
 // mini-raport payload (program/child/session, stages, missions, badges,
 // gallery) assembled to equal the admin preview; the raw token itself never
 // enters the DTO. photo_url is set only when photo consent is granted AND a
-// photo resolves for the report's topic — the client composes the photo URL.
+// photo resolves for the report's topic (pick → is_report_photo → newest
+// participant gallery photo, Fase 2); the client composes the photo URL.
 func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 	token := (*c).QueryParam("token")
 	if token == "" {
@@ -84,7 +85,7 @@ func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 		return err
 	}
 	if granted {
-		resolved, err := resolveReportPhoto(ctx, h.photos, r.ParticipantID, r.SessionID, r.ProgramStageID)
+		resolved, err := resolveReportPhotoWithFallback(ctx, h.photos, r.ParticipantID, r.SessionID, r.ProgramStageID)
 		if err != nil {
 			return err
 		}
@@ -119,7 +120,7 @@ func (h *ReportHandler) GetAccessPhoto(c *echo.Context) error {
 	if !granted {
 		return apperrors.Forbidden("consent_required", nil)
 	}
-	rec, err := resolveReportPhoto(ctx, h.photos, r.ParticipantID, r.SessionID, r.ProgramStageID)
+	rec, err := resolveReportPhotoWithFallback(ctx, h.photos, r.ParticipantID, r.SessionID, r.ProgramStageID)
 	if err != nil {
 		return err
 	}

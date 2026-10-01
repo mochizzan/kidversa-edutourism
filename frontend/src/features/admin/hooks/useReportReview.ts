@@ -68,11 +68,51 @@ const logError = (scope: string, err: unknown) => {
  console.error(`[${scope}]`, err)
 }
 
+/** Parse timestamp untuk recency: nilai hilang/invalid diperlakukan paling tua.
+ *  HANYA string yang di-parse — nilai non-string (angka/null/benda dari payload
+ *  rusak) dianggap invalid, tanpa pernah melempar. */
+function photoTime(value: unknown): number {
+ const parsed = typeof value === 'string' ? Date.parse(value) : NaN
+ return Number.isNaN(parsed) ? Number.MIN_SAFE_INTEGER : parsed
+}
+
 /**
- * Resolusi foto rapor topik aktif (spec §4.1): pick topik menang bila foto
- * masih ada; pick yang menunjuk foto terhapus jatuh ke foto is_report_photo
- * peserta (foto rapor harus menggantikan placeholder mini rapor); tanpa pick
- * atau tanpa topik aktif → foto is_report_photo; tidak ada sama sekali → null.
+ * Recency foto: positif bila `a` lebih baru dari `b`. Urut persis seperti
+ * server (ListPhotos): created_at DESC → tie-break taken_at DESC → id DESC.
+ */
+function photoRecencyDesc(a: SmartPhoto, b: SmartPhoto): number {
+ return (
+  photoTime(a.created_at) - photoTime(b.created_at) ||
+  photoTime(a.taken_at) - photoTime(b.taken_at) ||
+  (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+ )
+}
+
+/** Tier 3 (kontrak Fase 2): foto galeri TERBARU milik peserta tersebut —
+ *  daftar photos bisa multi-peserta (getBySession), jadi participant_id
+ *  wajib difilter; foto peserta lain tidak pernah ikut. photos non-array /
+ *  elemen null dilewati tanpa TypeError → null (placeholder). */
+function latestParticipantPhoto(
+ photos: SmartPhoto[],
+ participantId: string | undefined,
+): SmartPhoto | null {
+ if (!Array.isArray(photos)) return null
+ let best: SmartPhoto | null = null
+ for (const p of photos) {
+  if (!p || p.participant_id !== participantId) continue
+  if (!best || photoRecencyDesc(p, best) > 0) best = p
+ }
+ return best
+}
+
+/**
+ * Resolusi foto rapor topik aktif (kontrak Fase 2 — tiga tingkat, sejajar
+ * resolveReportPhoto server):
+ * 1. pick topik menang bila foto masih ada (pilihan manual, tak diubah);
+ * 2. pick gugur/tidak ada → foto is_report_photo peserta;
+ * 3. tanpa foto rapor → foto galeri TERBARU milik peserta (created_at DESC,
+ *    tie-break taken_at lalu id);
+ * tidak ada sama sekali → null → placeholder mini rapor.
  */
 export function resolveReportPhoto(
  picks: ReportPhotoPick[] | null,
@@ -80,12 +120,17 @@ export function resolveReportPhoto(
  participantId: string | undefined,
  activeTopicId: string | null,
 ): SmartPhoto | null {
- const fallback =
-  photos.find((p) => p.participant_id === participantId && p.is_report_photo) ?? null
- if (!picks || !activeTopicId) return fallback
- const pick = picks.find((p) => p.program_stage_id === activeTopicId)
+ // Payload rusak (photos/picks bukan array, elemen null) tidak boleh melempar
+ // TypeError di tengah render — degradasi ke fallback tingkat berikutnya /
+ // placeholder, tanpa error senyap.
+ const list = Array.isArray(photos) ? photos : []
+ const flagged =
+  list.find((p) => p && p.participant_id === participantId && p.is_report_photo) ?? null
+ const fallback = flagged ?? latestParticipantPhoto(list, participantId)
+ if (!Array.isArray(picks) || !activeTopicId) return fallback
+ const pick = picks.find((p) => p && p.program_stage_id === activeTopicId)
  if (!pick) return fallback
- return photos.find((p) => p.id === pick.photo_id) ?? fallback
+ return list.find((p) => p && p.id === pick.photo_id) ?? fallback
 }
 
 /** Judul misi untuk preview rapor: HANYA dari pilihan admin
@@ -136,9 +181,10 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
  const report = activeTopicId ? reportsByTopic[activeTopicId] ?? null : null
 
- // Foto rapor diturunkan dari topik aktif + picks (spec §4.1): pick menang →
- // cari foto asli; pick menunjuk foto terhapus → foto is_report_photo peserta;
- // picks gagal dimuat → perilaku lama (R3).
+ // Foto rapor diturunkan dari topik aktif + picks (kontrak Fase 2): pick menang →
+ // cari foto asli; pick menunjuk foto terhapus → is_report_photo peserta; tanpa
+ // foto rapor → foto galeri terbaru milik peserta; picks gagal dimuat → tetap
+ // fallback tingkat 2/3 (R3), tanpa error senyap.
  const photo = useMemo(
   () => resolveReportPhoto(partPicks, partPhotos, participantId, activeTopicId),
   [partPicks, partPhotos, activeTopicId, participantId],

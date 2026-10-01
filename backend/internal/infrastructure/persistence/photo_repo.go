@@ -154,7 +154,10 @@ func (r *GormPhotoRepository) DeleteReportPhotoPick(ctx context.Context, partici
 	return nil
 }
 
-// ListPhotos returns photos matching the filter (paginated).
+// ListPhotos returns photos matching the filter (paginated), ordered newest
+// first: created_at DESC with taken_at DESC, id DESC tie-breaks so identical
+// (or invalid) created_at values still page deterministically — the report
+// photo fallback picks items[0] off this ordering.
 func (r *GormPhotoRepository) ListPhotos(ctx context.Context, f repository.PhotoFilter, page, limit int) (*repository.Paginated[entity.SmartPhoto], error) {
 	q := r.db.WithContext(ctx).Model(&SmartPhotoModel{})
 	// Tenant scoping: photos inherit their owning session's tenant (same
@@ -177,7 +180,7 @@ func (r *GormPhotoRepository) ListPhotos(ctx context.Context, f repository.Photo
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	var models []SmartPhotoModel
-	if err := paginate(q, page, limit, "created_at DESC").Find(&models).Error; err != nil {
+	if err := paginate(q, page, limit, "created_at DESC, taken_at DESC, id DESC").Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.SmartPhoto, 0, len(models))
