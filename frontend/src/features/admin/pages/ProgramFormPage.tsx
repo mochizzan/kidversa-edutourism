@@ -36,7 +36,12 @@ const ProgramFormPage = () => {
         setLoading(true)
         try {
           const program = await programService.getById(programId)
-          if (cancelled || !program) return
+          if (cancelled) return
+          if (!program) {
+            // getById resolves null on 404 — surface it instead of a blank form.
+            addToast({ type: 'error', message: t('admin.programs.notFound') })
+            return
+          }
           setName(program.name)
           setDescription(program.description ?? '')
           setIsActive(program.is_active)

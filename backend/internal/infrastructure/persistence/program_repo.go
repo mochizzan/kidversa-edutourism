@@ -189,11 +189,13 @@ func (r *GormProgramRepository) UpdateStage(ctx context.Context, s *entity.Progr
 	// Map-form update so zero/false/empty values are not skipped by GORM and
 	// dropped columns are not referenced.
 	fields := map[string]interface{}{
-		"sequence_order": s.SequenceOrder,
-		"name":           s.Name,
-		"description":    s.Description,
-		"content_type":   s.ContentType,
-		"is_photo_stage": s.IsPhotoStage,
+		"sequence_order":  s.SequenceOrder,
+		"name":            s.Name,
+		"description":     s.Description,
+		"content_type":    s.ContentType,
+		"is_photo_stage":  s.IsPhotoStage,
+		"badge_name":      s.BadgeName,
+		"badge_image_url": s.BadgeImageURL,
 	}
 	if err := r.db.WithContext(ctx).Model(&ProgramStageModel{}).Where("id = ?", s.ID).Updates(fields).Error; err != nil {
 		if isDuplicate(err) {

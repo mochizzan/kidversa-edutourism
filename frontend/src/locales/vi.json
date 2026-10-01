@@ -370,7 +370,9 @@
       "uploadingPercent": "Đang tải lên... {{percent}}%",
       "uploadRetry": "Đang thử lại ({{attempt}}/{{max}})...",
       "uploadSuccess": "Tải lên thành công",
-      "uploadBtn": "Tải ảnh lên"
+      "uploadBtn": "Tải ảnh lên",
+      "mediaUnavailable": "Đã lưu tải lên, nhưng không thể truy cập hình ảnh từ máy chủ.",
+      "invalidType": "Định dạng không được hỗ trợ. Hãy dùng ảnh JPG, PNG, GIF hoặc WebP (không hỗ trợ SVG)."
     },
     "col": {
       "name": "Tên",
@@ -747,6 +749,7 @@
       "no": "Không",
       "deleteMsgConfirm": "Bạn có chắc chắn muốn xóa chủ đề \"{{name}}\" không? Tất cả các hoạt động bên trong cũng sẽ bị xóa. Hành động này không thể hoàn tác.",
       "createdToast": "Chủ đề đã được tạo thành công",
+      "badgeSaveError": "Đã tạo chủ đề nhưng không thể lưu huy hiệu. Hãy chỉnh sửa chủ đề để thử lại.",
       "updatedToast": "Chủ đề đã được cập nhật thành công",
       "deletedToast": "Chủ đề đã bị xóa",
       "emptyTitle": "Chưa có chủ đề nào",

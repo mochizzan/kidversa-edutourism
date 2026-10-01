@@ -2,6 +2,7 @@ package handler
 
 import (
 	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -23,6 +24,13 @@ func RegisterContentsRoutes(g *echo.Group, h *ContentHandler, uploadH *UploadHan
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMW := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator)
 	scopeMW := appmiddleware.TenantScope()
+	// Same UPLOAD_MAX_MB-derived echo BodyLimit as the photos/frames/avatar
+	// routes (RegisterUploadRoutes in router_upload.go, same uploadMaxBodyBytes
+	// helper): the two multipart upload routes below reject an oversized raw
+	// body with 413 at the Content-Length check before the handler parses or
+	// persists anything. The JSON CRUD routes intentionally stay unlimited,
+	// mirroring the existing pattern.
+	bodyMW := middleware.BodyLimit(uploadMaxBodyBytes(uploadH.cfg))
 
 	// Standalone content CRUD (tenant-scoped via JWT/scope).
 	g.GET("/contents", h.List, authMW, roleMW, scopeMW)
@@ -33,6 +41,6 @@ func RegisterContentsRoutes(g *echo.Group, h *ContentHandler, uploadH *UploadHan
 	g.GET("/contents/:id/usage", h.Usage, authMW, roleMW, scopeMW)
 
 	// Content-level multipart upload (reuses the upload handler's UploadContentFile).
-	g.POST("/contents/upload", uploadH.UploadContentFile, authMW, roleMW, scopeMW)
-	g.POST("/contents/:id/replace-file", uploadH.ReplaceContentFile, authMW, roleMW, scopeMW)
+	g.POST("/contents/upload", uploadH.UploadContentFile, authMW, roleMW, scopeMW, bodyMW)
+	g.POST("/contents/:id/replace-file", uploadH.ReplaceContentFile, authMW, roleMW, scopeMW, bodyMW)
 }

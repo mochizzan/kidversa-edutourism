@@ -370,7 +370,9 @@
       "uploadingPercent": "Sedang memuat naik… {{percent}}%",
       "uploadRetry": "Mencuba semula ({{attempt}}/{{max}})…",
       "uploadSuccess": "Berjaya dimuat naik",
-      "uploadBtn": "Muat Naik Gambar"
+      "uploadBtn": "Muat Naik Gambar",
+      "mediaUnavailable": "Muat naik disimpan, tetapi imej tidak dapat diakses dari pelayan.",
+      "invalidType": "Format tidak disokong. Gunakan imej JPG, PNG, GIF atau WebP (SVG tidak disokong)."
     },
     "col": {
       "name": "Nama",
@@ -747,6 +749,7 @@
       "no": "Tidak",
       "deleteMsgConfirm": "Adakah anda pasti ingin memadam topik \"{{name}}\"? Semua aktiviti di dalamnya juga akan dipadamkan. Tindakan ini tidak boleh dibatalkan.",
       "createdToast": "Topik berjaya dicipta",
+      "badgeSaveError": "Topik berjaya dicipta, tetapi lencana gagal disimpan. Edit topik untuk cuba lagi.",
       "updatedToast": "Topik berjaya dikemas kini",
       "deletedToast": "Topik dipadamkan",
       "emptyTitle": "Tiada topik lagi",

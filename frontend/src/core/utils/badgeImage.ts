@@ -16,16 +16,59 @@
 //   retried automatically, with exponential backoff mirroring backend-client
 //   (1s → 2s → 4s, cap 8s, 3 attempts total). HTTP 4xx/5xx surface
 //   immediately — retrying a 5xx could duplicate the Content row.
+// - Stored ≠ visible: uploadBadgeImage only proves the Content row exists.
+//   verifyBadgeMedia must confirm the media endpoint actually serves the id
+//   (the exact URL the <img> preview requests, built by getMediaUrl) before
+//   the UI is allowed to declare success.
 
 import { uploadMultipart, type UploadMultipartOptions } from '../services/upload-multipart'
-import { ApiError } from '../services/backend-client'
+import { ApiError, getApiBaseUrl, getTokens } from '../services/backend-client'
 import { API_ROUTES } from '../constants/apiRoutes'
+import { getMediaUrl } from './media'
 import type { Content } from '../types'
 
 /** Total upload attempts: 1 initial + 2 automatic network retries. */
 export const BADGE_UPLOAD_MAX_ATTEMPTS = 3
 /** Default XHR timeout so a dead connection fails fast instead of hanging. */
 export const BADGE_UPLOAD_TIMEOUT_MS = 30_000
+/**
+ * Client-side mirror of the server's raw-body cap for POST /api/contents/upload:
+ * UPLOAD_MAX_MB (backend config.go, default 25) is expanded to bytes by
+ * uploadMaxBodyBytes (router_upload.go) and enforced via an echo BodyLimit on
+ * the upload routes. Hardcoded here in ONE place because the frontend cannot
+ * read server env at runtime — if a deployment raises UPLOAD_MAX_MB, raise
+ * this constant to match.
+ */
+export const BADGE_UPLOAD_MAX_BYTES = 25 * 1024 * 1024
+
+/**
+ * Image MIME types persistFile's magic-byte sniff (detectAllowedMedia in
+ * upload_handler.go) can actually accept: jpg/png/gif/webp. Anything else —
+ * non-images, SVG (which detectAllowedMedia refuses AND safeContentType
+ * refuses to serve), bmp/tiff/… — would fail server-side AFTER the bytes went
+ * over the wire, so it is rejected up front instead.
+ */
+const BADGE_IMAGE_MIME_TYPES: Record<string, true> = {
+ 'image/jpeg': true,
+ 'image/png': true,
+ 'image/gif': true,
+ 'image/webp': true,
+}
+
+export type BadgeFileRejection = 'type' | 'size'
+
+/**
+ * Pre-network validation for a badge pick: returns 'type' for a file the
+ * server would reject (or that could never be served, e.g. SVG), 'size' above
+ * BADGE_UPLOAD_MAX_BYTES (the server BodyLimit), or null when the file may be
+ * uploaded. Pure and synchronous — the caller surfaces the reason to the user;
+ * it must never fail silently.
+ */
+export function badgeFileRejection(file: File): BadgeFileRejection | null {
+ if (!BADGE_IMAGE_MIME_TYPES[file.type]) return 'type'
+ if (file.size > BADGE_UPLOAD_MAX_BYTES) return 'size'
+ return null
+}
 /** Backoff after failed attempt n: 1s → 2s → 4s … capped at 8s. */
 const RETRY_BASE_DELAY_MS = 1_000
 const RETRY_MAX_DELAY_MS = 8_000
@@ -131,4 +174,70 @@ export async function uploadBadgeImage(
    await sleep(backoffDelay(attempt), opts.signal)
   }
  }
+}
+
+/**
+ * Confirms a stored badge content id is actually servable BEFORE the UI
+ * declares upload success. The upload response (2xx + data.id) only proves
+ * the Content row exists; the preview needs GET /api/media/content/{id} to
+ * answer — and that is exactly the URL this helper requests: both sides go
+ * through getMediaUrl('content', id), so verification and display can never
+ * disagree (incl. the SUPER_ADMIN ?tenant_id= fallback).
+ *
+ * Auth mirrors upload-multipart.ts: Bearer from getTokens() + withCredentials
+ * for the session cookie, and NO X-Tenant-Id header — TenantScope rejects a
+ * tenant header for non-SA roles, while the SA tenant already rides in the
+ * query string.
+ *
+ * The full response body is consumed; resolves ONLY on HTTP 200. Any other
+ * outcome rejects with an ApiError carrying the status, parsing the backend
+ * { error: { code, message } } envelope the same way upload-multipart does so
+ * user messages stay real.
+ */
+export function verifyBadgeMedia(id: string): Promise<void> {
+ const url = `${getApiBaseUrl()}${getMediaUrl('content', id)}`
+ const token = getTokens().accessToken
+ return new Promise<void>((resolve, reject) => {
+  const xhr = new XMLHttpRequest()
+  xhr.open('GET', url, true)
+  if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+  xhr.withCredentials = true
+  xhr.timeout = BADGE_UPLOAD_TIMEOUT_MS
+
+  xhr.onload = () => {
+   // Consume the whole body (image bytes or an error payload) before deciding.
+   const body = xhr.responseText
+   if (xhr.status === 200) {
+    resolve()
+    return
+   }
+   let parsed: { error?: string | { code?: string; message?: string }; code?: string } = {}
+   try {
+    const value: unknown = JSON.parse(body)
+    if (value !== null && typeof value === 'object') {
+     parsed = value as typeof parsed
+    }
+   } catch {
+    // Non-JSON error body — fall back to the status-based message below.
+   }
+   const err = parsed.error
+   const envelope = typeof err === 'object' && err !== null ? err : null
+   const message =
+    envelope?.message ||
+    (typeof err === 'string' ? err : `Gambar badge tidak dapat dimuat dari server (status ${xhr.status}).`)
+   const code = envelope?.code || (typeof parsed.code === 'string' ? parsed.code : 'unknown')
+   reject(new ApiError(message, code, xhr.status))
+  }
+
+  xhr.onerror = () => {
+   // Code "network" resolves to the localized errors.network text via friendlyError.
+   reject(new ApiError('Network error during media verification', 'network', 0))
+  }
+
+  xhr.ontimeout = () => {
+   reject(new ApiError('Media verification timed out', 'network', 0))
+  }
+
+  xhr.send()
+ })
 }

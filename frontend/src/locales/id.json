@@ -400,7 +400,9 @@
       "uploadingPercent": "Mengunggah… {{percent}}%",
       "uploadRetry": "Mencoba ulang ({{attempt}}/{{max}})…",
       "uploadSuccess": "Berhasil diunggah",
-      "uploadBtn": "Unggah Gambar"
+      "uploadBtn": "Unggah Gambar",
+      "mediaUnavailable": "Unggahan tersimpan, tetapi gambar tidak dapat diakses dari server.",
+      "invalidType": "Format tidak didukung. Gunakan gambar JPG, PNG, GIF, atau WebP (SVG tidak didukung)."
     },
     "col": {
       "name": "Nama",
@@ -882,6 +884,7 @@
       "no": "Tidak",
       "deleteMsgConfirm": "Yakin ingin menghapus topik \"{{name}}\"? Seluruh kegiatan di dalamnya juga akan dihapus. Tindakan ini tidak dapat dibatalkan.",
       "createdToast": "Topik berhasil dibuat",
+      "badgeSaveError": "Topik berhasil dibuat, tetapi lencana gagal disimpan. Edit topik untuk mencoba lagi.",
       "updatedToast": "Topik berhasil diperbarui",
       "deletedToast": "Topik dihapus",
       "emptyTitle": "Belum ada topik",

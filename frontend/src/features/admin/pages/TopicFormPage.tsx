@@ -51,7 +51,11 @@ const TopicFormPage = () => {
     programService
       .getAll({ limit: 1000 })
       .then((res) => setPrograms(res.data))
-      .catch((err) => { console.error('[TopicFormPage] programs load failed', err); setPrograms([]) })
+      .catch((err) => {
+        console.error('[TopicFormPage] programs load failed', err)
+        setPrograms([])
+        addToast({ type: 'error', message: friendlyError(err) })
+      })
       .finally(() => setProgramsLoading(false))
   }, [])
 
@@ -86,6 +90,7 @@ const TopicFormPage = () => {
         } catch (err) {
           console.error('[TopicFormPage] stage lookup failed', err)
           setStage(null)
+          addToast({ type: 'error', message: friendlyError(err) })
         } finally {
           setLoading(false)
         }
@@ -129,10 +134,18 @@ const TopicFormPage = () => {
           is_photo_stage: isPhotoStage,
         })
         if (badgeName.trim() || badgeImageUrl.trim()) {
-          await programService.updateStage(programId, created.id, {
-            badge_name: badgeName.trim() || undefined,
-            badge_image_url: badgeImageUrl.trim() || undefined,
-          })
+          try {
+            await programService.updateStage(programId, created.id, {
+              badge_name: badgeName.trim(),
+              badge_image_url: badgeImageUrl.trim(),
+            })
+          } catch (err) {
+            // Stage was created but its badge did not persist — tell the user
+            // explicitly and skip the success toast/navigation.
+            console.error('[TopicFormPage] badge save failed after stage creation', err)
+            addToast({ type: 'error', message: t('admin.topic.badgeSaveError') })
+            return
+          }
         }
         addToast({ type: 'success', message: t('admin.topic.createdToast') })
         navigate(topicDetailPath(created.id), { state: { showAddActivityCta: true } })
@@ -142,8 +155,8 @@ const TopicFormPage = () => {
           description: description.trim() || undefined,
           is_photo_stage: isPhotoStage,
           content_type: ContentType.MIXED,
-          badge_name: badgeName.trim() || undefined,
-          badge_image_url: badgeImageUrl.trim() || undefined,
+          badge_name: badgeName.trim(),
+          badge_image_url: badgeImageUrl.trim(),
         })
         addToast({ type: 'success', message: t('admin.topic.updatedToast') })
         navigate(topicDetailPath(topicId))

@@ -18,6 +18,10 @@ type ProgramStageRequest struct {
 	Description   string             `json:"description,omitempty"`
 	ContentType   entity.ContentType `json:"content_type" validate:"required"`
 	IsPhotoStage  bool               `json:"is_photo_stage,omitempty"`
+	// Badge fields follow the pointer convention of ProgramRequest: absent key
+	// -> nil -> leave the stored value untouched; present (even "") -> set/clear.
+	BadgeName     *string `json:"badge_name,omitempty"`
+	BadgeImageURL *string `json:"badge_image_url,omitempty"`
 }
 
 // ContentRequest is the create/update payload for the standalone Content entity

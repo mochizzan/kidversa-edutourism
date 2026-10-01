@@ -83,6 +83,12 @@ func (h *ProgramHandler) UpdateStage(c *echo.Context) error {
 	}
 	s.SequenceOrder = req.SequenceOrder
 	s.IsPhotoStage = req.IsPhotoStage
+	if req.BadgeName != nil {
+		s.BadgeName = *req.BadgeName
+	}
+	if req.BadgeImageURL != nil {
+		s.BadgeImageURL = *req.BadgeImageURL
+	}
 	if err := h.repo.UpdateStage((*c).Request().Context(), s); err != nil {
 		return err
 	}

@@ -370,7 +370,9 @@
       "uploadingPercent": "Nag-a-upload... {{percent}}%",
       "uploadRetry": "Sinusubukang muli ({{attempt}}/{{max}})...",
       "uploadSuccess": "Matagumpay na na-upload",
-      "uploadBtn": "Mag-upload ng Larawan"
+      "uploadBtn": "Mag-upload ng Larawan",
+      "mediaUnavailable": "Na-save ang upload, ngunit hindi ma-access ang imahe mula sa server.",
+      "invalidType": "Hindi suportado ang format. Gumamit ng JPG, PNG, GIF, o WebP na larawan (hindi suportado ang SVG)."
     },
     "col": {
       "name": "Pangalan",
@@ -747,6 +749,7 @@
       "no": "Hindi",
       "deleteMsgConfirm": "Sigurado ka bang gusto mong burahin ang paksang \"{{name}}\"? Ang lahat ng aktibidad sa loob nito ay mabubura rin. Hindi na mababawi ang aksyong ito.",
       "createdToast": "Matagumpay na nagawa ang paksa",
+      "badgeSaveError": "Matagumpay na nagawa ang paksa ngunit nabigo ang pag-save ng badge. I-edit ang paksa upang subukan muli.",
       "updatedToast": "Matagumpay na na-update ang paksa",
       "deletedToast": "Nabura ang paksa",
       "emptyTitle": "Wala pang mga paksa",

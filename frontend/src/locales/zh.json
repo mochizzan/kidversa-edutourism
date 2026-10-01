@@ -370,7 +370,9 @@
       "uploadingPercent": "上传中… {{percent}}%",
       "uploadRetry": "正在重试（{{attempt}}/{{max}}）…",
       "uploadSuccess": "上传成功",
-      "uploadBtn": "上传图片"
+      "uploadBtn": "上传图片",
+      "mediaUnavailable": "上传已存储，但无法从服务器访问该图片。",
+      "invalidType": "格式不受支持。请使用 JPG、PNG、GIF 或 WebP 图片（不支持 SVG）。"
     },
     "col": {
       "name": "姓名",
@@ -747,6 +749,7 @@
       "no": "否",
       "deleteMsgConfirm": "确定要删除主题“{{name}}”吗？其中的所有活动也将被删除。此操作无法撤销。",
       "createdToast": "主题创建成功",
+      "badgeSaveError": "主题已创建，但徽章保存失败。请编辑主题后重试。",
       "updatedToast": "主题更新成功",
       "deletedToast": "主题已删除",
       "emptyTitle": "暂无主题",

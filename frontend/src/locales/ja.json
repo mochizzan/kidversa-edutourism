@@ -370,7 +370,9 @@
       "uploadingPercent": "アップロード中… {{percent}}%",
       "uploadRetry": "再試行中（{{attempt}}/{{max}}）…",
       "uploadSuccess": "アップロードしました",
-      "uploadBtn": "画像をアップロード"
+      "uploadBtn": "画像をアップロード",
+      "mediaUnavailable": "アップロードは保存されましたが、画像にサーバーからアクセスできませんでした。",
+      "invalidType": "未対応の形式です。JPG、PNG、GIF、WebP の画像を使用してください（SVG は対応していません）。"
     },
     "col": {
       "name": "名前",
@@ -747,6 +749,7 @@
       "no": "いいえ",
       "deleteMsgConfirm": "トピック「{{name}}」を削除してもよろしいですか？含まれているすべての活動も削除されます。この操作は取り消せません。",
       "createdToast": "トピックが作成されました",
+      "badgeSaveError": "トピックは作成されましたが、バッジの保存に失敗しました。トピックを編集してもう一度お試しください。",
       "updatedToast": "トピックが更新されました",
       "deletedToast": "トピックが削除されました",
       "emptyTitle": "トピックがありません",

@@ -111,18 +111,26 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		relPath = rec.FileURL
 		owningTenant = rec.TenantID
 	case kindContent:
-		// Stage content is curriculum media; no consent gate. Tenant scope is
-		// resolved through the content's owning stage's program (CRIT-6).
+		// Stage content is curriculum media; no consent gate. Tenant scope
+		// comes primarily from the content row's own tenant_id (stamped at
+		// upload) — standalone assets such as badge images are never assigned
+		// to a stage. Legacy rows without a row tenant fall back to the owning
+		// stage's program (CRIT-6): unassigned + unscoped content stays unservable.
 		ct, err := h.contentRepo.GetContentByID(ctx, id)
 		if err != nil {
 			return err
 		}
 		relPath = ct.FileURL
-		owningTenant, terr := h.contentRepo.GetContentProgramTenant(ctx, id)
-		if terr != nil {
-			return terr
+		owningTenant = ct.TenantID
+		if owningTenant == "" {
+			pt, terr := h.contentRepo.GetContentProgramTenant(ctx, id)
+			if terr != nil {
+				return terr
+			}
+			owningTenant = pt
 		}
-		// Unassigned content (no stage) has no tenant to scope -> not playable.
+		// Unassigned content (no stage) and no row tenant has no tenant to
+		// scope -> not playable.
 		if owningTenant == "" {
 			return appresp.Fail(c, http.StatusNotFound, "not_found")
 		}

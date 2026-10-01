@@ -370,7 +370,9 @@
       "uploadingPercent": "Uploading... {{percent}}%",
       "uploadRetry": "Retrying ({{attempt}}/{{max}})...",
       "uploadSuccess": "Uploaded successfully",
-      "uploadBtn": "Upload Image"
+      "uploadBtn": "Upload Image",
+      "mediaUnavailable": "Upload stored, but the image could not be accessed from the server.",
+      "invalidType": "Unsupported format. Use a JPG, PNG, GIF, or WebP image (SVG is not supported)."
     },
     "col": {
       "name": "Name",
@@ -747,6 +749,7 @@
       "no": "No",
       "deleteMsgConfirm": "Are you sure you want to delete the topic \"{{name}}\"? All activities within it will also be deleted. This action cannot be undone.",
       "createdToast": "Topic created successfully",
+      "badgeSaveError": "Topic created, but the badge failed to save. Edit the topic to try again.",
       "updatedToast": "Topic updated successfully",
       "deletedToast": "Topic deleted",
       "emptyTitle": "No topics yet",

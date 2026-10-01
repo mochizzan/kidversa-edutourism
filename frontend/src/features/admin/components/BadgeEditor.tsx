@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Award, Check, Image, Loader2, Upload, X } from 'lucide-react'
+import { AlertCircle, Award, Check, Image, Loader2, Upload, X } from 'lucide-react'
 import { Input } from '../../../shared/components/ui/Input'
 import { Button } from '../../../shared/components/ui/Button'
 import { getMediaUrl } from '../../../core/utils/media'
-import { uploadBadgeImage, BADGE_UPLOAD_TIMEOUT_MS } from '../../../core/utils/badgeImage'
+import {
+  uploadBadgeImage,
+  verifyBadgeMedia,
+  badgeFileRejection,
+  BADGE_UPLOAD_MAX_BYTES,
+  BADGE_UPLOAD_TIMEOUT_MS,
+} from '../../../core/utils/badgeImage'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { useTranslation } from 'react-i18next'
@@ -45,26 +51,85 @@ export function BadgeEditor({
   const { addToast } = useGlobalToast()
   const fileRef = useRef<HTMLInputElement>(null)
   // D4 state machine: idle → uploading (real XHR transfer percent) →
-  // retrying (honest attempt n/max) → success ONLY after a valid server
-  // response with content.id. A failure surfaces as a toast and returns the
-  // state to idle so the button is usable again.
-  const [status, setStatus] = useState<'idle' | 'uploading' | 'retrying' | 'success'>('idle')
+  // retrying (honest attempt n/max) → success ONLY after the upload returned
+  // a content.id AND verifyBadgeMedia confirmed that id is servable. Every
+  // other failure lands in 'error' (explicit label, button stays usable) so
+  // a stored-but-unreachable image can never show "Berhasil diunggah".
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'retrying' | 'success' | 'error'>('idle')
   const [percent, setPercent] = useState<number | null>(null)
   const [retry, setRetry] = useState<{ attempt: number; max: number } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Preview <img> load failure — surfaced (toast + inline message), never a
+  // silent display:none. The ref keeps the toast once-per-src even if the
+  // error event fires more than once.
+  const previewFailedRef = useRef(false)
+  const [previewFailed, setPreviewFailed] = useState(false)
 
   // Abort the in-flight upload on unmount — no state updates or toasts from a
   // component that is gone.
   useEffect(() => () => abortRef.current?.abort(), [])
 
+  // A new verified id (or a cleared preview) resets any previous failure so
+  // the fresh media URL gets a clean load attempt.
+  useEffect(() => {
+    previewFailedRef.current = false
+    setPreviewFailed(false)
+  }, [imageUrl])
+
+  // The preview is the last mile of the upload: if the media GET fails here,
+  // the badge is NOT visible — flip a 'success' back to 'error' so the
+  // success label disappears, toast once, and swap the img for the inline
+  // message (the swap also stops the same src from re-firing error, so no
+  // re-render loop).
+  const handlePreviewError = () => {
+    if (previewFailedRef.current) return
+    previewFailedRef.current = true
+    setPreviewFailed(true)
+    setStatus((prev) => (prev === 'success' ? 'error' : prev))
+    addToast({ type: 'error', message: t('admin.badge.mediaUnavailable') })
+  }
+
+  // Single transfer at a time: while a transfer/retry is in flight the upload
+  // button is disabled but the hidden file input is NOT, so a change event can
+  // still reach handleFile. The new selection is IGNORED (never queued, never
+  // aborting the current transfer) so two uploads can never race the same
+  // status/percent/abort state — the in-flight upload owns the state machine
+  // until it settles.
+  const busy = status === 'uploading' || status === 'retrying'
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    // Re-arm the input on EVERY path (incl. the rejections below): `change`
+    // only fires when the input's value actually changes, so without this
+    // reset a re-pick of the same (previously rejected) file would be
+    // silently ignored by the browser.
+    e.target.value = ''
     if (!file) return
+    if (busy) return
+    // Reject unusable picks BEFORE any network call: the server would refuse
+    // these anyway (persistFile magic-byte sniff / BodyLimit), and an SVG
+    // could never be served even if it stored — fail fast with a clear
+    // message instead of uploading then watching verification fail.
+    const rejection = badgeFileRejection(file)
+    if (rejection) {
+      addToast({
+        type: 'error',
+        message:
+          rejection === 'type'
+            ? t('admin.badge.invalidType')
+            : t('admin.content.fileTooLarge', { limit: BADGE_UPLOAD_MAX_BYTES / (1024 * 1024) }),
+      })
+      setStatus('error')
+      return
+    }
     const controller = new AbortController()
     abortRef.current = controller
     setStatus('uploading')
     setPercent(null)
     setRetry(null)
+    // Which phase we're in decides the failure message: the upload itself
+    // failing differs from "stored but the media endpoint won't serve it".
+    let phase: 'upload' | 'verify' = 'upload'
     try {
       const id = await uploadBadgeImage(file, {
         signal: controller.signal,
@@ -75,20 +140,33 @@ export function BadgeEditor({
           setStatus('retrying')
         },
       })
+      phase = 'verify'
+      // Stored ≠ servable: only a 200 from GET /api/media/content/{id} (the
+      // same URL the preview requests) may hand the id to the parent and
+      // declare success.
+      await verifyBadgeMedia(id)
       onImageChange(id)
       setStatus('success')
     } catch (err) {
-      // Abort = deliberate cancellation (unmount), not a user-facing failure.
-      if (!(err instanceof DOMException && err.name === 'AbortError')) {
-        addToast({ type: 'error', message: friendlyError(err) })
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // Abort = deliberate cancellation (unmount), not a user-facing failure.
+        setStatus('idle')
+      } else {
+        // Verify-phase toast: the file IS persisted — say so, then append the
+        // real server message via friendlyError. The parent never receives an
+        // unverified id.
+        addToast({
+          type: 'error',
+          message:
+            phase === 'verify'
+              ? `${t('admin.badge.mediaUnavailable')} (${friendlyError(err)})`
+              : friendlyError(err),
+        })
+        setStatus('error')
       }
-      setStatus('idle')
-    } finally {
-      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
-  const busy = status === 'uploading' || status === 'retrying'
   const uploadLabel = () => {
     if (status === 'retrying' && retry) return t('admin.badge.uploadRetry', retry)
     if (status === 'uploading') {
@@ -97,6 +175,7 @@ export function BadgeEditor({
         : t('admin.badge.uploadingPercent', { percent })
     }
     if (status === 'success') return t('admin.badge.uploadSuccess')
+    if (status === 'error') return t('admin.status.error')
     return t('admin.badge.uploadBtn')
   }
 
@@ -127,14 +206,24 @@ export function BadgeEditor({
           <span className="mb-1 block text-xs font-medium text-on-surface-variant">{t('admin.badge.imageLabel')}</span>
           <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm ring-1 ring-inset ring-black/5">
             {imageUrl ? (
-              <img
-                src={getMediaUrl('content', imageUrl)}
-                alt={name || 'badge'}
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  ; (e.target as HTMLImageElement).style.display = 'none'
-                }}
-              />
+              previewFailed ? (
+                <div
+                  role="alert"
+                  className="grid h-full w-full place-items-center gap-1 p-3 text-center"
+                >
+                  <AlertCircle className="h-7 w-7 text-error" />
+                  <span className="text-xs leading-snug text-error">
+                    {t('admin.badge.mediaUnavailable')}
+                  </span>
+                </div>
+              ) : (
+                <img
+                  src={getMediaUrl('content', imageUrl)}
+                  alt={name || 'badge'}
+                  className="h-full w-full object-cover"
+                  onError={handlePreviewError}
+                />
+              )
             ) : (
               <div className="grid h-full w-full place-items-center">
                 <Image className="h-8 w-8 text-on-surface-variant/50" />
@@ -173,6 +262,8 @@ export function BadgeEditor({
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : status === 'success' ? (
                 <Check className="h-4 w-4" />
+              ) : status === 'error' ? (
+                <AlertCircle className="h-4 w-4" />
               ) : (
                 <Upload className="h-4 w-4" />
               )

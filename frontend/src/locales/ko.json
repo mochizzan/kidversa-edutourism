@@ -370,7 +370,9 @@
       "uploadingPercent": "업로드 중… {{percent}}%",
       "uploadRetry": "다시 시도 중 ({{attempt}}/{{max}})...",
       "uploadSuccess": "업로드 완료",
-      "uploadBtn": "이미지 업로드"
+      "uploadBtn": "이미지 업로드",
+      "mediaUnavailable": "업로드는 저장되었지만 이미지에 서버에서 접근할 수 없습니다.",
+      "invalidType": "지원되지 않는 형식입니다. JPG, PNG, GIF, WebP 이미지를 사용하세요(SVG는 지원하지 않습니다)."
     },
     "col": {
       "name": "이름",
@@ -747,6 +749,7 @@
       "no": "아니요",
       "deleteMsgConfirm": "\"{{name}}\" 토픽을 삭제하시겠습니까? 내부의 모든 활동도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
       "createdToast": "토픽이 성공적으로 생성되었습니다",
+      "badgeSaveError": "토픽은 생성되었지만 배지 저장에 실패했습니다. 토픽을 편집하여 다시 시도하세요.",
       "updatedToast": "토픽이 성공적으로 업데이트되었습니다",
       "deletedToast": "토픽이 삭제되었습니다",
       "emptyTitle": "토픽이 없습니다",
