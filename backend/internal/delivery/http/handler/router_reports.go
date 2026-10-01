@@ -36,6 +36,8 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	g.POST("/:id/approve", h.Approve, authMW, scopeMW)
 	g.POST("/:id/suggest-missions", h.SuggestMissions, authMW, scopeMW)
 	g.POST("/:id/missions", h.SaveMissions, authMW, scopeMW)
+	// On-demand gallery token for the admin preview QR footer (mint-if-missing).
+	g.POST("/:id/gallery-token", h.EnsureGalleryToken, authMW, scopeMW)
 	g.POST("/:id/send", h.Send, authMW, scopeMW)
 	// TODO: DELETE /api/reports/:id is not yet exposed. If added, it MUST use a
 	// HARD delete (db.Unscoped().Delete) — the soft-delete in GormReportRepository.Delete

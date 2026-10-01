@@ -17,7 +17,9 @@ export interface MiniRaportData {
  }[]
  extraTopicsCount?: number
  narrative: string
- missions: string[]
+ /** Boleh null/undefined (payload lama/DTO tanpa misi) — section tetap render
+ *  dengan teks "Tidak ada misi dirumah", tidak pernah throw. */
+ missions: string[] | null
  badgeTopics: { badgeName: string; badgeImageUrl?: string }[]
  badgeFinal?: { badgeName: string; badgeImageUrl?: string }
  facilitatorName: string
@@ -82,7 +84,9 @@ function stageRowHTML(
     </div>`
 }
 
-function missionsHTML(missions: string[]): string {
+function missionsHTML(missions: string[] | null | undefined): string {
+ if (!missions || missions.length === 0)
+  return '<p class="text-[12px] text-gray-500 italic">Tidak ada misi dirumah</p>'
  return missions
   .slice(0, 4)
   .map(
@@ -518,8 +522,9 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 </div>
             </div>
 
-            <!-- 3. LEVEL KEGIATAN -->
-            <div class="col-span-8 bg-white border-2 border-gray-200 rounded-[1.5rem] p-5 pt-6 relative mt-2">
+            <!-- 3. LEVEL KEGIATAN (row-span-3: memanjang ke baris yang ditinggalkan
+                 BADGE di kolom kanan, sejajar dengan dasar kartu BADGE di kolom kiri) -->
+            <div class="col-span-8 row-span-3 bg-white border-2 border-gray-200 rounded-[1.5rem] p-5 pt-6 relative mt-2">
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
                     <i class="fas fa-star text-brand-star text-xs"></i> LEVEL KEGIATAN
                 </div>
@@ -528,8 +533,9 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 </div>
             </div>
 
-            <!-- 4. BADGE PENCAPAIAN (compact, kolom kanan, di atas Ringkasan) -->
-            <div class="col-span-8 bg-white border-2 border-brand-badge rounded-[1.25rem] p-3 pt-5 shadow-sm relative min-h-[100px] mt-2">
+            <!-- 4. BADGE PENCAPAIAN (auto-placement menaruhnya di baris 4 kolom kiri,
+                 tepat di bawah kartu Momen Terbaik; kolom kanan diisi LEVEL KEGIATAN) -->
+            <div class="col-span-4 bg-white border-2 border-brand-badge rounded-[1.25rem] p-3 pt-5 shadow-sm relative min-h-[100px] mt-2">
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
                     <i class="fas fa-award text-xs"></i> BADGE PENCAPAIAN
                 </div>
@@ -544,7 +550,6 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 <p id="ringkasan-text" class="text-[13px] font-semibold text-gray-800 leading-snug">${narrativeBlock(data)}</p>
             </div>
 
-            ${data.missions.length > 0 ? `
             <!-- 6a. MISI RUMAH BERSAMA KELUARGA -->
             <div class="col-span-6 bg-brand-yellow rounded-[1.25rem] p-4 pt-3 border border-yellow-200 shadow-sm relative">
                 <div class="flex items-center gap-3 mb-3">
@@ -554,7 +559,7 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 <div class="flex flex-col gap-3">
                     ${missionsHTML(data.missions)}
                 </div>
-            </div>` : ''}
+            </div>
 
             <!-- 6b. PENGESAHAN + TTD -->
             <div class="col-span-6 bg-white border-2 border-gray-200 rounded-[1.25rem] p-4 pt-5 shadow-sm relative mt-2">

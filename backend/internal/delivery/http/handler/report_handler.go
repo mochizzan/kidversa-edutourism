@@ -440,6 +440,27 @@ func (h *ReportHandler) SaveMissions(c *echo.Context) error {
 	return appresp.OK(c, dto.NewReportResponse(r))
 }
 
+// EnsureGalleryToken handles POST /api/reports/:id/gallery-token: returns the
+// report with a QR-usable gallery token, minting one server-side when it is
+// missing (preview built before approval, rows approved before the gallery
+// feature) or expired, so the admin mini-raport QR footer always renders real
+// QR data instead of silently falling back to the "[ QR CODE ]" placeholder.
+func (h *ReportHandler) EnsureGalleryToken(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	r, err := h.uc.EnsureGalleryToken((*c).Request().Context(), id, tenantID)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.NewReportResponse(r))
+}
+
 // ListReports handles GET /api/reports?session_id= (tenant-scoped via TenantScope).
 // Returns an empty list (not an error) when no reports match (EC4).
 // While a session generate runs (handler genMu guard + usecase registry) or a

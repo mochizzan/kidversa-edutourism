@@ -233,6 +233,13 @@ export interface ReportService {
  ): Promise<Report>
  saveMissions(reportId: string, missionIds: string[], tenantId?: string | null): Promise<Report>
  /**
+  * POST /:id/gallery-token — returns the report with a QR-usable gallery
+  * token, minting one server-side when it is missing (preview before
+  * approval, legacy approved rows) or expired. Used by the admin mini-raport
+  * preview so the QR footer always has real data.
+  */
+ ensureGalleryToken(reportId: string, tenantId?: string | null): Promise<Report>
+ /**
   * `queue` = ALL report IDs the client still intends to send in this run,
   * INCLUDING this request's target — the server tracks the run (queued →
   * in-flight → done) and 409s a target that is already in flight.

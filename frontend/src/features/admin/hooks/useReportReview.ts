@@ -500,11 +500,41 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
   const topicName = topics.find((t) => t.programStageId === activeTopicId)?.name ?? ''
 
+  // Token galeri dipastikan lewat backend (POST /:id/gallery-token) SEBELUM
+  // QR dibangun: laporan yang belum disetujui, disetujui sebelum fitur galeri,
+  // atau token kedaluwarsa selalu mendapat token valid, sehingga footer QR
+  // preview admin berisi data asli — bukan placeholder senyap.
+  let galleryToken = report?.gallery_access_token
+  if (report) {
+   let ensureErr: unknown = null
+   try {
+    const fresh = await reportService.ensureGalleryToken(report.id, saTenant)
+    galleryToken = fresh?.gallery_access_token || galleryToken
+   } catch (err) {
+    ensureErr = err
+    logError('useReportReview.ensureGalleryToken', err)
+   }
+   if (!galleryToken) {
+    // Data QR tidak tersedia (mint gagal / respons kosong): log + toast —
+    // tanpa silent error; placeholder tetap tampil sebagai degradasi visual.
+    console.warn('[useReportReview] gallery QR data missing for report', report.id)
+   }
+   // Mint token gagal ATAU token tetap kosong → selalu toast (baik token lama
+   // yang tersisa maupun placeholder tetap dirender; pesan tidak pernah senyap).
+   if (ensureErr || !galleryToken) {
+    addToast({
+     type: 'error',
+     message:
+      ensureErr instanceof Error && ensureErr.message ? ensureErr.message : i18n.t('errors.default'),
+    })
+   }
+  }
+
   let galleryUrl: string | undefined
-  if (report?.gallery_access_token) {
+  if (galleryToken) {
    try {
     galleryUrl = await QRCode.toDataURL(
-     `${window.location.origin}/gallery?token=${report.gallery_access_token}`,
+     `${window.location.origin}/gallery?token=${galleryToken}`,
      { width: 128, margin: 1, errorCorrectionLevel: 'M' },
     )
    } catch (err) {
@@ -535,38 +565,52 @@ export function useReportReview(sessionId: string | undefined, participantId: st
      : undefined)?.trim() || DEFAULT_FACILITATOR_NAME,
    galleryUrl,
   })
- }, [participant, session, report, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, programName, activeTopicId, topics])
+ }, [participant, session, report, narrativeText, photo, stageInfos, missions, assignedMissionIds, groups, badges, programName, activeTopicId, topics, saTenant, addToast])
 
  const handleCetak = useCallback(async () => {
-  const html = await buildRaportHtml()
-  if (!html) return
-  const win = window.open('', '_blank')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-  const start = Date.now()
-  const poll = () => {
-   try {
-    if (win.closed) return
-   } catch (err) {
-    // Cross-origin/inaccessible window: printing cannot proceed — stop the
-    // poll and record why instead of aborting silently (fires once).
-    console.warn('[useReportReview] print window inaccessible; aborting print', err)
+  try {
+   const html = await buildRaportHtml()
+   if (!html) return
+   const win = window.open('', '_blank')
+   if (!win) {
+    // Popup diblokir browser: tanpa pesan pengguna hanya "tidak terjadi
+    // apa-apa" — log sebabnya + toast agar tidak senyap.
+    console.warn('[useReportReview] print window blocked by the browser')
+    addToast({ type: 'error', message: i18n.t('errors.default') })
     return
    }
-   const remaining = win.document.querySelectorAll('i[class*="fa-"]')
-   if (remaining.length === 0 || Date.now() - start >= 3000) {
+   win.document.write(html)
+   win.document.close()
+   const start = Date.now()
+   const poll = () => {
     try {
-     if (!win.closed) win.print()
-    } catch {
-     /* window closed */
+     if (win.closed) return
+    } catch (err) {
+     // Cross-origin/inaccessible window: printing cannot proceed — stop the
+     // poll and record why instead of aborting silently (fires once).
+     console.warn('[useReportReview] print window inaccessible; aborting print', err)
+     return
     }
-    return
+    const remaining = win.document.querySelectorAll('i[class*="fa-"]')
+    if (remaining.length === 0 || Date.now() - start >= 3000) {
+     try {
+      if (!win.closed) win.print()
+     } catch (err) {
+      // Jendela tertutup/sejak print gagal — catat, jangan telan kosong.
+      console.warn('[useReportReview] window.print failed', err)
+     }
+     return
+    }
+    setTimeout(poll, 50)
    }
-   setTimeout(poll, 50)
+   poll()
+  } catch (err) {
+   // Kegagalan tak terduga (build HTML dsb.) → log sebab + toast, tanpa
+   // rejection tak tertangani dari tombol Cetak.
+   logError('useReportReview.handleCetak', err)
+   addToast({ type: 'error', message: friendlyError(err) })
   }
-  poll()
- }, [buildRaportHtml])
+ }, [buildRaportHtml, addToast])
 
  const handleDownloadPdf = useCallback(async () => {
   if (!participant) return

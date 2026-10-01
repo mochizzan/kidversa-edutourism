@@ -123,6 +123,9 @@ export const API_ROUTES = {
    `/api/reports/${encodeURIComponent(id)}/missions`,
   APPROVE: (id: string) => `/api/reports/${encodeURIComponent(id)}/approve`,
   SEND: (id: string) => `/api/reports/${encodeURIComponent(id)}/send`,
+  // On-demand gallery token for the mini-raport QR footer (mint-if-missing).
+  ENSURE_GALLERY_TOKEN: (id: string) =>
+   `/api/reports/${encodeURIComponent(id)}/gallery-token`,
   ACCESS: '/api/reports/access',
   ACCESS_PHOTO: '/api/reports/access/photo',
   GALLERY: '/api/reports/gallery',

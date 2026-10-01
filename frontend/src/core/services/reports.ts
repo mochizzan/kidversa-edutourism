@@ -81,6 +81,21 @@ const saveMissions = async (
   )
 }
 
+// ensureGalleryToken asks the backend for a QR-usable gallery token for the
+// mini-raport QR footer, minting one server-side when missing/expired so the
+// admin preview never renders the "[ QR CODE ]" placeholder for want of data.
+const ensureGalleryToken = async (
+  reportId: string,
+  tenantId?: string | null,
+): Promise<Report> => {
+  return itemRequest<Report>(
+    'POST',
+    API_ROUTES.REPORTS.ENSURE_GALLERY_TOKEN(reportId),
+    undefined,
+    tenantId,
+  )
+}
+
 // suggestMissions calls the AI recommendation endpoint for a report. Returns up
 // to 4 mission IDs scoped to the report's Topic. No persistence — the caller
 // pre-fills the manual selector and persists on Approve.
@@ -126,6 +141,7 @@ export const reportService: ReportService = {
   approve,
   send,
   saveMissions,
+  ensureGalleryToken,
   suggestMissions,
   generateNarrativeStream,
 }

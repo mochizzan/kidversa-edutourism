@@ -136,20 +136,41 @@ describe('generateMiniRaportHTML — bintang penilaian di-capped 4 slot (domain 
  }
 })
 
-describe('generateMiniRaportHTML — kartu MISI hanya bila ada misi terpilih', () => {
- it('missions: [] → kartu MISI RUMAH BERSAMA KELUARGA tidak dirender', () => {
+describe('generateMiniRaportHTML — kartu MISI selalu dirender (null handling)', () => {
+ it('missions: [] → kartu MISI RUMAH BERSAMA KELUARGA tetap dirender + empty state', () => {
   const html = generateMiniRaportHTML(baseData({ missions: [] }))
-  expect(html).not.toContain('MISI RUMAH BERSAMA KELUARGA')
+  expect(html).toContain('MISI RUMAH BERSAMA KELUARGA')
+  expect(html).toContain('Tidak ada misi dirumah')
  })
 
- it('missions terisi → kartu tampil, maksimal 4 judul', () => {
+ it('missions terisi → kartu tampil dengan judul misi, tanpa teks null-handling', () => {
   const missions = ['Misi A', 'Misi B', 'Misi C', 'Misi D', 'Misi E']
   const html = generateMiniRaportHTML(baseData({ missions }))
   expect(html).toContain('MISI RUMAH BERSAMA KELUARGA')
+  expect(html).not.toContain('Tidak ada misi dirumah')
   for (const m of missions.slice(0, 4)) {
    expect(html).toContain(`>${m}</p>`)
   }
   expect(html).not.toContain('Misi E')
+ })
+
+ it('missions null → tidak throw; kartu + teks null-handling tetap dirender', () => {
+  let html = ''
+  expect(() => {
+   html = generateMiniRaportHTML(baseData({ missions: null }))
+  }).not.toThrow()
+  expect(html).toContain('MISI RUMAH BERSAMA KELUARGA')
+  expect(html).toContain('Tidak ada misi dirumah')
+ })
+
+ it('missions undefined (payload lama tanpa field) → tidak throw; kartu + teks null-handling tetap dirender', () => {
+  const legacy = { ...baseData(), missions: undefined } as unknown as MiniRaportData
+  let html = ''
+  expect(() => {
+   html = generateMiniRaportHTML(legacy)
+  }).not.toThrow()
+  expect(html).toContain('MISI RUMAH BERSAMA KELUARGA')
+  expect(html).toContain('Tidak ada misi dirumah')
  })
 })
 
@@ -295,5 +316,62 @@ describe('generateMiniRaportHTML — section BADGE PENCAPAIAN dua slot (kiri top
   }).not.toThrow()
   expect(html).toContain('Belum ada badge yang diraih.')
   expect(html).not.toContain('data-badge-slot=')
+ })
+})
+
+// ── Posisi section: BADGE pindah ke kolom kiri (di bawah Momen), LEVEL memanjang ──
+
+describe('generateMiniRaportHTML — urutan section: BADGE setelah Momen, sebelum RINGKASAN', () => {
+ it('BADGE PENCAPAIAN muncul SETELAH Momen Terbaik dan SEBELUM RINGKASAN; LEVEL KEGIATAN tetap render', () => {
+  const html = generateMiniRaportHTML(
+   baseData({
+    badgeTopics: [{ badgeName: 'Badge Topik A' }],
+    badgeFinal: { badgeName: 'Badge Final Program' },
+    stages: [
+     { name: 'Topik 1', sequenceOrder: 1, kegiatan: [{ name: 'Kegiatan A', starRating: 3 }] },
+    ],
+   }),
+  )
+  const momen = html.indexOf('<!-- 1. MOMEN TERBAIK HARI INI')
+  const badge = html.indexOf('<!-- 4. BADGE PENCAPAIAN')
+  const ringkasan = html.indexOf('<!-- 5. RINGKASAN')
+  expect(momen).toBeGreaterThan(-1)
+  expect(badge).toBeGreaterThan(momen)
+  expect(ringkasan).toBeGreaterThan(badge)
+
+  // LEVEL KEGIATAN tetap dirender.
+  expect(html).toContain('LEVEL KEGIATAN')
+
+  // Tinggi (auto-placement grid 12 kolom): LEVEL memakai row-span-3 sehingga
+  // memanjang mengisi baris-baris kolom kanan yang ditinggalkan BADGE;
+  // BADGE memakai col-span-4 sehingga jatuh ke baris 4 kolom kiri (di bawah foto).
+  expect(html).toContain('class="col-span-8 row-span-3 ')
+  expect(html).toContain('class="col-span-4 bg-white border-2 border-brand-badge')
+ })
+
+ it('grid BADGE/LEVEL tidak merusak section MISI: Momen < BADGE < RINGKASAN < MISI < PENGESAHAN', () => {
+  const html = generateMiniRaportHTML(
+   baseData({
+    missions: null,
+    badgeTopics: [{ badgeName: 'Badge Topik A' }],
+    stages: [
+     { name: 'Topik 1', sequenceOrder: 1, kegiatan: [{ name: 'Kegiatan A', starRating: 3 }] },
+    ],
+   }),
+  )
+  const marks = [
+   '<!-- 1. MOMEN TERBAIK',
+   '<!-- 4. BADGE PENCAPAIAN',
+   '<!-- 5. RINGKASAN',
+   'MISI RUMAH BERSAMA KELUARGA',
+   'PENGESAHAN',
+  ].map((m) => html.indexOf(m))
+  for (const idx of marks) expect(idx).toBeGreaterThan(-1)
+  // Urutan naik tanpa bagian yang tertimpa/terpotong oleh layout baru.
+  expect([...marks].sort((a, b) => a - b)).toEqual(marks)
+  // Kartu MISI tetap berada di dalam grid (col-span-6) dan menampilkan
+  // empty-state meski missions null pada payload yang sama.
+  expect(html).toMatch(/class="col-span-6 bg-brand-yellow[^"]*"/)
+  expect(html).toContain('Tidak ada misi dirumah')
  })
 })

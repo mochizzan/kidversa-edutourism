@@ -138,25 +138,10 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 	if err := u.repo.Update(ctx, r); err != nil {
 		return nil, err
 	}
-	// Generate gallery token for QR code (best-effort — don't fail approval).
-	tok, gerr := util.RandomToken()
-	if gerr == nil {
-		gt := &entity.GalleryToken{
-			ReportID:      r.ID,
-			ParticipantID: r.ParticipantID,
-			SessionID:     r.SessionID,
-			TenantID:      tenantID,
-			Token:         tok,
-			ExpiresAt:     time.Now().UTC().Add(u.cfg.GalleryTokenTTL),
-		}
-		if gerr := u.galleryRepo.Create(ctx, gt); gerr != nil {
-			log.Printf("reports: gallery token create failed for report %s: %v", r.ID, gerr)
-		}
-		r.GalleryAccessToken = tok
-		r.GalleryTokenExpiresAt = &gt.ExpiresAt
-		if uerr := u.repo.Update(ctx, r); uerr != nil {
-			log.Printf("reports: persist gallery token failed for report %s: %v", r.ID, uerr)
-		}
+	// Generate gallery token for QR code (best-effort — don't fail approval,
+	// but a failed mint MUST be logged so a missing QR token is diagnosable).
+	if err := u.mintGalleryToken(ctx, r, tenantID); err != nil {
+		log.Printf("reports: gallery token mint failed for report %s: %v", r.ID, err)
 	}
 	// Persist the approved mission selections into participant_missions (the
 	// single source of truth; r.MissionIDs is read-derived from that join).
@@ -175,7 +160,63 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 	return r, nil
 }
 
-// SaveMissions persists the selected mission IDs for a report without changing
+// mintGalleryToken mints a fresh gallery token for the report's mini-raport
+// QR footer: random token → gallery_tokens row → persisted
+// gallery_access_token column on the report. Every failure is returned (never
+// swallowed) so the caller decides whether it is fatal (EnsureGalleryToken)
+// or best-effort-but-logged (Approve).
+func (u *Usecase) mintGalleryToken(ctx context.Context, r *entity.Report, tenantID string) error {
+	tok, err := util.RandomToken()
+	if err != nil {
+		return fmt.Errorf("random token: %w", err)
+	}
+	gt := &entity.GalleryToken{
+		ReportID:      r.ID,
+		ParticipantID: r.ParticipantID,
+		SessionID:     r.SessionID,
+		TenantID:      tenantID,
+		Token:         tok,
+		ExpiresAt:     time.Now().UTC().Add(u.cfg.GalleryTokenTTL),
+	}
+	if err := u.galleryRepo.Create(ctx, gt); err != nil {
+		return fmt.Errorf("persist gallery_tokens row: %w", err)
+	}
+	r.GalleryAccessToken = tok
+	r.GalleryTokenExpiresAt = &gt.ExpiresAt
+	if err := u.repo.Update(ctx, r); err != nil {
+		// Roll back the in-memory values: a token that is not persisted must
+		// never be handed to a caller (it would render a QR that cannot scan).
+		r.GalleryAccessToken = ""
+		r.GalleryTokenExpiresAt = nil
+		return fmt.Errorf("persist report gallery token: %w", err)
+	}
+	return nil
+}
+
+// EnsureGalleryToken returns the report with a QR-usable gallery token,
+// minting and persisting one when the report has no token yet (pre-approval
+// previews, rows approved before the gallery feature) or when the existing
+// token is revoked/expired. The admin preview calls this before rendering the
+// QR footer so the footer never silently degrades to the "[ QR CODE ]"
+// placeholder while the token could be minted. Failures are logged AND
+// returned (HTTP error) so the client can surface them.
+func (u *Usecase) EnsureGalleryToken(ctx context.Context, reportID, tenantID string) (*entity.Report, error) {
+	r, err := u.repo.GetByID(ctx, reportID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if r.GalleryAccessToken != "" && !r.GalleryTokenRevoked &&
+		r.GalleryTokenExpiresAt != nil && time.Now().Before(*r.GalleryTokenExpiresAt) {
+		return r, nil
+	}
+	if err := u.mintGalleryToken(ctx, r, tenantID); err != nil {
+		log.Printf("reports: ensure gallery token failed for report %s: %v", r.ID, err)
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return r, nil
+}
+
+// SaveMissions persists the selected mission IDs on a report without changing
 // the report status. This allows auto-saving mission selections while the admin
 // is still reviewing (separate from Approve which also sets status + narrative).
 func (u *Usecase) SaveMissions(ctx context.Context, reportID, tenantID string, missionIDs []string) (*entity.Report, error) {
