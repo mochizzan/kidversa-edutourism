@@ -15,6 +15,7 @@ import { useCamera } from '../hooks/useCamera'
 import { useSmartPhotos } from '../hooks/useSmartPhotos'
 import { useGroupOwnership } from '../hooks/useGroupOwnership'
 import { CameraViewport } from '../components/CameraViewport'
+import { CameraSettings } from '../components/CameraSettings'
 import { PhotoEditor } from '../components/PhotoEditor'
 import { FramePicker } from '../components/FramePicker'
 import { computeCaptureCrop, composePhoto, drawVideoCrop } from '../utils/photoCapture'
@@ -103,7 +104,6 @@ const SmartPhotoPage = () => {
   cameraErrorMessage,
   devices,
   selectedDeviceId,
-  switchCamera,
   selectDevice,
   restartCamera,
   stopStream,
@@ -459,9 +459,10 @@ const SmartPhotoPage = () => {
     </div>
 
     {/* Editor host: the wrapper has NO overflow-hidden — it is the
-        positioning context PhotoEditor's absolute controls anchor to —
-        while the inner aspect box clips the camera/editor pixels. */}
-    <div className="relative w-full max-w-[min(56.25dvh,56rem)] mx-auto">
+        positioning context the right-side control column anchors to —
+        while the inner aspect box clips the camera/editor pixels. The
+        pr-16 gutter keeps that column beside the canvas, never over it. */}
+    <div className="relative w-full max-w-[min(56.25dvh,56rem)] mx-auto pr-16">
      <div className="relative aspect-[9/16] w-full rounded-3xl overflow-hidden bg-black shadow-md border border-slate-200">
       {phase === 'camera' && (
        <CameraViewport
@@ -483,10 +484,7 @@ const SmartPhotoPage = () => {
         onToggleCameraPicker={() => setCameraPickerOpen((v) => !v)}
         onCloseCameraPicker={() => setCameraPickerOpen(false)}
         onDeviceChange={selectDevice}
-        onSwitchCamera={switchCamera}
-        onToggleGrid={() => setShowGrid((v) => !v)}
         mirror={mirror}
-        onToggleMirror={() => setMirror((v) => !v)}
         photoCount={photoCount}
         maxPhotos={MAX_PHOTOS}
         isMaxPhotos={isMaxPhotos}
@@ -522,6 +520,18 @@ const SmartPhotoPage = () => {
 
       <canvas ref={captureCanvasRef} className="hidden" />
      </div>
+
+     {/* Right-side control column (in the wrapper's gutter, outside the
+         canvas box): the settings gear during the camera phase. */}
+     {phase === 'camera' && (
+      <CameraSettings
+       disabled={cameraState !== 'active'}
+       showGrid={showGrid}
+       mirror={mirror}
+       onToggleGrid={() => setShowGrid((v) => !v)}
+       onToggleMirror={() => setMirror((v) => !v)}
+      />
+     )}
 
      {/* Mount only once a photo exists: no editor controls (e.g. the report
          photo toggle) before there is anything to edit. */}

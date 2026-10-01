@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { act } from 'react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { fireEvent } from '@testing-library/react'
@@ -63,8 +65,6 @@ vi.mock('@/features/fasilitator/hooks/useCamera', () => ({
     cameraErrorMessage: null,
     devices: [],
     selectedDeviceId: '',
-    facingMode: 'user',
-    switchCamera: vi.fn(),
     selectDevice: vi.fn(),
     restartCamera: vi.fn(),
     stopStream: vi.fn(),
@@ -147,6 +147,19 @@ async function renderPageWithBackStack() {
 
 function errorToasts() {
   return useToastStore.getState().toasts.filter((t) => t.type === 'error')
+}
+
+/** Open the settings gear, flip one of its toggles, then close via Escape. */
+async function toggleViaGear(name: 'Grid' | 'Cermin') {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Pengaturan' }))
+  })
+  await act(async () => {
+    fireEvent.click(screen.getByRole('switch', { name }))
+  })
+  await act(async () => {
+    fireEvent.keyDown(document, { key: 'Escape' })
+  })
 }
 
 describe('SmartPhotoPage: participant fetch edge cases', () => {
@@ -455,13 +468,9 @@ describe('SmartPhotoPage: capture edge cases', () => {
   it('capture with mirror on uses the flip transform; editor compose/save use only the frozen base', async () => {
     const { container } = await renderPage()
 
-    // Mirror ON via the unified top-right menu (camera phase only).
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Otomatis' }))
-    })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Cermin' }))
-    })
+    // Mirror ON via the settings gear panel (camera phase only).
+    await toggleViaGear('Cermin')
+    expect(document.querySelector('video')?.style.transform).toBe('scaleX(-1)')
 
     await captureAndOpenEditor()
     await flush()
@@ -476,9 +485,10 @@ describe('SmartPhotoPage: capture edge cases', () => {
     // Snapshot taken after the flip — lossless PNG (no quality arg).
     expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledWith('image/png')
 
-    // The mirror menu lives only in the camera phase: unmounted in the editor,
+    // The gear panel lives only in the camera phase: unmounted in the editor,
     // so nothing can toggle it mid-edit.
-    expect(screen.queryByRole('button', { name: 'Cermin' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'Cermin' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Pengaturan' })).toBeNull()
 
     // Compose: ONE base draw at the full rect — no mirror transform re-applied.
     expect(callsFor(editor)).toEqual([
@@ -506,12 +516,7 @@ describe('SmartPhotoPage: capture edge cases', () => {
   it('toggling mirror off after a capture only affects the next capture (captured base is frozen)', async () => {
     const { container } = await renderPage()
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Otomatis' }))
-    })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Cermin' }))
-    })
+    await toggleViaGear('Cermin')
 
     ctxCalls = []
     await captureAndOpenEditor()
@@ -524,12 +529,7 @@ describe('SmartPhotoPage: capture edge cases', () => {
     })
     expect(screen.getByRole('button', { name: 'Otomatis' })).toBeInTheDocument()
     ctxCalls = []
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Otomatis' }))
-    })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Cermin' }))
-    })
+    await toggleViaGear('Cermin')
 
     await captureAndOpenEditor()
     // The NEXT capture reflects the new state; the first capture's flip was
@@ -641,6 +641,48 @@ describe('SmartPhotoPage: capture edge cases', () => {
     // PhotoEditor (and its rapor toggle / save control) only mounts with data.
     expect(screen.queryByRole('button', { name: 'Jadikan Foto Raport' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Simpan' })).toBeNull()
+  })
+
+  it('post-capture controls sit outside the canvas box; Batal is a card-less centered capsule footer', async () => {
+    const { container } = await renderPage()
+    await captureAndOpenEditor()
+    await flush()
+
+    const captureCanvas = container.querySelector('canvas.hidden')
+    expect(captureCanvas).not.toBeNull()
+    const canvasBox = captureCanvas!.parentElement as HTMLElement
+    expect(canvasBox.className).toContain('aspect-[9/16]')
+    expect(canvasBox.className).toContain('overflow-hidden')
+    const wrapper = canvasBox.parentElement as HTMLElement
+    expect(wrapper.classList.contains('pr-16')).toBe(true)
+
+    // Icon column: absolute right column anchored to the wrapper — NOT a
+    // descendant of the clipped canvas box (it lives in the pr-16 gutter).
+    const column = Array.from(wrapper.querySelectorAll('div')).find(
+      (el) =>
+        el.classList.contains('absolute') &&
+        el.classList.contains('flex-col') &&
+        Array.from(el.classList).some((cls) => cls.startsWith('right-')),
+    )
+    expect(column).toBeTruthy()
+    expect(column!.parentElement).toBe(wrapper)
+    expect(canvasBox.contains(column!)).toBe(false)
+
+    // Batal: standalone capsule in a centered footer below the canvas, with
+    // no card/panel wrapper anywhere in its ancestor chain.
+    const batal = screen.getByRole('button', { name: 'Batal' })
+    expect(batal.classList.contains('rounded-full')).toBe(true)
+    expect(canvasBox.contains(batal)).toBe(false)
+    const footer = batal.parentElement as HTMLElement
+    expect(footer.classList.contains('flex-col')).toBe(true)
+    expect(footer.classList.contains('items-center')).toBe(true)
+    expect(footer.classList.contains('rounded-2xl')).toBe(false)
+    expect(batal.closest('.rounded-2xl')).toBeNull()
+    // The footer renders after the canvas box (below it), both in the wrapper.
+    expect(footer.parentElement).toBe(wrapper)
+    expect(
+      canvasBox.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 })
 
@@ -775,10 +817,7 @@ describe('CameraViewport: denied/error overlay', () => {
     onToggleCameraPicker: vi.fn(),
     onCloseCameraPicker: vi.fn(),
     onDeviceChange: vi.fn(),
-    onSwitchCamera: vi.fn(),
-    onToggleGrid: vi.fn(),
     mirror: false,
-    onToggleMirror: vi.fn(),
     photoCount: 0,
     maxPhotos: 10,
     isMaxPhotos: false,
@@ -819,5 +858,134 @@ describe('CameraViewport: denied/error overlay', () => {
     )
 
     expect(screen.getByRole('alert')).toHaveTextContent(i18n.t('fasilitator.camera.errGeneric'))
+  })
+})
+
+// ── Settings gear: grid/mirror toggles live outside the canvas ────────────
+describe('SmartPhotoPage: settings gear panel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
+    useAuthStore.setState({
+      user: { id: 'u1', name: 'Fasil', role: 'FASILITATOR' },
+    } as never)
+    vi.mocked(frameService.getAll).mockResolvedValue({ data: [] } as never)
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([] as never)
+    vi.mocked(photoService.getReportPicks).mockResolvedValue([] as never)
+    vi.mocked(sessionService.getParticipantById).mockResolvedValue(participant as never)
+  })
+
+  it('gear opens a panel whose switches reflect state and drive the grid overlay and mirrored preview', async () => {
+    const { container } = await renderPage()
+
+    // Panel starts closed; the gear advertises the dialog and is enabled.
+    const gear = screen.getByRole('button', { name: 'Pengaturan' })
+    expect(gear).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(gear).toHaveAttribute('aria-expanded', 'false')
+    expect(gear).toHaveAttribute('aria-disabled', 'false')
+    expect(screen.queryByRole('dialog', { name: 'Pengaturan' })).toBeNull()
+
+    await act(async () => {
+      fireEvent.click(gear)
+    })
+    expect(gear.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('switch', { name: 'Grid' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: 'Cermin' })).toHaveAttribute('aria-checked', 'false')
+
+    // Grid on → thirds overlay appears over the preview.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: 'Grid' }))
+    })
+    expect(screen.getByRole('switch', { name: 'Grid' })).toHaveAttribute('aria-checked', 'true')
+    expect(container.querySelector('[data-testid="grid-overlay"]')).not.toBeNull()
+
+    // Mirror on → preview flips.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: 'Cermin' }))
+    })
+    expect(document.querySelector('video')?.style.transform).toBe('scaleX(-1)')
+
+    // Outside click closes the panel; the toggles keep their state.
+    await act(async () => {
+      fireEvent.click(document.querySelector('div.fixed.inset-0')!)
+    })
+    expect(screen.queryByRole('dialog', { name: 'Pengaturan' })).toBeNull()
+
+    // Reopen: state reflected; Escape closes.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Pengaturan' }))
+    })
+    expect(screen.getByRole('switch', { name: 'Grid' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('switch', { name: 'Cermin' })).toHaveAttribute('aria-checked', 'true')
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' })
+    })
+    expect(screen.queryByRole('dialog', { name: 'Pengaturan' })).toBeNull()
+
+    // Grid off → overlay gone again.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Pengaturan' }))
+    })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: 'Grid' }))
+    })
+    expect(container.querySelector('[data-testid="grid-overlay"]')).toBeNull()
+    expect(screen.getByRole('switch', { name: 'Grid' })).toHaveAttribute('aria-checked', 'false')
+  })
+})
+
+// ── FLIP feature deleted entirely (button, prop chain, handler, i18n) ─────
+describe('flip feature removed', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
+    useAuthStore.setState({
+      user: { id: 'u1', name: 'Fasil', role: 'FASILITATOR' },
+    } as never)
+    vi.mocked(frameService.getAll).mockResolvedValue({ data: [] } as never)
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([] as never)
+    vi.mocked(photoService.getReportPicks).mockResolvedValue([] as never)
+    vi.mocked(sessionService.getParticipantById).mockResolvedValue(participant as never)
+  })
+
+  it('renders no flip control anywhere, and the camera dropdown holds only the device list', async () => {
+    await renderPage()
+
+    expect(screen.queryByRole('button', { name: 'Balik' })).toBeNull()
+
+    // Open the camera selector: device list only — no flip/grid/mirror rows.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Otomatis' }))
+    })
+    expect(screen.queryByRole('button', { name: 'Balik' })).toBeNull()
+    expect(screen.queryByRole('switch')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Grid' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Cermin' })).toBeNull()
+    // Trigger + automatic-device option inside the open dropdown.
+    expect(screen.getAllByRole('button', { name: 'Otomatis' })).toHaveLength(2)
+  })
+
+  it('no flip references remain in the camera sources or any locale catalog', () => {
+    const sources = [
+      'src/features/fasilitator/components/CameraViewport.tsx',
+      'src/features/fasilitator/components/CameraSettings.tsx',
+      'src/features/fasilitator/pages/SmartPhotoPage.tsx',
+      'src/features/fasilitator/hooks/useCamera.ts',
+    ]
+    for (const rel of sources) {
+      const src = readFileSync(resolve(process.cwd(), rel), 'utf8')
+      expect(src, rel).not.toMatch(/switchCamera|onSwitchCamera|RefreshCw|camera\.flip/)
+    }
+
+    const langs = ['id', 'en', 'ja', 'ko', 'ms', 'th', 'tl', 'vi', 'zh']
+    for (const lang of langs) {
+      const catalog = JSON.parse(
+        readFileSync(resolve(process.cwd(), `src/locales/${lang}.json`), 'utf8'),
+      ) as { fasilitator: { camera: Record<string, string> } }
+      expect(catalog.fasilitator.camera.flip, lang).toBeUndefined()
+      // Replacement keys landed in every catalog too (parity).
+      expect(catalog.fasilitator.camera.settings, lang).toBeTruthy()
+      expect(catalog.fasilitator.camera.settingsDisabled, lang).toBeTruthy()
+    }
   })
 })

@@ -36,7 +36,7 @@ function makeProps(overrides: Partial<PhotoEditorProps> = {}): PhotoEditorProps 
   }
 }
 
-/** The absolute vertical icon column PhotoEditor overlays on the canvas. */
+/** The absolute vertical icon column PhotoEditor anchors in the wrapper gutter, beside the canvas. */
 function findIconColumn(container: HTMLElement): HTMLElement {
   const column = Array.from(container.querySelectorAll('div')).find(
     (el) => el.classList.contains('absolute') && el.classList.contains('flex-col'),
@@ -51,7 +51,7 @@ function click(element: HTMLElement) {
   })
 }
 
-describe('PhotoEditor: post-capture card with vertical icon controls', () => {
+describe('PhotoEditor: post-capture controls with vertical icon column', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -93,13 +93,22 @@ describe('PhotoEditor: post-capture card with vertical icon controls', () => {
     expect(findIconColumn(container).querySelectorAll('button')).toHaveLength(4)
   })
 
-  it('Batal keeps a visible text label, sits outside the icon column, and calls onDiscard', () => {
+  it('Batal is a standalone rounded-full capsule centered in a card-less footer and calls onDiscard', () => {
     const props = makeProps()
     const { container } = render(<PhotoEditor {...props} />)
 
     const batal = screen.getByRole('button', { name: 'Batal' })
     expect(batal.textContent).toBe('Batal')
+    expect(batal.classList.contains('rounded-full')).toBe(true)
     expect(findIconColumn(container).contains(batal)).toBe(false)
+
+    // Footer: horizontally centered below the canvas — no card/panel wrapper.
+    const footer = batal.parentElement as HTMLElement
+    expect(footer.classList.contains('flex-col')).toBe(true)
+    expect(footer.classList.contains('items-center')).toBe(true)
+    expect(footer.classList.contains('rounded-2xl')).toBe(false)
+    expect(footer.classList.contains('border')).toBe(false)
+    expect(batal.closest('.rounded-2xl')).toBeNull()
 
     click(batal)
     expect(props.onDiscard).toHaveBeenCalledTimes(1)
@@ -157,11 +166,15 @@ describe('PhotoEditor: post-capture card with vertical icon controls', () => {
     expect(props.onDiscard).toHaveBeenCalledTimes(1)
   })
 
-  it('without photo consent the rapor toggle is disabled and the warning is shown', () => {
+  it('without photo consent the rapor toggle is disabled and the warning badge survives in the footer', () => {
     const props = makeProps({ participant: { ...participant, consent_photo: false } })
-    render(<PhotoEditor {...props} />)
+    const { container } = render(<PhotoEditor {...props} />)
 
     expect(screen.getByRole('button', { name: 'Jadikan Foto Raport' })).toBeDisabled()
-    expect(screen.getByText('Izin foto belum diberikan')).toBeInTheDocument()
+    const badge = screen.getByText('Izin foto belum diberikan')
+    // Visible in the footer next to the capsule Batal — outside the icon column.
+    const batal = screen.getByRole('button', { name: 'Batal' })
+    expect(batal.parentElement?.contains(badge)).toBe(true)
+    expect(findIconColumn(container).contains(badge)).toBe(false)
   })
 })

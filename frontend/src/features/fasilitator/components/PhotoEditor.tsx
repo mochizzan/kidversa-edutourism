@@ -77,7 +77,8 @@ export const PhotoEditor = ({
 
  return (
   <>
-   {/* Vertical icon column anchored to the page's relative editor wrapper. */}
+   {/* Vertical icon column anchored to the page's relative editor wrapper,
+       sitting in its right gutter — beside the canvas, never over it. */}
    <div className="absolute right-2 top-2 z-10 flex flex-col items-center gap-2">
     <CircleIconButton
      label={frameLabel}
@@ -114,19 +115,15 @@ export const PhotoEditor = ({
     />
    </div>
 
-   {/* Card below the canvas: consent status (when missing) + labeled Batal. */}
-   <div
-    className={cn(
-     'mt-3 flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm',
-     participant.consent_photo && 'justify-end',
-    )}
-   >
+   {/* Footer below the canvas: consent status (when missing) above a
+       centered capsule Batal — deliberately no card/panel wrapper. */}
+   <div className="mt-3 flex flex-col items-center gap-2">
     {!participant.consent_photo && (
      <span className="rounded-full bg-warning-surface px-2 py-0.5 text-[10px] font-bold text-warning-text">
       {t('fasilitator.photos.consentRequired')}
      </span>
     )}
-    <Button variant="secondary" onClick={onDiscard}>
+    <Button variant="secondary" className="rounded-full px-6" onClick={onDiscard}>
      {t('common.cancel')}
     </Button>
    </div>

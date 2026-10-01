@@ -4,10 +4,8 @@ import {
   AlertTriangle,
   ChevronDown,
   Monitor,
-  RefreshCw,
   LayoutGrid,
   Image,
-  FlipHorizontal,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../../shared/components/ui/Button'
@@ -33,10 +31,9 @@ interface CameraViewportProps {
   onToggleCameraPicker: () => void
   onCloseCameraPicker: () => void
   onDeviceChange: (deviceId: string) => void
-  onSwitchCamera: () => void
-  onToggleGrid: () => void
+  // Render-only view state: the Grid/Mirror toggle controls live in the gear
+  // panel outside the canvas box (see CameraSettings).
   mirror: boolean
-  onToggleMirror: () => void
   photoCount: number
   maxPhotos: number
   isMaxPhotos: boolean
@@ -62,10 +59,7 @@ export const CameraViewport = ({
   onToggleCameraPicker,
   onCloseCameraPicker,
   onDeviceChange,
-  onSwitchCamera,
-  onToggleGrid,
   mirror,
-  onToggleMirror,
   photoCount,
   maxPhotos,
   isMaxPhotos,
@@ -107,7 +101,7 @@ export const CameraViewport = ({
       />
 
       {cameraState === 'active' && showGrid && (
-        <div className="absolute inset-0 z-[5] pointer-events-none">
+        <div data-testid="grid-overlay" className="absolute inset-0 z-[5] pointer-events-none">
           <div className="absolute top-0 left-1/3 w-px h-full bg-white/30" />
           <div className="absolute top-0 left-2/3 w-px h-full bg-white/30" />
           <div className="absolute top-1/3 left-0 h-px w-full bg-white/30" />
@@ -151,88 +145,43 @@ export const CameraViewport = ({
             <>
               <div className="fixed inset-0 z-40" onClick={onCloseCameraPicker} />
               <div className="absolute right-0 top-full mt-2 w-64 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50">
-                {devices.length > 0 && (
-                  <div className="p-1.5 space-y-1">
-                    <button
-                      onClick={() => {
-                        onDeviceChange('')
-                        onCloseCameraPicker()
-                      }}
-                      className={cn(
-                        'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
-                        !selectedDeviceId
-                          ? 'bg-primary-container text-primary'
-                          : 'hover:bg-surface-container-low text-on-surface',
-                      )}
-                    >
-                      <Camera className="w-4 h-4 text-primary" />
-                      <span>{t('fasilitator.camera.auto')}</span>
-                    </button>
-                    {devices.map((device) => {
-                      const isSelected = selectedDeviceId === device.deviceId
-                      return (
-                        <button
-                          key={device.deviceId}
-                          onClick={() => {
-                            onDeviceChange(device.deviceId)
-                            onCloseCameraPicker()
-                          }}
-                          className={cn(
-                            'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold truncate',
-                            isSelected
-                              ? 'bg-primary-container text-primary'
-                              : 'hover:bg-surface-container-low text-on-surface',
-                          )}
-                        >
-                          <Monitor className="w-4 h-4 text-on-surface-variant" />
-                          <span className="truncate">{device.label || t('fasilitator.camera.deviceFallback')}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                <div className={cn('p-1.5 space-y-1', devices.length > 0 && 'border-t border-slate-100')}>
+                <div className="p-1.5 space-y-1">
                   <button
                     onClick={() => {
-                      onSwitchCamera()
-                      onCloseCameraPicker()
-                    }}
-                    className="w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold hover:bg-surface-container-low text-on-surface"
-                  >
-                    <RefreshCw className="w-4 h-4 text-on-surface-variant" />
-                    <span>{t('fasilitator.camera.flip')}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      onToggleGrid()
+                      onDeviceChange('')
                       onCloseCameraPicker()
                     }}
                     className={cn(
                       'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
-                      showGrid
+                      !selectedDeviceId
                         ? 'bg-primary-container text-primary'
                         : 'hover:bg-surface-container-low text-on-surface',
                     )}
                   >
-                    <LayoutGrid className={cn('w-4 h-4', showGrid ? 'text-primary' : 'text-on-surface-variant')} />
-                    <span>{t('fasilitator.camera.grid')}</span>
+                    <Camera className="w-4 h-4 text-primary" />
+                    <span>{t('fasilitator.camera.auto')}</span>
                   </button>
-                  <button
-                    onClick={() => {
-                      onToggleMirror()
-                      onCloseCameraPicker()
-                    }}
-                    className={cn(
-                      'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
-                      mirror
-                        ? 'bg-primary-container text-primary'
-                        : 'hover:bg-surface-container-low text-on-surface',
-                    )}
-                  >
-                    <FlipHorizontal className={cn('w-4 h-4', mirror ? 'text-primary' : 'text-on-surface-variant')} />
-                    <span>{t('fasilitator.camera.mirror')}</span>
-                  </button>
+                  {devices.map((device) => {
+                    const isSelected = selectedDeviceId === device.deviceId
+                    return (
+                      <button
+                        key={device.deviceId}
+                        onClick={() => {
+                          onDeviceChange(device.deviceId)
+                          onCloseCameraPicker()
+                        }}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold truncate',
+                          isSelected
+                            ? 'bg-primary-container text-primary'
+                            : 'hover:bg-surface-container-low text-on-surface',
+                        )}
+                      >
+                        <Monitor className="w-4 h-4 text-on-surface-variant" />
+                        <span className="truncate">{device.label || t('fasilitator.camera.deviceFallback')}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </>

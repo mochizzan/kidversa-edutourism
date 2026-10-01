@@ -24,7 +24,10 @@ export function useCamera({ enabled }: UseCameraOptions) {
   // Human-readable reason for the current 'denied'/'error' state — shown in
   // the viewport overlay (the toast alone disappears; the state must not).
   const [cameraErrorMessage, setCameraErrorMessage] = useState<string | null>(null)
-  const [facingMode, setFacingMode] = useState<FacingMode>('environment')
+  // Rear camera by default. Nothing can flip it at runtime anymore (the flip
+  // control was removed), so it is a constant rather than state — start()'s
+  // constraints still read it for the facingMode fallback chain.
+  const facingMode: FacingMode = 'environment'
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
   // Monotonic counter: every restartCamera() bumps it, so the start effect
@@ -230,7 +233,7 @@ export function useCamera({ enabled }: UseCameraOptions) {
       cancelledRef.current = true
       stopStream()
     }
-  }, [enabled, facingMode, selectedDeviceId, restartTick, addToast, stopStream, attachStream])
+  }, [enabled, selectedDeviceId, restartTick, addToast, stopStream, attachStream])
 
   useEffect(() => {
     if (cameraState !== 'active' || !enabled) return
@@ -242,11 +245,6 @@ export function useCamera({ enabled }: UseCameraOptions) {
       })
     }
   }, [cameraState, enabled])
-
-  const switchCamera = useCallback(() => {
-    setSelectedDeviceId('')
-    setFacingMode((f) => (f === 'environment' ? 'user' : 'environment'))
-  }, [])
 
   const selectDevice = useCallback((deviceId: string) => {
     setSelectedDeviceId(deviceId)
@@ -263,8 +261,6 @@ export function useCamera({ enabled }: UseCameraOptions) {
     cameraErrorMessage,
     devices,
     selectedDeviceId,
-    facingMode,
-    switchCamera,
     selectDevice,
     restartCamera,
     stopStream,
