@@ -39,7 +39,6 @@ const ReportReviewPage = () => {
     topics,
     activeTopicId,
     setActiveTopicId,
-    loadTopicMissions,
     suggesting,
     session,
     participant,
@@ -164,8 +163,9 @@ const ReportReviewPage = () => {
               key={topic.programStageId}
               type="button"
               onClick={() => {
+                // Satu-satunya sumber: pindah topik → hook me-re-derive stage
+                // rows, mini rapor, hasNoAssessment, dan memuat misi topik itu.
                 setActiveTopicId(topic.programStageId)
-                void loadTopicMissions(topic.programStageId)
               }}
               className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors ${activeTopicId === topic.programStageId
                 ? 'bg-primary text-on-primary border-primary'
@@ -290,7 +290,7 @@ const ReportReviewPage = () => {
           </div>
         </Card>
 
-        <BadgeList participantId={report.participant_id} />
+        <BadgeList participantId={report.participant_id} programStageId={activeTopicId} />
 
         <ReportAssessmentScores stageInfos={stageInfos} />
 

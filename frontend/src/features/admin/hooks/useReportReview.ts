@@ -157,7 +157,10 @@ export function useReportReview(sessionId: string | undefined, participantId: st
  const [participant, setParticipant] = useState<Participant | null>(null)
  const [partPhotos, setPartPhotos] = useState<SmartPhoto[]>([])
  const [partPicks, setPartPicks] = useState<ReportPhotoPick[] | null>(null)
- const [stageInfos, setStageInfos] = useState<StageInfo[]>([])
+ // Semua stage info per topik (key: program_stage_id); section preview selalu
+ // diturunkan dari activeTopicId lewat stageInfos di bawah — 1 topik = 1 rapor
+ // terpisah, tanpa merge lintas topik.
+ const [stageInfoByTopic, setStageInfoByTopic] = useState<Map<string, StageInfo[]>>(new Map())
  const [missions, setMissions] = useState<MissionBank[]>([])
  const [assignedMissionIds, setAssignedMissionIds] = useState<string[]>([])
  const [groups, setGroups] = useState<SessionGroup[]>([])
@@ -170,7 +173,6 @@ export function useReportReview(sessionId: string | undefined, participantId: st
  const [actionLoading, setActionLoading] = useState<string | null>(null)
  const [narrativeText, setNarrativeText] = useState('')
  const [streaming, setStreaming] = useState(false)
- const [hasNoAssessment, setHasNoAssessment] = useState(false)
  const [suggesting, setSuggesting] = useState(false)
 
  const prevTextRef = useRef('')
@@ -188,6 +190,24 @@ export function useReportReview(sessionId: string | undefined, participantId: st
  const photo = useMemo(
   () => resolveReportPhoto(partPicks, partPhotos, participantId, activeTopicId),
   [partPicks, partPhotos, activeTopicId, participantId],
+ )
+
+ // Baris Kegiatan + penilaian HANYA milik topik yang aktif (satu-satunya sumber
+ // untuk tabel assessment, mini rapor/print/PDF/PNG, dan gate hasNoAssessment).
+ const stageInfos = useMemo(
+  () => (activeTopicId ? stageInfoByTopic.get(activeTopicId) ?? [] : []),
+  [stageInfoByTopic, activeTopicId],
+ )
+
+ // Gate narrative/mission/action bar: assessment milik TOPIK AKTIF saja.
+ // Predikat identik dengan perilaku lama (tanpa penilaian / rating 0 = none);
+ // topik tunggal tanpa penilaian tetap menghasilkan true seperti sebelumnya.
+ const hasNoAssessment = useMemo(
+  () =>
+   stageInfos
+    .flatMap((si) => si.kegiatan)
+    .every((k) => !k.assessment || k.assessment.star_rating < 1),
+  [stageInfos],
  )
 
  const loadData = useCallback(async () => {
@@ -272,31 +292,27 @@ export function useReportReview(sessionId: string | undefined, participantId: st
     await Promise.all(programStages.map((ps) => programSubstageService.listByStage(ps.id)))
    ).flat()
    const subNameById = new Map<string, string>(progSubs.map((s) => [s.id, s.name]))
-   const builtStageInfos: StageInfo[] = sessStages
-    .map((ss) => {
-     const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
-     if (!pgStage) return null
-     const kegiatan: KegiatanRow[] = substagesOfStage(sessSubstages, ss.id).map((k) => ({
-      sessionSubstage: k,
-      programSubstageName: subNameById.get(k.program_substage_id) ?? k.program_substage_id,
-      assessment: partAssessments.find((a) => a.session_substage_id === k.id),
-     }))
-     return { programStage: pgStage, sessionStageId: ss.id, kegiatan }
-    })
-    .filter((s): s is NonNullable<typeof s> => s !== null) as StageInfo[]
-   setStageInfos(builtStageInfos)
-
-   const hasNoAssessment = builtStageInfos
-    .flatMap((si) => si.kegiatan)
-    .every((k) => !k.assessment || k.assessment.star_rating < 1)
-   setHasNoAssessment(hasNoAssessment)
+   const stageInfoByTopic = new Map<string, StageInfo[]>()
+   for (const ss of sessStages) {
+    const pgStage = programStages.find((ps) => ps.id === ss.program_stage_id)
+    if (!pgStage) continue
+    const kegiatan: KegiatanRow[] = substagesOfStage(sessSubstages, ss.id).map((k) => ({
+     sessionSubstage: k,
+     programSubstageName: subNameById.get(k.program_substage_id) ?? k.program_substage_id,
+     assessment: partAssessments.find((a) => a.session_substage_id === k.id),
+    }))
+    const info: StageInfo = { programStage: pgStage, sessionStageId: ss.id, kegiatan }
+    const topicStages = stageInfoByTopic.get(ss.program_stage_id)
+    if (topicStages) topicStages.push(info)
+    else stageInfoByTopic.set(ss.program_stage_id, [info])
+   }
+   setStageInfoByTopic(stageInfoByTopic)
 
    setPartPhotos(partPhotos)
    setPartPicks(picks)
-
-   const missionResult = await missionService.getAll({ limit: 50 })
-   const programMissions = missionResult.data.filter((m) => m.program_id === sess.program_id)
-   setMissions(programMissions)
+   // Misi program-wide TIDAK lagi diambil di sini: daftar misi hanya berasal
+   // dari loadTopicMissions(activeTopicId) — fetch program-wide di tail ini
+   // dahulu balapan dengan & menimpa data scope-topik.
   } catch {
    setError(i18n.t('admin.reportReview.loadError'))
   } finally {
@@ -337,13 +353,20 @@ export function useReportReview(sessionId: string | undefined, participantId: st
  }, [assignedMissionIds, report?.id, saTenant])
 
  // Topic-scoped mission library (only this Topic's missions) for the modal.
+ // Sumber tunggal daftar misi: topik yang diminta terakhir menang — balasan
+ // lambat topik lain tidak boleh menimpa, dan daftar lama dikosongkan lebih
+ // dahulu agar tidak ada state lintas topik saat pindah topik.
+ const missionsTopicRef = useRef<string | null>(null)
  const loadTopicMissions = useCallback(async (topicId: string) => {
   if (!topicId) return
+  missionsTopicRef.current = topicId
+  setMissions([])
   try {
    const list = await missionService.getByTopic(topicId, { limit: 100 })
-   setMissions(list)
+   if (missionsTopicRef.current === topicId) setMissions(list)
   } catch (err) {
-   /* keep existing program-wide list as fallback */
+   // Gagal muat topik → daftar tetap kosong (empty-state per topik), tanpa
+   // fallback merge program-wide yang menyembunyikan scope topik.
    console.error('[useReportReview] loadTopicMissions failed', err)
   }
  }, [])
@@ -707,7 +730,6 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   suggesting,
   streaming,
   loadData,
-  loadTopicMissions,
   handleGenerateNarrative,
   toggleMission,
   handleSuggestMissions,
