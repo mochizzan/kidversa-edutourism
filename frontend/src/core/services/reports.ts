@@ -22,10 +22,13 @@ const getBySession = async (sessionId: string): Promise<ReportSessionResult> => 
 // Generate is async (202 Accepted): the server runs the session generate in a
 // detached worker and the response only acknowledges acceptance. Progress and
 // per-report outcomes are read from active_generate via getBySession.
-const generate = async (sessionId: string): Promise<void> => {
-  await apiRequest<unknown>('POST', API_ROUTES.REPORTS.GENERATE_SESSION, {
-    session_id: sessionId,
-  })
+// `topicId` scopes the run to one topic (the active topic filter); omitted,
+// the payload carries no topic_id and the server keeps legacy all-topics
+// behavior.
+const generate = async (sessionId: string, topicId?: string): Promise<void> => {
+  const body: { session_id: string; topic_id?: string } = { session_id: sessionId }
+  if (topicId) body.topic_id = topicId
+  await apiRequest<unknown>('POST', API_ROUTES.REPORTS.GENERATE_SESSION, body)
 }
 
 // Per-row "generate one" — same async 202 contract as generate (one

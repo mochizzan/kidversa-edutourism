@@ -355,7 +355,10 @@
       "error": "Gagal",
       "interrupted": "Terputus",
       "phaseNarrative": "Narasi",
-      "phaseMissions": "Misi"
+      "phaseMissions": "Misi",
+      "skipped": "Dilewati",
+      "missionSkipBankEmpty": "Misi dilewati: bank misi kosong",
+      "narrativeSkipNoAssessments": "Narasi dilewati: belum ada penilaian"
     },
     "reportStatus": {
       "draft": "Draft",

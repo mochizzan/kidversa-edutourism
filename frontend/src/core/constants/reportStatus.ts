@@ -113,12 +113,31 @@ export interface GenerateRowState {
  phase?: ReportGeneratePhase
  /** Failure message (status === 'error'). */
  message?: string
+ /** Server skip code for the mission phase (mission_bank_empty, …). */
+ missionSkipReason?: string
+ /** Server skip code for the narrative phase (no_assessments, …). */
+ narrativeSkipReason?: string
 }
 
 /** Observed per-item failure that outlived the registry (registry loss). */
 export interface RecordedGenerateError {
  message: string
  phase?: ReportGeneratePhase
+}
+
+/**
+ * Terminal per-item SKIP captured from active_generate items — the
+ * registry-loss bridge for skips (mirrors RecordedGenerateError). The server
+ * declared the row's outcome either a full skip or a success with a phase
+ * skipped; nothing persisted proves it (a skip generates no evidence), so the
+ * record is what keeps the verdict visible — and truthful — once the registry
+ * vanishes, instead of degrading to 'interrupted' or a silent re-ready row.
+ */
+export interface RecordedGenerateSkip {
+ /** The server's terminal verdict for this item. */
+ status: 'skipped' | 'success'
+ missionSkipReason?: string
+ narrativeSkipReason?: string
 }
 
 /** i18n keys for the generate row statuses (live items and registry-gone verdicts). */
@@ -128,7 +147,26 @@ export const GENERATE_ROW_LABEL = {
  success: 'admin.status.completed',
  error: 'admin.status.error',
  interrupted: 'admin.status.interrupted',
+ skipped: 'admin.status.skipped',
 } as const satisfies Record<GenerateRowStatus, string>
+
+/**
+ * i18n keys for the server's per-phase skip codes (active_generate items).
+ * Unknown codes resolve to null at the call site so the raw server code is
+ * rendered instead — a declared skip is never dropped silently.
+ */
+export const GENERATE_SKIP_REASON_LABEL = {
+ mission_bank_empty: 'admin.status.missionSkipBankEmpty',
+ no_assessments: 'admin.status.narrativeSkipNoAssessments',
+} as const satisfies Record<string, string>
+
+export type GenerateSkipReasonCode = keyof typeof GENERATE_SKIP_REASON_LABEL
+
+/** i18n key for a known skip code; null for an unknown one (render raw). */
+export const generateSkipReasonLabel = (reason: string) =>
+ reason in GENERATE_SKIP_REASON_LABEL
+  ? GENERATE_SKIP_REASON_LABEL[reason as GenerateSkipReasonCode]
+  : null
 
 /** i18n keys for the phase shown alongside processing/error generate rows. */
 export const GENERATE_PHASE_LABEL = {
@@ -143,6 +181,8 @@ export interface GenerateRowFlags {
  watchedIds?: ReadonlySet<string> | readonly string[]
  /** reportID → per-item failure captured from active_generate items. */
  recordedErrors?: ReadonlyMap<string, RecordedGenerateError>
+ /** reportID → per-item skip verdict captured from active_generate items. */
+ recordedSkips?: ReadonlyMap<string, RecordedGenerateSkip>
 }
 
 /**
@@ -163,13 +203,15 @@ function generateEvidenceComplete(
  * Pure per-row generate state: the active_generate items are authoritative
  * while the registry lives; once it vanishes (run ended or server restart),
  * a watched row resolves from persistent evidence — complete → 'success',
- * a recorded failure → 'error' with its message, otherwise 'interrupted'
- * (never a fake "done"). Rows outside every observed run report null so the
- * caller renders the existing persisted-status UI unchanged.
+ * a recorded failure → 'error' with its message, a recorded server-declared
+ * skip → its own verdict ('skipped' / 'success' with the phase skip reasons),
+ * otherwise 'interrupted' (never a fake "done", never a silent skip). Rows
+ * outside every observed run report null so the caller renders the existing
+ * persisted-status UI unchanged.
  *
- * Depends only on (report id, entity evidence, server extras, watch/error
- * sets derived from those extras) — identical inputs always yield identical
- * output, which is what makes a reload rebuild the same state.
+ * Depends only on (report id, entity evidence, server extras, watch/error/
+ * skip sets derived from those extras) — identical inputs always yield
+ * identical output, which is what makes a reload rebuild the same state.
  */
 export function getGenerateRowState(
  reportId: string | null | undefined,
@@ -180,8 +222,17 @@ export function getGenerateRowState(
  const gen = flags.activeGenerate ?? null
  const item = gen?.items?.find((i) => i.report_id === reportId)
  if (item) {
-  if (item.status === 'error') return { status: 'error', phase: item.phase, message: item.error }
-  return item.phase ? { status: item.status, phase: item.phase } : { status: item.status }
+  // Skip reasons ride along with whatever the terminal status is, so a
+  // partial skip (success + reason) renders BOTH facts on the row.
+  const skipReasons = {
+   missionSkipReason: item.mission_skip_reason,
+   narrativeSkipReason: item.narrative_skip_reason,
+  }
+  if (item.status === 'error')
+   return { status: 'error', phase: item.phase, message: item.error, ...skipReasons }
+  return item.phase
+   ? { status: item.status, phase: item.phase, ...skipReasons }
+   : { status: item.status, ...skipReasons }
  }
  if (gen) {
   // Defensive: legacy id views if a server ever omits items for this row.
@@ -193,8 +244,10 @@ export function getGenerateRowState(
    ? flags.watchedIds.has(reportId)
    : (flags.watchedIds as readonly string[] | undefined)?.includes(reportId) ?? false
  const recorded = flags.recordedErrors?.get(reportId)
- if (!watched && !recorded) return null
+ const skip = flags.recordedSkips?.get(reportId)
+ if (!watched && !recorded && !skip) return null
  if (generateEvidenceComplete(report)) return { status: 'success' }
  if (recorded) return { status: 'error', phase: recorded.phase, message: recorded.message }
+ if (skip) return { ...skip }
  return { status: 'interrupted' }
 }

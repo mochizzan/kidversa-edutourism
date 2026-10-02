@@ -325,7 +325,10 @@
       "error": "Ralat",
       "interrupted": "Terputus",
       "phaseNarrative": "Naratif",
-      "phaseMissions": "Misi"
+      "phaseMissions": "Misi",
+      "skipped": "Dilewatkan",
+      "missionSkipBankEmpty": "Misi dilangkau: bank misi kosong",
+      "narrativeSkipNoAssessments": "Naratif dilangkau: tiada penilaian lagi"
     },
     "reportStatus": {
       "draft": "Draf",

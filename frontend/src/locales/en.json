@@ -325,7 +325,10 @@
       "error": "Error",
       "interrupted": "Interrupted",
       "phaseNarrative": "Narrative",
-      "phaseMissions": "Missions"
+      "phaseMissions": "Missions",
+      "skipped": "Skipped",
+      "missionSkipBankEmpty": "Missions skipped: mission bank empty",
+      "narrativeSkipNoAssessments": "Narrative skipped: no assessments yet"
     },
     "reportStatus": {
       "draft": "Draft",

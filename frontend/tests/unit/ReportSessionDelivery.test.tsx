@@ -702,7 +702,8 @@ describe('ReportSessionPage — server-driven per-row delivery state', () => {
    await flush(4)
 
    expect(reportService.generate).toHaveBeenCalledTimes(1)
-   expect(reportService.generate).toHaveBeenCalledWith('s1')
+   // Payload follows the active topic filter (default = first tab, ps1).
+   expect(reportService.generate).toHaveBeenCalledWith('s1', 'ps1')
    // The post-202 refetch already observes active_generate → the row status
    // comes from the polled extras, not from the local click.
    expect(vi.mocked(reportService.getBySession).mock.calls.length).toBeGreaterThanOrEqual(2)
@@ -766,5 +767,110 @@ describe('ReportSessionPage — server-driven per-row delivery state', () => {
     (t) => t.message === i18n.t('admin.status.operationInterrupted'),
    ),
   ).toHaveLength(0)
+ })
+})
+
+describe('generate all — topic-scoped eligibility and payload (Bug 3)', () => {
+ const sessionStage2 = { id: 'st2', session_id: 's1', program_stage_id: 'ps2', status: 'ACTIVE' }
+ const programStage2 = { id: 'ps2', name: 'Topik Dua' }
+
+ beforeEach(() => {
+  vi.clearAllMocks()
+  useToastStore.getState().dismissAll()
+ })
+
+ /**
+  * Two-topic load (ps1 = Topik Satu via st1/sub1, ps2 = Topik Dua via
+  * st2/sub2). Ready rows are shaped purely by which topic the assessments
+  * belong to — reports are empty, nobody is absent.
+  */
+ function setupTwoTopicMocks(
+  assessments: { participant_id: string; session_substage_id: string; star_rating: number }[],
+ ): void {
+  setupMocks(async () => ({ items: [], extras: {} }))
+  vi.mocked(sessionService.getStages).mockResolvedValue([sessionStage, sessionStage2] as never)
+  vi.mocked(programService.getStages).mockResolvedValue([programStage, programStage2] as never)
+  vi.mocked(sessionService.getSubstages).mockResolvedValue([
+   { id: 'sub1', session_stage_id: 'st1' },
+   { id: 'sub2', session_stage_id: 'st2' },
+  ] as never)
+  vi.mocked(assessmentService.getBySession).mockResolvedValue(assessments as never)
+  vi.mocked(reportService.generate).mockResolvedValue(undefined)
+ }
+
+ it("generate all passes the active topic as topic_id and counts only that topic's eligible rows", async () => {
+  // p2 is ready only in ps1 (Topik Satu); p1 is ready only in ps2 (Topik Dua).
+  setupTwoTopicMocks([
+   { participant_id: 'p2', session_substage_id: 'sub1', star_rating: 4 },
+   { participant_id: 'p1', session_substage_id: 'sub2', star_rating: 5 },
+  ])
+
+  renderPage()
+  await flush()
+
+  // Default active topic = first tab (ps1), which has exactly ONE eligible row.
+  const generateBtn = screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') })
+  await act(async () => { generateBtn.click() })
+  await flush(4)
+
+  expect(reportService.generate).toHaveBeenCalledTimes(1)
+  expect(reportService.generate).toHaveBeenNthCalledWith(1, 's1', 'ps1')
+  // Result count reflects ONLY ps1's eligible row — ps2's ready row is not
+  // part of this run (cross-topic eligibility is gone).
+  expect(screen.getByText(/^1/, { selector: 'strong' })).toBeInTheDocument()
+  await act(async () => {
+   screen.getByRole('button', { name: i18n.t('admin.reports.understand') }).click()
+  })
+
+  // Switch to Topik Dua: the payload follows the topic filter.
+  await act(async () => {
+   screen.getByRole('button', { name: programStage2.name }).click()
+  })
+  await flush()
+  await act(async () => {
+   screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') }).click()
+  })
+  await flush(4)
+
+  expect(reportService.generate).toHaveBeenCalledTimes(2)
+  expect(reportService.generate).toHaveBeenNthCalledWith(2, 's1', 'ps2')
+ })
+
+ it('never fires a cross-topic generate: no eligible rows in the active topic → no POST at all', async () => {
+  // Both participants are ready ONLY in ps2; the default topic ps1 has zero
+  // eligible rows.
+  setupTwoTopicMocks([
+   { participant_id: 'p1', session_substage_id: 'sub2', star_rating: 5 },
+   { participant_id: 'p2', session_substage_id: 'sub2', star_rating: 4 },
+  ])
+
+  renderPage()
+  await flush()
+
+  const generateBtn = screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') })
+  expect(generateBtn).toBeEnabled()
+  await act(async () => { generateBtn.click() })
+  await flush(4)
+
+  // Old behavior found ps2's eligible rows and POSTed across topics — now the
+  // run refuses with an explicit error and no payload leaves the client.
+  expect(reportService.generate).not.toHaveBeenCalled()
+  expect(screen.getByText(i18n.t('admin.reports.eligibleEmptyError'))).toBeInTheDocument()
+  await act(async () => {
+   screen.getByRole('button', { name: i18n.t('admin.reports.understand') }).click()
+  })
+
+  // The eligible rows still exist — reachable once the filter moves there.
+  await act(async () => {
+   screen.getByRole('button', { name: programStage2.name }).click()
+  })
+  await flush()
+  await act(async () => {
+   screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') }).click()
+  })
+  await flush(4)
+
+  expect(reportService.generate).toHaveBeenCalledTimes(1)
+  expect(reportService.generate).toHaveBeenCalledWith('s1', 'ps2')
  })
 })

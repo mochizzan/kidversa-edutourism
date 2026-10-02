@@ -163,19 +163,28 @@ export interface ReportTokenResponse {
  */
 export type ReportGeneratePhase = 'narrative' | 'missions'
 
-/** One report's status inside active_generate (server-side registry). */
-export type ReportGenerateItemStatus = 'queued' | 'processing' | 'success' | 'error'
+/**
+ * One report's status inside active_generate (server-side registry).
+ * `skipped` = the server generated NOTHING for this report+topic and
+ * declared the skip explicitly (never a silent no-op); `success` with a
+ * `*_skip_reason` present is a partial skip (one phase ran, one did not).
+ */
+export type ReportGenerateItemStatus = 'queued' | 'processing' | 'success' | 'error' | 'skipped'
 
 /**
  * One report's status inside active_generate. `phase` is present while the
  * report is processing or when it failed (which phase failed); `error`
- * carries the failure message when status=error.
+ * carries the failure message when status=error; `mission_skip_reason` /
+ * `narrative_skip_reason` carry the server's skip code (e.g.
+ * `mission_bank_empty`, `no_assessments`) when that phase was skipped.
  */
 export interface ReportGenerateItem {
  report_id: string
  status: ReportGenerateItemStatus
  phase?: ReportGeneratePhase
  error?: string
+ mission_skip_reason?: string
+ narrative_skip_reason?: string
 }
 
 /**
@@ -223,8 +232,10 @@ export type ReportSessionResult = {
 export interface ReportService {
  getBySession(sessionId: string): Promise<ReportSessionResult>
  /** Async generate: 202 Accepted — the run continues server-side; progress
-  *  arrives via active_generate in getBySession, never from this response. */
- generate(sessionId: string): Promise<void>
+  *  arrives via active_generate in getBySession, never from this response.
+  *  `topicId` scopes the run to ONE topic (1 topic = 1 report); omitted the
+  *  server keeps its legacy all-topics behavior. */
+ generate(sessionId: string, topicId?: string): Promise<void>
  generateOne: (sessionId: string, participantId: string) => Promise<void>
  approve(
   reportId: string,

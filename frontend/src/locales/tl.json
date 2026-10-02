@@ -325,7 +325,10 @@
       "error": "Error",
       "interrupted": "Naantala",
       "phaseNarrative": "Narrative",
-      "phaseMissions": "Missions"
+      "phaseMissions": "Missions",
+      "skipped": "Nilaktawan",
+      "missionSkipBankEmpty": "Nilaktawan ang Missions: walang laman ang mission bank",
+      "narrativeSkipNoAssessments": "Nilaktawan ang Narrative: wala pang pagtatasa"
     },
     "reportStatus": {
       "draft": "Draft",

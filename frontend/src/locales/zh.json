@@ -325,7 +325,10 @@
       "error": "错误",
       "interrupted": "已中断",
       "phaseNarrative": "叙述",
-      "phaseMissions": "任务"
+      "phaseMissions": "任务",
+      "skipped": "已跳过",
+      "missionSkipBankEmpty": "任务已跳过：任务库为空",
+      "narrativeSkipNoAssessments": "叙述已跳过：暂无评估"
     },
     "reportStatus": {
       "draft": "草稿",

@@ -6,7 +6,7 @@ import { attendanceService } from '../../../core/services/attendance'
 import { programService } from '../../../core/services/programs'
 import { i18n } from '../../../core/i18n'
 import { isSendableReportStatus } from '../../../core/constants/reportStatus'
-import type { RecordedGenerateError } from '../../../core/constants/reportStatus'
+import type { RecordedGenerateError, RecordedGenerateSkip } from '../../../core/constants/reportStatus'
 import { ReportStatus } from '../../../core/types/enums'
 import { ApiError } from '../../../core/services/backend-client'
 import { useToastStore } from '../../../core/stores/toastStore'
@@ -58,8 +58,11 @@ const POLL_INTERVAL_MS = 2000
 
 /**
  * Generate-run completion evidence per watched report: the run persisted the
- * narrative draft AND either persisted its missions (mission_ids) or recorded
- * a terminal per-item failure in active_generate (captured message). The
+ * narrative draft AND either persisted its missions (mission_ids), recorded a
+ * terminal per-item failure in active_generate (captured message), or the
+ * server declared a terminal per-item SKIP (captured verdict — a skip
+ * generates no persisted evidence by definition, so without this check every
+ * run ending in explicit skips would be reported as an interruption). The
  * worklist of active_generate is exactly the reports whose draft was EMPTY at
  * enqueue, and the run persists every draft before it ends — so a watched id
  * missing a draft or mission evidence when the flag vanishes is a server-side
@@ -69,9 +72,11 @@ function generateSettled(
  watched: string[],
  items: Report[],
  recordedErrors: ReadonlyMap<string, RecordedGenerateError>,
+ recordedSkips: ReadonlyMap<string, RecordedGenerateSkip>,
 ): boolean {
- const byId = new Map<string, Report>(items.map((r) => [r.id, r]))
+ const byId = new Map(items.map((r) => [r.id, r]))
  return watched.every((id) => {
+  if (recordedSkips.has(id)) return true // server-declared terminal skip counts as settled
   const r = byId.get(id)
   const draft = typeof r?.ai_narrative_draft === 'string' && r.ai_narrative_draft.length > 0
   if (!draft) return false
@@ -220,6 +225,11 @@ export function useReportSession(sessionId: string | undefined) {
  // complete) / error (recorded message) / interrupted (evidence missing).
  const genWatchRef = useRef<Set<string>>(new Set())
  const genErrorsRef = useRef<Map<string, RecordedGenerateError>>(new Map())
+ // Per-item SKIP verdicts captured from active_generate items — the
+ // registry-loss bridge for skips (same lifecycle as genErrorsRef: server
+ // data only, rebuilt from extras on mount). Keeps an explicit skip visible
+ // as a skip after the registry vanishes, instead of a false 'interrupted'.
+ const genSkipsRef = useRef<Map<string, RecordedGenerateSkip>>(new Map())
  // True once the local generate POST was accepted (202) but the local
  // `generating` bridge has not yet been retired by an authoritative fetch
  // (one that STARTED after the acceptance, or one that observes the run).
@@ -251,8 +261,32 @@ export function useReportSession(sessionId: string | undefined) {
       message: item.error || i18n.t('admin.reports.generateError'),
       phase: item.phase,
      })
+     // Latest terminal verdict wins: a failure supersedes an older skip.
+     genSkipsRef.current.delete(item.report_id)
+    } else if (item.status === 'skipped') {
+     genSkipsRef.current.set(item.report_id, {
+      status: 'skipped',
+      missionSkipReason: item.mission_skip_reason,
+      narrativeSkipReason: item.narrative_skip_reason,
+     })
+     genErrorsRef.current.delete(item.report_id)
     } else if (item.status === 'success') {
      genErrorsRef.current.delete(item.report_id)
+     // Partial skip: success with a phase reason present. A clean success
+     // clears any stale verdict so a later re-run never inherits it.
+     if (item.mission_skip_reason || item.narrative_skip_reason) {
+      genSkipsRef.current.set(item.report_id, {
+       status: 'success',
+       missionSkipReason: item.mission_skip_reason,
+       narrativeSkipReason: item.narrative_skip_reason,
+      })
+     } else {
+      genSkipsRef.current.delete(item.report_id)
+     }
+    } else {
+     // queued/processing: outcome pending — drop any stale verdict so a
+     // re-run starts from a clean slate.
+     genSkipsRef.current.delete(item.report_id)
     }
    }
   }
@@ -290,7 +324,7 @@ export function useReportSession(sessionId: string | undefined) {
    } else if (prevGenIdsRef.current.length > 0) {
     const locallyHandled = localGenFailedRef.current || generatingRef.current
     localGenFailedRef.current = false
-    if (!locallyHandled && freshItems && !generateSettled(prevGenIdsRef.current, freshItems, genErrorsRef.current)) {
+    if (!locallyHandled && freshItems && !generateSettled(prevGenIdsRef.current, freshItems, genErrorsRef.current, genSkipsRef.current)) {
      interrupted = true
     }
    }
@@ -620,10 +654,14 @@ export function useReportSession(sessionId: string | undefined) {
   }
   setGenError(null)
 
-  const eligible = reports.filter((r) => r.status === 'ready_to_generate')
+  // Active Topic only (mirrors handleSendAll): eligibility, the skipped set
+  // and the POST scope all follow the topic filter — 1 topic = 1 report run,
+  // never a cross-topic generate.
+  const topicScoped = reports.filter((r) => r.topicId === activeTopicId)
+  const eligible = topicScoped.filter((r) => r.status === 'ready_to_generate')
   // Absent rows join the skipped set: they can never be generated (the server
   // excludes them), so the result toast must list them with the others.
-  const skipped = reports
+  const skipped = topicScoped
    .filter((r) => r.status === 'incomplete' || r.status === 'no_assessment' || r.status === 'absent')
    .map((r) => r.participant)
 
@@ -638,7 +676,9 @@ export function useReportSession(sessionId: string | undefined) {
   // the server's active_generate extras.
   setGenerating(true)
   try {
-   await reportService.generate(sessionId) // 202 — the run continues server-side
+   // topic_id scopes the server run to the active topic; with no active topic
+   // the field is omitted and the server keeps legacy all-topics behavior.
+   await reportService.generate(sessionId, activeTopicId ?? undefined) // 202 — the run continues server-side
   } catch (e) {
    // Failure surfaced via genError below — suppress the matching flag-clear
    // interruption notice (noteExtras consumes this on the next fetch).
@@ -657,7 +697,7 @@ export function useReportSession(sessionId: string | undefined) {
   await refreshReports()
   generatingRef.current = false
   return { ok: true, generatedCount: eligible.length, skippedParticipants: skipped }
- }, [sessionId, reports, refreshReports])
+ }, [sessionId, reports, activeTopicId, refreshReports])
 
  const handleGenerateOne = useCallback(async (participantId: string): Promise<boolean> => {
   if (generatingRef.current || activeGenerateRef.current) return false
@@ -715,6 +755,7 @@ export function useReportSession(sessionId: string | undefined) {
   activeSend,
   generateWatch: genWatchRef.current,
   generateErrors: genErrorsRef.current,
+  generateSkips: genSkipsRef.current,
   filteredReports,
   loadData,
   handleGenerateAll,

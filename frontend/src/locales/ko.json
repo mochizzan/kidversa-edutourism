@@ -325,7 +325,10 @@
       "error": "오류",
       "interrupted": "중단됨",
       "phaseNarrative": "내러티브",
-      "phaseMissions": "미션"
+      "phaseMissions": "미션",
+      "skipped": "건너뜀",
+      "missionSkipBankEmpty": "미션 건너뜀: 미션뱅크가 비어 있음",
+      "narrativeSkipNoAssessments": "내러티브 건너뜀: 아직 평가 없음"
     },
     "reportStatus": {
       "draft": "초안",

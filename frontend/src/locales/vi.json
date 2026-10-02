@@ -325,7 +325,10 @@
       "error": "Lỗi",
       "interrupted": "Bị gián đoạn",
       "phaseNarrative": "Tường thuật",
-      "phaseMissions": "Nhiệm vụ"
+      "phaseMissions": "Nhiệm vụ",
+      "skipped": "Đã bỏ qua",
+      "missionSkipBankEmpty": "Bỏ qua nhiệm vụ: ngân hàng nhiệm vụ trống",
+      "narrativeSkipNoAssessments": "Bỏ qua tường thuật: chưa có đánh giá"
     },
     "reportStatus": {
       "draft": "Bản nháp",

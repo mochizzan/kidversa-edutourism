@@ -325,7 +325,10 @@
       "error": "エラー",
       "interrupted": "中断",
       "phaseNarrative": "ナラティブ",
-      "phaseMissions": "ミッション"
+      "phaseMissions": "ミッション",
+      "skipped": "スキップ",
+      "missionSkipBankEmpty": "ミッションをスキップ: ミッションバンクが空",
+      "narrativeSkipNoAssessments": "ナラティブをスキップ: 評価がまだありません"
     },
     "reportStatus": {
       "draft": "下書き",

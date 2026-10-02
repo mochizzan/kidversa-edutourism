@@ -325,7 +325,10 @@
       "error": "ข้อผิดพลาด",
       "interrupted": "ถูกขัดจังหวะ",
       "phaseNarrative": "เรื่องเล่า",
-      "phaseMissions": "ภารกิจ"
+      "phaseMissions": "ภารกิจ",
+      "skipped": "ข้ามแล้ว",
+      "missionSkipBankEmpty": "ข้ามภารกิจ: คลังภารกิจว่างเปล่า",
+      "narrativeSkipNoAssessments": "ข้ามเรื่องเล่า: ยังไม่มีการประเมิน"
     },
     "reportStatus": {
       "draft": "ฉบับร่าง",

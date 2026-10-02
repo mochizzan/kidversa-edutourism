@@ -37,6 +37,7 @@ import {
   getGenerateRowState,
   GENERATE_ROW_LABEL,
   GENERATE_PHASE_LABEL,
+  generateSkipReasonLabel,
 } from '../../../core/constants/reportStatus'
 import { useReportSession } from '../hooks/useReportSession'
 import { CompactPagination } from '../../../shared/components/data/CompactPagination'
@@ -69,6 +70,7 @@ const ReportSessionPage = () => {
     activeSend,
     generateWatch,
     generateErrors,
+    generateSkips,
     filteredReports,
     loadData,
     handleGenerateAll,
@@ -135,6 +137,13 @@ const ReportSessionPage = () => {
     const start = (safeReportPage - 1) * REPORT_PAGE_SIZE
     return topicFilteredReports.slice(start, start + REPORT_PAGE_SIZE)
   }, [topicFilteredReports, safeReportPage])
+
+  // Server skip code → translated label; an unknown code renders raw so a
+  // declared skip is never dropped silently.
+  const skipReasonText = (code: string) => {
+    const key = generateSkipReasonLabel(code)
+    return key ? t(key) : code
+  }
 
   const onGenerate = async () => {
     const result = await handleGenerateAll()
@@ -363,6 +372,7 @@ const ReportSessionPage = () => {
                 activeGenerate,
                 watchedIds: generateWatch,
                 recordedErrors: generateErrors,
+                recordedSkips: generateSkips,
               })
               : null
             // A live send or an unfinished/interrupted generate holds the row
@@ -470,6 +480,22 @@ const ReportSessionPage = () => {
                             </span>
                           )}
                         </span>
+                        {generateState.narrativeSkipReason && (
+                          <span
+                            className="max-w-[16rem] break-words text-right text-[11px] font-normal"
+                            data-testid="report-generate-narrative-skip"
+                          >
+                            {skipReasonText(generateState.narrativeSkipReason)}
+                          </span>
+                        )}
+                        {generateState.missionSkipReason && (
+                          <span
+                            className="max-w-[16rem] break-words text-right text-[11px] font-normal"
+                            data-testid="report-generate-mission-skip"
+                          >
+                            {skipReasonText(generateState.missionSkipReason)}
+                          </span>
+                        )}
                         {generateState.message && (
                           <span
                             className="max-w-[16rem] break-words text-right text-[11px] font-normal text-error"
