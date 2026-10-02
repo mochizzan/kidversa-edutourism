@@ -366,6 +366,9 @@
   .-top-4 {
     top: calc(var(--spacing) * -4);
   }
+  .-top-5 {
+    top: calc(var(--spacing) * -5);
+  }
   .-top-10 {
     top: calc(var(--spacing) * -10);
   }
@@ -902,9 +905,6 @@
   }
   .h-\[96px\] {
     height: 96px;
-  }
-  .h-auto {
-    height: auto;
   }
   .h-dvh {
     height: 100dvh;
@@ -2217,6 +2217,9 @@
   .py-16 {
     padding-block: calc(var(--spacing) * 16);
   }
+  .ps-1 {
+    padding-inline-start: var(--spacing);
+  }
   .pt-0 {
     padding-top: 0;
   }
@@ -2493,9 +2496,6 @@
   }
   .text-blue-900 {
     color: var(--color-blue-900);
-  }
-  .text-brand-badge {
-    color: var(--color-brand-badge);
   }
   .text-brand-darkGreen {
     color: var(--color-brand-darkGreen);
