@@ -358,9 +358,9 @@ describe('generateMiniRaportHTML — section BADGE PENCAPAIAN dua slot (kiri top
   expect(right).toContain('alt="Badge Final Program"')
   expect(right).not.toContain('Badge Topik A')
   // Isi section = hanya <img>: tanpa ikon <i> dan tanpa span nama di dalam slot.
-  expect(left).not.toContain('<i')
+  expect(left).not.toMatch(/<i[\s>]/)
   expect(left).not.toContain('<span')
-  expect(right).not.toContain('<i')
+  expect(right).not.toMatch(/<i[\s>]/)
   expect(right).not.toContain('<span')
   // Empty-state tidak muncul saat ada gambar.
   expect(html).not.toContain('Belum ada badge yang diraih.')
