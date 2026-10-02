@@ -13,6 +13,7 @@ import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientLi
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { sessionService } from '../../../core/services/sessions'
+import { attendanceService } from '../../../core/services/attendance'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import { assessmentService } from '../../../core/services/assessments'
 import type { Column } from '../../../shared/components/data/DataTable'
@@ -125,7 +126,12 @@ const SessionsPage = () => {
     }
   }
 
-  // Complete gate: every participant in every group must be graded for all Kegiatan.
+  // Complete gate: every PRESENT participant in every group must be graded for
+  // all Kegiatan. Attendance is the prerequisite for grading — a participant
+  // without an explicit `is_present === true` row (explicit absent, or no
+  // attendance row at all = unmarked) is exempt. This mirrors the authoritative
+  // server gate `firstUngradedGroup` in backend/internal/usecase/session.go,
+  // which skips participants that are not explicitly present.
   const canComplete = async (id: string): Promise<boolean> => {
     const detail = await sessionService.getById(id)
     if (!detail) return false
@@ -137,8 +143,21 @@ const SessionsPage = () => {
     for (const a of assessments) {
       if (a.star_rating >= 1) graded.add(`${a.participant_id}__${a.session_substage_id}`)
     }
+    let present: Set<string>
+    try {
+      const attendance = await attendanceService.getBySession(id)
+      present = new Set(
+        attendance.filter((row) => row.is_present === true).map((row) => row.participant_id),
+      )
+    } catch (err) {
+      // Attendance is required to decide who must be graded — surface the
+      // failure explicitly instead of showing the misleading "ungraded" modal.
+      addToast({ type: 'error', message: friendlyError(err) })
+      return false
+    }
     for (const group of detail.groups) {
       for (const p of group.participants) {
+        if (!present.has(p.id)) continue // absent/unmarked → exempt from grading
         const fully = subIDs.every((sid) => graded.has(`${p.id}__${sid}`))
         if (!fully) {
           setUngradedGroupName(group.name)
