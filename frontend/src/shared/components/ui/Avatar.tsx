@@ -8,7 +8,11 @@ import { cn } from '../../../core/utils'
 // never a servable URL — rendering it raw as <img src> resolves against the
 // SPA route and 404s. The only correct source is the authenticated media
 // endpoint keyed by the owning user's id, so this component owns that
-// translation: src = avatar_url ? getMediaUrl('avatar', user.id) : null.
+// translation: src = avatar_url ? getMediaUrl('avatar', user.id, avatar_url)
+// : null. The stored path doubles as the ?v= cache key: the avatar mutation
+// mints a NEW random filename per upload (upload_handler.persistFile), so the
+// path changes exactly when the bytes change — an in-session avatar swap gets
+// a fresh cache key while old URLs stay correct via server revalidation.
 //
 // Callers keep their own container styling (size, colors, borders, hover
 // effects) via className — this component only owns the inner markup: the
@@ -41,7 +45,7 @@ function initialOf(name?: string | null): string {
 }
 
 export function Avatar({ user, className, imgClassName, fallbackClassName }: AvatarProps) {
-  const src = user.avatar_url ? getMediaUrl('avatar', user.id) : null
+  const src = user.avatar_url ? getMediaUrl('avatar', user.id, user.avatar_url) : null
   // Track the specific URL that failed so a different user (or a replaced
   // avatar) retries instead of staying stuck on the fallback.
   const [failedSrc, setFailedSrc] = useState<string | null>(null)

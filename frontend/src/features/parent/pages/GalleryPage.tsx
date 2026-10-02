@@ -63,7 +63,15 @@ function GalleryView() {
                   ) : (
                     <>
                       <img
-                        src={galleryService.photoUrl(token, photo.id, 'framed')}
+                        src={galleryService.photoUrl(
+                          token,
+                          photo.id,
+                          'framed',
+                          // Cache key: mirrors the server's path selection
+                          // (framed when present, else original), so the
+                          // framed/orig transition changes the URL.
+                          photo.framed_file_url || photo.original_file_url,
+                        )}
                         alt=""
                         className="w-full h-full object-cover"
                         loading="lazy"

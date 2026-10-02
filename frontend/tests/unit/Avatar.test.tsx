@@ -19,14 +19,17 @@ describe('shared Avatar', () => {
     vi.mocked(getActiveTenantId).mockReturnValue(null)
   })
 
-  it('renders <img> with getMediaUrl("avatar", id) when avatar_url is set', () => {
+  it('renders <img> with getMediaUrl("avatar", id, avatar_url) when avatar_url is set', () => {
     const { container } = render(<Avatar user={alice} />)
 
     const img = container.querySelector('img')
     expect(img).not.toBeNull()
-    expect(img!.getAttribute('src')).toBe('/api/media/avatar/u-1')
+    // avatar_url doubles as the ?v= cache key (P1-3): the avatar mutation
+    // mints a new filename per upload, so the version changes with the bytes.
+    expect(img!.getAttribute('src')).toBe('/api/media/avatar/u-1?v=avatars%2Fu-1.jpg')
     expect(img!.getAttribute('alt')).toBe('Alice')
-    // The stored relative path must never leak into src (the original bug).
+    // The stored relative path must never leak unencoded into src as the URL
+    // itself (the original bug) — it may only appear percent-encoded in ?v=.
     expect(img!.getAttribute('src')).not.toContain('avatars/u-1.jpg')
   })
 
@@ -35,8 +38,9 @@ describe('shared Avatar', () => {
 
     const { container } = render(<Avatar user={alice} />)
 
+    // tenant_id and the version share one query string (single "?").
     expect(container.querySelector('img')!.getAttribute('src')).toBe(
-      '/api/media/avatar/u-1?tenant_id=tenant-9',
+      '/api/media/avatar/u-1?tenant_id=tenant-9&v=avatars%2Fu-1.jpg',
     )
   })
 

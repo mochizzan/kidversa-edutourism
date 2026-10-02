@@ -148,7 +148,7 @@ func (h *ReportHandler) GetAccessPhoto(c *echo.Context) error {
 	if ct == "" || !strings.HasPrefix(ct, "image/") {
 		return apperrors.Forbidden("file_type_blocked", nil)
 	}
-	return (*c).Blob(http.StatusOK, ct, blob)
+	return serveMediaBlob(c, ct, dest, blob)
 }
 
 // GenerateStream handles POST /api/reports/:id/generate/stream (JWT, tenant-scoped).

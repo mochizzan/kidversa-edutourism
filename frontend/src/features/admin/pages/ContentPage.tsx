@@ -16,7 +16,6 @@ import type { Content, ContentUsage } from '../../../core/types'
 import { StageContentFileType } from '../../../core/types/enums'
 import { YOUTUBE_LABEL } from '../../../core/constants/labels'
 import { getContentThumbnailSrc } from '../../../core/utils/content'
-import { getActiveTenantId } from '../../../core/utils/tenant'
 import { useTranslation } from 'react-i18next'
 import { i18n } from '../../../core/i18n'
 
@@ -120,8 +119,6 @@ const ContentPage = () => {
     }
   }
 
-  const tenantId = getActiveTenantId() ?? undefined
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -178,7 +175,7 @@ const ContentPage = () => {
           {filtered.map((item) => {
             const meta = FILE_TYPE_META[item.file_type] || FILE_TYPE_META.VIDEO
             const isYouTube = item.file_type === StageContentFileType.VIDEO && !!item.youtube_url
-            const thumbnail = getContentThumbnailSrc(item as never, tenantId)
+            const thumbnail = getContentThumbnailSrc(item as never)
             return (
               <Card key={item.id} padding="none" className="hover:shadow-md transition-shadow flex flex-col overflow-hidden">
                 <div className="relative aspect-video bg-surface-container-high flex items-center justify-center overflow-hidden">

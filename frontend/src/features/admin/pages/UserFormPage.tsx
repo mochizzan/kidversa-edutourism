@@ -106,7 +106,7 @@ const UserFormPage = () => {
             phone: foundUser.phone || '',
             role: foundUser.role,
           } as UpdateFormData)
-          setAvatarPreview(foundUser.avatar_url ? getMediaUrl('avatar', foundUser.id) : null)
+          setAvatarPreview(foundUser.avatar_url ? getMediaUrl('avatar', foundUser.id, foundUser.avatar_url) : null)
         } else {
           addToast({ type: 'error', message: t('admin.users.notFound') })
           navigate(ROUTES.ADMIN.USERS)

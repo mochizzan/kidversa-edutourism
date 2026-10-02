@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -177,7 +178,60 @@ func (h *MediaHandler) Get(c *echo.Context) error {
 		// Unknown/unsafe extension — don't serve with an inferred type.
 		return appresp.Fail(c, http.StatusForbidden, "file_type_blocked")
 	}
-	return (*c).Blob(http.StatusOK, ct, data)
+	return serveMediaBlob(c, ct, dest, data)
+}
+
+// fileETag derives a strong ETag for a file from its mtime and size — a single
+// os.Stat, never a hash of the bytes. Sufficient here because every stored
+// path uses a random filename minted at upload: the path's identity is stable
+// while the bytes behind it can change (content replace, avatar swap). When
+// stat fails, ok=false so callers degrade to an unconditional 200 instead of
+// erroring.
+func fileETag(path string) (etag string, ok bool) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "", false
+	}
+	return fmt.Sprintf("\"%x-%x\"", fi.ModTime().UnixNano(), fi.Size()), true
+}
+
+// ifNoneMatch reports whether an If-None-Match header value matches etag:
+// comma-separated candidates, exact match, weak "W/" prefix tolerated
+// (If-None-Match uses the weak comparison function), and "*" (any current
+// representation). An empty header never matches.
+func ifNoneMatch(header, etag string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if candidate == "*" || candidate == etag {
+			return true
+		}
+		if strings.HasPrefix(candidate, "W/") && strings.TrimPrefix(candidate, "W/") == etag {
+			return true
+		}
+	}
+	return false
+}
+
+// serveMediaBlob is the shared raw-byte response path of the three media
+// endpoints (MediaHandler.Get, GalleryHandler.GetPhoto,
+// ReportHandler.GetAccessPhoto — same package): Cache-Control: no-cache on
+// EVERY response (200 and 304), an ETag from file mtime+size when stat
+// succeeds, a bodiless 304 carrying only the caching headers when the
+// request's If-None-Match matches, otherwise 200 + body + ETag. A failed stat
+// degrades to the plain 200 (no ETag, no 304) — never an error.
+func serveMediaBlob(c *echo.Context, contentType, path string, data []byte) error {
+	h := (*c).Response().Header()
+	h.Set("Cache-Control", "no-cache")
+	if etag, ok := fileETag(path); ok {
+		h.Set("ETag", etag)
+		if ifNoneMatch((*c).Request().Header.Get("If-None-Match"), etag) {
+			return (*c).NoContent(http.StatusNotModified)
+		}
+	}
+	return (*c).Blob(http.StatusOK, contentType, data)
 }
 
 // derefTenant normalizes a nullable tenant pointer into an empty-or-value string.

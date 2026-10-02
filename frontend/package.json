@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "pnpm build:raport-css && vite",
     "build:raport-css": "npx @tailwindcss/cli -i src/shared/templates/miniRaport.tailwind.css -o src/shared/templates/miniRaport.styles.css",
-    "build": "pnpm build:raport-css && tsc -b && vite build",
+    "build": "pnpm build:raport-css && tsc -b && pnpm stamp:version && vite build",
+    "stamp:version": "node scripts/stamp-version.mjs",
     "preview": "vite preview",
     "test:unit": "vitest",
     "test:unit:run": "vitest run",

@@ -60,9 +60,13 @@ export async function syncStageMeta(
 
 export type ContentThumbnail = { type: 'image'; src: string } | { type: 'video'; src: string } | { type: 'icon'; src: null }
 
-export function getContentThumbnailSrc(content: StageContent, tenantId?: string): ContentThumbnail {
-  const suffix = tenantId ? `?tenant_id=${tenantId}` : ''
-
+// The tenant scope rides inside getMediaUrl (it consults getActiveTenantId
+// itself — the caller previously re-appended ?tenant_id= by hand, which
+// collided with getMediaUrl's own param). The content's file_url is the ?v=
+// cache key: ReplaceContentFile re-mints a NEW random filename behind the SAME
+// content id (upload_handler.ReplaceContentFile → content.file_url), so the
+// version changes exactly when the stored bytes change.
+export function getContentThumbnailSrc(content: StageContent): ContentThumbnail {
   if (content.file_type === StageContentFileType.VIDEO && content.youtube_url) {
     const videoId = extractYouTubeID(content.youtube_url)
     if (videoId) {
@@ -71,11 +75,11 @@ export function getContentThumbnailSrc(content: StageContent, tenantId?: string)
   }
 
   if (content.file_type === StageContentFileType.IMAGE && content.file_url) {
-    return { type: 'image', src: `${getMediaUrl('content', content.id)}${suffix}` }
+    return { type: 'image', src: getMediaUrl('content', content.id, content.file_url) }
   }
 
   if (content.file_type === StageContentFileType.VIDEO && content.file_url) {
-    return { type: 'video', src: `${getMediaUrl('content', content.id)}${suffix}` }
+    return { type: 'video', src: getMediaUrl('content', content.id, content.file_url) }
   }
 
   return { type: 'icon', src: null }

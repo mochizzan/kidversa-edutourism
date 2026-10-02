@@ -23,7 +23,8 @@ vi.mock('@/shared/components/ui/Avatar', async (importOriginal) => {
 })
 
 // getMediaUrl's only dependency — keeps media URLs deterministic:
-// /api/media/avatar/<id> with no tenant query.
+// /api/media/avatar/<id>?v=<avatar_url> with no tenant query (the stored path
+// is the P1-3 cache key — it changes exactly when the avatar bytes change).
 vi.mock('@/core/utils/tenant', () => ({
   getActiveTenantId: () => null,
 }))
@@ -135,14 +136,17 @@ const program = { id: 'p1', name: 'Program A' }
 
 // Asserts the site renders THE shared Avatar (marker) with the given user id
 // AND that the real component resolved the stored relative path into the
-// authenticated media URL — the exact bug GAP-5 described.
-function expectSharedAvatar(container: HTMLElement, userId: string): HTMLElement {
+// authenticated media URL with avatar_url as the ?v= cache key — the exact bug
+// GAP-5 described, plus the P1-3 version param.
+function expectSharedAvatar(container: HTMLElement, userId: string, avatarUrl: string): HTMLElement {
   const marker = container.querySelector(
     `[data-testid="shared-avatar"][data-user-id="${userId}"]`,
   )
   expect(marker).not.toBeNull()
   const img = marker!.querySelector('img')
-  expect(img?.getAttribute('src')).toBe(`/api/media/avatar/${userId}`)
+  expect(img?.getAttribute('src')).toBe(
+    `/api/media/avatar/${userId}?v=${encodeURIComponent(avatarUrl)}`,
+  )
   return marker as HTMLElement
 }
 
@@ -168,7 +172,7 @@ describe('shared Avatar adoption sites', () => {
       </MemoryRouter>,
     )
 
-    const marker = expectSharedAvatar(container, 'u-header')
+    const marker = expectSharedAvatar(container, 'u-header', headerUser.avatar_url)
     expect(marker.querySelector('img')!.getAttribute('alt')).toBe('Kak Rina')
   })
 
@@ -184,7 +188,7 @@ describe('shared Avatar adoption sites', () => {
     await act(async () => { })
 
     expect(screen.getByText('Budi Santoso')).toBeTruthy()
-    expectSharedAvatar(container, 'u-table')
+    expectSharedAvatar(container, 'u-table', tableUser.avatar_url)
   })
 
   it('admin dashboard team list renders shared Avatars for team members', async () => {
@@ -201,7 +205,7 @@ describe('shared Avatar adoption sites', () => {
     // TeamList renders nothing when it has no members — guards against a
     // vacuous pass where the avatar never had a chance to render.
     expect(screen.getByText('Tim Eduwisata')).toBeTruthy()
-    expectSharedAvatar(container, 'u-team')
+    expectSharedAvatar(container, 'u-team', teamUser.avatar_url)
   })
 
 })

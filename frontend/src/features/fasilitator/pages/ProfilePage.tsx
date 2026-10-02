@@ -122,7 +122,7 @@ const ProfilePage = () => {
               avatarDragOver && 'ring-2 ring-primary'
             )}>
               {user.avatar_url ? (
-                <img src={getMediaUrl('avatar', user.id)} alt={user.name} className='w-full h-full object-cover rounded-full' />
+                <img src={getMediaUrl('avatar', user.id, user.avatar_url)} alt={user.name} className='w-full h-full object-cover rounded-full' />
               ) : (
                 <span className='text-[36px] md:text-[42px] lg:text-[48px] font-bold text-[#6D28D9]'>
                   {user.name?.charAt(0)?.toUpperCase() || '?'}
@@ -253,7 +253,7 @@ const ProfilePage = () => {
       <AvatarUploadModal
         open={showAvatarModal}
         onClose={() => { setShowAvatarModal(false); setPendingDragFile(null) }}
-        currentAvatarUrl={user.avatar_url ? getMediaUrl('avatar', user.id) : undefined}
+        currentAvatarUrl={user.avatar_url ? getMediaUrl('avatar', user.id, user.avatar_url) : undefined}
         initialFile={pendingDragFile}
         onUpload={handleAvatarUpload}
       />

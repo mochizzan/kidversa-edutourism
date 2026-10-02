@@ -19,8 +19,17 @@ export type MediaKind = 'photo' | 'frame' | 'content' | 'avatar'
 // <img> requests carry no custom headers, so SUPER_ADMIN (whose JWT has no
 // tenant claim) must scope via the ?tenant_id= query fallback honored by the
 // TenantScope middleware — same pattern as openSSE.
-export function getMediaUrl(kind: MediaKind, id: string): string {
+//
+// `version` is the client cache key for bytes that change behind a stable
+// entity id (P1-3): pass server data that changes exactly when the stored
+// bytes change (e.g. an avatar/content file path re-minted by the mutation —
+// never a constant). It is merged with tenant_id into ONE query string; when
+// absent the URL is byte-identical to the versionless form.
+export function getMediaUrl(kind: MediaKind, id: string, version?: string | null): string {
+ const params = new URLSearchParams()
  const tenantId = getActiveTenantId()
- const suffix = tenantId ? `?tenant_id=${tenantId}` : ''
- return `/api/media/${kind}/${id}${suffix}`
+ if (tenantId) params.set('tenant_id', tenantId)
+ if (version) params.set('v', version)
+ const query = params.toString()
+ return `/api/media/${kind}/${id}${query ? `?${query}` : ''}`
 }
