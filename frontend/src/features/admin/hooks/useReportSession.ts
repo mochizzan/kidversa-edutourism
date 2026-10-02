@@ -390,9 +390,20 @@ export function useReportSession(sessionId: string | undefined) {
     return false
    }
    console.warn('[useReportSession] reports refresh failed; keeping last known state', err)
+   // Transient poll failure while a server run (or the local accepted bridge)
+   // is in flight is a reconnecting poll tick, NOT a dead run: keep polling
+   // and surface a neutral reconnecting notice. A hard failure with no run in
+   // flight keeps the existing load-data error. The one-shot
+   // operationInterrupted warning (noteExtras path above) stays reserved for
+   // a watched run that vanished without persisted evidence (registry loss).
+   const runInFlight =
+    activeGenerateRef.current !== null ||
+    activeSendRef.current !== null ||
+    genAcceptedRef.current ||
+    generatingRef.current
    useToastStore.getState().addToast({
-    type: 'error',
-    message: i18n.t('admin.reports.loadDataError'),
+    type: runInFlight ? 'info' : 'error',
+    message: i18n.t(runInFlight ? 'admin.live.reconnecting' : 'admin.reports.loadDataError'),
    })
    return false
   }
@@ -683,7 +694,16 @@ export function useReportSession(sessionId: string | undefined) {
    // Failure surfaced via genError below — suppress the matching flag-clear
    // interruption notice (noteExtras consumes this on the next fetch).
    localGenFailedRef.current = true
-   setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
+   // 409 already_generating = another run owns the session: name it as such
+   // and refetch so the poll attaches to the live run instead of idling.
+   // The existing errors.already_generating locale string carries the message.
+   if (e instanceof ApiError && e.status === 409) {
+    setGenError(i18n.t('errors.already_generating'))
+    // A live run may exist server-side — refetch so the poll attaches to it.
+    void refreshReports()
+   } else {
+    setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
+   }
    generatingRef.current = false
    setGenerating(false)
    genAcceptedRef.current = false

@@ -105,3 +105,25 @@ export function isTopicCompletedFromProgress(
   ),
  )
 }
+
+/**
+ * Per-Kegiatan terminal state from the same SERVER group_stage_progress rows
+ * (Perbaikan-1).
+ *
+ * A single Kegiatan leaf is done when it has a terminal row (COMPLETED or
+ * SKIPPED) for the group; a missing row means NOT done. Used by
+ * ChildAssessmentPage to lock each KegiatanCard individually
+ * (`locked = isGroupCompleted || isKegiatanCompletedFromProgress(...)`) so a
+ * completed topik-1 Kegiatan stays read-only while topik-2 stays editable.
+ * Pure and refresh-safe like isTopicCompletedFromProgress above.
+ */
+export function isKegiatanCompletedFromProgress(
+ rows: readonly TopicProgressRow[],
+ leafId: string,
+): boolean {
+ return rows.some(
+  (row) =>
+   row.session_substage_id === leafId &&
+   (row.status === 'COMPLETED' || row.status === 'SKIPPED'),
+ )
+}

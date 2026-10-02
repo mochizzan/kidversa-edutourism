@@ -24,17 +24,32 @@ func NewAssessmentRepository(db *gorm.DB) repository.AssessmentRepository {
 }
 
 func (r *GormAssessmentRepository) Create(ctx context.Context, a *entity.Assessment) error {
-	// Denormalize: fetch participant name and kegiatan name if not set
+	// Denormalize: fetch participant name and kegiatan name if not set.
+	// Kegiatan names live on program_substages.name (session_substages has NO
+	// name column), so resolve via session_substages.program_substage_id.
 	if a.ParticipantName == "" && a.ParticipantID != "" {
 		var name string
-		if err := r.db.WithContext(ctx).Model(&ParticipantModel{}).Select("child_name").Where("id = ?", a.ParticipantID).Scan(&name).Error; err == nil {
+		if err := r.db.WithContext(ctx).Model(&ParticipantModel{}).Select("child_name").Where("id = ?", a.ParticipantID).Scan(&name).Error; err != nil {
+			log.Printf("assessments: denormalize participant_name failed for participant %s: %v", a.ParticipantID, err)
+		} else {
 			a.ParticipantName = name
 		}
 	}
 	if a.KegiatanName == "" && a.SessionSubstageID != "" {
-		var name string
-		if err := r.db.WithContext(ctx).Model(&SessionSubstageModel{}).Select("name").Where("id = ?", a.SessionSubstageID).Scan(&name).Error; err == nil {
-			a.KegiatanName = name
+		var programSubstageID string
+		if err := r.db.WithContext(ctx).Model(&SessionSubstageModel{}).Select("program_substage_id").Where("id = ?", a.SessionSubstageID).Scan(&programSubstageID).Error; err != nil {
+			log.Printf("assessments: denormalize kegiatan_name lookup session_substage %s failed: %v", a.SessionSubstageID, err)
+		} else if programSubstageID == "" {
+			log.Printf("assessments: denormalize kegiatan_name skipped for session_substage %s: no program_substage linked", a.SessionSubstageID)
+		} else {
+			var name string
+			if err := r.db.WithContext(ctx).Model(&ProgramSubstageModel{}).Select("name").Where("id = ?", programSubstageID).Scan(&name).Error; err != nil {
+				log.Printf("assessments: denormalize kegiatan_name lookup program_substage %s failed: %v", programSubstageID, err)
+			} else if name == "" {
+				log.Printf("assessments: denormalize kegiatan_name skipped for session_substage %s: program_substage %s has empty name", a.SessionSubstageID, programSubstageID)
+			} else {
+				a.KegiatanName = name
+			}
 		}
 	}
 	m := assessmentModelFromEntity(a)

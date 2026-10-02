@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, type ChangeEvent } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback, useMemo, useRef, type ChangeEvent } from 'react'
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Users, /* Monitor, */ User, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
@@ -87,9 +87,24 @@ const GroupPage = () => {
   const { t } = useTranslation()
   const { groupId } = useParams<{ groupId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const confirm = useConfirmDialog()
   const { user } = useAuth()
   const { addToast } = useGlobalToast()
+  // Mirror of the active topic in the URL query (`?stage=<sessionStageId>`).
+  // Written on every selection change (dropdown + continue control) with
+  // `replace: true` so the child assessment back-nav can restore the SAME
+  // topic without growing history. Read once via preferredStageRef above.
+  const syncStageQuery = useCallback(
+    (stageId: string | null) => {
+      const next = new URLSearchParams(searchParams)
+      if (stageId) next.set('stage', stageId)
+      else next.delete('stage')
+      setSearchParams(next, { replace: true })
+    },
+    [searchParams, setSearchParams],
+  )
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,7 +126,23 @@ const GroupPage = () => {
   // evaluateGroupCompletion inputs. Do NOT introduce a second notion of the
   // active topic (there is deliberately no sessionStage/programStageName on
   // groupDetail anymore).
+  //
+  // Perbaikan-1: the child assessment page returns via
+  // `/fasilitator/groups/:groupId?stage=<sessionStageId>` (query) + location
+  // state `{ sessionStageId }`. `preferredStageRef` carries that hint across
+  // the async fetchData below so a back-nav restores the SAME topic instead
+  // of re-resolving to current_session_stage_id (the topik-1/topik-2 bug).
   const [selectedSessionStageId, setSelectedSessionStageId] = useState<string | null>(null)
+  const preferredStageRef = useRef<string | null>(null)
+  if (preferredStageRef.current === null) {
+    const fromState = (location.state as { sessionStageId?: string } | null)?.sessionStageId
+    const fromQuery = searchParams.get('stage')
+    preferredStageRef.current = fromState ?? fromQuery ?? ''
+  }
+  // First-fetchData flag: the back-nav stage hint above applies ONLY on the
+  // initial load. Post-completion refetches re-sync with the server (existing
+  // behaviour) instead of sticking to a stale hint.
+  const didInitStageRef = useRef(false)
 
   // Server progress rows for THIS group (group_stage_progress via
   // liveService.getGroupsWithProgress). Fetched on EVERY fetchData (not only
@@ -225,6 +256,25 @@ const GroupPage = () => {
       // on every fetchData (mount, post-completion refresh, error retry) so a
       // refetch re-syncs with the server's current_session_stage_id instead of
       // keeping a stale selection.
+      //
+      // Perbaikan-1: on the FIRST fetchData only, a back-nav hint from the
+      // child assessment page (`?stage=<sessionStageId>` query and/or
+      // location.state.sessionStageId, written by handleAssess below) wins over
+      // the server chain above — otherwise returning from a topik-2 child
+      // always snaps back to topik-1 (current_session_stage_id). Unknown ids
+      // fall back loudly (warn) to the resolved stage, never to empty.
+      if (!didInitStageRef.current) {
+        didInitStageRef.current = true
+        const preferred = preferredStageRef.current
+        if (preferred) {
+          const match = detail.stages.find((s) => s.id === preferred)
+          if (match) {
+            currentStage = match
+          } else {
+            console.warn('[GroupPage] unknown stage hint; using resolved stage', preferred)
+          }
+        }
+      }
       setSelectedSessionStageId(currentStage?.id ?? null)
     } catch (err) {
       setError(friendlyError(err))
@@ -296,6 +346,16 @@ const GroupPage = () => {
       groupDetail?.group.status === 'COMPLETED' ||
       isTopicCompletedFromProgress(groupProgressRows, activeLeaves),
     [groupDetail, groupProgressRows, activeLeaves],
+  )
+
+  // Perbaikan-1 per-topic lock: the ACTIVE topic is locked when the whole
+  // group is terminal OR its every Kegiatan leaf has a terminal
+  // (COMPLETED/SKIPPED) progress row. Locked controls stay VISIBLE but
+  // disabled (read-only) and guarded writes toast via
+  // groupCompletedErrorMessage() — forms are never hidden.
+  const isTopicLocked = useMemo(
+    () => (groupDetail?.group.status ?? '') === 'COMPLETED' || isTopicCompleted,
+    [groupDetail, isTopicCompleted],
   )
 
   // Scored (participant, substage) pairs: assessment with star_rating >= 1.
@@ -384,15 +444,28 @@ const GroupPage = () => {
   }
 
   const handleAssess = (participantId: string) => {
-    if (groupDetail?.group.status === 'COMPLETED') {
+    // Perbaikan-1: lock BOTH on whole-group COMPLETED and on per-topic
+    // completion (isTopicLocked from server progress rows). Guard toast reuses
+    // the canonical message; the list below keeps both controls visible but
+    // disabled (never hidden).
+    if (!groupDetail || groupDetail.group.status === 'COMPLETED' || isTopicLocked) {
       addToast({
         type: 'error',
         message: groupCompletedErrorMessage(),
       })
       return
     }
-    navigate(`/fasilitator/groups/${groupId}/children/${participantId}`, {
-      state: { sessionId: groupDetail?.session.id },
+    // Perbaikan-1: forward the ACTIVE topic to the child assessment page via
+    // BOTH the query string (`?stage=<sessionStageId>`) and location state.
+    // The child resolves its leaves/scores from that stage (never from
+    // current_session_stage_id) and echoes it back on Back so the group page
+    // restores the same topic (topik-1/topik-2 bug fix).
+    const stageId = selectedSessionStage?.id
+    const target = stageId
+      ? `/fasilitator/groups/${groupId}/children/${participantId}?stage=${encodeURIComponent(stageId)}`
+      : `/fasilitator/groups/${groupId}/children/${participantId}`
+    navigate(target, {
+      state: { sessionId: groupDetail?.session.id, sessionStageId: stageId },
     })
   }
 
@@ -440,7 +513,11 @@ const GroupPage = () => {
 
   const handleToggleAttendance = useCallback(async (participantId: string) => {
     if (!groupDetail) return
-    if (groupDetail.group.status === 'COMPLETED') {
+    // Perbaikan-1: lock BOTH on whole-group COMPLETED and on per-topic
+    // completion (isTopicCompleted from server progress rows). The guard toast
+    // reuses the canonical group-completed message; the form stays visible
+    // but disabled (never hidden).
+    if (groupDetail.group.status === 'COMPLETED' || isTopicLocked) {
       addToast({
         type: 'error',
         message: groupCompletedErrorMessage(),
@@ -471,7 +548,7 @@ const GroupPage = () => {
         return next
       })
     }
-  }, [attendanceMap, groupDetail, addToast])
+  }, [attendanceMap, groupDetail, addToast, isTopicLocked, t])
 
   // Topic dropdown: switching the active topic is a pure state change on
   // selectedSessionStageId. Assessments/attendance/substages are SESSION-scoped
@@ -479,8 +556,19 @@ const GroupPage = () => {
   // activeLeaves, isAssessed, completion/lock) re-runs off that id — so a
   // selection change can never leave a stale topic's leaves/name/completion
   // visible, and there is no stage-scoped UI state to reset.
+  //
+  // Perbaikan-1 attendance decision: OPSI B (retain session-scoped). The
+  // backend schema keeps the (participant_id, session_id) unique key
+  // (migrations/000001_init_schema, entity/attendance.go) — NO
+  // session_stage_id column, NO migration. The toggle therefore flips a
+  // whole-session presence row and is rendered ONCE per session; the label
+  // below marks it explicitly as session-wide so identical values across
+  // topics are CORRECT (not the topik-1/topik-2 bug). Presence still gates
+  // grading per active topic (evaluateGroupCompletion in the child page).
   const handleTopicChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedSessionStageId(e.target.value)
+    const nextId = e.target.value
+    setSelectedSessionStageId(nextId)
+    syncStageQuery(nextId)
   }
 
   // Continue-to-next-topic control: advancing is a PURE selection change on
@@ -489,7 +577,10 @@ const GroupPage = () => {
   // derivation re-runs off the new id). Kept next to handleTopicChange so the
   // two selection pathways are visibly one mechanism.
   const handleContinueToNextTopic = () => {
-    if (nextSessionStage) setSelectedSessionStageId(nextSessionStage.id)
+    if (nextSessionStage) {
+      setSelectedSessionStageId(nextSessionStage.id)
+      syncStageQuery(nextSessionStage.id)
+    }
   }
 
   // ── Loading state ──
@@ -543,6 +634,8 @@ const GroupPage = () => {
   // assessment stay locked (render gates below) and the Complete button stays
   // rendered but DISABLED (never hidden) — the disabled state also derives
   // per-topic from server progress rows via isTopicCompleted above.
+  // (isTopicLocked is derived next to isTopicCompleted; both feed the gates
+  // below.)
   const isGroupCompleted = group.status === 'COMPLETED'
 
   return (
@@ -610,7 +703,16 @@ const GroupPage = () => {
         )
       )}
 
-      {/* Participant list */}
+      {/* Participant list.
+          Perbaikan-1 (Opsi B): attendance is SESSION-scoped (one toggle per
+          participant for the whole session), so the toggle renders once here
+          and is NOT re-rendered per topic — identical values across topics
+          are correct by design. The explicit label below states the scope. */}
+      {participants.length > 0 && (
+        <p className="text-xs text-on-surface-variant">
+          Kehadiran dicatat satu kali per sesi dan berlaku untuk seluruh topik.
+        </p>
+      )}
       {participants.length === 0 ? (
         <EmptyState
           icon={<Users className="w-12 h-12" />}
@@ -627,11 +729,11 @@ const GroupPage = () => {
               school={participant.school_name}
               isAssessed={isAssessed(participant.id)}
               isPresent={isPresent(participant.id)}
-              onToggleAttendance={isMine && !isGroupCompleted ? () => handleToggleAttendance(participant.id) : undefined}
+              onToggleAttendance={isMine && !isTopicLocked ? () => handleToggleAttendance(participant.id) : undefined}
               attendanceLoading={attendanceLoading.has(participant.id)}
               showPhoto={participant.consent_photo}
-              onAssess={isMine && isSessionActive && !isGroupCompleted ? () => handleAssess(participant.id) : undefined}
-              locked={isGroupCompleted}
+              onAssess={isMine && isSessionActive && !isTopicLocked ? () => handleAssess(participant.id) : undefined}
+              locked={isTopicLocked}
             />
           ))}
         </div>

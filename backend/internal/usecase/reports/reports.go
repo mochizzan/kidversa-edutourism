@@ -402,6 +402,7 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 // EVERY requested participant is absent, the whole run is rejected with
 // BadRequest("participant_absent") before anything is created.
 func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID string, participants []entity.Participant, topicIDs []string) ([]entity.Report, error) {
+	runStarted := time.Now()
 	attendance, err := u.attendanceRepo.ListBySession(ctx, sessionID, tenantID)
 	if err != nil {
 		return nil, err
@@ -522,6 +523,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			defer missionWg.Done()
 			missionSem <- struct{}{}
 			defer func() { <-missionSem }()
+			phaseStarted := time.Now()
 
 			fail := func(code string, err error) {
 				msg := missionFailureMessage(code, err)
@@ -543,7 +545,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 				// bank has no active missions. Record the machine reason and
 				// let the narrative phase proceed untouched.
 				u.genReg.markMissionsSkipped(sessionID, report.ID, SkipReasonMissionBankEmpty)
-				log.Printf("reports: mission phase skipped for report %s: %s", report.ID, SkipReasonMissionBankEmpty)
+				log.Printf("reports: mission phase skipped for report %s: %s (elapsed=%s)", report.ID, SkipReasonMissionBankEmpty, time.Since(phaseStarted).Round(time.Millisecond))
 				return
 			}
 			if _, err := u.SaveMissions(ctx, report.ID, tenantID, ids); err != nil {
@@ -551,6 +553,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 				return
 			}
 			u.genReg.markMissionsSuccess(sessionID, report.ID)
+			log.Printf("reports: mission phase done for report %s: missions=%d elapsed=%s", report.ID, len(ids), time.Since(phaseStarted).Round(time.Millisecond))
 		}(r)
 	}
 
@@ -567,6 +570,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			// observable until end() drops the run; the aggregate error
 			// return is unchanged.
 			u.genReg.markProcessing(sessionID, report.ID)
+			workerStarted := time.Now()
 
 			// Skip gate: no assessments for this report's Topic means an
 			// empty narrative — skip it explicitly (machine reason
@@ -585,7 +589,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			}
 			if !has {
 				u.genReg.markNarrativeSkipped(sessionID, report.ID, SkipReasonNoAssessments)
-				log.Printf("reports: narrative skipped for report %s: %s", report.ID, SkipReasonNoAssessments)
+				log.Printf("reports: narrative skipped for report %s: %s (elapsed=%s)", report.ID, SkipReasonNoAssessments, time.Since(workerStarted).Round(time.Millisecond))
 				return
 			}
 
@@ -595,6 +599,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			text, err := u.gen.Generate(genCtx, report.ID, tenantID)
 			if err != nil {
 				u.genReg.markNarrativeFailed(sessionID, report.ID, err.Error())
+				log.Printf("reports: narrative failed for report %s after %s: %v", report.ID, time.Since(workerStarted).Round(time.Millisecond), err)
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("report %s: %w", report.ID, err))
 				mu.Unlock()
@@ -603,12 +608,14 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			report.AINarrativeDraft = text
 			if err := u.repo.Update(genCtx, &report); err != nil {
 				u.genReg.markNarrativeFailed(sessionID, report.ID, err.Error())
+				log.Printf("reports: narrative persist failed for report %s after %s: %v", report.ID, time.Since(workerStarted).Round(time.Millisecond), err)
 				mu.Lock()
 				errs = append(errs, fmt.Errorf("update report %s: %w", report.ID, err))
 				mu.Unlock()
 				return
 			}
 			u.genReg.markNarrativeSuccess(sessionID, report.ID)
+			log.Printf("reports: narrative done for report %s: chars=%d elapsed=%s", report.ID, len(text), time.Since(workerStarted).Round(time.Millisecond))
 		}(r)
 	}
 	wg.Wait()
@@ -618,8 +625,9 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 	missionWg.Wait()
 
 	if len(errs) > 0 {
-		return nil, apperrors.Internal("narrative_generation_failed",
-			fmt.Errorf("%d dari %d laporan gagal dibuatkan narasi: %v", len(errs), len(all.Items), errors.Join(errs...)))
+		aggErr := fmt.Errorf("%d dari %d laporan gagal dibuatkan narasi: %v", len(errs), len(all.Items), errors.Join(errs...))
+		log.Printf("reports: session generate for %s finished with errors: worklist=%d failed=%d elapsed=%s: %v", sessionID, len(work), len(errs), time.Since(runStarted).Round(time.Millisecond), aggErr)
+		return nil, apperrors.Internal("narrative_generation_failed", aggErr)
 	}
 
 	all, err = u.repo.List(ctx, listFilter, 1, constants.MaxSessionReports)
@@ -627,6 +635,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 		return nil, err
 	}
 
+	log.Printf("reports: session generate for %s finished: worklist=%d elapsed=%s", sessionID, len(work), time.Since(runStarted).Round(time.Millisecond))
 	return all.Items, nil
 }
 

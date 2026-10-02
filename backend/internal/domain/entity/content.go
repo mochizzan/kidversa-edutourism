@@ -12,7 +12,7 @@ type Assessment struct {
 	Comment           string    `json:"comment,omitempty"`
 	AssessedBy        string    `json:"assessed_by"`
 	ParticipantName   string    `json:"participant_name,omitempty"` // denormalized from participants.child_name
-	KegiatanName      string    `json:"kegiatan_name,omitempty"`    // denormalized from session_substages.name
+	KegiatanName      string    `json:"kegiatan_name,omitempty"`    // denormalized from program_substages.name via session_substages.program_substage_id
 	AssessedAt        time.Time `json:"assessed_at"`
 }
 

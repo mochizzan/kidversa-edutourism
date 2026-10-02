@@ -335,6 +335,16 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID strin
 	if ungraded, gerr := u.firstUngradedGroup(ctx, id, gateTenant); gerr != nil {
 		return nil, gerr
 	} else if ungraded != "" {
+		// Observability only: the gate decision is unchanged (grading_incomplete).
+		// The group name + leaf count pinpoint which group/topic blocks completion
+		// without loosening the validator (Bug1's fix owns the gate itself).
+		leafCount := 0
+		if u.sessionSubstages != nil {
+			if subs, serr := u.sessionSubstages.ListSessionSubstages(ctx, id); serr == nil {
+				leafCount = len(subs)
+			}
+		}
+		log.Printf("session: complete blocked session=%s gate=grading_incomplete group=%q substage_leaves=%d", id, ungraded, leafCount)
 		return nil, apperrors.BadRequest("grading_incomplete", nil)
 	}
 	s.Status = entity.SessionCompleted

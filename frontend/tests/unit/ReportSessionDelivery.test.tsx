@@ -390,7 +390,14 @@ describe('ReportSessionPage — server-driven per-row delivery state', () => {
      '[useReportSession] reports refresh failed; keeping last known state',
      expect.any(Error),
     )
-    expect(useToastStore.getState().toasts.some((t) => t.type === 'error')).toBe(true)
+    // Transient poll failure while the server run is in flight surfaces the
+    // neutral reconnecting notice (info), NOT the hard load-data error: the
+    // run is alive and polling continues on the next tick.
+    expect(
+     useToastStore.getState().toasts.some(
+      (t) => t.type === 'info' && t.message === i18n.t('admin.live.reconnecting'),
+     ),
+    ).toBe(true)
     // Last known state retained (row still queued) — not cleared on failure.
     expect(screen.getByText(i18n.t('admin.status.queued'))).toBeInTheDocument()
 
@@ -872,5 +879,53 @@ describe('generate all — topic-scoped eligibility and payload (Bug 3)', () => 
 
   expect(reportService.generate).toHaveBeenCalledTimes(1)
   expect(reportService.generate).toHaveBeenCalledWith('s1', 'ps2')
+ })
+})
+
+describe('generate all — progress banner + 409 already_generating (Perbaikan-3)', () => {
+ beforeEach(() => {
+  vi.clearAllMocks()
+  useToastStore.getState().dismissAll()
+ })
+
+ it('renders progress %/ETA from active_generate Total/Succeeded while the run is live', async () => {
+  const items = [reportAna(ReportStatus.DRAFT), reportBela(ReportStatus.DRAFT)]
+  setupMocks(async () => ({
+   items,
+   extras: activeGenerate({ queued_ids: ['r-ana'], processing_ids: ['r-bela'] }),
+  }))
+
+  renderPage()
+  await flush()
+
+  // 2 total, 0 terminal → 0/2 · 0%.
+  const banner = screen.getByTestId('report-generate-progress')
+  expect(banner).toHaveTextContent('0/2')
+  expect(banner).toHaveTextContent('0%')
+  expect(banner.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('0')
+ })
+
+ it('a 409 already_generating names the live run instead of a generic error', async () => {
+  setupMocks(async () => ({ items: [], extras: {} }))
+  vi.mocked(sessionService.getSubstages).mockResolvedValue([
+   { id: 'sub1', session_stage_id: 'st1' },
+  ] as never)
+  vi.mocked(assessmentService.getBySession).mockResolvedValue([
+   { participant_id: 'p1', session_substage_id: 'sub1', star_rating: 5 },
+   { participant_id: 'p2', session_substage_id: 'sub1', star_rating: 4 },
+  ] as never)
+  vi.mocked(reportService.generate).mockRejectedValue(
+   new ApiError(i18n.t('errors.already_generating'), 'already_generating', 409),
+  )
+
+  renderPage()
+  await flush()
+
+  await act(async () => {
+   screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') }).click()
+  })
+  await flush(4)
+
+  expect(screen.getByText(i18n.t('errors.already_generating'))).toBeInTheDocument()
  })
 })

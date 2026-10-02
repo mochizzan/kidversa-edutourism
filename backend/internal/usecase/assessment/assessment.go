@@ -3,6 +3,7 @@ package assessment
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -71,6 +72,26 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	}
 	if g != nil && g.Status == entity.GroupCompleted {
 		return nil, apperrors.Forbidden("group_completed", errors.New("assessment cannot be changed after the group is completed"))
+	}
+	// Per-Kegiatan lock (Perbaikan-2): a COMPLETED/SKIPPED progress row locks
+	// the nilai for that Kegiatan only. Other Kegiatan rows of the same group
+	// stay writable until they complete. Rejected explicitly (403
+	// substage_completed) instead of silently overwriting the locked score.
+	if g != nil {
+		rows, perr := u.sessionRepo.ListGroupStageProgressByGroup(ctx, g.ID)
+		if perr != nil {
+			return nil, perr
+		}
+		for i := range rows {
+			if rows[i].SessionSubstageID != req.SessionSubstageID {
+				continue
+			}
+			if rows[i].Status == entity.ProgressCompleted || rows[i].Status == entity.ProgressSkipped {
+				return nil, apperrors.Forbidden("substage_completed",
+					fmt.Errorf("assessment locked: group %s substage %s already %s", g.ID, req.SessionSubstageID, rows[i].Status))
+			}
+			break
+		}
 	}
 	if starRating < 0 {
 		return nil, apperrors.BadRequest("validation_error", nil)

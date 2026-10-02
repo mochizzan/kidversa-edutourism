@@ -92,6 +92,12 @@ func (u *Usecase) Refresh(ctx context.Context, oldRefresh string) (*LoginResult,
 	hash := HashRefresh(oldRefresh)
 	rec, err := u.refresh.GetByHash(ctx, hash)
 	if err != nil {
+		// The store already distinguishes miss (401 token_invalid) from
+		// infrastructure failure (500 internal_error) — preserve it instead
+		// of collapsing everything to 401.
+		if _, _, ok := apperrors.AsAppError(err); ok {
+			return nil, err
+		}
 		return nil, apperrors.Unauthorized("token_invalid", err)
 	}
 	// Reuse detection: if the presented token was already revoked, the whole family is compromised.

@@ -30,6 +30,17 @@ func (u *Usecase) ListBySession(ctx context.Context, sessionID, tenantID string)
 }
 
 // Upsert marks attendance for a single participant in a session.
+//
+// Perbaikan-2, explicit choice (A): whole-group lock only. ParticipantAttendance
+// is session-scoped WITHOUT a substage/stage column (entity/attendance.go), so a
+// per-topik attendance lock is impossible without a schema migration — and the
+// schema/repo/DTO/migration surface belongs to Perbaikan-1 (DO NOT touch here).
+// Consequence, documented: after one Kegiatan (topik) completes, attendance rows
+// for the session stay writable until the whole group reaches COMPLETED, while
+// nilai for the completed Kegiatan is already locked per-substage in the
+// assessment usecase. No fake per-topic rejection is issued here: rejecting
+// without a backing column would be a false lock. If Perbaikan-1 lands a stage
+// column, add the per-topic guard here (option B).
 func (u *Usecase) Upsert(ctx context.Context, participantID, sessionID string, isPresent bool, markedBy, tenantID string) (*entity.ParticipantAttendance, error) {
 	if participantID == "" || sessionID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)

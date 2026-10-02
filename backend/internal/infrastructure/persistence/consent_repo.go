@@ -76,7 +76,7 @@ func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantI
 		First(&existing).Error
 	if err == nil {
 		// Row exists — update with new consent decision.
-		return r.db.WithContext(ctx).
+		if uerr := r.db.WithContext(ctx).
 			Model(&existing).
 			Updates(map[string]interface{}{
 				"value":          value,
@@ -85,7 +85,10 @@ func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantI
 				"ip_address":     ip,
 				"user_agent":     ua,
 				"responder_name": responderName,
-			}).Error
+			}).Error; uerr != nil {
+			return apperrors.Internal("internal_error", uerr)
+		}
+		return nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return apperrors.Internal("internal_error", err)
@@ -93,6 +96,9 @@ func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantI
 	// No existing row — create new.
 	m := ConsentLogModel{ConsentLog: *log}
 	if err := r.db.WithContext(ctx).Create(&m).Error; err != nil {
+		if isDuplicate(err) {
+			return apperrors.Conflict("conflict", err)
+		}
 		return apperrors.Internal("internal_error", err)
 	}
 	*log = m.ConsentLog
@@ -119,19 +125,28 @@ func (r *GormConsentRepository) SendConsentRequest(ctx context.Context, particip
 		First(&existing).Error
 	if err == nil {
 		// Row exists — update sent_at, clear responded_at (re-send).
-		return r.db.WithContext(ctx).
+		if uerr := r.db.WithContext(ctx).
 			Model(&existing).
 			Updates(map[string]interface{}{
 				"sent_at":      now,
 				"responded_at": nil,
 				"value":        false,
-			}).Error
+			}).Error; uerr != nil {
+			return apperrors.Internal("internal_error", uerr)
+		}
+		return nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return apperrors.Internal("internal_error", err)
 	}
 	// No existing row — create new.
-	return r.db.WithContext(ctx).Create(&m).Error
+	if cerr := r.db.WithContext(ctx).Create(&m).Error; cerr != nil {
+		if isDuplicate(cerr) {
+			return apperrors.Conflict("conflict", cerr)
+		}
+		return apperrors.Internal("internal_error", cerr)
+	}
+	return nil
 }
 
 // GetParticipantByConsentToken resolves a participant by their active combined consent

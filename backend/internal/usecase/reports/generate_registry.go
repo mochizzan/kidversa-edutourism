@@ -361,6 +361,14 @@ func (g *generateRegistry) status(sessionID, tenantID string) (GenerateStatus, b
 
 // GenerateStatus exposes the live generation registry for a session. Reports
 // false after the run completes, errors out, or on a fresh process/restart.
+//
+// Progress-delivery contract (Perbaikan-3): session-level generate progress is
+// POLLED via GET /api/reports?session_id= (active_generate extras, 2s tick in
+// useReportSession) — there is NO per-run SSE channel for session generate.
+// runNarrativeStream's hub.Publish covers only single-report streaming, and
+// publishing per-report mission/narrative marks to a session channel would fan
+// out N streams per run for no consumer. If an SSE session channel is ever
+// added, publish only the aggregate (total/done), never one stream per report.
 func (u *Usecase) GenerateStatus(sessionID, tenantID string) (GenerateStatus, bool) {
 	return u.genReg.status(sessionID, tenantID)
 }

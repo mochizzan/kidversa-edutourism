@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"text/template"
@@ -51,6 +52,11 @@ func (u *Usecase) SuggestMissions(ctx context.Context, reportID, tenantID string
 		return nil, fmt.Errorf("list candidate missions: %w", err)
 	}
 	if len(candidates.Items) == 0 {
+		// Explicit skip, not an error: this Topic has no active missions in
+		// the bank. The mission phase records skip reason mission_bank_empty
+		// and the report stays narrative-only; callers must not toast this
+		// as a failure.
+		log.Printf("reports: mission phase skipped for report %s: %s", reportID, SkipReasonMissionBankEmpty)
 		return []string{}, nil
 	}
 
@@ -65,6 +71,14 @@ func (u *Usecase) SuggestMissions(ctx context.Context, reportID, tenantID string
 	// Try the LLM; fall back to the heuristic on any failure or empty result.
 	picked, lerr := u.suggestViaLLM(ctx, r, session, candidates.Items, assessments.Items)
 	if lerr != nil || len(picked) == 0 {
+		// Observability only: the heuristic fallback is unchanged (skip logic
+		// itself belongs to Perbaikan-4). Log the cause so an LLM outage is
+		// visible instead of a silent quality downgrade.
+		if lerr != nil {
+			log.Printf("reports: mission LLM failed for report %s, using heuristic fallback: %v", reportID, lerr)
+		} else {
+			log.Printf("reports: mission LLM returned empty for report %s, using heuristic fallback", reportID)
+		}
 		return u.suggestHeuristic(candidates.Items, assessments.Items), nil
 	}
 	return picked, nil

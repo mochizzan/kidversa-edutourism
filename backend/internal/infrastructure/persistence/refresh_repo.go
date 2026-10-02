@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -83,7 +84,10 @@ func (r *GormRefreshRepository) GetByHash(ctx context.Context, tokenHash string)
 	if err := r.db.WithContext(ctx).
 		Where("token_hash = ?", tokenHash).
 		First(&m).Error; err != nil {
-		return nil, err // gorm.ErrRecordNotFound → usecase maps to token_invalid
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.Unauthorized("token_invalid", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
 	}
 	return &auth.RefreshRecord{
 		ID:        m.ID,

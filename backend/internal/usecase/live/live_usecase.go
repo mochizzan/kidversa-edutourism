@@ -136,6 +136,17 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, substageID string,
 	}
 	progress, _ := s.repo.GetProgressByGroup(ctx, groupID)
 	p := findProgress(progress, substageID)
+	// Per-Kegiatan lock (Perbaikan-2): a COMPLETED/SKIPPED progress row is
+	// terminal for that Kegiatan. Re-completing or re-skipping it is rejected
+	// with an explicit 409 (substage_completed) and zero mutation — the
+	// UpsertProgress below must not run. ActionUnlock stays allowed as the
+	// correction path (it intentionally reopens the row).
+	if p != nil && (p.Status == entity.ProgressCompleted || p.Status == entity.ProgressSkipped) {
+		if action == ActionComplete || action == ActionSkip {
+			return nil, apperrors.Conflict("substage_completed",
+				fmt.Errorf("live: group %s substage %s already %s", groupID, substageID, p.Status))
+		}
+	}
 	if p == nil {
 		p = &entity.GroupStageProgress{GroupID: groupID, SessionSubstageID: substageID, Status: entity.ProgressLocked}
 	}

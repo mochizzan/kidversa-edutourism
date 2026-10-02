@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -335,6 +336,8 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 func (h *ReportHandler) startGenerateRun(ctx context.Context, sessionID, tenantID string, participants []entity.Participant, topicIDs []string, extraGuardKey string) {
 	runCtx := context.WithoutCancel(ctx)
 	h.uc.BeginGenerateRun(sessionID, tenantID)
+	acceptedAt := time.Now()
+	log.Printf("reports: session generate accepted for %s: participants=%d topics=%d", sessionID, len(participants), len(topicIDs))
 	go func() {
 		defer h.uc.EndGenerateRun(sessionID)
 		defer h.endGenerate(sessionID)
@@ -344,8 +347,10 @@ func (h *ReportHandler) startGenerateRun(ctx context.Context, sessionID, tenantI
 		if _, err := h.uc.GenerateForSession(runCtx, sessionID, tenantID, participants, topicIDs); err != nil {
 			// The run's per-item outcome lives in active_generate; the
 			// aggregate failure is logged so it is never silent.
-			log.Printf("reports: session generate for %s failed: %v", sessionID, err)
+			log.Printf("reports: session generate for %s failed after %s: %v", sessionID, time.Since(acceptedAt).Round(time.Millisecond), err)
+			return
 		}
+		log.Printf("reports: session generate for %s done in %s", sessionID, time.Since(acceptedAt).Round(time.Millisecond))
 	}()
 }
 
