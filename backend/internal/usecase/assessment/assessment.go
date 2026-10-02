@@ -65,6 +65,13 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	if sess.Status != entity.SessionActive {
 		return nil, apperrors.Forbidden("session_not_active", errors.New("assessment can only be submitted when session is active"))
 	}
+	g, err := u.sessionRepo.GetSessionGroupByParticipant(ctx, req.ParticipantID)
+	if err != nil {
+		return nil, err
+	}
+	if g != nil && g.Status == entity.GroupCompleted {
+		return nil, apperrors.Forbidden("group_completed", errors.New("assessment cannot be changed after the group is completed"))
+	}
 	if starRating < 0 {
 		return nil, apperrors.BadRequest("validation_error", nil)
 	}

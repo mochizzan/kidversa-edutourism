@@ -158,4 +158,9 @@ type SessionRepository interface {
 	// FacilitatorOwnsAnyGroup reports whether the facilitator owns at least one group
 	// in the given session. Used to gate kiosk issuance to group owners.
 	FacilitatorOwnsAnyGroup(ctx context.Context, sessionID, facilitatorID string) (bool, error)
+
+	// GetSessionGroupByParticipant resolves the session group a participant belongs
+	// to (participants.group_id -> session_groups). Returns (nil, nil) when the
+	// participant has no group. Used to lock attendance/grading on COMPLETED groups.
+	GetSessionGroupByParticipant(ctx context.Context, participantID string) (*entity.SessionGroup, error)
 }

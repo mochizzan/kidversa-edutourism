@@ -12,6 +12,7 @@ import { useChildAssessment } from '../hooks/useChildAssessment'
 import { KegiatanCard } from '../components/KegiatanCard'
 import { assessmentService } from '../../../core/services/assessments'
 import { SessionStatus } from '../../../core/types/enums'
+import { groupCompletedErrorMessage } from '../utils/groupCompletedLock'
 import type { CreateAssessmentDTO } from '../../../core/types'
 
 const ChildAssessmentPage = () => {
@@ -35,9 +36,21 @@ const ChildAssessmentPage = () => {
   const [savingAny, setSavingAny] = useState(false)
   const { addToast } = useGlobalToast()
 
+  // Completion is terminal: once the group row is COMPLETED, grading is locked
+  // (the server rejects with group_completed as well). Read-only rendering —
+  // the session-inactive pattern keeps data visible, controls get disabled.
+  const isGroupCompleted = childDetail?.group?.status === 'COMPLETED'
+
   const handleSaveForKegiatan = useCallback(
     (_kegiatan: { id: string; session_id: string }) => {
       return async (data: CreateAssessmentDTO) => {
+        if (isGroupCompleted) {
+          addToast({
+            type: 'error',
+            message: groupCompletedErrorMessage(),
+          })
+          return
+        }
         setSavingAny(true)
         try {
           await assessmentService.upsert(data)
@@ -50,7 +63,7 @@ const ChildAssessmentPage = () => {
         }
       }
     },
-    [refreshAssessments, addToast],
+    [refreshAssessments, addToast, isGroupCompleted],
   )
 
   const handleBack = () => {
@@ -199,6 +212,7 @@ const ChildAssessmentPage = () => {
                 }
                 participantId={participant.id}
                 isMine={isMine}
+                locked={isGroupCompleted}
                 onSave={handleSaveForKegiatan(kegiatan)}
                 isSavingGlobal={savingAny}
               />

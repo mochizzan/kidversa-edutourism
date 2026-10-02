@@ -22,9 +22,11 @@ type fakeAssessmentRepo struct {
 	reviveErr                         error
 	ownerID                           *string
 	ownerErr                          error
+	created                           *entity.Assessment
 }
 
 func (r *fakeAssessmentRepo) Create(ctx context.Context, a *entity.Assessment) error {
+	r.created = a
 	return r.createErr
 }
 func (r *fakeAssessmentRepo) GetByID(ctx context.Context, id, tenantID string) (*entity.Assessment, error) {
@@ -50,8 +52,10 @@ func (r *fakeAssessmentRepo) GetGroupFacilitatorIDByParticipant(ctx context.Cont
 }
 
 type fakeSessionRepo struct {
-	session *entity.Session
-	err     error
+	session  *entity.Session
+	err      error
+	group    *entity.SessionGroup
+	groupErr error
 }
 
 func (r *fakeSessionRepo) CreateSession(ctx context.Context, s *entity.Session) error { return nil }
@@ -145,6 +149,9 @@ func (r *fakeSessionRepo) GetGroupFacilitatorID(ctx context.Context, groupID str
 }
 func (r *fakeSessionRepo) FacilitatorOwnsAnyGroup(ctx context.Context, sessionID, facilitatorID string) (bool, error) {
 	return false, nil
+}
+func (r *fakeSessionRepo) GetSessionGroupByParticipant(ctx context.Context, participantID string) (*entity.SessionGroup, error) {
+	return r.group, r.groupErr
 }
 
 type fakeBadgeEvaluator struct{}
@@ -280,4 +287,81 @@ func TestUsecase_Upsert_Ownership_Fails(t *testing.T) {
 		SessionSubstageID: "substage-1",
 	}, 3, "", "facilitator-1", "facilitator-1", string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	requireAppErrorCode(t, err, "not_group_owner")
+}
+
+func TestUsecase_Upsert_GroupCompleted_Fails(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+		group:   &entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupCompleted},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	requireAppErrorCode(t, err, "group_completed")
+	if assessmentRepo.created != nil {
+		t.Fatal("expected no assessment to be written on a COMPLETED group")
+	}
+}
+
+func TestUsecase_Upsert_GroupCompleted_NonActiveSession_KeepsSessionGate(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionCompleted},
+		group:   &entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupCompleted},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	requireAppErrorCode(t, err, "session_not_active")
+}
+
+func TestUsecase_Upsert_GroupNotCompleted_Succeeds(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+		group:   &entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupInProgress},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if assessmentRepo.created == nil {
+		t.Fatal("expected assessment to be written")
+	}
+}
+
+func TestUsecase_Upsert_NoGroup_Succeeds(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	if err != nil {
+		t.Fatalf("expected success for participant without group, got %v", err)
+	}
 }

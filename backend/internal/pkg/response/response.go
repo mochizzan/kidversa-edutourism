@@ -155,6 +155,8 @@ func MessageForCode(code string) string {
 		return "Terdapat peserta yang hadir namun belum dinilai pada sesi ini"
 	case "present_participants_unassessed":
 		return "Terdapat peserta yang sudah absen namun belum dinilai. Lengkapi penilaian peserta yang hadir sebelum menyelesaikan kelompok."
+	case "group_completed":
+		return "Kelompok sudah diselesaikan; kehadiran dan penilaian tidak dapat diubah lagi."
 	case "whatsapp_send_failed":
 		return "Gagal mengirim rapor via WhatsApp. Silakan coba kirim ulang."
 	case "whatsapp_number_missing":

@@ -724,3 +724,23 @@ func (r *GormSessionRepository) FacilitatorOwnsAnyGroup(ctx context.Context, ses
 	}
 	return n > 0, nil
 }
+
+// GetSessionGroupByParticipant resolves the session group a participant belongs to
+// (participants.group_id -> session_groups). Returns (nil, nil) when the participant
+// has no group. Used to lock attendance/grading writes on COMPLETED groups.
+func (r *GormSessionRepository) GetSessionGroupByParticipant(ctx context.Context, participantID string) (*entity.SessionGroup, error) {
+	var m SessionGroupModel
+	if err := r.db.WithContext(ctx).
+		Table("participants AS p").
+		Select("sg.*").
+		Joins("LEFT JOIN session_groups AS sg ON sg.id = p.group_id").
+		Where("p.id = ?", participantID).
+		Limit(1).
+		Scan(&m).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	if m.ID == "" {
+		return nil, nil
+	}
+	return m.ToEntity(), nil
+}

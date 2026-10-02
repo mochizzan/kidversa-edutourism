@@ -12,6 +12,9 @@ interface KegiatanCardProps {
   kegiatanName: string
   participantId: string
   isMine: boolean
+  // The owning group is COMPLETED: grading controls stay visible but disabled
+  // (the server rejects upserts with group_completed as well).
+  locked?: boolean
   onSave: (data: CreateAssessmentDTO) => Promise<void>
   isSavingGlobal: boolean
 }
@@ -65,6 +68,7 @@ export function KegiatanCard({
   kegiatanName,
   participantId,
   isMine,
+  locked = false,
   onSave,
   isSavingGlobal,
 }: KegiatanCardProps) {
@@ -90,7 +94,7 @@ export function KegiatanCard({
     comment !== initialComment.current
 
   const handleSave = useCallback(async () => {
-    if (!isMine || !isDirty || isSavingGlobal || saving) return
+    if (!isMine || locked || !isDirty || isSavingGlobal || saving) return
     setSaving(true)
     try {
       await onSave({
@@ -112,7 +116,7 @@ export function KegiatanCard({
     } finally {
       setSaving(false)
     }
-  }, [starRating, comment, kegiatan, participantId, isMine, isDirty, isSavingGlobal, saving, onSave])
+  }, [starRating, comment, kegiatan, participantId, isMine, locked, isDirty, isSavingGlobal, saving, onSave])
 
   const isSaving = saving || isSavingGlobal
 
@@ -149,7 +153,7 @@ export function KegiatanCard({
         <StarRatingInput
           value={starRating}
           onChange={setStarRating}
-          disabled={!isMine || isSaving}
+          disabled={!isMine || isSaving || locked}
         />
       </div>
 
@@ -164,7 +168,7 @@ export function KegiatanCard({
           placeholder={t('fasilitator.assessment.commentPlaceholder')}
           maxLength={300}
           rows={3}
-          disabled={!isMine || isSaving}
+          disabled={!isMine || isSaving || locked}
           className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-amber-400 focus:border-transparent outline-none resize-none transition-all disabled:opacity-60"
         />
         <p className="text-xs text-gray-400 mt-1 text-right">
@@ -177,7 +181,7 @@ export function KegiatanCard({
         <Button
           onClick={handleSave}
           loading={isSaving}
-          disabled={!isDirty || isSaving || !isMine}
+          disabled={!isDirty || isSaving || !isMine || locked}
           size="sm"
         >
           {t('common.save')}

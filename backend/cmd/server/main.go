@@ -89,7 +89,7 @@ func main() {
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo, attendanceRepo)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub, badgeUC)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, sessionRepo, badgeUC)
-	attendanceUC := attendanceuc.NewUsecase(attendanceRepo)
+	attendanceUC := attendanceuc.NewUsecase(attendanceRepo, sessionRepo)
 	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg, waGateway, userRepo, attendanceRepo)
 
 	// Handlers.

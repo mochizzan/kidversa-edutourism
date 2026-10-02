@@ -28,6 +28,7 @@ import { ChildListItem } from '../components/ChildListItem'
 import { GroupCompleteButton } from '../components/GroupCompleteButton'
 import { evaluateGroupCompletion } from '../utils/groupCompletion'
 import { friendlyError } from '../../../core/utils/errorMessages'
+import { groupCompletedErrorMessage } from '../utils/groupCompletedLock'
 import type {
   Session,
   SessionStage,
@@ -289,6 +290,13 @@ const GroupPage = () => {
   }
 
   const handleAssess = (participantId: string) => {
+    if (groupDetail?.group.status === 'COMPLETED') {
+      addToast({
+        type: 'error',
+        message: groupCompletedErrorMessage(),
+      })
+      return
+    }
     navigate(`/fasilitator/groups/${groupId}/children/${participantId}`, {
       state: { sessionId: groupDetail?.session.id },
     })
@@ -338,6 +346,13 @@ const GroupPage = () => {
 
   const handleToggleAttendance = useCallback(async (participantId: string) => {
     if (!groupDetail) return
+    if (groupDetail.group.status === 'COMPLETED') {
+      addToast({
+        type: 'error',
+        message: groupCompletedErrorMessage(),
+      })
+      return
+    }
     const current = attendanceMap.get(participantId) ?? false
     const newValue = !current
 
@@ -480,10 +495,11 @@ const GroupPage = () => {
               school={participant.school_name}
               isAssessed={isAssessed(participant.id)}
               isPresent={isPresent(participant.id)}
-              onToggleAttendance={isMine ? () => handleToggleAttendance(participant.id) : undefined}
+              onToggleAttendance={isMine && !isGroupCompleted ? () => handleToggleAttendance(participant.id) : undefined}
               attendanceLoading={attendanceLoading.has(participant.id)}
               showPhoto={participant.consent_photo}
-              onAssess={isMine && isSessionActive ? () => handleAssess(participant.id) : undefined}
+              onAssess={isMine && isSessionActive && !isGroupCompleted ? () => handleAssess(participant.id) : undefined}
+              locked={isGroupCompleted}
             />
           ))}
         </div>

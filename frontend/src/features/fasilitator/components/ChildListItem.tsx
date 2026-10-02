@@ -13,6 +13,9 @@ interface ChildListItemProps {
   showPhoto?: boolean
   onAssess?: () => void
   onPhoto?: () => void
+  // The owning group is COMPLETED: action controls stay visible but disabled
+  // (attendance/grading are locked server-side too).
+  locked?: boolean
   className?: string
 }
 
@@ -27,6 +30,7 @@ export function ChildListItem({
   showPhoto = false,
   onAssess,
   onPhoto,
+  locked = false,
   className,
 }: ChildListItemProps) {
   const { t } = useTranslation()
@@ -75,30 +79,32 @@ export function ChildListItem({
 
       {/* Actions */}
       <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-        {onToggleAttendance && (
+        {(onToggleAttendance || locked) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onToggleAttendance() }}
-            disabled={attendanceLoading}
+            onClick={(e) => { e.stopPropagation(); onToggleAttendance?.() }}
+            disabled={locked || attendanceLoading}
             className={cn(
-              'flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors min-h-[44px] whitespace-nowrap',
+              'flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors min-h-[44px] whitespace-nowrap disabled:opacity-60',
               isPresent
                 ? 'bg-green-100 text-green-700 border border-green-300 hover:bg-green-200'
                 : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200',
-              attendanceLoading && 'opacity-60 cursor-wait',
+              attendanceLoading ? 'opacity-60 cursor-wait' : locked && 'cursor-not-allowed',
             )}
           >
             {isPresent ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
             <span>{isPresent ? t('fasilitator.child.present') : t('fasilitator.child.notPresent')}</span>
           </button>
         )}
-        {onAssess && (
+        {(onAssess || locked) && (
           <button
-            onClick={(e) => { e.stopPropagation(); onAssess() }}
+            onClick={(e) => { e.stopPropagation(); onAssess?.() }}
+            disabled={locked}
             className={cn(
-              'flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors min-h-[44px] whitespace-nowrap',
+              'flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-colors min-h-[44px] whitespace-nowrap disabled:opacity-60',
               isAssessed
                 ? 'bg-primary-container text-on-primary-container hover:bg-primary-container/80'
                 : 'bg-primary text-white hover:bg-primary-dark',
+              locked && 'cursor-not-allowed',
             )}
           >
             <Star className="w-4 h-4" />
