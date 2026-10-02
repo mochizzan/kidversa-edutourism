@@ -48,6 +48,77 @@ function dashIfEmpty(v?: string): string {
  return v && v.trim() ? esc(v) : '—'
 }
 
+/** Skala transform terbesar agar konten PROFIL ANAK MUAT di dalam kartunya.
+ *  Rumus murni geometri terukur (tanpa angka tetap / cap arbitrer):
+ *    scale = min(availableWidth / contentWidth, availableHeight / contentHeight)
+ *  Ini adalah skala terbesar yang memenuhi contentWidth·scale ≤ availableWidth
+ *  DAN contentHeight·scale ≤ availableHeight sekaligus:
+ *  - konten lebih kecil dari kotak → skala tumbuh > 1 (mengisi kartu, termasuk
+ *    sisi kanan yang kosong);
+ *  - skala hanya turun < 1 saat konten melebihi kotak (tumpang tindih);
+ *  - batas sama persis → tepat 1.
+ *  Dimensi tidak valid (≤ 0 atau NaN) → 1 (no-op aman, selaras __fitBadgeLabel).
+ *  Sumber tunggal rumus ini dipakai unit test DAN disuntikkan ke skrip runtime
+ *  `__fitProfilAnak` (miniRaport.ts <head>) lewat `.toString()`. */
+export function computeProfilAnakScale(
+ contentWidth: number,
+ contentHeight: number,
+ availableWidth: number,
+ availableHeight: number,
+): number {
+ if (
+  !(contentWidth > 0) ||
+  !(contentHeight > 0) ||
+  !(availableWidth > 0) ||
+  !(availableHeight > 0)
+ )
+  return 1
+ return Math.min(availableWidth / contentWidth, availableHeight / contentHeight)
+}
+
+/** Bobot flex-grow satu blok stage di kartu LEVEL KEGIATAN = jumlah baris
+ *  visualnya (header KEGIATAN/BINTANG/LEVEL + satu baris per kegiatan) supaya
+ *  tinggi kartu yang tersedia terbagi rata ke SEMUA baris (bukan hanya antar
+ *  blok): stage berisi 5 kegiatan memperoleh bobot 6, stage berisi 1 kegiatan
+ *  bobot 2, stage tanpa kegiatan (empty state) bobot 1. Dipakai stageRowHTML
+ *  sebagai inline style dan dipakai unit test; bobot saja tidak mengubah
+ *  tinggi alami (hanya aktif saat __fitLevelKegiatan men-set tinggi layout). */
+export function computeLevelStageGrowWeight(kegiatanCount: number): number {
+ return kegiatanCount > 0 ? kegiatanCount + 1 : 1
+}
+
+/** Skala transform terbesar agar tabel LEVEL KEGIATAN MUAT sekaligus MENGISI
+ *  kartunya (row-span-3: tinggi baris grid dipaksa foto MOMEN, sehingga dengan
+ *  5 kegiatan isi tabel jauh lebih pendek dari kartunya — ruang kosong di bawah
+ *  harus terpakai). Rumus murni geometri terukur (tanpa angka tetap / cap
+ *  arbitrer):
+ *    scale = min(availableWidth / contentWidth, availableHeight / contentHeight)
+ *  Prioritas skala BESAR: konten lebih kecil dari kotak → tumbuh > 1 (nama,
+ *  bintang, dan pill LEVEL membesar); tinggi visual yang belum penuh (bila
+ *  lebar membatasi skala) dibagikan ke tiap baris oleh tinggi layout
+ *  availableHeight/scale + bobot flex-grow (computeLevelStageGrowWeight) sehingga
+ *  tabel memakan area putih di bawah. Turun < 1 HANYA saat konten melebihi
+ *  kotak (tumpang tindih) — clamp geometri kedua sumbu, bukan angka tetap.
+ *  Dimensi tidak valid (≤ 0 atau NaN) → 1 (no-op aman, selaras
+ *  computeProfilAnakScale/__fitBadgeLabel). Sumber tunggal rumus ini dipakai
+ *  unit test DAN disuntikkan ke skrip runtime `__fitLevelKegiatan`
+ *  (miniRaport.ts <head>) lewat `.toString()`. */
+export function computeLevelKegiatanScale(
+ contentWidth: number,
+ contentHeight: number,
+ availableWidth: number,
+ availableHeight: number,
+): number {
+ if (
+  !(contentWidth > 0) ||
+  !(contentHeight > 0) ||
+  !(availableWidth > 0) ||
+  !(availableHeight > 0)
+ )
+  return 1
+ return Math.min(availableWidth / contentWidth, availableHeight / contentHeight)
+}
+
 /** Jumlah slot bintang: domain skor 0..4, konsisten dengan max=4 di ReportAssessmentScores. */
 const STAR_SLOTS = 4
 
@@ -65,22 +136,29 @@ function stageRowHTML(
  isLast: boolean
 ): string {
  const border = isLast ? '' : 'border-b border-dashed border-gray-200 pb-3'
+ // Distribusi tinggi kartu LEVEL KEGIATAN (lihat __fitLevelKegiatan): bobot
+ // flex-grow = jumlah baris visual (computeLevelStageGrowWeight) supaya tinggi
+ // yang tersedia terbagi rata antar-baris; blok stage jadi flex-col agar tinggi
+ // terbagi diteruskan ke baris-barisnya. Inline style saja — tanpa kelas baru,
+ // tanpa perubahan ukuran alami (grow hanya aktif bila wadahnya ber-set tinggi).
+ const grow = computeLevelStageGrowWeight(stage.kegiatan?.length ?? 0)
+ const rowStyle = ' style="flex-grow:1;flex-shrink:0"'
  const kegiatan = stage.kegiatan && stage.kegiatan.length
-  ? `<div class="flex items-center gap-2 pb-1 border-b border-gray-200"><span class="flex-1 min-w-0 text-[10px] font-bold tracking-wider text-gray-400">KEGIATAN</span><span class="shrink-0 text-[10px] font-bold tracking-wider text-gray-400">BINTANG</span><span class="w-12 text-center shrink-0 text-[10px] font-bold tracking-wider text-gray-400">LEVEL</span></div>` +
+  ? `<div class="flex items-center gap-2 pb-1 border-b border-gray-200"${rowStyle}><span class="flex-1 min-w-0 text-[10px] font-bold tracking-wider text-gray-400">KEGIATAN</span><span class="shrink-0 text-[10px] font-bold tracking-wider text-gray-400">BINTANG</span><span class="w-12 text-center shrink-0 text-[10px] font-bold tracking-wider text-gray-400">LEVEL</span></div>` +
   stage.kegiatan
    .map(
     (k, ki, arr) => `
-          <div class="flex items-center gap-2 py-1${ki === arr.length - 1 ? '' : ' border-b border-dashed border-gray-200'}">
+          <div class="flex items-center gap-2 py-1${ki === arr.length - 1 ? '' : ' border-b border-dashed border-gray-200'}"${rowStyle}>
             <span class="flex-1 min-w-0 truncate text-[12px] font-semibold text-gray-700">${esc(k.name)}</span>
             <span class="shrink-0 flex gap-0.5 text-brand-star text-sm">${starsHTML(k.starRating)}</span>
             <span class="w-12 text-center shrink-0 inline-flex items-center justify-center px-1 py-0.5 rounded-full bg-brand-lightPurple text-brand-purple font-black text-[12px]">${RATING_ABBREVIATIONS[k.starRating] ?? '–'}</span>
           </div>`
    )
    .join('')
-  : '<p class="text-[11px] text-gray-400 italic">Belum ada kegiatan tercatat.</p>'
+  : '<p class="text-[11px] text-gray-400 italic" style="flex-grow:1;flex-shrink:0;display:flex;flex-direction:column;justify-content:center">Belum ada kegiatan tercatat.</p>'
  return `
-    <div class="${border}">
-      <div class="flex flex-col gap-1.5">${kegiatan}</div>
+    <div class="${border}" style="display:flex;flex-direction:column;flex-grow:${grow};flex-shrink:0">
+      <div class="flex flex-col gap-1.5" style="flex-grow:1">${kegiatan}</div>
     </div>`
 }
 
@@ -165,11 +243,11 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
     .join('')
    const extra =
     data.extraTopicsCount && data.extraTopicsCount > 0
-     ? `<div class="text-[11px] text-gray-400 italic mt-1">Topik lain: ${esc(data.extraTopicsCount)}</div>`
+     ? `<div class="text-[11px] text-gray-400 italic mt-1" style="flex-shrink:0">Topik lain: ${esc(data.extraTopicsCount)}</div>`
      : ''
    return rows + extra
   })()
-  : '<p class="text-sm text-gray-500 italic">Belum ada data topik.</p>'
+  : '<p class="text-sm text-gray-500 italic" style="flex-grow:1;flex-shrink:0;display:flex;flex-direction:column;justify-content:center">Belum ada data topik.</p>'
 
  const kidversaLogo = data.kidversaLogoUrl
   ? `<img src="${esc(data.kidversaLogoUrl)}" alt="Kidversa" class="w-full h-16 object-contain" />`
@@ -401,6 +479,82 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             pill.style.transform = s < 1 ? 'scale(' + s + ')' : ''
         }
 
+        /* ===== Skala dinamis isi kartu PROFIL ANAK (grid 2 kolom max-content) =====
+           Fields (#profil-anak-fields) di-reset dulu agar ukuran alami murni
+           (whitespace-nowrap, tanpa truncate → nilai tak pernah terpotong),
+           lalu diskalakan agar muat SEKALIGUS mengisi kartu
+           (#profil-anak-card, content-box = client − padding):
+             natural = fields.offsetWidth / offsetHeight  (grid max-content)
+             available = card.clientWidth − padX, card.clientHeight − padY
+             scale = min(availableW / naturalW, availableH / naturalH)
+           Rumusnya fungsi murni computeProfilAnakScale (diekspor dari
+           miniRaport.ts dan disuntikkan di bawah sebagai sumber tunggal):
+           skala terbesar yang tetap muat — tumbuh > 1 mengisi sisi kanan kartu
+           yang kosong, hanya turun saat konten melebihi kotak (tumpang tindih).
+           transform tidak mengubah layout kartu sehingga pengukuran global
+           __fitRaport tetap konvergen. Aman dipanggil berulang (idempoten) &
+           no-op bila elemennya tidak ada. */
+        var __computeProfilAnakScale = ${computeProfilAnakScale.toString()}
+        function __fitProfilAnak() {
+            var card = document.getElementById('profil-anak-card')
+            var fields = document.getElementById('profil-anak-fields')
+            if (!card || !fields) return
+            fields.style.transform = 'none' // reset → pengukuran alami murni
+            var naturalW = fields.offsetWidth
+            var naturalH = fields.offsetHeight
+            var cs = window.getComputedStyle ? window.getComputedStyle(card) : null
+            var padX = cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 32
+            var padY = cs ? (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) : 40
+            var s = __computeProfilAnakScale(naturalW, naturalH, card.clientWidth - padX, card.clientHeight - padY)
+            fields.style.transformOrigin = 'top left'
+            fields.style.transform = s !== 1 ? 'scale(' + s + ')' : ''
+        }
+
+        /* ===== Skala + distribusi tinggi isi kartu LEVEL KEGIATAN =====
+           Konten (#level-kegiatan-rows) berukuran max-content (lebar alami baris
+           terpanjang → nama kegiatan tak pernah terpotong), di-reset dulu agar
+           ukuran alami murni, lalu diskalakan agar muat SEKALIGUS mengisi kartu
+           (#level-kegiatan-card, content-box = client − padding):
+             natural   = rows.offsetWidth / offsetHeight  (max-content)
+             available = card.clientWidth − padX, card.clientHeight − padY − marginTop
+             scale     = computeLevelKegiatanScale(naturalW, naturalH, availW, availH)
+                       = min(availW / naturalW, availH / naturalH)  ← clamp geometri
+           Prioritas skala besar: konten kecil (mis. 5 kegiatan) → tumbuh > 1,
+           nama/bintang/pill LEVEL membesar; bila skala dibatasi lebar sehingga
+           tinggi visual belum penuh, tinggi LAYOUT di-set availH/scale sehingga
+           tinggi visual (= × scale) pas mengisi kartu DAN sisa ruangnya terbagi
+           rata ke tiap baris oleh bobot flex-grow inline (computeLevelStageGrowWeight
+           di stageRowHTML) — area putih di bawah ikut terpakai. Skala turun < 1
+           HANYA saat konten melebihi kotak: tinggi layout otomatis dikembalikan
+           (konten alami) lalu transform mengecilkannya ke tepi kartu.
+           transform tidak mengubah layout kartu sehingga pengukuran global
+           __fitRaport tetap konvergen. Aman dipanggil berulang (idempoten) &
+           no-op bila elemennya tidak ada. */
+        var __computeLevelKegiatanScale = ${computeLevelKegiatanScale.toString()}
+        function __fitLevelKegiatan() {
+            var card = document.getElementById('level-kegiatan-card')
+            var rows = document.getElementById('level-kegiatan-rows')
+            if (!card || !rows) return
+            rows.style.transform = 'none' // reset → pengukuran alami murni
+            rows.style.height = ''
+            var naturalW = rows.offsetWidth
+            var naturalH = rows.offsetHeight
+            var cs = window.getComputedStyle ? window.getComputedStyle(card) : null
+            var padX = cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 40
+            var padY = cs ? (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) : 44
+            var rs = window.getComputedStyle ? window.getComputedStyle(rows) : null
+            var marginTop = rs ? parseFloat(rs.marginTop) || 0 : 4
+            var availW = card.clientWidth - padX
+            var availH = card.clientHeight - padY - marginTop
+            var s = __computeLevelKegiatanScale(naturalW, naturalH, availW, availH)
+            // Tinggi layout = availH/s → tinggi VISUAL (tinggi × s) pas mengisi
+            // kartu. Hanya untuk s ≥ 1 (availH/s ≤ availH → tanpa overflow
+            // layout, pengukuran __fitRaport tidak terpengaruh).
+            rows.style.height = s >= 1 && availH > 0 ? (availH / s) + 'px' : ''
+            rows.style.transformOrigin = 'top left'
+            rows.style.transform = s !== 1 ? 'scale(' + s + ')' : ''
+        }
+
         /* ===== Skala dinamis isi lembar (container fixed 210mm × 297mm) =====
            Geometri kertas TIDAK berubah: .a4-sheet tetap 210mm × 297mm dan
            .raport-main tetap flex item berukuran sisa ruang. #raport-scale
@@ -440,11 +594,13 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
         function __scheduleFit() {
             if (__fitQueued) return
             __fitQueued = true
-            setTimeout(function () { __fitQueued = false; __fitRaport(); __fitBadgeLabel() }, 0)
+            setTimeout(function () { __fitQueued = false; __fitRaport(); __fitBadgeLabel(); __fitProfilAnak(); __fitLevelKegiatan() }, 0)
         }
 
         function __initFit() {
             __fitRaport()
+            __fitProfilAnak()
+            __fitLevelKegiatan()
             // Web font (Nunito/Caveat) mengubah tinggi teks setelah paint pertama.
             if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
                 document.fonts.ready.then(__scheduleFit, function () {})
@@ -472,6 +628,8 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
             if (window.addEventListener) {
                 window.addEventListener('beforeprint', __fitRaport)
                 window.addEventListener('beforeprint', __fitBadgeLabel)
+                window.addEventListener('beforeprint', __fitProfilAnak)
+                window.addEventListener('beforeprint', __fitLevelKegiatan)
             }
         }
 
@@ -539,38 +697,48 @@ export function generateMiniRaportHTML(data: MiniRaportData): string {
                 </div>
             </div>
 
-            <!-- 2. PROFIL ANAK (vertikal, kolom kanan) -->
-            <div class="col-span-8 bg-white border-[2px] border-brand-badge rounded-[1.5rem] p-4 relative pt-6">
+            <!-- 2. PROFIL ANAK (grid 2 kolom max-content; skala dihitung __fitProfilAnak) -->
+            <div id="profil-anak-card" class="col-span-8 bg-white border-[2px] border-brand-badge rounded-[1.5rem] p-4 relative pt-6">
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold flex items-center gap-2 z-10">
                     <i class="fas fa-user text-xs"></i> PROFIL ANAK
                 </div>
-                <div class="flex flex-col gap-1.5 text-[13px]">
-                    <div class="flex items-baseline gap-1">
-                        <span class="text-brand-purple font-semibold w-28 shrink-0 whitespace-nowrap">Nama Anak</span>
-                        <span class="text-brand-purple font-black truncate min-w-0 flex-1">: ${esc(data.childName)}</span>
+                <!-- Grid 2×2 berukuran alami (max-content) memakai sisi kanan kartu
+                     tanpa kelas Tailwind baru; setiap baris whitespace-nowrap tanpa
+                     truncate sehingga nilai tak pernah terpotong. __fitProfilAnak
+                     men-skalakan konten ke skala terbesar yang masih muat (computeProfilAnakScale). -->
+                <div id="profil-anak-fields" class="text-[13px]" style="display:grid;grid-template-columns:repeat(2, max-content);column-gap:16px;row-gap:6px;width:max-content">
+                    <div class="flex items-baseline gap-1 whitespace-nowrap">
+                        <span class="text-brand-purple font-semibold">Nama Anak</span>
+                        <span class="text-brand-purple font-black">: ${esc(data.childName)}</span>
                     </div>
-                    <div class="flex items-baseline gap-1">
-                        <span class="text-brand-purple font-semibold w-28 shrink-0 whitespace-nowrap">Usia</span>
-                        <span class="text-brand-purple font-black truncate min-w-0 flex-1">: ${data.childAge > 0 ? data.childAge + ' Tahun' : '—'}</span>
+                    <div class="flex items-baseline gap-1 whitespace-nowrap">
+                        <span class="text-brand-purple font-semibold">Usia</span>
+                        <span class="text-brand-purple font-black">: ${data.childAge > 0 ? data.childAge + ' Tahun' : '—'}</span>
                     </div>
-                    <div class="flex items-baseline gap-1">
-                        <span class="text-brand-purple font-semibold w-28 shrink-0 whitespace-nowrap">Sekolah</span>
-                        <span class="text-brand-purple font-black truncate min-w-0 flex-1">: ${dashIfEmpty(data.childSchool)}</span>
+                    <div class="flex items-baseline gap-1 whitespace-nowrap">
+                        <span class="text-brand-purple font-semibold">Sekolah</span>
+                        <span class="text-brand-purple font-black">: ${dashIfEmpty(data.childSchool)}</span>
                     </div>
-                    <div class="flex items-baseline gap-1">
-                        <span class="text-brand-purple font-semibold w-28 shrink-0 whitespace-nowrap">Kelompok</span>
-                        <span class="text-brand-purple font-black truncate min-w-0 flex-1">: ${dashIfEmpty(data.childGroup)}</span>
+                    <div class="flex items-baseline gap-1 whitespace-nowrap">
+                        <span class="text-brand-purple font-semibold">Kelompok</span>
+                        <span class="text-brand-purple font-black">: ${dashIfEmpty(data.childGroup)}</span>
                     </div>
                 </div>
             </div>
 
             <!-- 3. LEVEL KEGIATAN (row-span-3: memanjang ke baris yang ditinggalkan
                  BADGE di kolom kanan, sejajar dengan dasar kartu BADGE di kolom kiri) -->
-            <div class="col-span-8 row-span-3 bg-white border-2 border-gray-200 rounded-[1.5rem] p-5 pt-6 relative mt-2">
+            <div id="level-kegiatan-card" class="col-span-8 row-span-3 bg-white border-2 border-gray-200 rounded-[1.5rem] p-5 pt-6 relative mt-2">
                 <div class="absolute -top-3 left-5 bg-brand-badge text-white px-5 py-1 rounded-full font-bold shadow-md flex items-center gap-2 z-10">
                     <i class="fas fa-star text-brand-star text-xs"></i> LEVEL KEGIATAN
                 </div>
-                <div class="flex flex-col gap-2 mt-1">
+                <!-- Tabel berukuran max-content (lebar baris terpanjang → nama tak
+                     pernah terpotong). __fitLevelKegiatan men-skala ke skala
+                     terbesar yang masih muat (computeLevelKegiatanScale) lalu
+                     membagi tinggi kartu yang tersisa ke tiap baris lewat bobot
+                     flex-grow sehingga tabel mengisi kartu (area putih bawah ikut
+                     terpakai). -->
+                <div id="level-kegiatan-rows" class="flex flex-col gap-2 mt-1" style="width:max-content">
                     ${stagesBlock}
                 </div>
             </div>
