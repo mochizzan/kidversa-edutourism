@@ -133,6 +133,18 @@ type subGuardAttendanceRepo struct {
 	upserts int
 }
 
+func (r *subGuardAttendanceRepo) GetByParticipantSessionStage(_ context.Context, _, _, _, _ string) (*entity.ParticipantAttendance, error) {
+	return nil, apperrors.NotFound("not_found", nil)
+}
+
+func (r *subGuardAttendanceRepo) ListBySessionStage(_ context.Context, _, _, _ string) ([]entity.ParticipantAttendance, error) {
+	return nil, nil
+}
+
+func (r *subGuardAttendanceRepo) ListByParticipantSession(_ context.Context, _, _, _ string) ([]entity.ParticipantAttendance, error) {
+	return nil, nil
+}
+
 func (r *subGuardAttendanceRepo) Upsert(_ context.Context, _ *entity.ParticipantAttendance) error {
 	r.upserts++
 	return nil
@@ -332,7 +344,9 @@ func TestSubstageGuard_AttendanceWholeGroupCompletedRejected(t *testing.T) {
 	srepo := &subGuardSessionRepo{group: subGuardGroup(entity.GroupCompleted)}
 	uc := attendance.NewUsecase(arepo, srepo)
 
-	_, err := uc.Upsert(context.Background(), "part-1", "sess-subguard", true, "guru-1", "tenant-subguard")
+	// Group COMPLETED keeps precedence over topic validation: the stage
+	// lookup is never reached, so no ListSessionStages stub is needed.
+	_, err := uc.Upsert(context.Background(), "part-1", "sess-subguard", "stage-subguard", true, "guru-1", "tenant-subguard")
 	requireAppErrorCode(t, err, "group_completed")
 	if arepo.upserts != 0 {
 		t.Fatalf("upserts = %d, want 0 (completed group locks attendance)", arepo.upserts)

@@ -23,7 +23,7 @@ vi.mock('@/core/services/assessments', () => ({
 }))
 
 vi.mock('@/core/services/attendance', () => ({
-  attendanceService: { getBySession: vi.fn(), upsert: vi.fn() },
+  attendanceService: { getBySession: vi.fn(), getByTopic: vi.fn(), upsert: vi.fn() },
 }))
 
 vi.mock('@/core/services/live', () => ({
@@ -142,6 +142,7 @@ function seedMocks() {
   vi.mocked(programService.getStages).mockResolvedValue(programStages as never)
   vi.mocked(assessmentService.getBySession).mockResolvedValue(assessments as never)
   vi.mocked(attendanceService.getBySession).mockResolvedValue(attendanceRows as never)
+  vi.mocked(attendanceService.getByTopic).mockResolvedValue(attendanceRows as never)
   vi.mocked(liveService.getGroupsWithProgress).mockResolvedValue([] as never)
 }
 
@@ -196,20 +197,23 @@ describe('GroupPage Perbaikan-1: per-topic leaves+scores, whole-session attendan
     expect(screen.queryByText('Semua sudah dinilai')).toBeNull()
   })
 
-  it('attendance (OPSI B): one whole-session toggle with an explicit session-wide label', async () => {
+  it('attendance (per-topic): one toggle per participant for the ACTIVE topic with a per-topic label', async () => {
     renderAt('/fasilitator/groups/g-1')
     await flush()
 
-    // Exactly one toggle per participant, labelled session-wide.
-    expect(screen.getByText('Kehadiran dicatat satu kali per sesi dan berlaku untuk seluruh topik.')).toBeInTheDocument()
+    // Per-topic label; seeded ss1 row (present) shows the Hadir toggle.
+    expect(screen.getByText('Kehadiran dicatat per topik dan hanya berlaku untuk topik aktif.')).toBeInTheDocument()
     const toggles = screen.getAllByRole('button', { name: 'Hadir' })
     expect(toggles).toHaveLength(1)
 
-    // Identical session value across topics is CORRECT (OPSI B): after
-    // switching to ss2 the same single toggle stays present.
+    // Switching to ss2 refetches that topic (getByTopic) instead of reusing
+    // ss1's value raw. The seeded ss2 row is legacy session-wide (no
+    // session_stage_id) → fills the topic (fill-if-absent) → still present.
     await act(async () => {
       fireEvent.change(topicSelect(), { target: { value: 'ss2' } })
     })
+    await flush()
+    expect(attendanceService.getByTopic).toHaveBeenCalledWith('s-1', 'ss2')
     expect(screen.getAllByRole('button', { name: 'Hadir' })).toHaveLength(1)
   })
 

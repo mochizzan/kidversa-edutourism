@@ -175,6 +175,7 @@ describe('GroupPage: COMPLETED group locks attendance and grading', () => {
     expect(attendanceService.upsert).toHaveBeenCalledWith({
       participant_id: 'c-1',
       session_id: 's-1',
+      session_stage_id: 'ss1',
       is_present: true,
     })
 

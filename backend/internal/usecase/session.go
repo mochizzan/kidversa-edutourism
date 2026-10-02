@@ -1105,30 +1105,73 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 	return nil
 }
 
-// carryAttendance copies the participant's attendance row from the source
-// session to the target session during LinkParticipant. A missing source row
-// means there is nothing to carry and is not an error; every other failure is
-// returned so the migration aborts before the participant moves. The write is
-// an Upsert keyed on (participant, session), keeping retries idempotent.
+// carryAttendance copies the participant's attendance rows from the source
+// session to the target session during LinkParticipant. Attendance is
+// per-Topik: every source row is remapped onto the target session's
+// session_stage with the same program_stage (same-program gate guarantees the
+// program matches; the target normally instantiates the same Topics).
+// A source row whose Topik has no counterpart in the target session is an
+// explicit error (dropping audit rows silently would lose data). A missing
+// source row set means there is nothing to carry and is not an error; every
+// other failure is returned so the migration aborts before the participant
+// moves. Each write is an Upsert keyed on
+// (participant, session, session_stage), keeping retries idempotent.
+// Legacy session-wide rows (empty session_stage_id, pre-backfill) carry as-is.
 func (u *SessionUsecase) carryAttendance(ctx context.Context, participantID, oldSessionID, newSessionID, tenantID string) error {
 	if u.attendanceRepo == nil || oldSessionID == "" {
 		return nil
 	}
-	src, err := u.attendanceRepo.GetByParticipantSession(ctx, participantID, oldSessionID, tenantID)
+	srcRows, err := u.attendanceRepo.ListByParticipantSession(ctx, participantID, oldSessionID, tenantID)
 	if err != nil {
-		if _, code, _ := apperrors.AsAppError(err); code == "not_found" {
-			return nil
-		}
 		return err
 	}
-	dst := &entity.ParticipantAttendance{
-		ParticipantID: participantID,
-		SessionID:     newSessionID,
-		IsPresent:     src.IsPresent,
-		MarkedAt:      src.MarkedAt,
-		MarkedBy:      src.MarkedBy,
+	if len(srcRows) == 0 {
+		return nil
 	}
-	return u.attendanceRepo.Upsert(ctx, dst)
+	oldStages, err := u.sessionRepo.ListSessionStages(ctx, oldSessionID)
+	if err != nil {
+		return err
+	}
+	newStages, err := u.sessionRepo.ListSessionStages(ctx, newSessionID)
+	if err != nil {
+		return err
+	}
+	programOfOld := make(map[string]string, len(oldStages))
+	for i := range oldStages {
+		programOfOld[oldStages[i].ID] = oldStages[i].ProgramStageID
+	}
+	targetByProgram := make(map[string]string, len(newStages))
+	for i := range newStages {
+		if _, dup := targetByProgram[newStages[i].ProgramStageID]; !dup {
+			targetByProgram[newStages[i].ProgramStageID] = newStages[i].ID
+		}
+	}
+	for i := range srcRows {
+		src := srcRows[i]
+		dstStageID := ""
+		if src.SessionStageID != "" {
+			programStageID, ok := programOfOld[src.SessionStageID]
+			if !ok {
+				return fmt.Errorf("link_participant: cannot carry attendance participant=%s: source stage %s not found in session %s", participantID, src.SessionStageID, oldSessionID)
+			}
+			dstStageID, ok = targetByProgram[programStageID]
+			if !ok {
+				return fmt.Errorf("link_participant: cannot carry attendance participant=%s: program stage %s has no session stage in target session %s", participantID, programStageID, newSessionID)
+			}
+		}
+		dst := &entity.ParticipantAttendance{
+			ParticipantID:  participantID,
+			SessionID:      newSessionID,
+			SessionStageID: dstStageID,
+			IsPresent:      src.IsPresent,
+			MarkedAt:       src.MarkedAt,
+			MarkedBy:       src.MarkedBy,
+		}
+		if uerr := u.attendanceRepo.Upsert(ctx, dst); uerr != nil {
+			return uerr
+		}
+	}
+	return nil
 }
 
 // firstUngradedGroup reports whether the session has an ungraded PRESENT
@@ -1160,8 +1203,13 @@ func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID, tena
 		subIDs = append(subIDs, subs[i].ID)
 	}
 	// Present set for the attendance-aware gate: participant IDs with an
-	// explicit is_present=true row. A nil map (repo unwired) means every
+	// explicit is_present=true row in ANY Topik. Attendance is per-Topik, so
+	// one participant may own several rows: a single true row marks them
+	// present (fail-closed), all-false means explicitly absent (exempt), and
+	// no row means unmarked (exempt). A nil map (repo unwired) means every
 	// participant is checked (fail-closed, pre-attendance behavior).
+	// Session completion closes the whole session, so no per-Topik narrowing
+	// applies here: any presence requires full grading on every leaf.
 	var present map[string]bool
 	if u.attendanceRepo != nil {
 		rows, aerr := u.attendanceRepo.ListBySession(ctx, sessionID, tenantID)
@@ -1170,7 +1218,11 @@ func (u *SessionUsecase) firstUngradedGroup(ctx context.Context, sessionID, tena
 		}
 		present = make(map[string]bool, len(rows))
 		for i := range rows {
-			present[rows[i].ParticipantID] = rows[i].IsPresent
+			if rows[i].IsPresent {
+				present[rows[i].ParticipantID] = true
+			} else if _, ok := present[rows[i].ParticipantID]; !ok {
+				present[rows[i].ParticipantID] = false
+			}
 		}
 	}
 	for i := range groups {

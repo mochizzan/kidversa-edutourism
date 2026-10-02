@@ -394,24 +394,60 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 //     attached. Real failures (recommender/persist/generation errors) stay
 //     "error" and are never swallowed.
 //
-// Attendance gate: a participant with an EXPLICIT attendance row
-// is_present=false (absent) is excluded BEFORE GetOrCreateDraft, so an absent
-// participant never receives a report/draft. A participant with NO attendance
-// row is UNMARKED (attendance never used for the session) and stays eligible —
-// sessions that never marked attendance keep working exactly as before. When
-// EVERY requested participant is absent, the whole run is rejected with
-// BadRequest("participant_absent") before anything is created.
+// Attendance gate: a participant is absent for a Topik only when an EXPLICIT
+// attendance row is_present=false exists AND no is_present=true row for that
+// participant covers the run's Topics. Attendance is per-Topik: when the run
+// is scoped to topics (single- or multi-topic via topicIDs), only rows of
+// those session_stages decide exclusion; a participant present in one in-scope
+// Topik stays eligible even when absent in another.
 func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID string, participants []entity.Participant, topicIDs []string) ([]entity.Report, error) {
 	runStarted := time.Now()
 	attendance, err := u.attendanceRepo.ListBySession(ctx, sessionID, tenantID)
 	if err != nil {
 		return nil, err
 	}
-	absent := make(map[string]bool, len(attendance))
+	// topicIDs are program_stage_ids (report scope); attendance rows carry
+	// session_stage_ids, so resolve the session's stages to bridge the two.
+	// Rows of out-of-scope Topics never decide exclusion. Legacy session-wide
+	// rows (empty session_stage_id, pre-backfill) keep the old session-wide
+	// semantics. An empty topicIDs keeps the legacy behavior (any explicit
+	// false excludes) for backward compatibility. Stage lookup failures are
+	// returned, never swallowed into a bypassed gate.
+	inScope := make(map[string]bool, len(topicIDs))
+	for _, tid := range topicIDs {
+		inScope[tid] = true
+	}
+	scoped := len(topicIDs) > 0
+	stageProgram := map[string]string{}
+	if scoped {
+		stages, serr := u.sessionRepo.ListSessionStages(ctx, sessionID)
+		if serr != nil {
+			return nil, serr
+		}
+		for i := range stages {
+			stageProgram[stages[i].ID] = stages[i].ProgramStageID
+		}
+	}
+	presentInScope := make(map[string]bool, len(attendance))
+	absentInScope := make(map[string]bool, len(attendance))
 	for _, a := range attendance {
+		if scoped && a.SessionStageID != "" {
+			programStageID, ok := stageProgram[a.SessionStageID]
+			if !ok || !inScope[programStageID] {
+				continue // unknown or out-of-scope Topik: never decides.
+			}
+		}
 		// Absence = explicit is_present=false; missing row = unmarked (eligible).
-		if !a.IsPresent {
-			absent[a.ParticipantID] = true
+		if a.IsPresent {
+			presentInScope[a.ParticipantID] = true
+		} else {
+			absentInScope[a.ParticipantID] = true
+		}
+	}
+	absent := make(map[string]bool, len(absentInScope))
+	for pid := range absentInScope {
+		if !presentInScope[pid] {
+			absent[pid] = true
 		}
 	}
 	eligible := make([]entity.Participant, 0, len(participants))

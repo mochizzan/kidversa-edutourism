@@ -163,6 +163,8 @@ func MessageForCode(code string) string {
 		return "Penilaian kegiatan ini sudah diselesaikan; tidak dapat diubah lagi."
 	case "topic_completed":
 		return "Penilaian topik ini sudah diselesaikan; tidak dapat diubah lagi."
+	case "topic_not_in_session":
+		return "Topik tidak termasuk dalam sesi ini"
 	case "whatsapp_send_failed":
 		return "Gagal mengirim rapor via WhatsApp. Silakan coba kirim ulang."
 	case "whatsapp_number_missing":

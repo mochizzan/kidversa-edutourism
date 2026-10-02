@@ -95,6 +95,9 @@ export interface CreateAssessmentDTO {
 export interface AttendanceUpsertDTO {
  participant_id: string
  session_id: string
+ // Canonical topic identity (session_stages.id, NOT program_stage_id).
+ // REQUIRED — the backend keys attendance per (participant, session, topic).
+ session_stage_id: string
  is_present: boolean
 }
 

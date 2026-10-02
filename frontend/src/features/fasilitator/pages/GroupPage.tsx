@@ -34,6 +34,7 @@ import type {
   SessionStage,
   SessionGroup,
   Participant,
+  ParticipantAttendance,
   Assessment,
   SessionSubstage,
 } from '../../../core/types'
@@ -83,6 +84,35 @@ function SkeletonList() {
   )
 }
 
+// Per-topic attendance key: `${sessionStageId}:${participantId}` — kehadiran
+// dicatat per (peserta, topik), bukan per sesi. Toggle topik B tidak
+// menyentuh topik A (kontrak: session_stage_id kanonis = session_stages.id).
+const attendanceKey = (sessionStageId: string, participantId: string) =>
+  `${sessionStageId}:${participantId}`
+
+// Merge server rows into the per-topic map. Explicit per-topic rows always
+// win; legacy rows with missing/empty session_stage_id (pre-migration,
+// NOT NULL DEFAULT '' per backend 000007, no backfill) fill only topics
+// that have no explicit row yet (fill-if-absent), so old data still reads
+// session-wide until re-marked per topic. A topic with no row at all stays
+// UNMARKED (toggle defaults to not-present; completion exempts unmarked —
+// existing convention, no new rule).
+function mergeAttendanceRows(rows: ParticipantAttendance[], stageIds: string[]): Map<string, boolean> {
+  const map = new Map<string, boolean>()
+  const legacy: ParticipantAttendance[] = []
+  for (const a of rows) {
+    if (a.session_stage_id) map.set(attendanceKey(a.session_stage_id, a.participant_id), a.is_present)
+    else legacy.push(a)
+  }
+  for (const a of legacy) {
+    for (const stageId of stageIds) {
+      const k = attendanceKey(stageId, a.participant_id)
+      if (!map.has(k)) map.set(k, a.is_present)
+    }
+  }
+  return map
+}
+
 const GroupPage = () => {
   const { t } = useTranslation()
   const { groupId } = useParams<{ groupId: string }>()
@@ -113,8 +143,17 @@ const GroupPage = () => {
   const [sessionSubstages, setSessionSubstages] = useState<SessionSubstage[]>([])
   const [completing, setCompleting] = useState(false)
   // const [kioskLoading, setKioskLoading] = useState(false) // hidden: tombol Buka Kiosk
+  // Per-topic attendance: key `${sessionStageId}:${participantId}` —
+  // kehadiran dicatat per (peserta, topik), bukan per sesi. Toggle topik B
+  // tidak menyentuh topik A (kontrak: session_stage_id kanonis).
   const [attendanceMap, setAttendanceMap] = useState<Map<string, boolean>>(new Map())
   const [attendanceLoading, setAttendanceLoading] = useState<Set<string>>(new Set())
+  // Topic id currently (re)fetching its attendance rows — drives the
+  // per-topic loading hint on topic switch (null when idle).
+  const [attendanceTopicLoading, setAttendanceTopicLoading] = useState<string | null>(null)
+  // Monotonic id guarding per-topic refetches: a slow earlier topic fetch must
+  // never overwrite a newer topic's rows after rapid dropdown switches.
+  const attendanceFetchRef = useRef(0)
 
   // ── Single source of truth for the ACTIVE TOPIC ──
   // One session stage = one topic. Initialized inside fetchData from the
@@ -231,14 +270,13 @@ const GroupPage = () => {
       const sessionAssessments = await assessmentService.getBySession(detail.id)
       setAssessments(sessionAssessments)
 
-      // Fetch attendance for this session
+      // Fetch attendance for this session (per-topic rows). One list call
+      // returns every topic's rows; mergeAttendanceRows keys them per
+      // (topic, participant). Legacy rows without session_stage_id fill
+      // topics lacking an explicit row (fill-if-absent).
       try {
         const attendanceRes = await attendanceService.getBySession(detail.id)
-        const attMap = new Map<string, boolean>()
-        for (const a of attendanceRes) {
-          attMap.set(a.participant_id, a.is_present)
-        }
-        setAttendanceMap(attMap)
+        setAttendanceMap(mergeAttendanceRows(attendanceRes, detail.stages.map((s) => s.id)))
       } catch (error) {
         // Non-fatal: attendance defaults to not-present — log so the default
         // is traceable to a fetch failure, not real absence.
@@ -370,11 +408,13 @@ const GroupPage = () => {
     return set
   }, [assessments])
 
-  // Check if a participant is present for this session (explicit attendance
-  // row only — unmarked participants are handled by evaluateGroupCompletion).
+  // Check if a participant is present for the ACTIVE topic (explicit
+  // per-topic row only — unmarked participants are handled by
+  // evaluateGroupCompletion).
   const isPresent = useCallback((participantId: string): boolean => {
-    return attendanceMap.get(participantId) ?? false
-  }, [attendanceMap])
+    if (!selectedSessionStageId) return false
+    return attendanceMap.get(attendanceKey(selectedSessionStageId, participantId)) ?? false
+  }, [attendanceMap, selectedSessionStageId])
 
   // C7 all-or-nothing: a child counts as assessed for the active SubTopik only
   // when EVERY Kegiatan leaf has an assessment (star_rating >= 1) for them.
@@ -388,11 +428,23 @@ const GroupPage = () => {
     )
   }
 
-  // Completion rule: every explicitly-present participant fully assessed.
-  // Explicit absentees and unmarked participants (belum absen) do not block.
+  // Completion rule for the ACTIVE topic: every explicitly-present (in this
+  // topic) participant fully assessed. Explicit absentees and unmarked
+  // participants (belum absen) do not block. The per-topic slice is derived
+  // from the composite map by stripping the active topic prefix.
+  const activeTopicAttendance = useMemo(() => {
+    if (!selectedSessionStageId) return new Map<string, boolean>()
+    const slice = new Map<string, boolean>()
+    const prefix = `${selectedSessionStageId}:`
+    for (const [k, v] of attendanceMap) {
+      if (k.startsWith(prefix)) slice.set(k.slice(prefix.length), v)
+    }
+    return slice
+  }, [attendanceMap, selectedSessionStageId])
+
   const completion = evaluateGroupCompletion({
     participantIds: groupDetail ? groupDetail.participants.map((p) => p.id) : [],
-    attendance: attendanceMap,
+    attendance: activeTopicAttendance,
     isFullyAssessed: isAssessed,
   })
 
@@ -512,11 +564,10 @@ const GroupPage = () => {
   // }
 
   const handleToggleAttendance = useCallback(async (participantId: string) => {
-    if (!groupDetail) return
-    // Perbaikan-1: lock BOTH on whole-group COMPLETED and on per-topic
-    // completion (isTopicCompleted from server progress rows). The guard toast
-    // reuses the canonical group-completed message; the form stays visible
-    // but disabled (never hidden).
+    if (!groupDetail || !selectedSessionStageId) return
+    // Per-topic lock: whole-group COMPLETED or the active topic completed
+    // per server progress rows. Guard toast reuses the canonical
+    // group-completed message; the form stays visible but disabled.
     if (groupDetail.group.status === 'COMPLETED' || isTopicLocked) {
       addToast({
         type: 'error',
@@ -524,62 +575,84 @@ const GroupPage = () => {
       })
       return
     }
-    const current = attendanceMap.get(participantId) ?? false
+    const topicId = selectedSessionStageId
+    const key = attendanceKey(topicId, participantId)
+    const current = attendanceMap.get(key) ?? false
     const newValue = !current
 
-    // Optimistic update
-    setAttendanceMap(prev => new Map(prev).set(participantId, newValue))
-    setAttendanceLoading(prev => new Set(prev).add(participantId))
+    // Optimistic update (per-topic key — other topics untouched)
+    setAttendanceMap(prev => new Map(prev).set(key, newValue))
+    setAttendanceLoading(prev => new Set(prev).add(key))
 
     try {
       await attendanceService.upsert({
         participant_id: participantId,
         session_id: groupDetail.session.id,
+        session_stage_id: topicId,
         is_present: newValue,
       })
     } catch {
       // Revert on error
-      setAttendanceMap(prev => new Map(prev).set(participantId, current))
+      setAttendanceMap(prev => new Map(prev).set(key, current))
       addToast({ type: 'error', message: t('fasilitator.group.attendanceError') })
     } finally {
       setAttendanceLoading(prev => {
         const next = new Set(prev)
-        next.delete(participantId)
+        next.delete(key)
         return next
       })
     }
-  }, [attendanceMap, groupDetail, addToast, isTopicLocked, t])
+  }, [attendanceMap, groupDetail, selectedSessionStageId, addToast, isTopicLocked, t])
 
-  // Topic dropdown: switching the active topic is a pure state change on
-  // selectedSessionStageId. Assessments/attendance/substages are SESSION-scoped
-  // and stay loaded, while every stage-keyed derivation (topic name,
-  // activeLeaves, isAssessed, completion/lock) re-runs off that id — so a
-  // selection change can never leave a stale topic's leaves/name/completion
-  // visible, and there is no stage-scoped UI state to reset.
-  //
-  // Perbaikan-1 attendance decision: OPSI B (retain session-scoped). The
-  // backend schema keeps the (participant_id, session_id) unique key
-  // (migrations/000001_init_schema, entity/attendance.go) — NO
-  // session_stage_id column, NO migration. The toggle therefore flips a
-  // whole-session presence row and is rendered ONCE per session; the label
-  // below marks it explicitly as session-wide so identical values across
-  // topics are CORRECT (not the topik-1/topik-2 bug). Presence still gates
-  // grading per active topic (evaluateGroupCompletion in the child page).
+  // Refetch attendance rows for one topic and merge them additively into the
+  // per-topic map (other topics' rows are kept, never cleared). Shows a
+  // per-topic loading hint while in flight. A topic with no rows on the
+  // server stays UNMARKED (toggle defaults to not-present; completion
+  // exempts unmarked — existing convention, no new rule). Stale guard via
+  // attendanceFetchRef: rapid dropdown switches resolve in order.
+  const refetchTopicAttendance = useCallback(async (sessionId: string, stageId: string) => {
+    const svc = attendanceService as { getByTopic?: (s: string, t: string) => Promise<ParticipantAttendance[]> }
+    if (!svc.getByTopic) return
+    const fetchId = ++attendanceFetchRef.current
+    setAttendanceTopicLoading(stageId)
+    try {
+      const rows = (await svc.getByTopic(sessionId, stageId)) ?? []
+      if (attendanceFetchRef.current !== fetchId) return
+      setAttendanceMap((prev) => {
+        const next = new Map(prev)
+        for (const a of rows) {
+          const topic = a.session_stage_id ?? stageId
+          next.set(attendanceKey(topic, a.participant_id), a.is_present)
+        }
+        return next
+      })
+    } catch (error) {
+      console.error('[GroupPage] topic attendance refetch failed', error)
+    } finally {
+      if (attendanceFetchRef.current === fetchId) setAttendanceTopicLoading(null)
+    }
+  }, [])
+
+  // Topic dropdown: switching the active topic updates selectedSessionStageId
+  // AND refetches that topic's attendance rows into the per-topic map
+  // (additive merge — other topics' rows are kept, never reused raw). Every
+  // stage-keyed derivation (topic name, activeLeaves, isAssessed,
+  // completion/lock) re-runs off the new id.
   const handleTopicChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const nextId = e.target.value
     setSelectedSessionStageId(nextId)
     syncStageQuery(nextId)
+    if (groupDetail) void refetchTopicAttendance(groupDetail.session.id, nextId)
   }
 
-  // Continue-to-next-topic control: advancing is a PURE selection change on
-  // the SAME single-source state the dropdown writes above — no refetch and no
-  // server write (session-scoped data is already loaded; every stage-keyed
-  // derivation re-runs off the new id). Kept next to handleTopicChange so the
-  // two selection pathways are visibly one mechanism.
+  // Continue-to-next-topic control: advancing writes the SAME single-source
+  // state the dropdown writes above, plus the same per-topic attendance
+  // refetch — the two selection pathways stay one mechanism.
   const handleContinueToNextTopic = () => {
     if (nextSessionStage) {
       setSelectedSessionStageId(nextSessionStage.id)
       syncStageQuery(nextSessionStage.id)
+      if (groupDetail) void refetchTopicAttendance(groupDetail.session.id, nextSessionStage.id)
     }
   }
 
@@ -703,14 +776,18 @@ const GroupPage = () => {
         )
       )}
 
-      {/* Participant list.
-          Perbaikan-1 (Opsi B): attendance is SESSION-scoped (one toggle per
-          participant for the whole session), so the toggle renders once here
-          and is NOT re-rendered per topic — identical values across topics
-          are correct by design. The explicit label below states the scope. */}
+      {/* Participant list. Attendance is PER-TOPIC: one toggle per
+          participant for the ACTIVE topic, keyed by session_stage_id. A
+          topic with no rows stays unmarked (defaults to not-present;
+          unmarked never blocks completion). */}
+      {participants.length > 0 && attendanceTopicLoading === selectedSessionStageId && (
+        <p className="text-xs text-on-surface-variant" role="status">
+          Memuat kehadiran topik…
+        </p>
+      )}
       {participants.length > 0 && (
         <p className="text-xs text-on-surface-variant">
-          Kehadiran dicatat satu kali per sesi dan berlaku untuk seluruh topik.
+          Kehadiran dicatat per topik dan hanya berlaku untuk topik aktif.
         </p>
       )}
       {participants.length === 0 ? (
@@ -730,7 +807,7 @@ const GroupPage = () => {
               isAssessed={isAssessed(participant.id)}
               isPresent={isPresent(participant.id)}
               onToggleAttendance={isMine && !isTopicLocked ? () => handleToggleAttendance(participant.id) : undefined}
-              attendanceLoading={attendanceLoading.has(participant.id)}
+              attendanceLoading={selectedSessionStageId ? attendanceLoading.has(`${selectedSessionStageId}:${participant.id}`) : false}
               showPhoto={participant.consent_photo}
               onAssess={isMine && isSessionActive && !isTopicLocked ? () => handleAssess(participant.id) : undefined}
               locked={isTopicLocked}

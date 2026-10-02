@@ -13,26 +13,75 @@ import (
 
 type fakeAttendanceRepo struct {
 	upserted *entity.ParticipantAttendance
+	rows     map[string]entity.ParticipantAttendance
+	listErr  error
 }
 
-func (r *fakeAttendanceRepo) GetByParticipantSession(ctx context.Context, participantID, sessionID, tenantID string) (*entity.ParticipantAttendance, error) {
-	return nil, nil
+func attKey(participantID, sessionID, sessionStageID string) string {
+	return participantID + "|" + sessionID + "|" + sessionStageID
 }
 
-func (r *fakeAttendanceRepo) ListBySession(ctx context.Context, sessionID, tenantID string) ([]entity.ParticipantAttendance, error) {
-	return nil, nil
+func (r *fakeAttendanceRepo) GetByParticipantSessionStage(_ context.Context, participantID, sessionID, sessionStageID, _ string) (*entity.ParticipantAttendance, error) {
+	if a, ok := r.rows[attKey(participantID, sessionID, sessionStageID)]; ok {
+		cp := a
+		return &cp, nil
+	}
+	return nil, apperrors.NotFound("not_found", nil)
 }
 
-func (r *fakeAttendanceRepo) Upsert(ctx context.Context, a *entity.ParticipantAttendance) error {
+func (r *fakeAttendanceRepo) ListBySession(_ context.Context, sessionID, _ string) ([]entity.ParticipantAttendance, error) {
+	if r.listErr != nil {
+		return nil, r.listErr
+	}
+	out := make([]entity.ParticipantAttendance, 0, len(r.rows))
+	for _, a := range r.rows {
+		if a.SessionID == sessionID {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeAttendanceRepo) ListBySessionStage(_ context.Context, sessionID, sessionStageID, _ string) ([]entity.ParticipantAttendance, error) {
+	if r.listErr != nil {
+		return nil, r.listErr
+	}
+	out := make([]entity.ParticipantAttendance, 0, len(r.rows))
+	for _, a := range r.rows {
+		if a.SessionID == sessionID && a.SessionStageID == sessionStageID {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeAttendanceRepo) ListByParticipantSession(_ context.Context, participantID, sessionID, _ string) ([]entity.ParticipantAttendance, error) {
+	out := make([]entity.ParticipantAttendance, 0, len(r.rows))
+	for _, a := range r.rows {
+		if a.ParticipantID == participantID && a.SessionID == sessionID {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeAttendanceRepo) Upsert(_ context.Context, a *entity.ParticipantAttendance) error {
+	if r.rows == nil {
+		r.rows = map[string]entity.ParticipantAttendance{}
+	}
+	r.rows[attKey(a.ParticipantID, a.SessionID, a.SessionStageID)] = *a
 	r.upserted = a
 	return nil
 }
 
 // fakeSessionRepo is a hand-rolled SessionRepository fake. Only
-// GetSessionGroupByParticipant is configurable; the rest are inert.
+// GetSessionGroupByParticipant and ListSessionStages are configurable; the
+// rest are inert.
 type fakeSessionRepo struct {
 	group    *entity.SessionGroup
 	groupErr error
+	stages   []entity.SessionStage
+	stageErr error
 }
 
 func (r *fakeSessionRepo) CreateSession(ctx context.Context, s *entity.Session) error { return nil }
@@ -47,8 +96,11 @@ func (r *fakeSessionRepo) DeleteSession(ctx context.Context, id string) error   
 func (r *fakeSessionRepo) CreateSessionStage(ctx context.Context, s *entity.SessionStage) error {
 	return nil
 }
-func (r *fakeSessionRepo) ListSessionStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
-	return nil, nil
+func (r *fakeSessionRepo) ListSessionStages(_ context.Context, _ string) ([]entity.SessionStage, error) {
+	if r.stageErr != nil {
+		return nil, r.stageErr
+	}
+	return r.stages, nil
 }
 func (r *fakeSessionRepo) UpdateSessionStage(ctx context.Context, s *entity.SessionStage) error {
 	return nil
@@ -145,14 +197,22 @@ func requireAppErrorCode(t *testing.T, err error, want string) {
 	}
 }
 
+func attSessionRepo(group *entity.SessionGroup) *fakeSessionRepo {
+	return &fakeSessionRepo{
+		group: group,
+		stages: []entity.SessionStage{
+			{BaseModel: entity.BaseModel{ID: "stage-A"}, SessionID: "session-1"},
+			{BaseModel: entity.BaseModel{ID: "stage-B"}, SessionID: "session-1"},
+		},
+	}
+}
+
 func TestUpsert_GroupCompleted_Fails(t *testing.T) {
 	attendanceRepo := &fakeAttendanceRepo{}
-	sessionRepo := &fakeSessionRepo{
-		group: &entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupCompleted},
-	}
+	sessionRepo := attSessionRepo(&entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupCompleted})
 	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
 
-	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", true, "facilitator-1", "tenant-1")
+	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1")
 	requireAppErrorCode(t, err, "group_completed")
 	if attendanceRepo.upserted != nil {
 		t.Fatal("expected no attendance write on a COMPLETED group")
@@ -161,12 +221,10 @@ func TestUpsert_GroupCompleted_Fails(t *testing.T) {
 
 func TestUpsert_GroupNotCompleted_Succeeds(t *testing.T) {
 	attendanceRepo := &fakeAttendanceRepo{}
-	sessionRepo := &fakeSessionRepo{
-		group: &entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupInProgress},
-	}
+	sessionRepo := attSessionRepo(&entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupInProgress})
 	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
 
-	a, err := uc.Upsert(context.Background(), "participant-1", "session-1", true, "facilitator-1", "tenant-1")
+	a, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1")
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -176,14 +234,17 @@ func TestUpsert_GroupNotCompleted_Succeeds(t *testing.T) {
 	if !attendanceRepo.upserted.IsPresent {
 		t.Fatal("expected is_present to be persisted")
 	}
+	if attendanceRepo.upserted.SessionStageID != "stage-A" {
+		t.Fatalf("expected session_stage_id stage-A, got %q", attendanceRepo.upserted.SessionStageID)
+	}
 }
 
 func TestUpsert_NoGroup_Succeeds(t *testing.T) {
 	attendanceRepo := &fakeAttendanceRepo{}
-	sessionRepo := &fakeSessionRepo{}
+	sessionRepo := attSessionRepo(nil)
 	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
 
-	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", false, "facilitator-1", "tenant-1")
+	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", false, "facilitator-1", "tenant-1")
 	if err != nil {
 		t.Fatalf("expected success for participant without group, got %v", err)
 	}
@@ -192,12 +253,106 @@ func TestUpsert_NoGroup_Succeeds(t *testing.T) {
 	}
 }
 
-func TestUpsert_GroupResolverError_Propagates(t *testing.T) {
+func TestUpsert_MissingStageID_Fails(t *testing.T) {
 	attendanceRepo := &fakeAttendanceRepo{}
-	sessionRepo := &fakeSessionRepo{groupErr: errors.New("db down")}
+	sessionRepo := attSessionRepo(nil)
 	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
 
-	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", true, "facilitator-1", "tenant-1")
+	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", "", true, "facilitator-1", "tenant-1")
+	requireAppErrorCode(t, err, "validation_error")
+	if attendanceRepo.upserted != nil {
+		t.Fatal("expected no attendance write without a topic")
+	}
+}
+
+func TestUpsert_ForeignStage_Fails(t *testing.T) {
+	attendanceRepo := &fakeAttendanceRepo{}
+	sessionRepo := attSessionRepo(nil)
+	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-other-session", true, "facilitator-1", "tenant-1")
+	requireAppErrorCode(t, err, "topic_not_in_session")
+	if attendanceRepo.upserted != nil {
+		t.Fatal("expected no attendance write for a foreign stage")
+	}
+}
+
+func TestUpsert_StageLookupError_Propagates(t *testing.T) {
+	attendanceRepo := &fakeAttendanceRepo{}
+	sessionRepo := attSessionRepo(nil)
+	sessionRepo.stageErr = errors.New("db down")
+	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if attendanceRepo.upserted != nil {
+		t.Fatal("expected no attendance write when the stage lookup fails")
+	}
+}
+
+func TestUpsert_TopicB_DoesNotTouchTopicA(t *testing.T) {
+	attendanceRepo := &fakeAttendanceRepo{}
+	sessionRepo := attSessionRepo(nil)
+	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
+
+	if _, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1"); err != nil {
+		t.Fatalf("topic A upsert: %v", err)
+	}
+	if _, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-B", false, "facilitator-1", "tenant-1"); err != nil {
+		t.Fatalf("topic B upsert: %v", err)
+	}
+	aRow, err := attendanceRepo.GetByParticipantSessionStage(context.Background(), "participant-1", "session-1", "stage-A", "tenant-1")
+	if err != nil {
+		t.Fatalf("topic A read: %v", err)
+	}
+	if !aRow.IsPresent {
+		t.Fatal("topic A row must stay present after topic B is marked absent")
+	}
+	bRow, err := attendanceRepo.GetByParticipantSessionStage(context.Background(), "participant-1", "session-1", "stage-B", "tenant-1")
+	if err != nil {
+		t.Fatalf("topic B read: %v", err)
+	}
+	if bRow.IsPresent {
+		t.Fatal("topic B row must hold its own absent value")
+	}
+}
+
+func TestList_FiltersByTopic(t *testing.T) {
+	attendanceRepo := &fakeAttendanceRepo{}
+	sessionRepo := attSessionRepo(nil)
+	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
+
+	if _, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1"); err != nil {
+		t.Fatalf("topic A upsert: %v", err)
+	}
+	if _, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-B", false, "facilitator-1", "tenant-1"); err != nil {
+		t.Fatalf("topic B upsert: %v", err)
+	}
+	scoped, err := uc.ListBySessionStage(context.Background(), "session-1", "stage-A", "tenant-1")
+	if err != nil {
+		t.Fatalf("scoped list: %v", err)
+	}
+	if len(scoped) != 1 || scoped[0].SessionStageID != "stage-A" {
+		t.Fatalf("scoped list = %+v, want exactly the stage-A row", scoped)
+	}
+	all, err := uc.ListBySessionStage(context.Background(), "session-1", "", "tenant-1")
+	if err != nil {
+		t.Fatalf("unscoped list: %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("unscoped list rows = %d, want 2 (compat: all Topics)", len(all))
+	}
+}
+
+func TestUpsert_GroupResolverError_Propagates(t *testing.T) {
+	attendanceRepo := &fakeAttendanceRepo{}
+	sessionRepo := attSessionRepo(nil)
+	sessionRepo.groupErr = errors.New("db down")
+	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

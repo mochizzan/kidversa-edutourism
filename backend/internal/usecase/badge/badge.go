@@ -317,31 +317,45 @@ func (u *Usecase) CompleteSessionSubstage(ctx context.Context, sessionSubstageID
 
 // ValidateGroupCompletion enforces the attendance-aware grading gate for
 // group completion: it returns an explicit present_participants_unassessed
-// error while any participant marked PRESENT (attendance is_present=true) for
-// the session has not scored (star_rating >= 1) every Kegiatan leaf in scope.
-// Participants with no attendance row (belum absen) and explicitly absent
-// participants are exempt — they are not required to be graded and never
-// block completion. Scope mirrors the fasilitator frontend gate: the leaves
-// of the group's current session stage, falling back to every session
-// Kegiatan when no current stage is set. An unwired attendance repo
-// conservatively falls back to grading every participant (the
-// pre-attendance rule), so the gate can never be silently waived. Every
-// lookup failure other than "not found" (never graded) is returned wrapped.
+// error while any participant marked PRESENT (attendance is_present=true) in
+// the group's current scope has not scored (star_rating >= 1) every Kegiatan
+// leaf in scope. Attendance is per-Topik: presence is read from the rows of
+// the group's current session stage when it is set (a single true row in that
+// Topik marks the participant present); when no current stage is set the gate
+// falls back to any-Topik presence across the session. Participants with no
+// attendance row (belum absen) and explicitly absent participants are exempt —
+// they are not required to be graded and never block completion. Scope mirrors
+// the fasilitator frontend gate: the leaves of the group's current session
+// stage, falling back to every session Kegiatan when no current stage is set.
+// An unwired attendance repo conservatively falls back to grading every
+// participant (the pre-attendance rule), so the gate can never be silently
+// waived. Every lookup failure other than "not found" (never graded) is
+// returned wrapped.
 func (u *Usecase) ValidateGroupCompletion(ctx context.Context, group *entity.SessionGroup, tenantID string) error {
 	if group == nil {
 		return apperrors.Internal("internal_error", fmt.Errorf("badge: ValidateGroupCompletion called with nil group"))
 	}
-	// Present set: participant IDs with an explicit attendance row. A nil map
-	// (repo unwired) means every participant must be graded.
+	// Present set: participant IDs with an explicit attendance row in scope.
+	// A nil map (repo unwired) means every participant must be graded.
 	var present map[string]bool
 	if u.attendanceRepo != nil {
-		rows, err := u.attendanceRepo.ListBySession(ctx, group.SessionID, tenantID)
+		var rows []entity.ParticipantAttendance
+		var err error
+		if group.CurrentSessionStageID != nil && *group.CurrentSessionStageID != "" {
+			rows, err = u.attendanceRepo.ListBySessionStage(ctx, group.SessionID, *group.CurrentSessionStageID, tenantID)
+		} else {
+			rows, err = u.attendanceRepo.ListBySession(ctx, group.SessionID, tenantID)
+		}
 		if err != nil {
 			return fmt.Errorf("badge: list attendance session=%s group=%s: %w", group.SessionID, group.ID, err)
 		}
 		present = make(map[string]bool, len(rows))
 		for i := range rows {
-			present[rows[i].ParticipantID] = rows[i].IsPresent
+			if rows[i].IsPresent {
+				present[rows[i].ParticipantID] = true
+			} else if _, ok := present[rows[i].ParticipantID]; !ok {
+				present[rows[i].ParticipantID] = false
+			}
 		}
 		markedPresent := false
 		for _, isPresent := range present {

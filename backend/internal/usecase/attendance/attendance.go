@@ -11,6 +11,16 @@ import (
 )
 
 // Usecase contains the business logic for participant attendance.
+//
+// Attendance is per-Topik: every write carries a session_stage_id (the
+// session_stages row — see entity.ParticipantAttendance) and is keyed on
+// (participant_id, session_id, session_stage_id), so marking Topik B never
+// touches Topik A's row. Reads accept an optional Topik filter; empty keeps
+// the session-wide compat behavior. The whole-group COMPLETED lock is
+// retained (a COMPLETED group rejects every write); a completed Topik alone
+// does NOT lock attendance — only nilai is per-Kegiatan locked (assessment
+// usecase, substage_completed). Every rejection is an explicit apperrors
+// code; nothing is swallowed.
 type Usecase struct {
 	repo        repository.AttendanceRepository
 	sessionRepo repository.SessionRepository
@@ -21,7 +31,8 @@ func NewUsecase(repo repository.AttendanceRepository, sessionRepo repository.Ses
 	return &Usecase{repo: repo, sessionRepo: sessionRepo}
 }
 
-// ListBySession returns all attendance records for a session.
+// ListBySession returns all attendance records for a session across every
+// Topik (session-wide compat path).
 func (u *Usecase) ListBySession(ctx context.Context, sessionID, tenantID string) ([]entity.ParticipantAttendance, error) {
 	if sessionID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
@@ -29,22 +40,31 @@ func (u *Usecase) ListBySession(ctx context.Context, sessionID, tenantID string)
 	return u.repo.ListBySession(ctx, sessionID, tenantID)
 }
 
-// Upsert marks attendance for a single participant in a session.
-//
-// Perbaikan-2, explicit choice (A): whole-group lock only. ParticipantAttendance
-// is session-scoped WITHOUT a substage/stage column (entity/attendance.go), so a
-// per-topik attendance lock is impossible without a schema migration — and the
-// schema/repo/DTO/migration surface belongs to Perbaikan-1 (DO NOT touch here).
-// Consequence, documented: after one Kegiatan (topik) completes, attendance rows
-// for the session stay writable until the whole group reaches COMPLETED, while
-// nilai for the completed Kegiatan is already locked per-substage in the
-// assessment usecase. No fake per-topic rejection is issued here: rejecting
-// without a backing column would be a false lock. If Perbaikan-1 lands a stage
-// column, add the per-topic guard here (option B).
-func (u *Usecase) Upsert(ctx context.Context, participantID, sessionID string, isPresent bool, markedBy, tenantID string) (*entity.ParticipantAttendance, error) {
-	if participantID == "" || sessionID == "" {
+// ListBySessionStage returns attendance records for a session, narrowed to
+// one Topik when sessionStageID is set. An empty sessionStageID keeps the
+// session-wide compat behavior (all Topics).
+func (u *Usecase) ListBySessionStage(ctx context.Context, sessionID, sessionStageID, tenantID string) ([]entity.ParticipantAttendance, error) {
+	if sessionID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
 	}
+	if sessionStageID == "" {
+		return u.repo.ListBySession(ctx, sessionID, tenantID)
+	}
+	return u.repo.ListBySessionStage(ctx, sessionID, sessionStageID, tenantID)
+}
+
+// Upsert marks attendance for a single participant for one Topik of a session.
+//
+// sessionStageID is required (every write is per-Topik) and must belong to
+// the session — a stage of another session is rejected with an explicit
+// topic_not_in_session instead of writing a cross-session row.
+func (u *Usecase) Upsert(ctx context.Context, participantID, sessionID, sessionStageID string, isPresent bool, markedBy, tenantID string) (*entity.ParticipantAttendance, error) {
+	if participantID == "" || sessionID == "" || sessionStageID == "" {
+		return nil, apperrors.BadRequest("validation_error", nil)
+	}
+	// Whole-group lock keeps precedence (mirrors the assessment usecase where
+	// group_completed precedes substage_completed): a COMPLETED group rejects
+	// every write before any topic validation.
 	g, err := u.sessionRepo.GetSessionGroupByParticipant(ctx, participantID)
 	if err != nil {
 		return nil, err
@@ -52,12 +72,27 @@ func (u *Usecase) Upsert(ctx context.Context, participantID, sessionID string, i
 	if g != nil && g.Status == entity.GroupCompleted {
 		return nil, apperrors.Forbidden("group_completed", errors.New("attendance cannot be changed after the group is completed"))
 	}
+	stages, err := u.sessionRepo.ListSessionStages(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	owned := false
+	for i := range stages {
+		if stages[i].ID == sessionStageID {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		return nil, apperrors.BadRequest("topic_not_in_session", errors.New("attendance stage does not belong to the session"))
+	}
 	a := &entity.ParticipantAttendance{
-		ParticipantID: participantID,
-		SessionID:     sessionID,
-		IsPresent:     isPresent,
-		MarkedAt:      time.Now(),
-		MarkedBy:      &markedBy,
+		ParticipantID:  participantID,
+		SessionID:      sessionID,
+		SessionStageID: sessionStageID,
+		IsPresent:      isPresent,
+		MarkedAt:       time.Now(),
+		MarkedBy:       &markedBy,
 	}
 	if err := u.repo.Upsert(ctx, a); err != nil {
 		return nil, err

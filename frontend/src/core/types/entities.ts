@@ -217,6 +217,9 @@ export interface ParticipantAttendance {
  id: string
  participant_id: string
  session_id: string
+ // Canonical topic identity (session_stages.id). Optional only for legacy
+ // rows written before the per-topic migration — new upserts always carry it.
+ session_stage_id?: string
  is_present: boolean
  marked_at: string
  marked_by?: string

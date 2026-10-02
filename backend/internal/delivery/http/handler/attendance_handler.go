@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v5"
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
@@ -19,14 +21,22 @@ func NewAttendanceHandler(uc *attendanceuc.Usecase) *AttendanceHandler {
 	return &AttendanceHandler{uc: uc}
 }
 
-// List handles GET /api/attendance?session_id=xxx.
+// List handles GET /api/attendance?session_id=xxx[&session_stage_id=yyy].
+// session_stage_id narrows the read to one Topik; empty keeps the
+// session-wide compat behavior (all Topics).
 func (h *AttendanceHandler) List(c *echo.Context) error {
-	sessionID := (*c).QueryParam("session_id")
+	q := dto.AttendanceListQuery{
+		SessionID:      (*c).QueryParam("session_id"),
+		SessionStageID: (*c).QueryParam("session_stage_id"),
+	}
+	if err := (*c).Validate(q); err != nil {
+		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+	}
 	tenantID := appmiddleware.GetTenantID(c)
 	if err := tenantGuard(c, tenantID); err != nil {
 		return err
 	}
-	items, err := h.uc.ListBySession((*c).Request().Context(), sessionID, tenantID)
+	items, err := h.uc.ListBySessionStage((*c).Request().Context(), q.SessionID, q.SessionStageID, tenantID)
 	if err != nil {
 		return err
 	}
@@ -48,7 +58,7 @@ func (h *AttendanceHandler) Upsert(c *echo.Context) error {
 		return err
 	}
 	actorID := appmiddleware.GetUserID(c)
-	a, err := h.uc.Upsert((*c).Request().Context(), req.ParticipantID, req.SessionID, req.IsPresent, actorID, tenantID)
+	a, err := h.uc.Upsert((*c).Request().Context(), req.ParticipantID, req.SessionID, req.SessionStageID, req.IsPresent, actorID, tenantID)
 	if err != nil {
 		return err
 	}

@@ -223,10 +223,8 @@ const ChildAssessmentPage = () => {
         </div>
       </div>
 
-      {/* Attendance status banner.
-          OPSI B: attendance is SESSION-scoped (one whole-session row, toggled
-          once on GroupPage) — this page only reads it as the grading gate
-          (hadir prasyarat nilai). The banner text stays session-wide. */}
+      {/* Attendance status banner. Per-topic presence (session_stage_id)
+          gates grading for the ACTIVE topic (hadir prasyarat nilai). */}
       {!isPresent && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-700">
           {t('fasilitator.assessment.absentBanner')}

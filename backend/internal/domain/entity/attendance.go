@@ -2,12 +2,23 @@ package entity
 
 import "time"
 
-// ParticipantAttendance tracks whether a participant was present at a session.
+// ParticipantAttendance tracks whether a participant was present for one Topik
+// (session_stages row) of a session. Keyed per peserta-per-topik:
+// (participant_id, session_id, session_stage_id).
+//
+// SessionStageID is the canonical topic identity: the session_stages row
+// (entity/session.go SessionStage), NOT the program_stages template and NOT
+// a session_substage leaf. Mapping to assessments: an assessment's
+// session_substage_id resolves its Topik via
+// session_substages.session_stage_id, which equals this column.
+// Legacy rows predate the per-topic migration and carry an empty SessionStageID
+// (session-wide, pre-backfill); all new writes require a Topik.
 type ParticipantAttendance struct {
 	BaseModel
-	ParticipantID string    `json:"participant_id"`
-	SessionID     string    `json:"session_id"`
-	IsPresent     bool      `json:"is_present"`
-	MarkedAt      time.Time `json:"marked_at"`
-	MarkedBy      *string   `json:"marked_by,omitempty"`
+	ParticipantID  string    `json:"participant_id"`
+	SessionID      string    `json:"session_id"`
+	SessionStageID string    `json:"session_stage_id,omitempty"`
+	IsPresent      bool      `json:"is_present"`
+	MarkedAt       time.Time `json:"marked_at"`
+	MarkedBy       *string   `json:"marked_by,omitempty"`
 }

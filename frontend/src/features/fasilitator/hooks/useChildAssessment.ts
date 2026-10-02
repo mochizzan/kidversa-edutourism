@@ -242,14 +242,16 @@ export function useChildAssessment(childId: string | undefined, sessionId?: stri
         })
       })
 
-      // Fetch attendance for this child using the correct session.
-      // Perbaikan-1 OPSI B: attendance stays SESSION-scoped (one whole-session
-      // row per participant) — the toggle lives once on GroupPage and this
-      // page only reads it as the grading gate (hadir prasyarat nilai).
+      // Fetch attendance for this child for the ACTIVE topic. Per-topic rows
+      // (keyed by session_stage_id) gate grading per topic (hadir prasyarat
+      // nilai); a legacy row without session_stage_id still gates (fill).
       if (resolvedSessionId) {
         try {
           const attRes = await attendanceService.getBySession(resolvedSessionId)
-          const att = attRes.find(a => a.participant_id === childId)
+          const topicId = detail.sessionStage?.id
+          const rows = attRes.filter(a => a.participant_id === childId)
+          const att = rows.find(a => a.session_stage_id === topicId)
+            ?? rows.find(a => !a.session_stage_id)
           setIsPresent(att?.is_present ?? false)
         } catch (error) {
           // Attendance defaults to absent (fail closed) — log the failure so

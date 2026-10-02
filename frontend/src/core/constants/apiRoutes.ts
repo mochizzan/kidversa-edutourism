@@ -6,6 +6,15 @@
  * Static paths are plain strings.
  */
 
+/**
+ * Single source of truth for the canonical topic-identity query/JSON field on
+ * attendance (agreed with the backend owner: `session_stage_id` =
+ * session_stages.id, NOT program_stage_id, NOT session_substage_id). If the
+ * backend renames the field, change it ONLY here plus the BY_SESSION_STAGE
+ * builder below — the service builds its list filter from this constant.
+ */
+export const ATTENDANCE_TOPIC_FIELD = 'session_stage_id' as const
+
 export const API_ROUTES = {
  AUTH: {
   LOGIN: '/api/auth/login',

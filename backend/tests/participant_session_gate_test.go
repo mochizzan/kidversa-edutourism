@@ -32,8 +32,9 @@ type fakeSessionFlowRepo struct {
 
 	session        *entity.Session
 	sessionGets    int
-	extraSessions  map[string]*entity.Session // secondary sessions (link-migration sources)
-	sessionTenants map[string]string          // sessionID -> owning tenant (unset = unscoped)
+	extraSessions  map[string]*entity.Session       // secondary sessions (link-migration sources)
+	sessionTenants map[string]string                // sessionID -> owning tenant (unset = unscoped)
+	stages         map[string][]entity.SessionStage // sessionID -> session stages (carryAttendance remap)
 	groups         map[string]*entity.SessionGroup
 	members        map[string][]entity.Participant // groupID -> existing members
 	participant    *entity.Participant
@@ -68,6 +69,10 @@ func (r *fakeSessionFlowRepo) GetSessionGroupByID(_ context.Context, id, _ strin
 		return &cp, nil
 	}
 	return nil, apperrors.NotFound("not_found", nil)
+}
+
+func (r *fakeSessionFlowRepo) ListSessionStages(_ context.Context, sessionID string) ([]entity.SessionStage, error) {
+	return r.stages[sessionID], nil
 }
 
 func (r *fakeSessionFlowRepo) ListParticipants(_ context.Context, _, groupID, _ string) ([]entity.Participant, error) {
@@ -577,7 +582,7 @@ type fakeLinkProgramSubstageRepo struct {
 	repository.ProgramSubstageRepository
 }
 
-// fakeLinkAttendanceRepo stores attendance rows keyed "participantID|sessionID".
+// fakeLinkAttendanceRepo stores attendance rows keyed "participantID|sessionID|sessionStageID".
 type fakeLinkAttendanceRepo struct {
 	repository.AttendanceRepository
 	rows      map[string]*entity.ParticipantAttendance
@@ -586,15 +591,42 @@ type fakeLinkAttendanceRepo struct {
 	upserts   []*entity.ParticipantAttendance
 }
 
-func (r *fakeLinkAttendanceRepo) GetByParticipantSession(_ context.Context, participantID, sessionID, _ string) (*entity.ParticipantAttendance, error) {
+func linkAttKey(participantID, sessionID, sessionStageID string) string {
+	return participantID + "|" + sessionID + "|" + sessionStageID
+}
+
+func (r *fakeLinkAttendanceRepo) GetByParticipantSessionStage(_ context.Context, participantID, sessionID, sessionStageID, _ string) (*entity.ParticipantAttendance, error) {
 	if r.getErr != nil {
 		return nil, r.getErr
 	}
-	if a, ok := r.rows[participantID+"|"+sessionID]; ok {
+	if a, ok := r.rows[linkAttKey(participantID, sessionID, sessionStageID)]; ok {
 		cp := *a
 		return &cp, nil
 	}
 	return nil, apperrors.NotFound("not_found", nil)
+}
+
+func (r *fakeLinkAttendanceRepo) ListBySessionStage(_ context.Context, sessionID, sessionStageID, _ string) ([]entity.ParticipantAttendance, error) {
+	out := make([]entity.ParticipantAttendance, 0, len(r.rows))
+	for _, a := range r.rows {
+		if a.SessionID == sessionID && a.SessionStageID == sessionStageID {
+			out = append(out, *a)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeLinkAttendanceRepo) ListByParticipantSession(_ context.Context, participantID, sessionID, _ string) ([]entity.ParticipantAttendance, error) {
+	if r.getErr != nil {
+		return nil, r.getErr
+	}
+	out := make([]entity.ParticipantAttendance, 0, len(r.rows))
+	for _, a := range r.rows {
+		if a.ParticipantID == participantID && a.SessionID == sessionID {
+			out = append(out, *a)
+		}
+	}
+	return out, nil
 }
 
 func (r *fakeLinkAttendanceRepo) Upsert(_ context.Context, a *entity.ParticipantAttendance) error {
@@ -602,7 +634,7 @@ func (r *fakeLinkAttendanceRepo) Upsert(_ context.Context, a *entity.Participant
 		return r.upsertErr
 	}
 	cp := *a
-	r.rows[a.ParticipantID+"|"+a.SessionID] = &cp
+	r.rows[linkAttKey(a.ParticipantID, a.SessionID, a.SessionStageID)] = &cp
 	r.upserts = append(r.upserts, &cp)
 	return nil
 }
@@ -646,11 +678,15 @@ func newLinkMigrationFixture(targetProgram, srcProgram string) *linkMigrationFix
 	markedBy := "fas-1"
 	markedAt := time.Date(2026, 1, 15, 9, 30, 0, 0, time.UTC)
 	att := &fakeLinkAttendanceRepo{rows: map[string]*entity.ParticipantAttendance{
-		"pid-1|sess-src": {
-			ParticipantID: "pid-1", SessionID: "sess-src", IsPresent: true,
-			MarkedAt: markedAt, MarkedBy: &markedBy,
+		"pid-1|sess-src|ss-src": {
+			ParticipantID: "pid-1", SessionID: "sess-src", SessionStageID: "ss-src",
+			IsPresent: true, MarkedAt: markedAt, MarkedBy: &markedBy,
 		},
 	}}
+	repo.stages = map[string][]entity.SessionStage{
+		"sess-src": {{BaseModel: entity.BaseModel{ID: "ss-src"}, SessionID: "sess-src", ProgramStageID: "stage-1"}},
+		"sess-1":   {{BaseModel: entity.BaseModel{ID: "ss-tgt"}, SessionID: "sess-1", ProgramStageID: "stage-1"}},
+	}
 
 	uc := usecase.NewSessionUsecase(repo, nil)
 	uc.SetSubstageRepos(nil, sub)
@@ -736,13 +772,17 @@ func TestLinkParticipantSameProgramCarriesAllAssessmentsAndAttendance(t *testing
 		t.Fatal("star = 5 assessment must be carried with its rating")
 	}
 
-	// Attendance carried to the new session_id with identical content.
+	// Attendance carried to the new session_id with identical content,
+	// remapped onto the target session's session_stage (same program_stage).
 	if len(f.att.upserts) != 1 {
 		t.Fatalf("expected exactly one attendance upsert, got %d", len(f.att.upserts))
 	}
-	carried := f.att.rows["pid-1|sess-1"]
+	carried := f.att.rows["pid-1|sess-1|ss-tgt"]
 	if carried == nil {
-		t.Fatal("attendance row must exist under the new session_id")
+		t.Fatal("attendance row must exist under the new session_id and target stage")
+	}
+	if carried.SessionStageID != "ss-tgt" {
+		t.Fatalf("carried session_stage_id = %q, want ss-tgt (target session's stage)", carried.SessionStageID)
 	}
 	if !carried.IsPresent {
 		t.Fatal("attendance IsPresent must be carried")
