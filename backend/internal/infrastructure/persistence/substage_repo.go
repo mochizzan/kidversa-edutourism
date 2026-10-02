@@ -254,3 +254,18 @@ func (r *GormSessionSubstageRepository) ListFinalBadgesByParticipant(ctx context
 	}
 	return items, nil
 }
+
+// RevokeFinalBadge revokes the participant's FINAL badge(s) for a program by
+// soft-deleting them (participant_badges carries no tenant_id; the scope
+// mirrors ListFinalBadgesByParticipant — participant + program + badge_type).
+// GORM's soft delete on DeletedAt stamps deleted_at and every list query stops
+// returning the row; SUBTOPIK rows are never touched. A no-op when no FINAL
+// row exists; write failures surface as explicit internal errors.
+func (r *GormSessionSubstageRepository) RevokeFinalBadge(ctx context.Context, participantID, programID string) error {
+	if err := r.db.WithContext(ctx).
+		Where("participant_id = ? AND program_id = ? AND badge_type = ?", participantID, programID, entity.BadgeTypeFinal).
+		Delete(&ParticipantBadgeModel{}).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	return nil
+}

@@ -46,4 +46,10 @@ type SessionSubstageRepository interface {
 	ListBadgesByParticipantStage(ctx context.Context, participantID, programStageID string) ([]entity.ParticipantBadge, error)
 	// ListFinalBadgesByParticipant returns FINAL badges for a participant (one per program).
 	ListFinalBadgesByParticipant(ctx context.Context, participantID, programID string) ([]entity.ParticipantBadge, error)
+	// RevokeFinalBadge revokes (soft-deletes via deleted_at) every FINAL badge
+	// of a participant on a program — the reconcile counterpart of CreateBadge,
+	// used when the program is no longer fully assessed (e.g. it grew Topik
+	// after the badge was earned). Scope mirrors ListFinalBadgesByParticipant;
+	// a no-op when no FINAL row exists, an explicit error on write failure.
+	RevokeFinalBadge(ctx context.Context, participantID, programID string) error
 }

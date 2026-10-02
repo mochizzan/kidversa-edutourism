@@ -94,24 +94,32 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 	return b, nil
 }
 
-// RecomputeFinalBadge awards a FINAL badge for the participant on the program
-// once every Kegiatan of the program has an awarded Kegiatan badge for the
-// participant. Enforces exactly one FINAL per (participant, program). Returns
-// the badge (existing or newly created). Returns (nil, nil) when not all
-// Kegiatan are completed yet (not an error). When the program's final_badge_name
-// template is empty no row is created — the skip is logged at info level.
+// RecomputeFinalBadge reconciles the participant's FINAL badge for the program
+// against the CURRENT program content. Completion means: every Topik
+// (program_stage) of the program has an awarded SUBTOPIK badge for the
+// participant.
+//   - all Topik assessed → ensure exactly one FINAL row exists (idempotent
+//     award; an existing row is returned unchanged — Enforces exactly one
+//     FINAL per (participant, program)).
+//   - NOT all Topik assessed (e.g. the program grew Topik after the badge was
+//     earned, or the participant migrated onto the grown program) → revoke an
+//     existing FINAL row (soft delete via RevokeFinalBadge); a no-op when
+//     none exists.
+//
+// SUBTOPIK rows are never touched here — they are program-scoped and always
+// carry across migrations. Returns (nil, nil) when there is nothing to do.
+// When the program's final_badge_name template is empty no row is created —
+// the skip is logged at info level. Every lookup/revoke failure is returned;
+// nothing is swallowed. Re-running on the same state is a no-op.
 func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, programID string) (*entity.ParticipantBadge, error) {
 	if participantID == "" || programID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
 	}
-	// Enforce exactly one FINAL per (participant, program).
+	// Existing FINAL row(s) drive the reconcile: returned as-is when the
+	// program is still complete, revoked when it is not. A failed lookup must
+	// not be ignored: continuing could award a duplicate on a repo failure.
 	existing, eerr := u.substageRepo.ListFinalBadgesByParticipant(ctx, participantID, programID)
-	if eerr == nil && len(existing) > 0 {
-		return &existing[0], nil
-	}
 	if eerr != nil {
-		// A failed idempotency pre-check must not be ignored: continuing would
-		// risk a duplicate award and hides a real repo failure.
 		return nil, fmt.Errorf("badge: list FINAL badges participant=%s program=%s: %w", participantID, programID, eerr)
 	}
 	stages, err := u.programRepo.ListStages(ctx, programID)
@@ -119,19 +127,38 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 		return nil, err
 	}
 	if len(stages) == 0 {
+		// Degenerate program without Topik: completion is undefined — keep an
+		// existing FINAL (nothing proves it stale) and never award one.
+		if len(existing) > 0 {
+			return &existing[0], nil
+		}
 		return nil, nil
 	}
 	for i := range stages {
 		got, gerr := u.substageRepo.ListBadgesByParticipantStage(ctx, participantID, stages[i].ID)
 		if gerr != nil {
 			// A lookup failure must not be treated as "not awarded": that would
-			// silently withhold the FINAL badge on a repo error.
+			// silently withhold (or wrongly revoke) the FINAL badge on a repo error.
 			return nil, fmt.Errorf("badge: list SUBTOPIK badge participant=%s stage=%s: %w", participantID, stages[i].ID, gerr)
 		}
 		if len(got) == 0 {
-			// Not all Kegiatan completed yet.
+			// Not every Topik is assessed (yet): a stale FINAL must not survive
+			// this state — revoke it (no-op when none exists).
+			if len(existing) == 0 {
+				return nil, nil
+			}
+			if rerr := u.substageRepo.RevokeFinalBadge(ctx, participantID, programID); rerr != nil {
+				return nil, fmt.Errorf("badge: revoke FINAL badge participant=%s program=%s: %w", participantID, programID, rerr)
+			}
+			log.Printf("badge: revoked FINAL participant=%s program=%s: not all Topik assessed", participantID, programID)
 			return nil, nil
 		}
+	}
+	// Every Topik has its SUBTOPIK badge: the FINAL must exist — but only the
+	// completion check above may grant it (the pre-check alone must never
+	// bypass a re-evaluation of grown program content).
+	if len(existing) > 0 {
+		return &existing[0], nil
 	}
 	prog, perr := u.programRepo.GetProgramByID(ctx, programID)
 	if perr != nil {

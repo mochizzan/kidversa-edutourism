@@ -53,6 +53,7 @@ type badgeStore struct {
 	badges       []entity.ParticipantBadge
 	seq          int
 	createErrFor string // participant whose CreateBadge write fails
+	revokeErr    error  // injected RevokeFinalBadge write failure
 }
 
 func stageKey(b *entity.ParticipantBadge) string {
@@ -149,6 +150,26 @@ func (s *badgeStore) ListFinalBadgesByParticipant(ctx context.Context, participa
 	return out, nil
 }
 
+// RevokeFinalBadge emulates the production soft delete: revoked rows leave the
+// active list (the fake has no deleted_at — a dropped row behaves exactly like
+// a GORM soft-deleted row, invisible to every list query) and SUBTOPIK rows are
+// never touched. revokeErr injects a write failure.
+func (s *badgeStore) RevokeFinalBadge(ctx context.Context, participantID, programID string) error {
+	if s.revokeErr != nil {
+		return s.revokeErr
+	}
+	kept := make([]entity.ParticipantBadge, 0, len(s.badges))
+	for i := range s.badges {
+		b := s.badges[i]
+		if b.ParticipantID == participantID && b.ProgramID == programID && b.BadgeType == entity.BadgeTypeFinal {
+			continue
+		}
+		kept = append(kept, b)
+	}
+	s.badges = kept
+	return nil
+}
+
 type fakeProgramRepo struct {
 	repository.ProgramRepository
 	program *entity.Program
@@ -215,6 +236,19 @@ func (r *fakeAssessmentRepo) score(participantID, sessionSubstageID string) {
 	})
 }
 
+// Create persists an assessment (the assessment usecase's create path), making
+// the row visible to List so the badge evaluation sees the score.
+func (r *fakeAssessmentRepo) Create(_ context.Context, a *entity.Assessment) error {
+	cp := *a
+	r.rows = append(r.rows, cp)
+	return nil
+}
+
+// GetByParticipantStageIncludingDeleted: the fixture never soft-deletes.
+func (r *fakeAssessmentRepo) GetByParticipantStageIncludingDeleted(_ context.Context, _, _, _ string) (*entity.Assessment, error) {
+	return nil, apperrors.NotFound("not_found", nil)
+}
+
 func (r *fakeAssessmentRepo) List(ctx context.Context, flt repository.AssessmentFilter, page, limit int) (*repository.Paginated[entity.Assessment], error) {
 	// Replicates the production repo guard (assessment_repo.go): an empty
 	// TenantID is rejected as a required scope.
@@ -274,6 +308,13 @@ func (r *fakeSessionRepo) ListParticipants(ctx context.Context, sessionID, group
 	return r.participants, nil
 }
 
+// GetSessionGroupByParticipant: the fixture's participant belongs to no group,
+// so the assessment upsert's group-completion gate is skipped (production
+// returns (nil, nil) for a group-less participant).
+func (r *fakeSessionRepo) GetSessionGroupByParticipant(ctx context.Context, participantID string) (*entity.SessionGroup, error) {
+	return nil, nil
+}
+
 type fakeMissionRepo struct {
 	repository.MissionBankRepository
 }
@@ -294,6 +335,10 @@ type fixture struct {
 	program  *entity.Program
 	stageA   *entity.ProgramStage
 	stageB   *entity.ProgramStage
+	// Exposed so tests can simulate content changes (a program growing a new
+	// Topik) against the SAME repos the usecase holds.
+	progRepo *fakeProgramRepo
+	progSubs *fakeProgramSubstageRepo
 }
 
 func newFixture() *fixture {
@@ -378,6 +423,8 @@ func newFixture() *fixture {
 		program:  program,
 		stageA:   stageA,
 		stageB:   stageB,
+		progRepo: progRepo,
+		progSubs: progSubs,
 	}
 }
 

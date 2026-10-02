@@ -87,6 +87,9 @@ func main() {
 	sessionUC.SetAttendanceRepo(attendanceRepo)
 	sessionUC.SetUserRepo(userRepo)
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo, attendanceRepo)
+	// LinkParticipant reconciles the participant's FINAL badge after a
+	// same-program migration (a grown program revokes the stale FINAL).
+	sessionUC.SetBadgeReconciler(badgeUC)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub, badgeUC)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, sessionRepo, badgeUC)
 	attendanceUC := attendanceuc.NewUsecase(attendanceRepo, sessionRepo)

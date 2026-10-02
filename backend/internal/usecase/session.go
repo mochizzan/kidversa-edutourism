@@ -34,6 +34,17 @@ type ProgramReader interface {
 	GetProgramByID(ctx context.Context, id string) (*entity.Program, error)
 }
 
+// BadgeReconciler is the minimal contract SessionUsecase needs to reconcile a
+// participant's badges after a same-program migration (LinkParticipant) —
+// kept narrow (same pattern as assessment.BadgeEvaluator and
+// live.GroupCompletionValidator) so the session usecase does not depend on the
+// badge usecase package. RecomputeFinalBadge is the badge package's single
+// reconcile entry point: it awards the FINAL badge only when every Topik of
+// the program has its SUBTOPIK badge and revokes a stale FINAL otherwise.
+type BadgeReconciler interface {
+	RecomputeFinalBadge(ctx context.Context, participantID, programID string) (*entity.ParticipantBadge, error)
+}
+
 // SessionUsecase orchestrates session + Topik + groups + participants business logic.
 type SessionUsecase struct {
 	sessionRepo      repository.SessionRepository
@@ -44,6 +55,7 @@ type SessionUsecase struct {
 	assessmentRepo   repository.AssessmentRepository
 	attendanceRepo   repository.AttendanceRepository
 	userRepo         repository.UserRepository
+	badgeReconciler  BadgeReconciler
 }
 
 // NewSessionUsecase builds the session usecase.
@@ -79,6 +91,14 @@ func (u *SessionUsecase) SetAttendanceRepo(attendanceRepo repository.AttendanceR
 // for the session detail view (so non-admin callers don't need GET /api/users).
 func (u *SessionUsecase) SetUserRepo(userRepo repository.UserRepository) {
 	u.userRepo = userRepo
+}
+
+// SetBadgeReconciler injects the badge usecase used to reconcile the
+// participant's FINAL badge after a same-program migration (LinkParticipant):
+// when the program grew Topik since the badge was earned, the stale FINAL must
+// be revoked immediately. Optional: unwired (nil) skips the reconcile.
+func (u *SessionUsecase) SetBadgeReconciler(b BadgeReconciler) {
+	u.badgeReconciler = b
 }
 
 // CreateSession creates a new DRAFT session owned by the tenant.
@@ -818,14 +838,25 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	//     session's Kegiatan leaves — a failure aborts while the participant is
 	//     still in the source session.
 	//  2. Carry the attendance row (idempotent upsert on participant+session).
-	//  3. Move the participant LAST (the commit step): if it fails after 1/2, a
-	//     retry converges because the clone skips already-existing rows and the
-	//     attendance upsert is idempotent.
+	//  3. Reconcile the FINAL badge (same-program migration only): the program
+	//     may have grown Topik since the badge was earned — RecomputeFinalBadge
+	//     is the shared reconcile point (award iff every Topik has its SUBTOPIK
+	//     badge, revoke a stale FINAL otherwise) and never touches SUBTOPIK
+	//     rows, which are program-scoped and carry automatically. A failure
+	//     aborts while the participant is still in the source session.
+	//  4. Move the participant LAST (the commit step): if it fails after 1/2/3,
+	//     a retry converges because the clone skips already-existing rows, the
+	//     attendance upsert is idempotent, and the badge reconcile is idempotent.
 	if err := u.cloneScoredAssessments(ctx, participantID, prevSessionID, sessionID, tenantID); err != nil {
 		return nil, err
 	}
 	if err := u.carryAttendance(ctx, participantID, prevSessionID, sessionID, tenantID); err != nil {
 		return nil, err
+	}
+	if u.badgeReconciler != nil && prevSessionID != "" {
+		if _, err := u.badgeReconciler.RecomputeFinalBadge(ctx, participantID, targetS.ProgramID); err != nil {
+			return nil, fmt.Errorf("link_participant: reconcile badges participant=%s program=%s: %w", participantID, targetS.ProgramID, err)
+		}
 	}
 
 	sid := sessionID

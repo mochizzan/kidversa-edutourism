@@ -17,6 +17,7 @@ import (
 	"kidversa-edutourism-backend/internal/domain/repository"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	"kidversa-edutourism-backend/internal/usecase"
+	badgeuc "kidversa-edutourism-backend/internal/usecase/badge"
 )
 
 // ---------------------------------------------------------------------------
@@ -449,11 +450,13 @@ func (r *fakeLinkAssessmentRepo) Create(_ context.Context, a *entity.Assessment)
 }
 
 // fakeLinkSubstageRepo resolves session Kegiatan by ID and by
-// (session, program Kegiatan) keys.
+// (session, program Kegiatan) keys. Its badges slice is the in-memory
+// participant_badges table the migration reconcile hook reads and writes.
 type fakeLinkSubstageRepo struct {
 	repository.SessionSubstageRepository
 	byID   map[string]*entity.SessionSubstage
 	byKeys map[string]*entity.SessionSubstage // "<sessionID>|<programSubstageID>"
+	badges []entity.ParticipantBadge          // active (non-revoked) badge rows
 }
 
 func (r *fakeLinkSubstageRepo) GetSessionSubstage(_ context.Context, id string) (*entity.SessionSubstage, error) {
@@ -470,6 +473,108 @@ func (r *fakeLinkSubstageRepo) GetSessionSubstageByKeys(_ context.Context, sessi
 		return &cp, nil
 	}
 	return nil, apperrors.NotFound("not_found", nil)
+}
+
+// CreateBadge emulates the DB uniques (one SUBTOPIK per Topik, one FINAL per
+// program) so an accidental double award fails loudly as a conflict.
+func (r *fakeLinkSubstageRepo) CreateBadge(_ context.Context, b *entity.ParticipantBadge) error {
+	for i := range r.badges {
+		ex := r.badges[i]
+		if ex.ParticipantID != b.ParticipantID {
+			continue
+		}
+		if b.BadgeType == entity.BadgeTypeSubtopik && ex.BadgeType == entity.BadgeTypeSubtopik &&
+			ex.ProgramStageID != nil && b.ProgramStageID != nil && *ex.ProgramStageID == *b.ProgramStageID {
+			return apperrors.Conflict("conflict", nil)
+		}
+		if b.BadgeType == entity.BadgeTypeFinal && ex.BadgeType == entity.BadgeTypeFinal && ex.ProgramID == b.ProgramID {
+			return apperrors.Conflict("conflict", nil)
+		}
+	}
+	r.badges = append(r.badges, *b)
+	return nil
+}
+
+func (r *fakeLinkSubstageRepo) ListBadgesByParticipantStage(_ context.Context, participantID, programStageID string) ([]entity.ParticipantBadge, error) {
+	out := make([]entity.ParticipantBadge, 0, 1)
+	for i := range r.badges {
+		b := r.badges[i]
+		if b.ParticipantID == participantID && b.BadgeType == entity.BadgeTypeSubtopik &&
+			b.ProgramStageID != nil && *b.ProgramStageID == programStageID {
+			out = append(out, b)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeLinkSubstageRepo) ListFinalBadgesByParticipant(_ context.Context, participantID, programID string) ([]entity.ParticipantBadge, error) {
+	out := make([]entity.ParticipantBadge, 0, 1)
+	for i := range r.badges {
+		b := r.badges[i]
+		if b.ParticipantID == participantID && b.BadgeType == entity.BadgeTypeFinal && b.ProgramID == programID {
+			out = append(out, b)
+		}
+	}
+	return out, nil
+}
+
+// RevokeFinalBadge drops the FINAL rows — soft-delete emulation: a revoked row
+// leaves every list result. SUBTOPIK rows are never touched.
+func (r *fakeLinkSubstageRepo) RevokeFinalBadge(_ context.Context, participantID, programID string) error {
+	kept := make([]entity.ParticipantBadge, 0, len(r.badges))
+	for i := range r.badges {
+		b := r.badges[i]
+		if b.ParticipantID == participantID && b.ProgramID == programID && b.BadgeType == entity.BadgeTypeFinal {
+			continue
+		}
+		kept = append(kept, b)
+	}
+	r.badges = kept
+	return nil
+}
+
+// badgesFor returns the active badge rows of a participant (assertion helper).
+func badgesFor(r *fakeLinkSubstageRepo, participantID string) []entity.ParticipantBadge {
+	out := make([]entity.ParticipantBadge, 0, len(r.badges))
+	for i := range r.badges {
+		if r.badges[i].ParticipantID == participantID {
+			out = append(out, r.badges[i])
+		}
+	}
+	return out
+}
+
+// fakeLinkProgramRepo feeds the FINAL badge reconcile triggered by
+// LinkParticipant's same-program hook (SetBadgeReconciler →
+// RecomputeFinalBadge → ListStages). listStagesCalls lets tests assert the
+// hook actually ran (or did NOT run, e.g. cross-program rejection).
+type fakeLinkProgramRepo struct {
+	repository.ProgramRepository
+	program         *entity.Program
+	stages          map[string][]entity.ProgramStage // programID → Topik (sequence order)
+	listStagesErr   error                            // injected lookup failure
+	listStagesCalls int
+}
+
+func (r *fakeLinkProgramRepo) GetProgramByID(_ context.Context, id string) (*entity.Program, error) {
+	if r.program != nil && r.program.ID == id {
+		return r.program, nil
+	}
+	return nil, apperrors.NotFound("not_found", nil)
+}
+
+func (r *fakeLinkProgramRepo) ListStages(_ context.Context, programID string) ([]entity.ProgramStage, error) {
+	r.listStagesCalls++
+	if r.listStagesErr != nil {
+		return nil, r.listStagesErr
+	}
+	return append([]entity.ProgramStage(nil), r.stages[programID]...), nil
+}
+
+// fakeLinkProgramSubstageRepo only satisfies badgeuc.NewUsecase's signature —
+// the reconcile path never resolves Kegiatan.
+type fakeLinkProgramSubstageRepo struct {
+	repository.ProgramSubstageRepository
 }
 
 // fakeLinkAttendanceRepo stores attendance rows keyed "participantID|sessionID".
@@ -511,6 +616,7 @@ type linkMigrationFixture struct {
 	asmt *fakeLinkAssessmentRepo
 	sub  *fakeLinkSubstageRepo
 	att  *fakeLinkAttendanceRepo
+	prog *fakeLinkProgramRepo
 	uc   *usecase.SessionUsecase
 }
 
@@ -550,7 +656,27 @@ func newLinkMigrationFixture(targetProgram, srcProgram string) *linkMigrationFix
 	uc.SetSubstageRepos(nil, sub)
 	uc.SetAssessmentRepo(asmt)
 	uc.SetAttendanceRepo(att)
-	return &linkMigrationFixture{repo: repo, asmt: asmt, sub: sub, att: att, uc: uc}
+	// Wire the REAL badge usecase so LinkParticipant's same-program hook runs
+	// the genuine reconcile (RecomputeFinalBadge) against the fakes above.
+	// Baseline: the target program still has the single Topik stage-1
+	// ("unchanged"); tests modeling growth override f.prog.stages.
+	prog := &fakeLinkProgramRepo{
+		program: &entity.Program{
+			BaseModel:      entity.BaseModel{ID: targetProgram},
+			Name:           "Program",
+			FinalBadgeName: "Juara Akhir",
+		},
+		stages: map[string][]entity.ProgramStage{
+			targetProgram: {{
+				BaseModel:     entity.BaseModel{ID: "stage-1"},
+				ProgramID:     targetProgram,
+				SequenceOrder: 1,
+				BadgeName:     "Topik 1",
+			}},
+		},
+	}
+	uc.SetBadgeReconciler(badgeuc.NewUsecase(sub, &fakeLinkProgramSubstageRepo{}, prog, asmt, repo, att))
+	return &linkMigrationFixture{repo: repo, asmt: asmt, sub: sub, att: att, prog: prog, uc: uc}
 }
 
 // TestLinkParticipantSameProgramCarriesAllAssessmentsAndAttendance: a link
@@ -631,9 +757,16 @@ func TestLinkParticipantSameProgramCarriesAllAssessmentsAndAttendance(t *testing
 
 // TestLinkParticipantRejectsCrossProgramMigration: sessions of DIFFERENT
 // programs must fail with 400 program_mismatch before anything is copied or
-// moved — no assessment read/write, no attendance write, no participant move.
+// moved — no assessment read/write, no attendance write, no participant move,
+// and NO badge recompute at all (a rejected link is not a migration).
 func TestLinkParticipantRejectsCrossProgramMigration(t *testing.T) {
 	f := newLinkMigrationFixture("prog-A", "prog-B")
+	// Seed badges so any (forbidden) badge mutation would be observable.
+	stage1 := "stage-1"
+	f.sub.badges = append(f.sub.badges,
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeSubtopik, BadgeName: "Topik 1"},
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-final"}, ParticipantID: "pid-1", ProgramID: "prog-A", BadgeType: entity.BadgeTypeFinal, BadgeName: "Juara Akhir"},
+	)
 
 	_, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1")
 	requireAppErrorCode(t, err, "program_mismatch")
@@ -648,6 +781,12 @@ func TestLinkParticipantRejectsCrossProgramMigration(t *testing.T) {
 	if len(f.att.upserts) != 0 || len(f.att.rows) != 1 {
 		t.Fatalf("cross-program link must not carry attendance: upserts=%d rows=%d",
 			len(f.att.upserts), len(f.att.rows))
+	}
+	if f.prog.listStagesCalls != 0 {
+		t.Fatalf("cross-program rejection must not trigger badge recompute, got %d runs", f.prog.listStagesCalls)
+	}
+	if rows := badgesFor(f.sub, "pid-1"); len(rows) != 2 {
+		t.Fatalf("cross-program link must leave badges untouched, got %d rows (%+v)", len(rows), rows)
 	}
 }
 
@@ -704,7 +843,26 @@ func TestLinkParticipantMigrationFailuresPropagateAndDoNotMove(t *testing.T) {
 		_, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1")
 		requireAppErrorCode(t, err, "internal_error")
 		if f.repo.updated != nil {
-			t.Fatal("participant must stay in the source session when the attendance upsert fails")
+			t.Fatal("participant must stay in the source session when the attendance write fails")
+		}
+	})
+
+	t.Run("badge_reconcile_failure", func(t *testing.T) {
+		f := newLinkMigrationFixture("prog-A", "prog-A")
+		f.prog.listStagesErr = apperrors.Internal("internal_error", nil)
+
+		_, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1")
+		requireAppErrorCode(t, err, "internal_error")
+		if f.repo.updated != nil {
+			t.Fatal("participant must stay in the source session when the badge reconcile fails")
+		}
+		// Documented ordering: clone and carry run BEFORE the reconcile (the
+		// hook fires "after assessments/attendance are copied"), so those copies
+		// are already in place — a retry converges because each step is
+		// idempotent (clone skips duplicates, attendance upsert, recompute).
+		if len(f.asmt.created) != 2 || len(f.att.upserts) != 1 {
+			t.Fatalf("copies must precede the reconcile: cloned=%d attendance=%d",
+				len(f.asmt.created), len(f.att.upserts))
 		}
 	})
 }
@@ -728,5 +886,87 @@ func TestLinkParticipantRejectsForeignTenantSourceSession(t *testing.T) {
 	}
 	if len(f.att.upserts) != 0 {
 		t.Fatal("foreign-tenant source must not carry attendance")
+	}
+}
+
+// TestLinkParticipantGrownProgramRevokesStaleFinalBadge is the Bug-4
+// migration contract: the participant earned the stage-1 SUBTOPIK badge and
+// the FINAL badge back when prog-A had a single Topik; the program has since
+// grown to three. The same-program migration must REVOKE the stale FINAL
+// immediately while KEEPING the already-earned SUBTOPIK badge (program-scoped
+// rows always carry across sessions).
+func TestLinkParticipantGrownProgramRevokesStaleFinalBadge(t *testing.T) {
+	f := newLinkMigrationFixture("prog-A", "prog-A")
+	// prog-A now has three Topik; the participant is assessed on stage-1 only.
+	f.prog.stages["prog-A"] = []entity.ProgramStage{
+		{BaseModel: entity.BaseModel{ID: "stage-1"}, ProgramID: "prog-A", SequenceOrder: 1, BadgeName: "Topik 1"},
+		{BaseModel: entity.BaseModel{ID: "stage-2"}, ProgramID: "prog-A", SequenceOrder: 2, BadgeName: "Topik 2"},
+		{BaseModel: entity.BaseModel{ID: "stage-3"}, ProgramID: "prog-A", SequenceOrder: 3, BadgeName: "Topik 3"},
+	}
+	stage1 := "stage-1"
+	f.sub.badges = append(f.sub.badges,
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeSubtopik, BadgeName: "Topik 1"},
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-final"}, ParticipantID: "pid-1", ProgramID: "prog-A", BadgeType: entity.BadgeTypeFinal, BadgeName: "Juara Akhir"},
+	)
+
+	res, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1")
+	if err != nil {
+		t.Fatalf("same-program link must succeed, got: %v", err)
+	}
+	if f.repo.updated == nil || f.repo.updated.SessionID == nil || *f.repo.updated.SessionID != "sess-1" {
+		t.Fatalf("participant must be moved to sess-1, got %+v", f.repo.updated)
+	}
+	if res.PreviousSessionID != "sess-src" || res.PreviousProgramID != "prog-A" {
+		t.Fatalf("migration context lost: %+v", res)
+	}
+
+	if f.prog.listStagesCalls != 1 {
+		t.Fatalf("badge reconcile must run exactly once during migration, got %d runs", f.prog.listStagesCalls)
+	}
+	rows := badgesFor(f.sub, "pid-1")
+	if len(rows) != 1 {
+		t.Fatalf("badge rows = %d (%+v), want 1 (stale FINAL revoked, SUBTOPIK kept)", len(rows), rows)
+	}
+	got := rows[0]
+	if got.BadgeType != entity.BadgeTypeSubtopik || got.ProgramStageID == nil || *got.ProgramStageID != "stage-1" {
+		t.Fatalf("surviving badge = %+v, want the SUBTOPIK badge of stage-1", got)
+	}
+}
+
+// TestLinkParticipantUnchangedProgramKeepsFinalBadge: same-program migration
+// with an UNCHANGED Topik count and every Topik assessed — the reconcile must
+// retain BOTH the FINAL and the SUBTOPIK badge (migration never strips a
+// still-earned badge).
+func TestLinkParticipantUnchangedProgramKeepsFinalBadge(t *testing.T) {
+	f := newLinkMigrationFixture("prog-A", "prog-A") // prog-A: 1 Topik, unchanged
+	stage1 := "stage-1"
+	f.sub.badges = append(f.sub.badges,
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeSubtopik, BadgeName: "Topik 1"},
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-final"}, ParticipantID: "pid-1", ProgramID: "prog-A", BadgeType: entity.BadgeTypeFinal, BadgeName: "Juara Akhir"},
+	)
+
+	if _, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1"); err != nil {
+		t.Fatalf("same-program link must succeed, got: %v", err)
+	}
+
+	// The reconcile really ran (it did not just skip) and kept every row.
+	if f.prog.listStagesCalls != 1 {
+		t.Fatalf("badge reconcile must run exactly once during migration, got %d runs", f.prog.listStagesCalls)
+	}
+	rows := badgesFor(f.sub, "pid-1")
+	if len(rows) != 2 {
+		t.Fatalf("badge rows = %d (%+v), want 2 (FINAL and SUBTOPIK retained)", len(rows), rows)
+	}
+	var sawSub, sawFinal bool
+	for i := range rows {
+		switch rows[i].BadgeType {
+		case entity.BadgeTypeSubtopik:
+			sawSub = rows[i].ProgramStageID != nil && *rows[i].ProgramStageID == "stage-1"
+		case entity.BadgeTypeFinal:
+			sawFinal = rows[i].ProgramID == "prog-A"
+		}
+	}
+	if !sawSub || !sawFinal {
+		t.Fatalf("retained badges = %+v, want SUBTOPIK stage-1 AND FINAL prog-A", rows)
 	}
 }
