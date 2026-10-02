@@ -36,12 +36,16 @@ func (f *attendanceRowsFake) ListBySession(_ context.Context, sessionID, tenantI
 
 // newAbsenceFixture wires the generate path with an empty report repo state,
 // an immediate (non-blocking) narrative generator and the given attendance
-// fake. All other dependencies stay nil — GenerateForSession only reaches
-// them through the mission phase, which fails fast with topic_required for
-// the fake's topic-less drafts (existing behavior, never fatal to the run).
+// fake, plus the mission-phase dependencies (session/bank/assessments/
+// participant-missions fakes) so the topic-scoped drafts the run creates
+// (topicIDs={"stage1"}) generate end-to-end without touching nil deps.
 func newAbsenceFixture(repo *genRepo, att *attendanceRowsFake) *reports.Usecase {
 	cfg := &config.Config{ParentReportBaseURL: "http://localhost/parent/report", ReportTokenTTL: 168 * time.Hour}
-	return reports.NewUsecase(repo, newBlockingGen(), nil, nil, nil, nil, nil, nil, nil, nil, nil, cfg, nil, nil, att)
+	sess := &genSessionRepo{participants: newParticipants(3)}
+	bank := &missionBankFake{items: []entity.MissionBank{
+		{BaseModel: entity.BaseModel{ID: "m-1"}, Title: "Misi Satu"},
+	}}
+	return reports.NewUsecase(repo, newBlockingGen(), nil, bank, &assessmentListFake{}, sess, nil, newParticipantMissionFake(), nil, nil, nil, cfg, nil, nil, att)
 }
 
 // reportRowCountByParticipant counts stored report rows per participant.

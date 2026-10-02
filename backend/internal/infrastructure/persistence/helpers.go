@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -56,4 +57,52 @@ func isSchemaDrift(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "1054") || strings.Contains(msg, "unknown column")
+}
+
+// deadlockRetryAttempts bounds the transaction deadlock retry: one initial
+// attempt plus the retries below. Enough to ride out the short lock-order
+// inversions of concurrent generate runs without ever serializing them.
+const deadlockRetryAttempts = 4
+
+// isDeadlock reports whether err is a MySQL/MariaDB deadlock (1213) or a
+// lock-wait timeout (1205) — transient errors a transaction can succeed on
+// after rolling back and starting over. Like its isDuplicate/isSchemaDrift
+// siblings it matches on the message, so causes wrapped by apperrors (whose
+// Error() returns the wrapped cause) still match.
+func isDeadlock(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "deadlock") ||
+		strings.Contains(msg, "error 1213") ||
+		strings.Contains(msg, "lock wait timeout") ||
+		strings.Contains(msg, "error 1205")
+}
+
+// withDeadlockRetry runs fn up to deadlockRetryAttempts times, retrying only
+// when the attempt failed with a deadlock/lock-wait error. fn must own a
+// complete transaction per attempt (BEGIN/COMMIT/ROLLBACK — gorm's
+// Transaction), so every retry starts from a clean rollback and the work
+// inside one attempt stays atomic. A non-deadlock error returns immediately;
+// the final error after exhausting the attempts is returned unchanged, never
+// swallowed. Between attempts it backs off (respecting ctx cancellation) so
+// the competing transaction holding the locks can finish.
+func withDeadlockRetry(ctx context.Context, fn func() error) error {
+	var err error
+	for attempt := range deadlockRetryAttempts {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				// Caller is gone: surface the last real (deadlock) error
+				// instead of hiding it behind the context error.
+				return err
+			case <-time.After(time.Duration(attempt) * 50 * time.Millisecond):
+			}
+		}
+		if err = fn(); err == nil || !isDeadlock(err) {
+			return err
+		}
+	}
+	return err
 }

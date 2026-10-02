@@ -54,13 +54,10 @@ func (u *Usecase) SuggestMissions(ctx context.Context, reportID, tenantID string
 		return []string{}, nil
 	}
 
-	// Participant's Topic-scoped assessments.
-	assessments, err := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
-		ParticipantID:  r.ParticipantID,
-		SessionID:      r.SessionID,
-		ProgramStageID: r.ProgramStageID,
-		TenantID:       tenantID,
-	}, 1, 100)
+	// Participant's Topic-scoped assessments — same filter as the narrative
+	// skip gate and the generator itself (topicAssessmentFilter), so the
+	// recommender and the narrative always see the identical data scope.
+	assessments, err := u.assessmentRepo.List(ctx, topicAssessmentFilter(r, tenantID), 1, 100)
 	if err != nil {
 		return nil, fmt.Errorf("fetch assessments: %w", err)
 	}

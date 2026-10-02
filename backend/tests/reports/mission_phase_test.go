@@ -41,14 +41,31 @@ func (f *missionBankFake) List(_ context.Context, _ repository.MissionBankFilter
 	return &repository.Paginated[entity.MissionBank]{Items: out, Total: len(out)}, nil
 }
 
-// assessmentListFake returns an empty assessment page; with no LLM client
-// wired the recommender falls back to the deterministic heuristic.
+// assessmentListFake serves Topic-scoped assessment pages for the generate
+// fixtures. A zero value returns ONE benign row for every participant, so the
+// narrative skip gate ("no assessments") stays open and the generator runs —
+// the default for tests that are not about that gate. Set empty to serve NO
+// rows anywhere, or noFor to serve empty pages for specific participants only
+// (per-report gate control). The row carries no comment, so the mission
+// recommender's heuristic keeps candidate order.
 type assessmentListFake struct {
 	repository.AssessmentRepository
+	empty bool            // no assessments for any participant
+	noFor map[string]bool // participant IDs served an empty page
 }
 
-func (f *assessmentListFake) List(context.Context, repository.AssessmentFilter, int, int) (*repository.Paginated[entity.Assessment], error) {
-	return &repository.Paginated[entity.Assessment]{}, nil
+func (f *assessmentListFake) List(_ context.Context, rf repository.AssessmentFilter, _, _ int) (*repository.Paginated[entity.Assessment], error) {
+	if f.empty || f.noFor[rf.ParticipantID] {
+		return &repository.Paginated[entity.Assessment]{}, nil
+	}
+	return &repository.Paginated[entity.Assessment]{
+		Items: []entity.Assessment{{
+			ParticipantID: rf.ParticipantID,
+			SessionID:     rf.SessionID,
+			StarRating:    5,
+		}},
+		Total: 1,
+	}, nil
 }
 
 // participantMissionFake records every ReplaceByReport persist call — the
@@ -102,10 +119,17 @@ func markTopicScoped(repo *genRepo, stageID string) {
 }
 
 // newMissionUsecase wires the generate fixture with the mission-phase
-// dependencies (LLM client left nil → deterministic heuristic path).
+// dependencies (LLM client left nil → deterministic heuristic path) and the
+// default assessment fake (gate open — the narrative runs).
 func newMissionUsecase(repo *genRepo, gen *blockingGen, sess *genSessionRepo, bank repository.MissionBankRepository, pm repository.ParticipantMissionRepository) *reports.Usecase {
+	return newMissionUsecaseWithAssess(repo, gen, sess, bank, pm, &assessmentListFake{})
+}
+
+// newMissionUsecaseWithAssess is newMissionUsecase with an explicit assessment
+// repository — the narrative skip gate (no_assessments) reads it.
+func newMissionUsecaseWithAssess(repo *genRepo, gen *blockingGen, sess *genSessionRepo, bank repository.MissionBankRepository, pm repository.ParticipantMissionRepository, assess repository.AssessmentRepository) *reports.Usecase {
 	cfg := &config.Config{ParentReportBaseURL: "http://localhost/parent/report", ReportTokenTTL: 168 * time.Hour}
-	return reports.NewUsecase(repo, gen, nil, bank, &assessmentListFake{}, sess, nil, pm, nil, nil, nil, cfg, nil, nil, &attendanceRowsFake{})
+	return reports.NewUsecase(repo, gen, nil, bank, assess, sess, nil, pm, nil, nil, nil, cfg, nil, nil, &attendanceRowsFake{})
 }
 
 // waitMissionPersist waits until every wanted report has at least one
@@ -235,62 +259,121 @@ func TestGenerateForSessionKeepsExistingMissionSelection(t *testing.T) {
 	}
 }
 
-// TestGenerateMissionPhaseFailuresMarkRegistry: an empty mission bank (zero
-// candidates) and a recommender error both record a clear per-item failure in
-// the generation registry — never silent, never a panic — while the narrative
-// phase still completes and the run still returns success for that item.
-func TestGenerateMissionPhaseFailuresMarkRegistry(t *testing.T) {
-	cases := []struct {
-		name    string
-		bank    *missionBankFake
-		wantMsg string
-	}{
-		{name: "empty mission bank", bank: &missionBankFake{}, wantMsg: "kandidat misi kosong"},
-		{name: "recommender error", bank: &missionBankFake{listErr: errors.New("mission bank down")}, wantMsg: "mission_selection_failed"},
+// TestGenerateMissionPhaseFailureMarksRegistry: a recommender error records a
+// clear per-item failure in the generation registry — never silent, never a
+// panic — while the narrative phase still completes and the run still returns
+// success for that item. (An EMPTY mission bank is no longer a failure: it is
+// pinned by TestGenerateMissionPhaseEmptyBankSkips.)
+func TestGenerateMissionPhaseFailureMarksRegistry(t *testing.T) {
+	bank := &missionBankFake{listErr: errors.New("mission bank down")}
+	repo := newGenRepo("p-a")
+	markTopicScoped(repo, "stage1")
+	gen := newBlockingGen("r-p-a")
+	sess := &genSessionRepo{participants: newParticipants(1)}
+	pm := newParticipantMissionFake()
+	uc := newMissionUsecase(repo, gen, sess, bank, pm)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := uc.GenerateForSession(context.Background(), genSessionID, testTenantID, newParticipants(1), nil)
+		done <- err
+	}()
+
+	st := pollGenerate(t, uc, genSessionID, testTenantID,
+		func(st reports.GenerateStatus, ok bool) bool {
+			return ok && st.Failed["r-p-a"] != ""
+		}, "mission failure recorded in registry")
+	if !strings.Contains(st.Failed["r-p-a"], "mission_selection_failed") {
+		t.Errorf("failed message = %q, want it to contain %q", st.Failed["r-p-a"], "mission_selection_failed")
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			repo := newGenRepo("p-a")
-			markTopicScoped(repo, "stage1")
-			gen := newBlockingGen("r-p-a")
-			sess := &genSessionRepo{participants: newParticipants(1)}
-			pm := newParticipantMissionFake()
-			uc := newMissionUsecase(repo, gen, sess, tc.bank, pm)
+	if pm.persistedCount("r-p-a") != 0 {
+		t.Error("a failed selection must not persist missions")
+	}
 
-			done := make(chan error, 1)
-			go func() {
-				_, err := uc.GenerateForSession(context.Background(), genSessionID, testTenantID, newParticipants(1), nil)
-				done <- err
-			}()
+	// The narrative phase is unaffected: its worker still runs and the
+	// run returns without error.
+	close(gen.blocks["r-p-a"])
+	if err := <-done; err != nil {
+		t.Fatalf("mission failure must not fail the run: %v", err)
+	}
+	r, gerr := repo.GetByID(context.Background(), "r-p-a", testTenantID)
+	if gerr != nil {
+		t.Fatalf("GetByID(r-p-a): %v", gerr)
+	}
+	if r.AINarrativeDraft != "draft" {
+		t.Errorf("narrative draft = %q, want %q", r.AINarrativeDraft, "draft")
+	}
+	if _, ok := uc.GenerateStatus(genSessionID, testTenantID); ok {
+		t.Fatal("registry must be cleaned up after the run")
+	}
+}
 
-			st := pollGenerate(t, uc, genSessionID, testTenantID,
-				func(st reports.GenerateStatus, ok bool) bool {
-					return ok && st.Failed["r-p-a"] != ""
-				}, "mission failure recorded in registry")
-			if !strings.Contains(st.Failed["r-p-a"], tc.wantMsg) {
-				t.Errorf("failed message = %q, want it to contain %q", st.Failed["r-p-a"], tc.wantMsg)
-			}
-			if pm.persistedCount("r-p-a") != 0 {
-				t.Error("a failed selection must not persist missions")
-			}
+// TestGenerateMissionPhaseEmptyBankSkips: an EMPTY mission bank for the
+// report's Topic is an EXPLICIT SKIP (mission_bank_empty), not a failure —
+// the item never lands in Failed, nothing is persisted, and the narrative
+// phase still generates the draft (mission-less report). The skip reason is
+// observable in the registry while the run lives, and the item derives
+// status=success (partial skip) with the reason attached once the narrative
+// finishes.
+func TestGenerateMissionPhaseEmptyBankSkips(t *testing.T) {
+	repo := newGenRepo("p-a", "p-b")
+	markTopicScoped(repo, "stage1")
+	gen := newBlockingGen("r-p-a", "r-p-b")
+	sess := &genSessionRepo{participants: newParticipants(2)}
+	pm := newParticipantMissionFake()
+	uc := newMissionUsecase(repo, gen, sess, &missionBankFake{}, pm) // empty bank
 
-			// The narrative phase is unaffected: its worker still runs and the
-			// run returns without error.
-			close(gen.blocks["r-p-a"])
-			if err := <-done; err != nil {
-				t.Fatalf("mission failure must not fail the run: %v", err)
+	done := make(chan error, 1)
+	go func() {
+		_, err := uc.GenerateForSession(context.Background(), genSessionID, testTenantID, newParticipants(2), nil)
+		done <- err
+	}()
+	waitStarted(t, gen, 2)
+
+	// Release r-p-a's narrative; r-p-b keeps the run alive so r-p-a's
+	// terminal state is observable.
+	close(gen.blocks["r-p-a"])
+	st := pollGenerate(t, uc, genSessionID, testTenantID,
+		func(st reports.GenerateStatus, ok bool) bool {
+			if !ok {
+				return false
 			}
-			r, gerr := repo.GetByID(context.Background(), "r-p-a", testTenantID)
-			if gerr != nil {
-				t.Fatalf("GetByID(r-p-a): %v", gerr)
-			}
-			if r.AINarrativeDraft != "draft" {
-				t.Errorf("narrative draft = %q, want %q", r.AINarrativeDraft, "draft")
-			}
-			if _, ok := uc.GenerateStatus(genSessionID, testTenantID); ok {
-				t.Fatal("registry must be cleaned up after the run")
-			}
-		})
+			it := findItem(st, "r-p-a")
+			return it != nil && it.Status == reports.GenerateItemSuccess &&
+				it.MissionSkipReason == reports.SkipReasonMissionBankEmpty
+		}, "r-p-a success (partial skip) after mission skip + narrative persist")
+
+	it := findItem(st, "r-p-a")
+	if it.MissionSkipReason != reports.SkipReasonMissionBankEmpty {
+		t.Errorf("mission_skip_reason = %q, want %q", it.MissionSkipReason, reports.SkipReasonMissionBankEmpty)
+	}
+	if it.NarrativeSkipReason != "" {
+		t.Errorf("narrative_skip_reason = %q, want empty (narrative still runs)", it.NarrativeSkipReason)
+	}
+	if msg := st.Failed["r-p-a"]; msg != "" {
+		t.Errorf("an empty mission bank must NOT be a failure, Failed[r-p-a] = %q", msg)
+	}
+	if st.ErrorCount != 0 {
+		t.Errorf("error count = %d, want 0", st.ErrorCount)
+	}
+
+	close(gen.blocks["r-p-b"])
+	if err := <-done; err != nil {
+		t.Fatalf("empty mission bank must not fail the run: %v", err)
+	}
+	// Nothing was persisted for either report, but both narratives exist —
+	// the result of an empty bank is a narrative-only report, not an error.
+	for _, id := range []string{"r-p-a", "r-p-b"} {
+		if n := pm.persistedCount(id); n != 0 {
+			t.Errorf("mission persists for %s = %d, want 0 (bank empty)", id, n)
+		}
+		r, gerr := repo.GetByID(context.Background(), id, testTenantID)
+		if gerr != nil {
+			t.Fatalf("GetByID(%s): %v", id, gerr)
+		}
+		if r.AINarrativeDraft != "draft" {
+			t.Errorf("narrative draft for %s = %q, want %q", id, r.AINarrativeDraft, "draft")
+		}
 	}
 }
 

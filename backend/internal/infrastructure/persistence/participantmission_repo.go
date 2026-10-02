@@ -110,28 +110,37 @@ func (r *GormParticipantMissionRepository) Delete(ctx context.Context, tenantID,
 }
 
 // ReplaceByReport atomically replaces all participant missions for a report:
-// deletes the existing rows and inserts the provided items within one transaction.
+// deletes the existing rows and inserts the provided items within one
+// transaction. The transaction is retried on a transient MySQL/MariaDB
+// deadlock (error 1213 — the delete's next-key locks on
+// idx_participant_missions_report collide with concurrent narrative workers
+// X-locking the same reports rows during a generate run): each attempt is a
+// full delete+insert transaction from a clean rollback, and the error after
+// exhausting the retries surfaces unchanged (same apperrors wrapping as
+// before).
 func (r *GormParticipantMissionRepository) ReplaceByReport(ctx context.Context, tenantID, reportID string, items []entity.ParticipantMission) error {
 	if err := r.assertReportOwnership(ctx, tenantID, reportID); err != nil {
 		return err
 	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Unscoped().Where("report_id = ?", reportID).Delete(&ParticipantMissionModel{}).Error; err != nil {
-			return apperrors.Internal("internal_error", err)
-		}
-		if len(items) == 0 {
-			return nil
-		}
-		models := make([]ParticipantMissionModel, 0, len(items))
-		for i := range items {
-			models = append(models, *participantMissionModelFromEntity(&items[i]))
-		}
-		if err := tx.Create(&models).Error; err != nil {
-			if isDuplicate(err) {
-				return apperrors.Conflict("conflict", err)
+	return withDeadlockRetry(ctx, func() error {
+		return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := tx.Unscoped().Where("report_id = ?", reportID).Delete(&ParticipantMissionModel{}).Error; err != nil {
+				return apperrors.Internal("internal_error", err)
 			}
-			return apperrors.Internal("internal_error", err)
-		}
-		return nil
+			if len(items) == 0 {
+				return nil
+			}
+			models := make([]ParticipantMissionModel, 0, len(items))
+			for i := range items {
+				models = append(models, *participantMissionModelFromEntity(&items[i]))
+			}
+			if err := tx.Create(&models).Error; err != nil {
+				if isDuplicate(err) {
+					return apperrors.Conflict("conflict", err)
+				}
+				return apperrors.Internal("internal_error", err)
+			}
+			return nil
+		})
 	})
 }

@@ -372,11 +372,27 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 // every report in the session concurrently. Reports in the worklist that do
 // not have persisted missions yet also get a mission-selection pass (existing
 // SuggestMissions recommender persisted via SaveMissions); failures are
-// recorded per item in the generation registry (markFailed). topicIDs is the set of
-// program_stage_ids instantiated by the session (resolved by the caller via
-// sessionRepo.ListSessionStages). Passing an empty topicIDs creates only the
-// legacy whole-session report (program_stage_id = "") for backward
-// compatibility. Returns the full list of reports after generation.
+// recorded per item in the generation registry (markFailed) and intentional
+// non-generation is recorded as an explicit skip (markMissionsSkipped /
+// markNarrativeSkipped with a machine-readable SkipReason* code — never
+// silent). topicIDs is the authoritative topic scope of the run: drafts are
+// only created for the given topics, the report reads are narrowed to them
+// (single-topic runs via ReportFilter.ProgramStageID, plus an in-memory
+// worklist guard that also covers multi-topic runs), so reports of any OTHER
+// topic never get a draft, a narrative, or missions persisted — one topic =
+// one separate report. An empty topicIDs keeps the legacy behavior (no draft
+// creation, whole-session worklist) for backward compatibility. Returns the
+// full list of reports after generation.
+//
+// Skip rules (per phase, both explicit in the registry):
+//   - mission bank empty for the report's Topic → mission phase SKIPPED
+//     (SkipReasonMissionBankEmpty); the narrative phase still runs;
+//   - no assessments for the report's Topic → narrative phase SKIPPED
+//     (SkipReasonNoAssessments) before any LLM call;
+//   - an item whose BOTH phases skipped derives status "skipped" (nothing
+//     generated); a partial skip keeps status "success" with the reason
+//     attached. Real failures (recommender/persist/generation errors) stay
+//     "error" and are never swallowed.
 //
 // Attendance gate: a participant with an EXPLICIT attendance row
 // is_present=false (absent) is excluded BEFORE GetOrCreateDraft, so an absent
@@ -416,7 +432,21 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 	for _, p := range eligible {
 		targetIDs[p.ID] = true
 	}
-	if _, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, constants.MaxSessionReports); err != nil {
+
+	// Topic scope of THIS run. Drafts are created only for the given topics
+	// (loop below) and every report read is narrowed to them: a single-topic
+	// run pushes the scope into the DB query (report_repo honors
+	// ProgramStageID), while topicScope below guards the worklist for
+	// multi-topic runs — reports of other topics are never generated.
+	topicScope := make(map[string]bool, len(topicIDs))
+	for _, tid := range topicIDs {
+		topicScope[tid] = true
+	}
+	listFilter := repository.ReportFilter{SessionID: sessionID}
+	if len(topicIDs) == 1 {
+		listFilter.ProgramStageID = topicIDs[0]
+	}
+	if _, err := u.repo.List(ctx, listFilter, 1, constants.MaxSessionReports); err != nil {
 		return nil, err
 	}
 
@@ -432,7 +462,7 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 		}
 	}
 
-	all, err := u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, constants.MaxSessionReports)
+	all, err := u.repo.List(ctx, listFilter, 1, constants.MaxSessionReports)
 	if err != nil {
 		return nil, err
 	}
@@ -447,6 +477,12 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 	// conditions are exactly the ones the spawn loop used before).
 	work := make([]entity.Report, 0, len(all.Items))
 	for _, r := range all.Items {
+		// Topic guard: only reports of the run's topics enter the worklist.
+		// Single-topic runs already exclude others via listFilter; this also
+		// covers multi-topic scopes, which ReportFilter can't express.
+		if len(topicScope) > 0 && !topicScope[r.ProgramStageID] {
+			continue
+		}
 		if r.AINarrativeDraft != "" {
 			continue
 		}
@@ -468,11 +504,13 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 	// existing recommender (SuggestMissions) and persist its result through the
 	// existing SaveMissions → ReplaceByReport path. Reports that already carry
 	// missions are skipped — mirroring the narrative rule of only filling empty
-	// drafts — so an existing selection is never overwritten. Any failure (empty
-	// mission bank / zero candidates, recommender error, persist error) is
-	// recorded per item in the generation registry with a clear message and
-	// logged; it never panics, never aborts the run, and never touches the
-	// narrative worklist/semaphore.
+	// drafts — so an existing selection is never overwritten. An EMPTY mission
+	// bank (zero candidates) is an explicit SKIP (mission_bank_empty), not a
+	// failure: the report simply stays narrative-only. Real failures
+	// (recommender error, persist error) are recorded per item in the
+	// generation registry with a clear message and logged; neither outcome
+	// ever panics, ever aborts the run, or ever touches the narrative
+	// worklist/semaphore.
 	var missionWg sync.WaitGroup
 	missionSem := make(chan struct{}, constants.ReportNarrativeConcurrency)
 	for _, r := range work {
@@ -500,7 +538,12 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 				return
 			}
 			if len(ids) == 0 {
-				fail("mission_selection_failed", fmt.Errorf("kandidat misi kosong: mission bank topik ini tidak memiliki misi aktif"))
+				// Explicit skip, not a failure: SuggestMissions returns an
+				// empty slice with a nil error only when this Topic's mission
+				// bank has no active missions. Record the machine reason and
+				// let the narrative phase proceed untouched.
+				u.genReg.markMissionsSkipped(sessionID, report.ID, SkipReasonMissionBankEmpty)
+				log.Printf("reports: mission phase skipped for report %s: %s", report.ID, SkipReasonMissionBankEmpty)
 				return
 			}
 			if _, err := u.SaveMissions(ctx, report.ID, tenantID, ids); err != nil {
@@ -519,10 +562,32 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			defer func() { <-sem }()
 
 			// Semaphore acquired → processing. Every exit path below marks the
-			// narrative phase terminal (success or error with a message) so the
-			// per-item registry state is observable until end() drops the run;
-			// the aggregate error return is unchanged.
+			// narrative phase terminal (success, explicit skip with a reason,
+			// or error with a message) so the per-item registry state is
+			// observable until end() drops the run; the aggregate error
+			// return is unchanged.
 			u.genReg.markProcessing(sessionID, report.ID)
+
+			// Skip gate: no assessments for this report's Topic means an
+			// empty narrative — skip it explicitly (machine reason
+			// no_assessments) BEFORE any LLM call instead of generating
+			// filler text. The existence check reuses the exact assessment
+			// filter the generator itself queries with (topicAssessmentFilter).
+			has, aerr := u.hasAssessments(ctx, &report, tenantID)
+			if aerr != nil {
+				// A failed existence check is a real error: recorded per
+				// item AND returned in the aggregate — never swallowed.
+				u.genReg.markNarrativeFailed(sessionID, report.ID, aerr.Error())
+				mu.Lock()
+				errs = append(errs, fmt.Errorf("report %s: assessment existence check: %w", report.ID, aerr))
+				mu.Unlock()
+				return
+			}
+			if !has {
+				u.genReg.markNarrativeSkipped(sessionID, report.ID, SkipReasonNoAssessments)
+				log.Printf("reports: narrative skipped for report %s: %s", report.ID, SkipReasonNoAssessments)
+				return
+			}
 
 			genCtx, cancel := context.WithTimeout(ctx, ai.OpenRouterRequestTimeout)
 			defer cancel()
@@ -557,12 +622,48 @@ func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID st
 			fmt.Errorf("%d dari %d laporan gagal dibuatkan narasi: %v", len(errs), len(all.Items), errors.Join(errs...)))
 	}
 
-	all, err = u.repo.List(ctx, repository.ReportFilter{SessionID: sessionID}, 1, constants.MaxSessionReports)
+	all, err = u.repo.List(ctx, listFilter, 1, constants.MaxSessionReports)
 	if err != nil {
 		return nil, err
 	}
 
 	return all.Items, nil
+}
+
+// topicAssessmentFilter builds the assessment scope of a report: the
+// participant's assessments for the report's Topic (empty ProgramStageID =
+// legacy whole-session scope), tenant-scoped via the session. It is THE
+// assessment query of the reports package — shared by the mission
+// recommender, the narrative skip gate, and (identically shaped) the narrative
+// generator itself — so "does this report have assessments" can never drift
+// from "which assessments feed the report".
+func topicAssessmentFilter(r *entity.Report, tenantID string) repository.AssessmentFilter {
+	return repository.AssessmentFilter{
+		ParticipantID:  r.ParticipantID,
+		SessionID:      r.SessionID,
+		ProgramStageID: r.ProgramStageID,
+		TenantID:       tenantID,
+	}
+}
+
+// hasAssessments reports whether the report's participant has at least one
+// assessment row for the report's Topic — the existence check that gates
+// narrative generation in GenerateForSession (a report without assessments
+// would produce an empty narrative). It runs the same query the generator
+// uses (topicAssessmentFilter), bounded to one row since only existence
+// matters. A nil assessmentRepo (unwired legacy wiring — production always
+// passes one from cmd/server) cannot decide, so generation proceeds as before
+// instead of silently skipping every narrative.
+func (u *Usecase) hasAssessments(ctx context.Context, r *entity.Report, tenantID string) (bool, error) {
+	if u.assessmentRepo == nil {
+		log.Printf("reports: assessment repo not wired; narrative skip gate bypassed for report %s", r.ID)
+		return true, nil
+	}
+	page, err := u.assessmentRepo.List(ctx, topicAssessmentFilter(r, tenantID), 1, 1)
+	if err != nil {
+		return false, fmt.Errorf("fetch assessments: %w", err)
+	}
+	return len(page.Items) > 0, nil
 }
 
 // missionFailureMessage renders the per-item registry failure text for the

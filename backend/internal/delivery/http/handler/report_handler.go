@@ -232,7 +232,11 @@ func (h *ReportHandler) runNarrativeStream(ctx context.Context, id, tenantID str
 // Creates DRAFT reports for all participants in the session that don't have one
 // yet, then triggers narrative generation for every report. Reports are created
 // per (participant, topic) so the invariant 1 Report = 1 Topic = 1 Participant
-// holds; the session's Topics are resolved from its session_stages.
+// holds; the session's Topics are resolved from its session_stages. An
+// optional topic_id body field pins the whole run to that single topic (it is
+// validated against the session's Topics first), so "generate all" for one
+// filtered topic never creates or generates another topic's reports; without
+// it every session topic is generated (back-compat).
 //
 // The run is detached (same pattern as GenerateStream): request validation
 // (bind, tenant, topics, participants, genMu guard) runs inline so caller
@@ -247,14 +251,40 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	// bindAndValidate writes the 400 envelope itself but returns nil when it
+	// rejects the body — Committed is the only failure signal (same as
+	// UserHandler.Update / CreateSession); without this check an invalid
+	// body (bad session_id/topic_id uuid) would keep executing and append a
+	// second write to the response.
+	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
+		return nil
+	}
 	tenantID := appmiddleware.GetTenantID(c)
 	if err := tenantGuard(c, tenantID); err != nil {
 		return err
 	}
 	// Resolve the session's Topics (program_stage_ids) to scope per-Topic reports.
+	// When the request pins a single topic (topic_id), validate it belongs to
+	// this session (400 topic_not_in_session otherwise) and generate ONLY that
+	// topic: generate-all must never touch another topic's reports (1 topic =
+	// 1 separate report). Without topic_id the full session-topic list is
+	// passed (back-compat for whole-session / single-topic sessions).
 	topicIDs, terr := h.resolveSessionTopics((*c).Request().Context(), req.SessionID)
 	if terr != nil {
 		return terr
+	}
+	if req.TopicID != nil && *req.TopicID != "" {
+		inSession := false
+		for _, id := range topicIDs {
+			if id == *req.TopicID {
+				inSession = true
+				break
+			}
+		}
+		if !inSession {
+			return appresp.FailMsg(c, http.StatusBadRequest, "topic_not_in_session", "Topik tidak termasuk dalam sesi ini")
+		}
+		topicIDs = []string{*req.TopicID}
 	}
 	if req.ParticipantID != "" {
 		if !h.tryBeginGenerate(req.SessionID) {

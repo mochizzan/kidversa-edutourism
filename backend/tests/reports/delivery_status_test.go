@@ -78,6 +78,10 @@ func (f *genRepo) List(ctx context.Context, rf repository.ReportFilter, page, li
 		if rf.SessionID != "" && r.SessionID != rf.SessionID {
 			continue
 		}
+		// Mirrors report_repo.go: ProgramStageID narrows to one Topic.
+		if rf.ProgramStageID != "" && r.ProgramStageID != rf.ProgramStageID {
+			continue
+		}
 		out = append(out, r)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
@@ -104,12 +108,18 @@ func (f *genRepo) GetOrCreateDraft(ctx context.Context, participantID, sessionID
 			return &cp, nil
 		}
 	}
+	// One draft per (participant, topic): the id carries the topic so two
+	// topics of the same participant never collide (uq_reports_session_participant_topic).
 	id := "draft-" + participantID
+	if programStageID != "" {
+		id += "-" + programStageID
+	}
 	f.byID[id] = entity.Report{
-		BaseModel:     entity.BaseModel{ID: id},
-		ParticipantID: participantID,
-		SessionID:     sessionID,
-		Status:        entity.ReportDraft,
+		BaseModel:      entity.BaseModel{ID: id},
+		ParticipantID:  participantID,
+		SessionID:      sessionID,
+		ProgramStageID: programStageID,
+		Status:         entity.ReportDraft,
 	}
 	cp := f.byID[id]
 	return &cp, nil
@@ -231,7 +241,7 @@ func allReportIDs() []string {
 
 func newUsecaseFixture(repo repository.ReportRepository, gen reports.NarrativeGenerator, sess repository.SessionRepository, msg repository.MessagingService) *reports.Usecase {
 	cfg := &config.Config{ParentReportBaseURL: "http://localhost/parent/report", ReportTokenTTL: 168 * time.Hour}
-	return reports.NewUsecase(repo, gen, nil, nil, nil, sess, nil, nil, nil, nil, nil, cfg, msg, nil, &attendanceRowsFake{})
+	return reports.NewUsecase(repo, gen, nil, nil, &assessmentListFake{}, sess, nil, nil, nil, nil, nil, cfg, msg, nil, &attendanceRowsFake{})
 }
 
 func newDeliveryHandlerFixture(repo *genRepo, gen *blockingGen, sess *genSessionRepo, msg repository.MessagingService) (*handler.ReportHandler, *echo.Echo) {

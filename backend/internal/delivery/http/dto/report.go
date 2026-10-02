@@ -32,14 +32,20 @@ type ReportListResponse struct {
 }
 
 // ReportGenerateItem is one report's status inside active_generate. status is
-// queued|processing|success|error (derived from the report's narrative and
-// mission phase); phase (narrative|missions) is set while processing or on
+// queued|processing|success|error|skipped (derived from the report's narrative
+// and mission phase); phase (narrative|missions) is set while processing or on
 // failure; error carries the failure message when status=error.
+// mission_skip_reason / narrative_skip_reason carry a machine code
+// (mission_bank_empty | no_assessments) when that phase was intentionally not
+// generated: a fully skipped item has status=skipped plus both reasons; a
+// partial skip keeps status=success with just the skip reason attached.
 type ReportGenerateItem struct {
-	ReportID string `json:"report_id"`
-	Status   string `json:"status"`
-	Phase    string `json:"phase,omitempty"`
-	Error    string `json:"error,omitempty"`
+	ReportID            string `json:"report_id"`
+	Status              string `json:"status"`
+	Phase               string `json:"phase,omitempty"`
+	Error               string `json:"error,omitempty"`
+	MissionSkipReason   string `json:"mission_skip_reason,omitempty"`
+	NarrativeSkipReason string `json:"narrative_skip_reason,omitempty"`
 }
 
 // ReportActiveGenerate snapshots an in-flight session generate run: the
@@ -63,10 +69,12 @@ func NewReportActiveGenerate(gs reportsuc.GenerateStatus) *ReportActiveGenerate 
 	items := make([]ReportGenerateItem, 0, len(gs.Items))
 	for _, it := range gs.Items {
 		items = append(items, ReportGenerateItem{
-			ReportID: it.ReportID,
-			Status:   it.Status,
-			Phase:    it.Phase,
-			Error:    it.Error,
+			ReportID:            it.ReportID,
+			Status:              it.Status,
+			Phase:               it.Phase,
+			Error:               it.Error,
+			MissionSkipReason:   it.MissionSkipReason,
+			NarrativeSkipReason: it.NarrativeSkipReason,
 		})
 	}
 	return &ReportActiveGenerate{
@@ -223,7 +231,12 @@ type ReportSaveMissionsRequest struct {
 
 // ReportGenerateSessionRequest triggers narrative generation for all participants
 // in a session. Creates DRAFT reports for participants that don't have one yet.
+// topic_id optionally pins the run to a SINGLE topic of the session: when set,
+// only that topic's reports are created/generated (generate-all must never
+// cross topics — 1 topic = 1 separate report); when absent, every topic of the
+// session is generated (back-compat).
 type ReportGenerateSessionRequest struct {
-	SessionID     string `json:"session_id" validate:"required,uuid"`
-	ParticipantID string `json:"participant_id,omitempty" validate:"omitempty,uuid"`
+	SessionID     string  `json:"session_id" validate:"required,uuid"`
+	ParticipantID string  `json:"participant_id,omitempty" validate:"omitempty,uuid"`
+	TopicID       *string `json:"topic_id,omitempty" validate:"omitempty,uuid"`
 }
