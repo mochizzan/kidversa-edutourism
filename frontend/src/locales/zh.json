@@ -1379,7 +1379,10 @@
       "complete": "完成小组",
       "rateAllFirst": "请先评估所有参与者",
       "completeHint": "在完成小组前，必须评估所有参与者",
-      "fallbackName": "未命名小组"
+      "fallbackName": "未命名小组",
+      "topicSelectLabel": "选择主题",
+      "continueToNextTopic": "继续下一个主题：{{name}}",
+      "allTopicsDone": "所有主题已完成"
     },
     "session": {
       "allDay": "全天",

@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, type ChangeEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, /* Monitor, */ User } from 'lucide-react'
+import { Users, /* Monitor, */ User, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { sessionService } from '../../../core/services/sessions'
 import { SessionStatus } from '../../../core/types/enums'
-import { liveService } from '../../../core/services/live'
+import { liveService, type GroupStageProgressRow } from '../../../core/services/live'
 import { ROUTES } from '../../../core/constants/app'
 // import { kioskAccessPath } from '../../../core/constants/app' // hidden: tombol Buka Kiosk
 // import { apiRequest } from '../../../core/services/backend-client' // hidden: tombol Buka Kiosk
@@ -26,7 +26,7 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { ChildListItem } from '../components/ChildListItem'
 import { GroupCompleteButton } from '../components/GroupCompleteButton'
-import { evaluateGroupCompletion } from '../utils/groupCompletion'
+import { evaluateGroupCompletion, isTopicCompletedFromProgress } from '../utils/groupCompletion'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { groupCompletedErrorMessage } from '../utils/groupCompletedLock'
 import type {
@@ -41,9 +41,11 @@ import type {
 interface GroupDetail {
   group: SessionGroup
   participants: Participant[]
-  programStageName?: string
   session: Session
-  sessionStage: SessionStage | undefined
+  /** All session stages of the session — one session stage = one topic. */
+  stages: SessionStage[]
+  /** Topic display names keyed by program_stage_id (from programService.getStages). */
+  topicNameByProgramStageId: Map<string, string>
 }
 
 function findGroupInSessions(
@@ -99,6 +101,25 @@ const GroupPage = () => {
   const [attendanceMap, setAttendanceMap] = useState<Map<string, boolean>>(new Map())
   const [attendanceLoading, setAttendanceLoading] = useState<Set<string>>(new Set())
 
+  // ── Single source of truth for the ACTIVE TOPIC ──
+  // One session stage = one topic. Initialized inside fetchData from the
+  // historical resolution chain (group.current_session_stage_id →
+  // progress-row fallback → ACTIVE stage → first stage) and afterwards only
+  // by the topic dropdown (handleTopicChange). EVERYTHING topic-related on
+  // this page derives from this id via `selectedSessionStage` below — the
+  // topic name, activeLeaves, isAssessed/scored-pair checks, and the
+  // evaluateGroupCompletion inputs. Do NOT introduce a second notion of the
+  // active topic (there is deliberately no sessionStage/programStageName on
+  // groupDetail anymore).
+  const [selectedSessionStageId, setSelectedSessionStageId] = useState<string | null>(null)
+
+  // Server progress rows for THIS group (group_stage_progress via
+  // liveService.getGroupsWithProgress). Fetched on EVERY fetchData (not only
+  // on the stage-resolution fallback) — the source of truth for the per-topic
+  // completed state derived below, so a page refresh restores the disabled
+  // Complete button from server data instead of local memory.
+  const [groupProgressRows, setGroupProgressRows] = useState<GroupStageProgressRow[]>([])
+
   const fetchData = useCallback(async () => {
     if (!groupId) return
     try {
@@ -138,15 +159,27 @@ const GroupPage = () => {
       const sessionSubstagesData = await sessionService.getSubstages(detail.id)
       setSessionSubstages(sessionSubstagesData)
 
+      // Progress rows for THIS group — fetched on EVERY load (previously only
+      // on the stage-resolution fallback below) so the per-topic completed
+      // state derives from server data and survives a page refresh. Non-fatal
+      // on failure: the page degrades to "topic not completed" and the
+      // server-side re-completion guard is the authoritative backstop.
+      let progressRows: GroupStageProgressRow[] = []
+      try {
+        const groupsData = await liveService.getGroupsWithProgress(detail.id)
+        progressRows = groupsData.find((g) => g.group.id === group.id)?.progress ?? []
+      } catch (progressErr) {
+        console.error('[GroupPage] group progress fetch failed', progressErr)
+      }
+      setGroupProgressRows(progressRows)
+
       // Find current session stage
       let currentStage = detail.stages.find((s) => s.id === group.current_session_stage_id)
 
       if (!currentStage && detail.stages.length > 0) {
-        const groupsData = await liveService.getGroupsWithProgress(detail.id)
-        const groupProg = groupsData.find((g) => g.group.id === group.id)
-        const latest = groupProg?.progress
-          ?.filter((p) => p.status === 'COMPLETED' || p.status === 'IN_PROGRESS' || p.status === 'SKIPPED')
-          ?.sort(
+        const latest = progressRows
+          .filter((p) => p.status === 'COMPLETED' || p.status === 'IN_PROGRESS' || p.status === 'SKIPPED')
+          .sort(
             (a, b) =>
               new Date(b.completed_at ?? b.entered_at ?? '').getTime() -
               new Date(a.completed_at ?? a.entered_at ?? '').getTime(),
@@ -184,12 +217,15 @@ const GroupPage = () => {
       setGroupDetail({
         group,
         participants: group.participants,
-        programStageName: currentStage
-          ? stageNameMap.get(currentStage.program_stage_id)
-          : undefined,
         session: detail,
-        sessionStage: currentStage,
+        stages: detail.stages,
+        topicNameByProgramStageId: stageNameMap,
       })
+      // Persist the resolved active topic into the single-source state. Runs
+      // on every fetchData (mount, post-completion refresh, error retry) so a
+      // refetch re-syncs with the server's current_session_stage_id instead of
+      // keeping a stale selection.
+      setSelectedSessionStageId(currentStage?.id ?? null)
     } catch (err) {
       setError(friendlyError(err))
     } finally {
@@ -201,11 +237,66 @@ const GroupPage = () => {
     fetchData()
   }, [fetchData])
 
+  // Pure derivation of selectedSessionStageId from the loaded session stages —
+  // the ONLY bridge between the dropdown state and the rest of the page.
+  const selectedSessionStage = useMemo<SessionStage | undefined>(
+    () => groupDetail?.stages.find((s) => s.id === selectedSessionStageId),
+    [groupDetail, selectedSessionStageId],
+  )
+
+  // Dropdown options: one option per topic (session stage), labelled with the
+  // topic name resolved from the program stages lookup. `undefined` name falls
+  // back to fasilitator.topicFallback at the render site.
+  const topicOptions = useMemo(
+    () =>
+      groupDetail
+        ? groupDetail.stages.map((s) => ({
+          id: s.id,
+          name: groupDetail.topicNameByProgramStageId.get(s.program_stage_id),
+        }))
+        : [],
+    [groupDetail],
+  )
+
+  // Next-topic lookup for the continue mechanism: the entry IMMEDIATELY AFTER
+  // the selected topic in groupDetail.stages — the same array topicOptions maps
+  // into dropdown options, so dropdown order and "next" agree by construction
+  // (no second topic list). undefined on the last topic or when nothing is
+  // selected.
+  const nextSessionStage = useMemo<SessionStage | undefined>(() => {
+    if (!groupDetail || !selectedSessionStage) return undefined
+    const index = groupDetail.stages.findIndex((s) => s.id === selectedSessionStage.id)
+    return index === -1 ? undefined : groupDetail.stages[index + 1]
+  }, [groupDetail, selectedSessionStage])
+
+  // Displayed topic name — follows selectedSessionStage (the dropdown), never a
+  // frozen copy on groupDetail.
+  const programStageName = useMemo(
+    () =>
+      selectedSessionStage
+        ? groupDetail?.topicNameByProgramStageId.get(selectedSessionStage.program_stage_id)
+        : undefined,
+    [groupDetail, selectedSessionStage],
+  )
+
   // Kegiatan leaves (session_substages) of the active SubTopik.
   const activeLeaves = useMemo<SessionSubstage[]>(() => {
-    if (!groupDetail?.sessionStage) return []
-    return substagesOfStage(sessionSubstages, groupDetail.sessionStage.id)
-  }, [groupDetail?.sessionStage, sessionSubstages])
+    if (!selectedSessionStage) return []
+    return substagesOfStage(sessionSubstages, selectedSessionStage.id)
+  }, [selectedSessionStage, sessionSubstages])
+
+  // Per-topic completed state from SERVER progress rows (groupProgressRows,
+  // fetched on every fetchData): the active topic is done when EVERY Kegiatan
+  // leaf has a terminal (COMPLETED/SKIPPED) row — missing rows mean NOT
+  // completed. A whole-group COMPLETED status also counts (terminal group ⇒
+  // every topic done). Refresh-safe: derives from server data, never local
+  // memory.
+  const isTopicCompleted = useMemo(
+    () =>
+      groupDetail?.group.status === 'COMPLETED' ||
+      isTopicCompletedFromProgress(groupProgressRows, activeLeaves),
+    [groupDetail, groupProgressRows, activeLeaves],
+  )
 
   // Scored (participant, substage) pairs: assessment with star_rating >= 1.
   // Built once so isAssessed stays O(1) per participant.
@@ -231,7 +322,7 @@ const GroupPage = () => {
   // evaluateGroupCompletion (only explicitly-present participants are required;
   // absent and unmarked participants never block).
   const isAssessed = (participantId: string): boolean => {
-    if (!groupDetail?.sessionStage || activeLeaves.length === 0) return false
+    if (!selectedSessionStage || activeLeaves.length === 0) return false
     return activeLeaves.every((leaf) =>
       scoredPairs.has(`${participantId}|${leaf.id}`),
     )
@@ -252,7 +343,7 @@ const GroupPage = () => {
   }
 
   const confirmComplete = async () => {
-    if (!groupDetail || !groupId || !groupDetail.sessionStage) return
+    if (!groupDetail || !groupId || !selectedSessionStage) return
     if (activeLeaves.length === 0) {
       addToast({ type: 'error', message: t('fasilitator.group.noActivities') })
       return
@@ -274,7 +365,7 @@ const GroupPage = () => {
         groupDetail.session.id,
         groupId,
         'group:completed',
-        `${groupDetail.group.name} menyelesaikan "${groupDetail.programStageName ?? 'Topik'}"`,
+        `${groupDetail.group.name} menyelesaikan "${programStageName ?? 'Topik'}"`,
         user?.id,
       )
       confirm.dismiss()
@@ -282,8 +373,11 @@ const GroupPage = () => {
       // Stay on this page and refresh so the completed state renders; the old
       // code pushed to the dashboard which hid the (never-changing) status.
       await fetchData()
-    } catch {
-      addToast({ type: 'error', message: t('fasilitator.group.completeError') })
+    } catch (err) {
+      // Never swallow: surface the real failure — including the server's
+      // explicit group_already_completed rejection — via friendlyError
+      // (locale key → backend envelope message → generic fallback).
+      addToast({ type: 'error', message: friendlyError(err) })
     } finally {
       setCompleting(false)
     }
@@ -379,6 +473,25 @@ const GroupPage = () => {
     }
   }, [attendanceMap, groupDetail, addToast])
 
+  // Topic dropdown: switching the active topic is a pure state change on
+  // selectedSessionStageId. Assessments/attendance/substages are SESSION-scoped
+  // and stay loaded, while every stage-keyed derivation (topic name,
+  // activeLeaves, isAssessed, completion/lock) re-runs off that id — so a
+  // selection change can never leave a stale topic's leaves/name/completion
+  // visible, and there is no stage-scoped UI state to reset.
+  const handleTopicChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    setSelectedSessionStageId(e.target.value)
+  }
+
+  // Continue-to-next-topic control: advancing is a PURE selection change on
+  // the SAME single-source state the dropdown writes above — no refetch and no
+  // server write (session-scoped data is already loaded; every stage-keyed
+  // derivation re-runs off the new id). Kept next to handleTopicChange so the
+  // two selection pathways are visibly one mechanism.
+  const handleContinueToNextTopic = () => {
+    if (nextSessionStage) setSelectedSessionStageId(nextSessionStage.id)
+  }
+
   // ── Loading state ──
   if (loading) {
     return (
@@ -414,8 +527,8 @@ const GroupPage = () => {
     )
   }
 
-  const { group, participants, programStageName } = groupDetail
-  // const openableStageId = groupDetail.sessionStage?.id ?? groupDetail.group.current_session_stage_id // hidden: tombol Buka Kiosk
+  const { group, participants } = groupDetail
+  // const openableStageId = selectedSessionStage?.id ?? groupDetail.group.current_session_stage_id // hidden: tombol Buka Kiosk
   // PIC name is resolved server-side (Opsi B) and sent on each group, so it is
   // safe for any role that can open this page — no admin-only call needed.
   const facilitatorName = group.facilitator_name
@@ -426,17 +539,36 @@ const GroupPage = () => {
     !user || user.role !== 'FASILITATOR' || group.facilitator_id === user.id
 
   const isSessionActive = groupDetail.session.status === SessionStatus.ACTIVE
-  // Completion is terminal: once the group row is COMPLETED, hide the CTA
-  // entirely (the old code kept rendering an enabled button because the
-  // status never changed server-side). While the refetch is in flight the
-  // button simply disables via `completing`/refresh.
+  // Completion is terminal: once the group row is COMPLETED, attendance and
+  // assessment stay locked (render gates below) and the Complete button stays
+  // rendered but DISABLED (never hidden) — the disabled state also derives
+  // per-topic from server progress rows via isTopicCompleted above.
   const isGroupCompleted = group.status === 'COMPLETED'
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={group.name}
-        subtitle={programStageName ?? t('fasilitator.topicFallback')}
+        subtitle={
+          // >1 topic → topic selector in the subtitle slot (directly under the
+          // group name); exactly 1 topic → the plain-text topic name as before.
+          topicOptions.length > 1 ? (
+            <select
+              value={selectedSessionStage?.id ?? ''}
+              onChange={handleTopicChange}
+              aria-label={t('fasilitator.group.topicSelectLabel')}
+              className="max-w-full px-3 py-1.5 rounded-xl border text-sm outline-none bg-surface-container-low border-outline-variant/60 text-on-surface"
+            >
+              {topicOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.name ?? t('fasilitator.topicFallback')}
+                </option>
+              ))}
+            </select>
+          ) : (
+            programStageName ?? t('fasilitator.topicFallback')
+          )
+        }
         breadcrumbs={[
           { label: t('common.dashboard'), href: ROUTES.FASILITATOR.DASHBOARD },
           { label: group.name },
@@ -505,9 +637,12 @@ const GroupPage = () => {
         </div>
       )}
 
-      {/* Group complete button — hidden once terminal COMPLETED so it
-          can never be clicked repeatedly after success. */}
-      {participants.length > 0 && !isGroupCompleted && (
+      {/* Group complete button — always rendered while the group has
+          participants; DISABLED (not hidden) once the active topic is
+          completed per server progress rows, the whole group is terminal,
+          the grading gate is unmet, a completion is in flight, or the caller
+          does not own the group. */}
+      {participants.length > 0 && (
         <GroupCompleteButton
           canComplete={completion.canComplete}
           assessedCount={completion.assessedPresentCount}
@@ -515,9 +650,49 @@ const GroupPage = () => {
           remainingCount={completion.remainingCount}
           onComplete={handleComplete}
           loading={completing}
-          disabled={!isMine}
+          disabled={
+            isTopicCompleted ||
+            isGroupCompleted ||
+            !completion.canComplete ||
+            completing ||
+            !isMine
+          }
         />
       )}
+
+      {/* Topic completion status — the continue mechanism reads the SAME
+          single-source state as everything above (isTopicCompleted + the
+          selectedSessionStage-derived nextSessionStage) and writes through the
+          SAME pathway as the topic dropdown (setSelectedSessionStageId), so
+          dropdown and continue can never disagree. Pure client-side selection:
+          no refetch, no server write.
+          - active topic completed + next topic → "continue" control;
+          - active topic completed + last topic, OR whole group COMPLETED →
+            terminal indicator instead;
+          - active topic not completed → neither renders. */}
+      {isTopicCompleted &&
+        (isGroupCompleted || !nextSessionStage ? (
+          <div
+            role="status"
+            className="flex items-center justify-center gap-2 rounded-2xl bg-green-50 border border-green-200 px-4 py-3.5 text-sm font-medium text-green-700"
+          >
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
+            {t('fasilitator.group.allTopicsDone')}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleContinueToNextTopic}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-base transition-all duration-200 min-h-[52px] bg-primary text-white hover:bg-primary-dark shadow-sm hover:shadow-md"
+          >
+            {t('fasilitator.group.continueToNextTopic', {
+              name:
+                groupDetail.topicNameByProgramStageId.get(nextSessionStage.program_stage_id) ??
+                t('fasilitator.topicFallback'),
+            })}
+            <ArrowRight className="w-5 h-5" />
+          </button>
+        ))}
 
       {/* Confirmation Modal */}
       <Modal

@@ -1379,7 +1379,10 @@
       "complete": "Tapusin ang Grupo",
       "rateAllFirst": "Tasahin Muna ang Lahat ng Kalahok",
       "completeHint": "Dapat matasa ang lahat ng kalahok bago matapos ang grupo",
-      "fallbackName": "Grupo na walang pangalan"
+      "fallbackName": "Grupo na walang pangalan",
+      "topicSelectLabel": "Piliin ang paksa",
+      "continueToNextTopic": "Magpatuloy sa susunod na paksa: {{name}}",
+      "allTopicsDone": "Tapos na ang lahat ng paksa"
     },
     "session": {
       "allDay": "Buong araw",

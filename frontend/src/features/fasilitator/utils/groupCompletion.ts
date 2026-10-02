@@ -71,3 +71,37 @@ export function evaluateGroupCompletion({
   remainingCount,
  }
 }
+
+/**
+ * Per-topic completed state derived from SERVER group_stage_progress rows
+ * (`liveService.getGroupsWithProgress(...).groups[].progress[]`, already
+ * scoped to the group by the caller).
+ *
+ * A topic (session stage) is completed when EVERY Kegiatan leaf of the topic
+ * has a terminal row (COMPLETED or SKIPPED) for the group:
+ * - missing row for any leaf → NOT completed (rows are seeded LOCKED at
+ *   session start, so a missing row means the leaf was never processed);
+ * - empty leaf list → NOT completed: there is nothing to derive from, so the
+ *   caller stays driven by the attendance/assessment rule instead.
+ *
+ * Pure and refresh-safe: the input comes from a fresh fetchData on mount, so
+ * the derived state survives a page reload (no local-memory dependency).
+ */
+export interface TopicProgressRow {
+ session_substage_id: string
+ status: string
+}
+
+export function isTopicCompletedFromProgress(
+ rows: readonly TopicProgressRow[],
+ leaves: readonly { id: string }[],
+): boolean {
+ if (leaves.length === 0) return false
+ return leaves.every((leaf) =>
+  rows.some(
+   (row) =>
+    row.session_substage_id === leaf.id &&
+    (row.status === 'COMPLETED' || row.status === 'SKIPPED'),
+  ),
+ )
+}

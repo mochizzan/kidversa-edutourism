@@ -116,6 +116,24 @@ func (s *Service) OverrideStage(ctx context.Context, groupID, substageID string,
 	if err := assertOwnership(actorRole, g.FacilitatorID, actorID); err != nil {
 		return nil, err
 	}
+	// A COMPLETED group is terminal: reject re-completion with an explicit
+	// error instead of upserting a progress row and returning 200 (the
+	// promotion block below skips COMPLETED groups, but the mutation had
+	// already happened). Guard placement: after the load + tenant/ownership
+	// asserts, BEFORE the progress upsert, so a rejected re-completion mutates
+	// nothing. ActionSkip shares this path and the promotion block, but has no
+	// route (router_live.go mounts unlock/complete only) and no frontend
+	// caller today — both completion-family actions are guarded so neither can
+	// write a terminal group; ActionUnlock keeps its existing behaviour.
+	// Multi-topic flows are unaffected: the group only reaches COMPLETED once
+	// EVERY progress row is terminal, so completing a later topic while
+	// earlier topics are done never trips this guard.
+	if action == ActionComplete || action == ActionSkip {
+		if g.Status == entity.GroupCompleted {
+			return nil, apperrors.Conflict("group_already_completed",
+				fmt.Errorf("live: group %s is already completed", groupID))
+		}
+	}
 	progress, _ := s.repo.GetProgressByGroup(ctx, groupID)
 	p := findProgress(progress, substageID)
 	if p == nil {

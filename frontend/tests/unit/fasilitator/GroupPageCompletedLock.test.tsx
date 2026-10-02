@@ -43,6 +43,7 @@ import { sessionService } from '@/core/services/sessions'
 import { programService } from '@/core/services/programs'
 import { assessmentService } from '@/core/services/assessments'
 import { attendanceService } from '@/core/services/attendance'
+import { liveService } from '@/core/services/live'
 import { useAuth } from '@/core/hooks/useAuth'
 import { useToastStore } from '@/core/stores/toastStore'
 
@@ -102,6 +103,9 @@ async function renderGroupPage(groupStatus: string) {
   ] as never)
   vi.mocked(assessmentService.getBySession).mockResolvedValue([] as never)
   vi.mocked(attendanceService.getBySession).mockResolvedValue([] as never)
+  // Always-fetched now: GroupPage reads the group's progress rows on every
+  // fetchData (per-topic completed state), not only on the fallback path.
+  vi.mocked(liveService.getGroupsWithProgress).mockResolvedValue([] as never)
 
   const result = render(
     <MemoryRouter initialEntries={['/fasilitator/groups/g-1']}>
@@ -141,6 +145,9 @@ describe('GroupPage: COMPLETED group locks attendance and grading', () => {
     expect(toggle).toBeDisabled()
     expect(assess).toBeDisabled()
 
+    // Complete button is DISABLED, not hidden, on a terminal COMPLETED group.
+    expect(screen.getByRole('button', { name: 'Selesaikan Kelompok' })).toBeDisabled()
+
     await act(async () => {
       fireEvent.click(toggle)
       fireEvent.click(assess)
@@ -159,6 +166,8 @@ describe('GroupPage: COMPLETED group locks attendance and grading', () => {
     const assess = assessButton()
     expect(toggle).not.toBeDisabled()
     expect(assess).not.toBeDisabled()
+    // No terminal server rows and a non-completed group → button stays enabled.
+    expect(screen.getByRole('button', { name: 'Selesaikan Kelompok' })).toBeEnabled()
 
     await act(async () => {
       fireEvent.click(toggle)

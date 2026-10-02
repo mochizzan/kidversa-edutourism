@@ -1379,7 +1379,10 @@
       "complete": "Complete Group",
       "rateAllFirst": "Assess All Participants First",
       "completeHint": "All participants must be assessed before the group can be completed",
-      "fallbackName": "Unnamed group"
+      "fallbackName": "Unnamed group",
+      "topicSelectLabel": "Select topic",
+      "continueToNextTopic": "Continue to the next topic: {{name}}",
+      "allTopicsDone": "All topics completed"
     },
     "session": {
       "allDay": "All day",

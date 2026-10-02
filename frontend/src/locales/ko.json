@@ -1379,7 +1379,10 @@
       "complete": "그룹 완료",
       "rateAllFirst": "먼저 모든 참가자를 평가하세요",
       "completeHint": "그룹을 완료하려면 모든 참가자를 평가해야 합니다",
-      "fallbackName": "이름 없는 그룹"
+      "fallbackName": "이름 없는 그룹",
+      "topicSelectLabel": "주제 선택",
+      "continueToNextTopic": "다음 주제로 계속: {{name}}",
+      "allTopicsDone": "모든 주제가 완료되었습니다"
     },
     "session": {
       "allDay": "하루 종일",

@@ -4,7 +4,9 @@ import { cn } from '../../../core/utils'
 
 interface PageHeaderProps {
   title: string
-  subtitle?: string
+  // ReactNode (was string): lets callers pass an inline control, e.g. the
+  // GroupPage topic <select>. Plain strings render exactly as before.
+  subtitle?: ReactNode
   actions?: ReactNode
   breadcrumbs?: Array<{
     label: string

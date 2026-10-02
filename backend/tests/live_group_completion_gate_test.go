@@ -164,3 +164,63 @@ func TestOverrideStageNilValidatorRejectsPromotion(t *testing.T) {
 		t.Fatalf("group updates = %d, want 0 (nil validator must not promote)", repo.groupUpdates)
 	}
 }
+
+// newCompletedGroupFixture wires a service over a group that is already
+// terminal (COMPLETED) with one still-non-terminal row — the exact state a
+// stale/double submit hits when it tries to re-complete a leaf.
+func newCompletedGroupFixture(validator live.GroupCompletionValidator) (*fakeGateLiveRepo, *live.Service) {
+	repo := &fakeGateLiveRepo{
+		group: &entity.SessionGroup{
+			BaseModel: entity.BaseModel{ID: liveGateGroupID},
+			SessionID: liveGateSessionID,
+			Status:    entity.GroupCompleted,
+		},
+		progress: []entity.GroupStageProgress{
+			{GroupID: liveGateGroupID, SessionSubstageID: "leaf-1", Status: entity.ProgressUnlocked},
+			{GroupID: liveGateGroupID, SessionSubstageID: "leaf-2", Status: entity.ProgressCompleted},
+		},
+	}
+	return repo, live.NewService(repo, nil, sse.NewHub(), validator)
+}
+
+// Re-completing an already-COMPLETED group must be rejected with an explicit
+// app error BEFORE the progress upsert: no row mutation, no promotion, no
+// silent 200 (the handler returns the error verbatim).
+func TestOverrideStageRejectsRecompletionOfCompletedGroup(t *testing.T) {
+	repo, svc := newCompletedGroupFixture(&stubGroupCompletionValidator{})
+
+	p, err := svc.OverrideStage(context.Background(), liveGateGroupID, "leaf-1",
+		live.ActionComplete, "actor-1", string(entity.RoleAdmin), liveGateTenant)
+	requireAppErrorCode(t, err, "group_already_completed")
+	if p != nil {
+		t.Fatalf("progress = %+v, want nil (rejected re-completion returns no row)", p)
+	}
+	// Mutates nothing: the guard runs before the upsert and before promotion.
+	if repo.progress[0].Status != entity.ProgressUnlocked {
+		t.Fatalf("leaf-1 status = %q, want %q (progress upsert must not run)",
+			repo.progress[0].Status, entity.ProgressUnlocked)
+	}
+	if repo.groupUpdates != 0 {
+		t.Fatalf("group updates = %d, want 0 (rejected re-completion must not promote)", repo.groupUpdates)
+	}
+	if repo.group.Status != entity.GroupCompleted {
+		t.Fatalf("group status = %q, want %q", repo.group.Status, entity.GroupCompleted)
+	}
+}
+
+// ActionSkip shares the promotion path with ActionComplete; it is guarded the
+// same way so neither completion-family action can mutate a terminal group.
+func TestOverrideStageRejectsSkipOnCompletedGroup(t *testing.T) {
+	repo, svc := newCompletedGroupFixture(&stubGroupCompletionValidator{})
+
+	p, err := svc.OverrideStage(context.Background(), liveGateGroupID, "leaf-1",
+		live.ActionSkip, "actor-1", string(entity.RoleAdmin), liveGateTenant)
+	requireAppErrorCode(t, err, "group_already_completed")
+	if p != nil {
+		t.Fatalf("progress = %+v, want nil (rejected skip returns no row)", p)
+	}
+	if repo.progress[0].Status != entity.ProgressUnlocked {
+		t.Fatalf("leaf-1 status = %q, want %q (progress upsert must not run)",
+			repo.progress[0].Status, entity.ProgressUnlocked)
+	}
+}

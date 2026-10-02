@@ -1379,7 +1379,10 @@
       "complete": "Selesaikan Kumpulan",
       "rateAllFirst": "Nilai Semua Peserta Terlebih Dahulu",
       "completeHint": "Semua peserta perlu dinilai sebelum kumpulan boleh diselesaikan",
-      "fallbackName": "Kumpulan tanpa nama"
+      "fallbackName": "Kumpulan tanpa nama",
+      "topicSelectLabel": "Pilih topik",
+      "continueToNextTopic": "Teruskan ke topik seterusnya: {{name}}",
+      "allTopicsDone": "Semua topik telah selesai"
     },
     "session": {
       "allDay": "Sepanjang hari",

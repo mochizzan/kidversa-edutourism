@@ -1379,7 +1379,10 @@
       "complete": "Hoàn thành nhóm",
       "rateAllFirst": "Vui lòng đánh giá tất cả người tham gia trước",
       "completeHint": "Tất cả người tham gia phải được đánh giá trước khi nhóm có thể được hoàn thành",
-      "fallbackName": "Nhóm chưa đặt tên"
+      "fallbackName": "Nhóm chưa đặt tên",
+      "topicSelectLabel": "Chọn chủ đề",
+      "continueToNextTopic": "Tiếp tục sang chủ đề tiếp theo: {{name}}",
+      "allTopicsDone": "Tất cả chủ đề đã hoàn thành"
     },
     "session": {
       "allDay": "Cả ngày",

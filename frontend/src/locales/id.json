@@ -1364,7 +1364,10 @@
       "complete": "Selesaikan Kelompok",
       "rateAllFirst": "Nilai Semua Peserta Terlebih Dahulu",
       "completeHint": "Semua peserta harus dinilai sebelum kelompok dapat diselesaikan",
-      "fallbackName": "Kelompok tanpa nama"
+      "fallbackName": "Kelompok tanpa nama",
+      "topicSelectLabel": "Pilih topik",
+      "continueToNextTopic": "Lanjut ke topik berikutnya: {{name}}",
+      "allTopicsDone": "Semua topik selesai"
     },
     "session": { "allDay": "Sepanjang hari", "notMine": "Sesi ini bukan tanggung jawab Anda", "noLocation": "Lokasi belum ditentukan" },
     "child": {
