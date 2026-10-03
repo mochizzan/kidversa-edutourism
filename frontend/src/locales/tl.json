@@ -1272,6 +1272,9 @@
       "selectModeNoPhotos": "Wala pang larawang mapapili.",
       "selectModeNothingSelected": "Walang napiling larawan pa. Klik muna sa isang larawan.",
       "noActiveTopic": "Walang aktibong paksa para pumili ng larawan ng ulat.",
+      "legacyChip": "Mga Lumang Larawan",
+      "legacyPickReason": "Ang mga lumang larawan ay hindi nakaugat sa anumang paksa — ang pagpili ng mini report ay magagawa lamang sa loob ng isang paksa.",
+      "addCardLabel": "Magdagdag ng larawan sa paksa na ito",
       "topicLoadError": "Nabigong i-load ang listahan ng paksa. Maaaring hindi kumpleto ang mga pangalan ng paksa.",
       "picksLoadError": "Nabigong i-load ang mga napiling larawan ng ulat.",
       "groupGoneDesc": "Hindi mahanap ang grupo sa sesyong ito. Maaaring natanggal na.",
@@ -1305,6 +1308,8 @@
       "processingImage": "Pinoproseso ang larawan...",
       "galleryTitle": "Gallery ng Larawan — {{name}}",
       "photoCount": "{{count}}/{{max}} larawan",
+      "noTopic": "Walang paksa ng sesyon para i-save ang larawan.",
+      "takePhotoWithTopic": "Kumuha ng Larawan — {{topic}}",
       "chooseFrame": "Piliin ang Frame",
       "changeFrame": "Palitan ang Frame",
       "deleteFrame": "Alisin ang Frame",
@@ -1495,7 +1500,10 @@
       "revokedTitle": "Sarado na ang gallery",
       "revokedDesc": "Ang link ng gallery na ito ay isinara na ng admin. Mangyaring makipag-ugnayan sa coordinator.",
       "needHelp": "Kailangan ng tulong?",
-      "contactUs": "Makipag-ugnayan sa Amin"
+      "contactUs": "Makipag-ugnayan sa Amin",
+      "topicsLabel": "Pumili ng paksa",
+      "legacyChip": "Mga Lumang Larawan",
+      "emptyTopic": "Wala pang larawan sa paksa na ito"
     },
     "consent": {
       "yes": "Oo, Sumasang-ayon ako",

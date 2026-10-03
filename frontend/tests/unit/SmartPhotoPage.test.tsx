@@ -11,6 +11,7 @@ vi.mock('@/core/services/sessions', () => ({
   sessionService: {
     getParticipantById: vi.fn(),
     getById: vi.fn(),
+    getStages: vi.fn(),
   },
 }))
 
@@ -84,6 +85,14 @@ import { i18n } from '@/core/i18n'
 import type { SmartPhoto } from '@/core/types'
 
 const NETWORK_MSG = 'Gagal terhubung ke server. Periksa koneksi internet Anda.'
+
+// Perbaikan-2: session stages drive the camera's topic resolution — upload
+// (session_stage_id) + the "Ambil Foto — <topik>" label. Default: ONE topic;
+// set once at module scope so vi.clearAllMocks() (calls only, keeps the
+// implementation) leaves it in place for every suite in this file.
+vi.mocked(sessionService.getStages).mockResolvedValue([
+  { id: 'ss1', session_id: 's-1', program_stage_id: 'ps1', status: 'IN_PROGRESS' },
+] as never)
 
 const participant = {
   id: 'c-1',
@@ -192,7 +201,9 @@ describe('SmartPhotoPage: participant fetch edge cases', () => {
     // Recovered: second fetch attempted, camera page rendered
     expect(sessionService.getParticipantById).toHaveBeenCalledTimes(2)
     expect(screen.queryByText(NETWORK_MSG)).toBeNull()
-    expect(screen.getByText('Ambil Foto')).toBeInTheDocument()
+    // Perbaikan-2: the header carries the active topic (topicFallback name
+    // here — the mocked useGroupOwnership exposes no program data).
+    expect(screen.getByText('Ambil Foto — Topik')).toBeInTheDocument()
   })
 
   it('shows the child-missing screen with a retry button when the participant is gone (404)', async () => {
@@ -209,7 +220,7 @@ describe('SmartPhotoPage: participant fetch edge cases', () => {
     })
 
     expect(screen.queryByText('Anak Tidak Ditemukan')).toBeNull()
-    expect(screen.getByText('Ambil Foto')).toBeInTheDocument()
+    expect(screen.getByText('Ambil Foto — Topik')).toBeInTheDocument()
   })
 })
 
@@ -821,6 +832,7 @@ describe('CameraViewport: denied/error overlay', () => {
     photoCount: 0,
     maxPhotos: 10,
     isMaxPhotos: false,
+    takePhotoLabel: 'Ambil Foto',
     onTakePhoto: vi.fn(),
     onOpenGallery: vi.fn(),
     onOpenFramePicker: vi.fn(),

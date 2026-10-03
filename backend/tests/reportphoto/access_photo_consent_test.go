@@ -144,7 +144,7 @@ func newAccessHandler(consentGranted bool) (*handler.ReportHandler, *echo.Echo) 
 		nil, // attendanceRepo (rute akses tidak memakai generate)
 	)
 	h := handler.NewReportHandler(uc, cfg, &accessSessionRepo{}, sse.NewHub(),
-		&accessConsentRepo{granted: consentGranted}, &accessPhotoPanicRepo{})
+		&accessConsentRepo{granted: consentGranted}, &accessPhotoPanicRepo{}, nil)
 	return h, echo.New()
 }
 

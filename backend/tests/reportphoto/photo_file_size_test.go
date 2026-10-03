@@ -36,8 +36,9 @@ func TestUpload_RecordsMultipartFileSize(t *testing.T) {
 	photos := newFakePhotoRepo()
 	h := newUpload(photos, defaultSessions(), uploadDir)
 	c, rec := newMultipartRequestWithFile(uploadEcho(), map[string]string{
-		"participant_id": testParticipantID,
-		"session_id":     testSessionID,
+		"participant_id":   testParticipantID,
+		"session_id":       testSessionID,
+		"session_stage_id": testSessionStageID,
 	}, body)
 
 	if err := h.UploadPhoto(c); err != nil {

@@ -9,96 +9,108 @@ import { API_ROUTES } from '../constants/apiRoutes'
 // the PhotoService signature.
 
 const getBySession = async (sessionId: string): Promise<SmartPhoto[]> => {
-  const qs = new URLSearchParams()
-  qs.set('session_id', sessionId)
-  qs.set('limit', '100')
-  return itemsRequest<SmartPhoto>('GET', `${API_ROUTES.PHOTOS.BASE}?${qs.toString()}`)
+ const qs = new URLSearchParams()
+ qs.set('session_id', sessionId)
+ qs.set('limit', '100')
+ return itemsRequest<SmartPhoto>('GET', `${API_ROUTES.PHOTOS.BASE}?${qs.toString()}`)
 }
 
 const getByParticipant = async (
-  participantId: string,
+ participantId: string,
+ options?: { sessionStageId?: string },
 ): Promise<SmartPhoto[]> => {
-  const qs = new URLSearchParams()
-  qs.set('participant_id', participantId)
-  qs.set('limit', '100')
-  return itemsRequest<SmartPhoto>('GET', `${API_ROUTES.PHOTOS.BASE}?${qs.toString()}`)
+ const qs = new URLSearchParams()
+ qs.set('participant_id', participantId)
+ qs.set('limit', '100')
+ // Topic filter semantics (locked backend contract): a PRESENT
+ // session_stage_id filters strictly — uuid → that topic, '' (legacy bucket)
+ // → only no-topic rows; an ABSENT param keeps the all-photos behavior.
+ // URLSearchParams serializes set('session_stage_id', '') as the PRESENT
+ // `session_stage_id=` (no trailing value), which is exactly the
+ // legacy-bucket signal — never drop the key for ''.
+ if (options && options.sessionStageId !== undefined) {
+  qs.set('session_stage_id', options.sessionStageId)
+ }
+ return itemsRequest<SmartPhoto>('GET', `${API_ROUTES.PHOTOS.BASE}?${qs.toString()}`)
 }
 
 const upload = async (
-  participantId: string,
-  sessionId: string,
-  file: File,
-  options?: { onProgress?: (percent: number) => void },
+ participantId: string,
+ sessionId: string,
+ sessionStageId: string,
+ file: File,
+ options?: { onProgress?: (percent: number) => void },
 ): Promise<SmartPhoto> => {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('participant_id', participantId)
-  form.append('session_id', sessionId)
-  // The File is sent byte-for-byte as multipart — no re-encode. onProgress
-  // rides the shared XHR upload-progress plumbing in uploadMultipart.
-  return uploadMultipart<SmartPhoto>(API_ROUTES.PHOTOS.UPLOAD, form, options)
+ const form = new FormData()
+ form.append('file', file)
+ form.append('participant_id', participantId)
+ form.append('session_id', sessionId)
+ form.append('session_stage_id', sessionStageId)
+ // The File is sent byte-for-byte as multipart — no re-encode. onProgress
+ // rides the shared XHR upload-progress plumbing in uploadMultipart.
+ return uploadMultipart<SmartPhoto>(API_ROUTES.PHOTOS.UPLOAD, form, options)
 }
 
 const update = async (
-  photoId: string,
-  data: Partial<SmartPhoto>,
+ photoId: string,
+ data: Partial<SmartPhoto>,
 ): Promise<SmartPhoto> => {
-  const body: Record<string, unknown> = {}
-  if (data.framed_file_url !== undefined)
-    body.framed_file_url = data.framed_file_url
-  if (data.taken_by !== undefined) body.taken_by = data.taken_by
-  if (data.taken_at !== undefined) body.taken_at = data.taken_at
-  if (data.frame_id !== undefined) body.frame_id = data.frame_id
-  return itemRequest<SmartPhoto>('PUT', API_ROUTES.PHOTOS.DETAIL(photoId), body)
+ const body: Record<string, unknown> = {}
+ if (data.framed_file_url !== undefined)
+  body.framed_file_url = data.framed_file_url
+ if (data.taken_by !== undefined) body.taken_by = data.taken_by
+ if (data.taken_at !== undefined) body.taken_at = data.taken_at
+ if (data.frame_id !== undefined) body.frame_id = data.frame_id
+ return itemRequest<SmartPhoto>('PUT', API_ROUTES.PHOTOS.DETAIL(photoId), body)
 }
 
 const remove = async (id: string): Promise<void> => {
-  await voidRequest('DELETE', API_ROUTES.PHOTOS.DETAIL(id))
+ await voidRequest('DELETE', API_ROUTES.PHOTOS.DETAIL(id))
 }
 
 const setReportPhoto = (photoId: string): Promise<SmartPhoto> =>
-  itemRequest<SmartPhoto>('POST', API_ROUTES.PHOTOS.SET_REPORT(photoId))
+ itemRequest<SmartPhoto>('POST', API_ROUTES.PHOTOS.SET_REPORT(photoId))
 
 const getReportPicks = (
-  participantId: string,
-  sessionId: string,
+ participantId: string,
+ sessionId: string,
 ): Promise<ReportPhotoPick[]> =>
-  arrayRequest<ReportPhotoPick>(
-    'GET',
-    `${API_ROUTES.PHOTOS.REPORT_PICKS}?participant_id=${participantId}&session_id=${sessionId}`,
-  )
+ arrayRequest<ReportPhotoPick>(
+  'GET',
+  `${API_ROUTES.PHOTOS.REPORT_PICKS}?participant_id=${participantId}&session_id=${sessionId}`,
+ )
 
 const setReportPick = (data: {
-  participant_id: string
-  session_id: string
-  program_stage_id: string
-  photo_id: string
+ participant_id: string
+ session_id: string
+ program_stage_id: string
+ photo_id: string
 }): Promise<SmartPhoto> =>
-  itemRequest<SmartPhoto>('PUT', API_ROUTES.PHOTOS.REPORT_PICK, data)
+ itemRequest<SmartPhoto>('PUT', API_ROUTES.PHOTOS.REPORT_PICK, data)
 
 const clearReportPick = async (params: {
-  participant_id: string
-  session_id: string
-  program_stage_id: string
+ participant_id: string
+ session_id: string
+ program_stage_id: string
 }): Promise<void> => {
-  await voidRequest(
-    'DELETE',
-    `${API_ROUTES.PHOTOS.REPORT_PICK}?participant_id=${params.participant_id}` +
-    `&session_id=${params.session_id}&program_stage_id=${params.program_stage_id}`,
-  )
+ await voidRequest(
+  'DELETE',
+  `${API_ROUTES.PHOTOS.REPORT_PICK}?participant_id=${params.participant_id}` +
+  `&session_id=${params.session_id}&program_stage_id=${params.program_stage_id}`,
+ )
 }
 
 // `satisfies` (instead of a `: PhotoService` annotation) keeps the interface
 // check while preserving the concrete `upload` signature — the optional
 // `onProgress` option must stay visible to callers (useSmartPhotos).
 export const photoService = {
-  getBySession,
-  getByParticipant,
-  upload,
-  update,
-  delete: remove,
-  setReportPhoto,
-  getReportPicks,
-  setReportPick,
-  clearReportPick,
+ getBySession,
+ getByParticipant,
+ upload,
+ update,
+ delete: remove,
+ setReportPhoto,
+ getReportPicks,
+ setReportPick,
+ clearReportPick,
 } satisfies PhotoService

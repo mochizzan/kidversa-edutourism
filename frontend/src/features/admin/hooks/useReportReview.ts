@@ -90,47 +90,74 @@ function photoRecencyDesc(a: SmartPhoto, b: SmartPhoto): number {
 
 /** Tier 3 (kontrak Fase 2): foto galeri TERBARU milik peserta tersebut —
  *  daftar photos bisa multi-peserta (getBySession), jadi participant_id
- *  wajib difilter; foto peserta lain tidak pernah ikut. photos non-array /
- *  elemen null dilewati tanpa TypeError → null (placeholder). */
+ *  wajib difilter; foto peserta lain tidak pernah ikut. `inScope` membatasi
+ *  ke bucket topik aktif (sejajar tier-3 server); photos non-array / elemen
+ *  null dilewati tanpa TypeError → null (placeholder). */
 function latestParticipantPhoto(
  photos: SmartPhoto[],
  participantId: string | undefined,
+ inScope: (p: SmartPhoto) => boolean,
 ): SmartPhoto | null {
  if (!Array.isArray(photos)) return null
  let best: SmartPhoto | null = null
  for (const p of photos) {
-  if (!p || p.participant_id !== participantId) continue
+  if (!p || p.participant_id !== participantId || !inScope(p)) continue
   if (!best || photoRecencyDesc(p, best) > 0) best = p
  }
  return best
 }
 
 /**
- * Resolusi foto rapor topik aktif (kontrak Fase 2 — tiga tingkat, sejajar
- * resolveReportPhoto server):
- * 1. pick topik menang bila foto masih ada (pilihan manual, tak diubah);
- * 2. pick gugur/tidak ada → foto is_report_photo peserta;
- * 3. tanpa foto rapor → foto galeri TERBARU milik peserta (created_at DESC,
- *    tie-break taken_at lalu id);
- * tidak ada sama sekali → null → placeholder mini rapor.
+ * Resolusi foto rapor topik aktif (sejajar resolveReportPhotoTiers server):
+ * 1. pick topik (program_stage_id) menang bila foto masih ada — pick dibaca
+ *    apa adanya tanpa cek bucket foto (sejajar server);
+ * 2. pick gugur/tidak ada → foto is_report_photo peserta DI BUCKET TOPIK
+ *    aktif (session_stage_id); foto bertopik lain / legacy tak pernah menang;
+ * 3. tanpa foto rapor → foto galeri TERBARU milik peserta di topik yang sama
+ *    (created_at DESC, tie-break taken_at lalu id);
+ * Topik aktif tapi tak pernah terinstansiasi di sesi (activeSessionStageId
+ * null) → null (placeholder), persis server — tanpa fallback lintas topik.
+ * Tanpa topik (laporan legacy) → tier 2/3 sesi lebar seperti perilaku lama.
+ * Tidak ada sama sekali → null → placeholder mini rapor.
+ *
+ * @param activeSessionStageId session stage (bucket foto) milik activeTopicId
+ *   — caller resolve dari stageInfoByTopic; null bila topik tak ada di sesi.
  */
 export function resolveReportPhoto(
  picks: ReportPhotoPick[] | null,
  photos: SmartPhoto[],
  participantId: string | undefined,
  activeTopicId: string | null,
+ activeSessionStageId: string | null,
 ): SmartPhoto | null {
  // Payload rusak (photos/picks bukan array, elemen null) tidak boleh melempar
  // TypeError di tengah render — degradasi ke fallback tingkat berikutnya /
  // placeholder, tanpa error senyap.
  const list = Array.isArray(photos) ? photos : []
+
+ // Tier 1 — pick TOPIK INI menang bila foto masih ada (pilihan manual, tak
+ // diubah); foto terhapus → gugur ke tier 2/3 di bawah.
+ if (Array.isArray(picks) && activeTopicId) {
+  const pick = picks.find((p) => p && p.program_stage_id === activeTopicId)
+  if (pick) {
+   const hit = list.find((p) => p && p.id === pick.photo_id)
+   if (hit) return hit
+  }
+ }
+
+ // Topik ada tapi bucket-nya tak terinstansiasi → placeholder; jangan pernah
+ // jatuh ke foto topik lain (sejajar server: stageID=="" → return nil).
+ if (activeTopicId && activeSessionStageId === null) return null
+
+ // Scope tier 2/3: '' = legacy bila tanpa topik; strict equality bertopik.
+ const inScope =
+  activeTopicId === null
+   ? (_p: SmartPhoto) => true
+   : (p: SmartPhoto) => (p.session_stage_id ?? '') === activeSessionStageId
+
  const flagged =
-  list.find((p) => p && p.participant_id === participantId && p.is_report_photo) ?? null
- const fallback = flagged ?? latestParticipantPhoto(list, participantId)
- if (!Array.isArray(picks) || !activeTopicId) return fallback
- const pick = picks.find((p) => p && p.program_stage_id === activeTopicId)
- if (!pick) return fallback
- return list.find((p) => p && p.id === pick.photo_id) ?? fallback
+  list.find((p) => p && p.participant_id === participantId && p.is_report_photo && inScope(p)) ?? null
+ return flagged ?? latestParticipantPhoto(list, participantId, inScope)
 }
 
 /** Judul misi untuk preview rapor: HANYA dari pilihan admin
@@ -183,13 +210,30 @@ export function useReportReview(sessionId: string | undefined, participantId: st
 
  const report = activeTopicId ? reportsByTopic[activeTopicId] ?? null : null
 
- // Foto rapor diturunkan dari topik aktif + picks (kontrak Fase 2): pick menang →
- // cari foto asli; pick menunjuk foto terhapus → is_report_photo peserta; tanpa
- // foto rapor → foto galeri terbaru milik peserta; picks gagal dimuat → tetap
- // fallback tingkat 2/3 (R3), tanpa error senyap.
+ // Session stage (bucket foto) milik topik aktif — first match dari
+ // stageInfoByTopic, urutan yang sama dengan resolusi stageID server
+ // (ListSessionStages → first ProgramStageID match). null = topik belum
+ // terinstansiasi di sesi → placeholder (bukan foto lintas topik).
+ const activeSessionStageId = useMemo(
+  () => (activeTopicId ? stageInfoByTopic.get(activeTopicId)?.[0]?.sessionStageId ?? null : null),
+  [activeTopicId, stageInfoByTopic],
+ )
+
+ // Foto rapor diturunkan dari topik aktif + picks (kontrak Fase 2): pick TOPIK
+ // menang → cari foto asli; pick menunjuk foto terhapus → is_report_photo peserta
+ // DI BUCKET TOPIK itu; tanpa foto rapor → foto galeri terbaru di topik yang sama;
+ // picks gagal dimuat → tetap fallback tingkat 2/3 terskopi topik (R3), tanpa
+ // error senyap. Tanpa topik → tier 2/3 sesi lebar (laporan legacy).
  const photo = useMemo(
-  () => resolveReportPhoto(partPicks, partPhotos, participantId, activeTopicId),
-  [partPicks, partPhotos, activeTopicId, participantId],
+  () =>
+   resolveReportPhoto(
+    partPicks,
+    partPhotos,
+    participantId,
+    activeTopicId,
+    activeSessionStageId,
+   ),
+  [partPicks, partPhotos, activeTopicId, participantId, activeSessionStageId],
  )
 
  // Baris Kegiatan + penilaian HANYA milik topik yang aktif (satu-satunya sumber

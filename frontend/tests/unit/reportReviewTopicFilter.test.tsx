@@ -541,3 +541,88 @@ describe('useReportReview — regresi sesi topik tunggal', () => {
     expect(screen.getByText(/^Belum ada misi dipilih/)).toBeTruthy()
   })
 })
+
+describe('useReportReview — foto mini rapor = pick TOPIK itu (sejajar backend tier)', () => {
+  // Foto peserta di dua bucket: ss1 (Kebakaran) berisi foto berflag
+  // is_report_photo + galeri terbaru tanpa flag; ss2 (Gempa) berisi foto pick.
+  const TOPIC_PHOTOS = [
+    {
+      id: 'ph-flag',
+      participant_id: 'c-1',
+      session_id: 's-1',
+      session_stage_id: 'ss1',
+      original_file_url: 'photos/flag.jpg',
+      is_report_photo: true,
+      taken_by: 'fac-1',
+      taken_at: '2026-09-30T01:00:00Z',
+      created_at: '2026-09-30T01:00:00Z',
+    },
+    {
+      id: 'ph-newest-ss1',
+      participant_id: 'c-1',
+      session_id: 's-1',
+      session_stage_id: 'ss1',
+      original_file_url: 'photos/newest.jpg',
+      is_report_photo: false,
+      taken_by: 'fac-1',
+      taken_at: '2026-09-30T05:00:00Z',
+      created_at: '2026-09-30T05:00:00Z',
+    },
+    {
+      id: 'ph-pick-ps2',
+      participant_id: 'c-1',
+      session_id: 's-1',
+      session_stage_id: 'ss2',
+      original_file_url: 'photos/pick2.jpg',
+      is_report_photo: false,
+      taken_by: 'fac-1',
+      taken_at: '2026-09-30T02:00:00Z',
+      created_at: '2026-09-30T02:00:00Z',
+    },
+  ]
+  const TOPIC_PICKS = [
+    { program_stage_id: 'ps1', photo_id: 'ph-flag' },
+    { program_stage_id: 'ps2', photo_id: 'ph-pick-ps2' },
+  ]
+
+  it('pick topik aktif yang dirender — bukan galeri terbaru / foto lintas topik', async () => {
+    setupMocks('multi')
+    vi.mocked(photoService.getBySession).mockResolvedValue(TOPIC_PHOTOS as never)
+    vi.mocked(photoService.getReportPicks).mockResolvedValue(TOPIC_PICKS as never)
+    render(<Harness />)
+    await flush()
+    expect(screen.getByTestId('loading')).toHaveTextContent('ready')
+
+    // Topik awal (ps1): pick ps1 menang atas galeri terbaru bucket ss1.
+    await click(PDF_BUTTON)
+    let html = lastBuiltHtml()
+    expect(html).toContain('/api/media/photo/ph-flag')
+    expect(html).not.toContain('/api/media/photo/ph-newest-ss1')
+
+    // Pindah Gempa (ps2): pick ps2 dirender — bukan flag/foto topik Kebakaran.
+    await click('switch-Gempa')
+    await click(PDF_BUTTON)
+    html = lastBuiltHtml()
+    expect(html).toContain('/api/media/photo/ph-pick-ps2')
+    expect(html).not.toContain('/api/media/photo/ph-flag')
+    expect(html).not.toContain('/api/media/photo/ph-newest-ss1')
+  })
+
+  it('topik tanpa pick dan tanpa foto di bucket-nya → placeholder (bukan flag topik lain)', async () => {
+    setupMocks('multi')
+    vi.mocked(photoService.getBySession).mockResolvedValue(TOPIC_PHOTOS as never)
+    vi.mocked(photoService.getReportPicks).mockResolvedValue(TOPIC_PICKS as never)
+    render(<Harness />)
+    await flush()
+    expect(screen.getByTestId('loading')).toHaveTextContent('ready')
+
+    // Banjir (ps3, bucket ss3) tak ada fotonya: resolusi sesi-lebar lama akan
+    // salah menampilkan flag Kebakaran — sekarang placeholder, sejajar server.
+    await click('switch-Banjir')
+    await click(PDF_BUTTON)
+    const html = lastBuiltHtml()
+    expect(html).toContain('PLACEHOLDER FOTO ANAK')
+    expect(html).not.toContain('/api/media/photo/ph-flag')
+    expect(html).not.toContain('/api/media/photo/ph-pick-ps2')
+  })
+})

@@ -50,7 +50,13 @@ func NewPhotoHandler(
 	return &PhotoHandler{photos: photos, sessions: sessions, consent: consent, programs: programs, cfg: cfg}
 }
 
-// List handles GET /api/photos (filter by ?participant_id= or ?session_id=).
+// List handles GET /api/photos (filter by ?participant_id=, ?session_id= and
+// ?session_stage_id=).
+// session_stage_id uses PARAM-PRESENCE semantics (the frontend depends on it
+// exactly): param ABSENT → no stage filter (all topics — current behavior);
+// param PRESENT, even with an empty value (?session_stage_id=) → STRICT
+// `session_stage_id = <value>`, where "" is the legacy/no-topic bucket
+// (sentinel from migration 000009).
 // Results are scoped to the caller's tenant: a photo inherits the tenant of its
 // owning session (PhotoFilter.TenantID -> scopeByTenant).
 func (h *PhotoHandler) List(c *echo.Context) error {
@@ -58,6 +64,13 @@ func (h *PhotoHandler) List(c *echo.Context) error {
 		TenantID:      appmiddleware.GetTenantID(c),
 		ParticipantID: (*c).QueryParam("participant_id"),
 		SessionID:     (*c).QueryParam("session_id"),
+	}
+	// Presence, not emptiness, decides: Has() is true for ?session_stage_id=
+	// too, so the legacy bucket stays queryable and an absent param never
+	// narrows the list.
+	if (*c).Request().URL.Query().Has("session_stage_id") {
+		stageID := (*c).QueryParam("session_stage_id")
+		f.SessionStageID = &stageID
 	}
 	page, limit := pagination(c)
 	res, err := h.photos.ListPhotos((*c).Request().Context(), f, page, limit)
@@ -221,6 +234,32 @@ func (h *PhotoHandler) SetReportPick(c *echo.Context) error {
 	}
 	if err := h.assertStageInTenant(c, req.ProgramStageID); err != nil {
 		return err
+	}
+	// Topic truth (migration 000009): a NEW pick must be topic-true — the
+	// photo's session_stage must resolve to this pick's program stage within
+	// the SAME session (p.SessionID == req.SessionID, checked above). A photo
+	// captured under another topic, or a legacy ''-stage photo (topic
+	// unknown — it can never be proven to be this topic), is rejected with
+	// 400 validation_error. Reads of EXISTING picks stay tolerant: this gate
+	// runs only on writes, so stored rows keep resolving as before.
+	if p.SessionStageID == "" {
+		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error",
+			"foto tanpa topik (legacy) tidak bisa dipilih sebagai foto rapor")
+	}
+	stages, err := h.sessions.ListSessionStages(ctx, p.SessionID)
+	if err != nil {
+		return err
+	}
+	pickTopicTrue := false
+	for i := range stages {
+		if stages[i].ID == p.SessionStageID && stages[i].ProgramStageID == req.ProgramStageID {
+			pickTopicTrue = true
+			break
+		}
+	}
+	if !pickTopicTrue {
+		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error",
+			"foto bukan milik topik program_stage_id ini")
 	}
 	if err := h.assertPhotoOwnership(c, p.ParticipantID); err != nil {
 		return err

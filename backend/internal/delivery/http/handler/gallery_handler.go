@@ -1,12 +1,12 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -53,7 +53,9 @@ func NewGalleryHandler(
 // resolveGalleryToken runs the shared validation of the public gallery routes
 // (GetByToken and GetPhoto) so the two can never drift: empty/!64hex → 400
 // bad_request, unknown token → the repo's 404 token_invalid, revoked → 410
-// token_revoked, expired → 410 token_expired. It returns (nil, nil) when a
+// token_revoked. Time expiry is NEVER a denial: gallery QR URLs must not
+// expire, so an old expires_at (pre-never-expiry mint) does not 410 — only an
+// explicit revocation does. It returns (nil, nil) when a
 // failure response was already written — the caller must then return nil
 // immediately; (nil, err) means a real error to propagate.
 func (h *GalleryHandler) resolveGalleryToken(c *echo.Context) (*entity.GalleryToken, error) {
@@ -68,9 +70,10 @@ func (h *GalleryHandler) resolveGalleryToken(c *echo.Context) (*entity.GalleryTo
 	if gt.Revoked {
 		return nil, appresp.Fail(c, http.StatusGone, "token_revoked")
 	}
-	if time.Now().After(gt.ExpiresAt) {
-		return nil, appresp.Fail(c, http.StatusGone, "token_expired")
-	}
+	// Deliberately NO time check: the QR on a printed rapor must keep working
+	// forever (mint stores a far-future sentinel, and tokens issued before
+	// that change are retroactively un-expired here). Revocation semantics
+	// are unchanged — a revoked row still answers 410.
 	return gt, nil
 }
 
@@ -113,7 +116,7 @@ func (h *GalleryHandler) GetByToken(c *echo.Context) error {
 		return err
 	}
 
-	resolved, err := resolveReportPhoto(ctx, h.photoRepo, gt.ParticipantID, gt.SessionID, report.ProgramStageID)
+	resolved, err := resolveReportPhoto(ctx, h.photoRepo, h.sessionRepo, gt.ParticipantID, gt.SessionID, report.ProgramStageID)
 	if err != nil {
 		return err
 	}
@@ -130,7 +133,27 @@ func (h *GalleryHandler) GetByToken(c *echo.Context) error {
 		return err
 	}
 
-	return appresp.OK(c, dto.NewPublicGalleryDTO(report, participant, photos.Items, reportPhotoID))
+	// Topics for the parent gallery switcher: the session's session_stages as
+	// listed (created_at ASC — CreateSession instantiates them by iterating the
+	// program's stages in sequence_order, so listing order IS the topic
+	// sequence, the same order GET /api/sessions/:id returns). Display name =
+	// the denormalized program_stage_name written at stage creation
+	// (CreateSessionStage), so no program_stages join/lookup is needed.
+	stages, err := h.sessionRepo.ListSessionStages(ctx, gt.SessionID)
+	if err != nil {
+		log.Printf("gallery: stage list failed (session=%s): %v", gt.SessionID, err)
+		return err
+	}
+	topics := make([]dto.GalleryTopic, 0, len(stages))
+	for i := range stages {
+		topics = append(topics, dto.GalleryTopic{
+			SessionStageID: stages[i].ID,
+			ProgramStageID: stages[i].ProgramStageID,
+			Name:           stages[i].ProgramStageName,
+		})
+	}
+
+	return appresp.OK(c, dto.NewPublicGalleryDTO(report, participant, photos.Items, reportPhotoID, topics))
 }
 
 // GetPhoto handles GET /api/reports/gallery/photo/:photoId?token={64hex}&variant=framed|original

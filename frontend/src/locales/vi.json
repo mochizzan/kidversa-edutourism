@@ -1272,6 +1272,9 @@
       "selectModeNoPhotos": "Chưa có ảnh nào để chọn.",
       "selectModeNothingSelected": "Chưa chọn ảnh nào. Hãy nhấp chọn một ảnh trước.",
       "noActiveTopic": "Không có chủ đề đang hoạt động để chọn ảnh báo cáo.",
+      "legacyChip": "Ảnh cũ",
+      "legacyPickReason": "Ảnh cũ không gắn với chủ đề nào — chỉ có thể chọn ảnh mini báo cáo bên trong một chủ đề.",
+      "addCardLabel": "Thêm ảnh vào chủ đề này",
       "topicLoadError": "Không tải được danh sách chủ đề. Tên chủ đề có thể chưa đầy đủ.",
       "picksLoadError": "Không tải được lựa chọn ảnh báo cáo.",
       "groupGoneDesc": "Không tìm thấy nhóm trong phiên này. Có thể đã bị xóa.",
@@ -1305,6 +1308,8 @@
       "processingImage": "Memproses gambar...",
       "galleryTitle": "Galeri Foto — {{name}}",
       "photoCount": "{{count}}/{{max}} foto",
+      "noTopic": "Không có chủ đề phiên để lưu ảnh.",
+      "takePhotoWithTopic": "Chụp ảnh — {{topic}}",
       "chooseFrame": "Pilih Bingkai",
       "changeFrame": "Ganti Bingkai",
       "deleteFrame": "Hapus Bingkai",
@@ -1495,7 +1500,10 @@
       "revokedTitle": "Thư viện đã đóng",
       "revokedDesc": "Liên kết thư viện này đã bị quản trị viên đóng. Vui lòng liên hệ với điều phối viên.",
       "needHelp": "Cần trợ giúp?",
-      "contactUs": "Liên hệ với chúng tôi"
+      "contactUs": "Liên hệ với chúng tôi",
+      "topicsLabel": "Chọn chủ đề",
+      "legacyChip": "Ảnh cũ",
+      "emptyTopic": "Chưa có ảnh trong chủ đề này"
     },
     "consent": {
       "yes": "Vâng, đồng ý",

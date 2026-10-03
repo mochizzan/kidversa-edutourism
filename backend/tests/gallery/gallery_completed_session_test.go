@@ -29,6 +29,9 @@ const (
 	gParticipantID = "participant-1"
 	gSessionID     = "session-1"
 	gReportID      = "report-1"
+	// gSessionStageID adalah baris session_stages yang menginstansiasi
+	// topik report "stage-1" pada gSessionID (migrasi 000009).
+	gSessionStageID = "stage-session-1"
 )
 
 // galleryToken64 adalah token 64-hex yang lolos galleryTokenFormat.
@@ -56,6 +59,7 @@ type gallerySessionRepo struct {
 	repository.SessionRepository
 	session         *entity.Session
 	participant     *entity.Participant
+	stages          []entity.SessionStage
 	getSessionCalls int
 	lastParticipant string
 }
@@ -68,6 +72,13 @@ func (f *gallerySessionRepo) GetParticipantByID(_ context.Context, id, _ string)
 func (f *gallerySessionRepo) GetSessionByID(_ context.Context, id, _ string) (*entity.Session, error) {
 	f.getSessionCalls++
 	return f.session, nil
+}
+
+// ListSessionStages memberi topik (session_stages) untuk resolusi foto rapor
+// bertopik dan daftar topik payload galeri (migrasi 000009) — TIDAK membaca
+// status sesi, jadi penghitung getSessionCalls tetap nol.
+func (f *gallerySessionRepo) ListSessionStages(context.Context, string) ([]entity.SessionStage, error) {
+	return f.stages, nil
 }
 
 // galleryReportRepo: report selalu ada (gerbang "report hilang" bukan objek
@@ -160,6 +171,7 @@ func newGalleryFixture(t *testing.T, consentGranted bool) *galleryFixture {
 			BaseModel:       entity.BaseModel{ID: "photo-1"},
 			ParticipantID:   gParticipantID,
 			SessionID:       gSessionID,
+			SessionStageID:  gSessionStageID,
 			OriginalFileURL: "/api/media/photos/photo-1.jpg",
 			TakenBy:         "fasilitator-1",
 			TakenAt:         time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC),
@@ -168,13 +180,20 @@ func newGalleryFixture(t *testing.T, consentGranted bool) *galleryFixture {
 			BaseModel:       entity.BaseModel{ID: "photo-2"},
 			ParticipantID:   gParticipantID,
 			SessionID:       gSessionID,
+			SessionStageID:  gSessionStageID,
 			OriginalFileURL: "/api/media/photos/photo-2.jpg",
 			TakenBy:         "fasilitator-1",
 			TakenAt:         time.Date(2026, 9, 20, 11, 0, 0, 0, time.UTC),
 		},
 	}
 
-	sessions := &gallerySessionRepo{session: session, participant: participant}
+	// Sesi menginstansiasi topik report "stage-1" sebagai sesi-stage
+	// gSessionStageID — resolusi bertopik memetakan report.ProgramStageID ke
+	// sini, dan daftar topik payload datang dari baris ini.
+	stage := entity.SessionStage{ProgramStageID: "stage-1", SessionID: gSessionID, ProgramStageName: "Topik 1"}
+	stage.ID = gSessionStageID
+
+	sessions := &gallerySessionRepo{session: session, participant: participant, stages: []entity.SessionStage{stage}}
 	consent := &galleryConsentRepo{granted: consentGranted}
 	photoRepo := &galleryPhotoRepo{photos: photos}
 
@@ -263,7 +282,13 @@ func TestGalleryOpenWhenSessionCompleted(t *testing.T) {
 			Photos        []struct {
 				ID              string `json:"id"`
 				OriginalFileURL string `json:"original_file_url"`
+				SessionStageID  string `json:"session_stage_id"`
 			} `json:"photos"`
+			Topics []struct {
+				SessionStageID string `json:"session_stage_id"`
+				ProgramStageID string `json:"program_stage_id"`
+				Name           string `json:"name"`
+			} `json:"topics"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
@@ -283,6 +308,19 @@ func TestGalleryOpenWhenSessionCompleted(t *testing.T) {
 		if p.ID == "" || p.OriginalFileURL == "" {
 			t.Errorf("foto %q tanpa url: %+v", p.ID, p)
 		}
+		if p.SessionStageID != gSessionStageID {
+			t.Errorf("foto %q session_stage_id = %q, want %q (topik foto ikut terkirim)", p.ID, p.SessionStageID, gSessionStageID)
+		}
+	}
+	// Daftar topik untuk switcher galeri orang tua: topik sesi terinstansiasi,
+	// terpetakan dari topik report stage-1.
+	if len(env.Data.Topics) != 1 {
+		t.Fatalf("len(topics) = %d, want 1 (topik sesi untuk switcher): %+v", len(env.Data.Topics), env.Data.Topics)
+	}
+	top := env.Data.Topics[0]
+	if top.SessionStageID != gSessionStageID || top.ProgramStageID != "stage-1" || top.Name == "" {
+		t.Errorf("topics[0] = %+v, want session_stage_id=%q program_stage_id=%q name terisi",
+			top, gSessionStageID, "stage-1")
 	}
 
 	// Bukti nol cek status sesi: jalur galeri tidak pernah membaca sesi.
@@ -311,7 +349,9 @@ func TestGalleryOpenWhenSessionCompleted(t *testing.T) {
 // TestGalleryGatesStillDenyWithoutValidToken membuktikan akses TANPA token
 // valid tetap tertolak meski sesi COMPLETED — yang terbuka hanya jalur
 // ber-token: format salah → 400, token tak dikenal → 404, consent belum
-// granted → 403, revoked → 410, kedaluwarsa → 410.
+// granted → 403, revoked → 410. Kedaluwarsa TIDAK menolak: masa berlaku QR
+// galeri tidak pernah kedaluwarsa (token lampau ikut terbuka, subtest
+// token_kedaluwarsa_tetap_200).
 func TestGalleryGatesStillDenyWithoutValidToken(t *testing.T) {
 	t.Run("tanpa_token", func(t *testing.T) {
 		fx := newGalleryFixture(t, true)
@@ -360,14 +400,19 @@ func TestGalleryGatesStillDenyWithoutValidToken(t *testing.T) {
 		requireFailCode(t, rec, http.StatusGone, "token_revoked")
 	})
 
-	t.Run("token_expired", func(t *testing.T) {
+	t.Run("token_kedaluwarsa_tetap_200", func(t *testing.T) {
+		// QR yang sudah dicetak tidak boleh pernah kadaluwarsa: masa berlaku
+		// lampau (bahkan token yang di-mint sebelum masa berlaku jauh) tetap
+		// terbuka — hanya revokasi yang menolak.
 		fx := newGalleryFixture(t, true)
 		fx.token.ExpiresAt = time.Now().Add(-time.Hour)
 		rec, err := callGallery(t, fx.h, "/api/reports/gallery?token="+galleryToken64)
 		if err != nil {
-			t.Fatalf("handler error: %v", err)
+			t.Fatalf("handler error: %v (token kedaluwarsa tidak boleh ditolak)", err)
 		}
-		requireFailCode(t, rec, http.StatusGone, "token_expired")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+		}
 	})
 }
 

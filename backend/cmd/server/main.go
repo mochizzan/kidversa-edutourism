@@ -85,6 +85,10 @@ func main() {
 	sessionUC.SetProgramReader(programRepo)
 	sessionUC.SetAssessmentRepo(assessmentRepo)
 	sessionUC.SetAttendanceRepo(attendanceRepo)
+	// Gallery snapshot: a same-program LinkParticipant copies the participant's
+	// same-topic photos (with their own files under cfg.UploadDir) to the
+	// target session.
+	sessionUC.SetPhotoSnapshot(photoRepo, cfg.UploadDir)
 	sessionUC.SetUserRepo(userRepo)
 	badgeUC := badgeuc.NewUsecase(sessionSubstageRepo, programSubstageRepo, programRepo, assessmentRepo, sessionRepo, attendanceRepo)
 	// LinkParticipant reconciles the participant's FINAL badge after a
@@ -117,7 +121,7 @@ func main() {
 	registry.Assessment = handler.NewAssessmentHandler(assessmentUC)
 	registry.Attendance = handler.NewAttendanceHandler(attendanceUC)
 	registry.Photo = handler.NewPhotoHandler(photoRepo, sessionRepo, consentRepo, programRepo, cfg)
-	registry.Report = handler.NewReportHandler(reportsUC, cfg, sessionRepo, hub, consentRepo, photoRepo)
+	registry.Report = handler.NewReportHandler(reportsUC, cfg, sessionRepo, hub, consentRepo, photoRepo, contentRepo)
 	registry.MissionBank = handler.NewMissionBankHandler(missionBankRepo)
 	registry.ParticipantMission = handler.NewParticipantMissionHandler(participantMissionRepo)
 	registry.Consent = handler.NewConsentHandler(consentRepo, sessionRepo, waGateway, cfg, hub)

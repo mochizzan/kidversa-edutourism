@@ -71,7 +71,9 @@ function ReportView() {
       const { topicBadges, finalBadge } = splitBadgeSlots(
         (report.badges ?? []).map((b) => ({
           badgeName: b.badge_name,
-          badgeImageUrl: b.badge_image_url || undefined,
+          badgeImageUrl: b.badge_image_url
+            ? `${b.badge_image_url}?token=${encodeURIComponent(token)}`
+            : undefined,
           badge_type: b.badge_type,
           program_stage_id: b.program_stage_id,
         })),

@@ -24,7 +24,19 @@ import (
 type sessionScope interface {
 	GetSessionByID(ctx context.Context, id, tenantID string) (*entity.Session, error)
 	GetParticipantByID(ctx context.Context, id, tenantID string) (*entity.Participant, error)
+	// ListSessionStages lists a session's session_stages (its topics, created in
+	// program sequence). Used to prove a requested session_stage_id BELONGS to
+	// the session (upload) and to resolve a report's program stage to its
+	// session stage for topic-true photo resolution.
+	ListSessionStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error)
 	GetGroupFacilitatorID(ctx context.Context, groupID string) (*string, error)
+}
+
+// stageLister is the session-stage read the topic-scoped report-photo
+// resolution needs (subset of repository.SessionRepository, satisfied by
+// persistence.GormSessionRepository and by sessionScope).
+type stageLister interface {
+	ListSessionStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error)
 }
 
 // consentScope provides the fresh consent read used by the consent gates
@@ -87,8 +99,40 @@ func assertParticipantGroupOwnership(ctx context.Context, sessions sessionScope,
 // Two-tier form only: the public gallery's computed report_photo (gallery_handler)
 // uses it as-is — tier 3 below must never mark a plain gallery photo as the
 // report photo there.
-func resolveReportPhoto(ctx context.Context, photos repository.PhotoRepository,
+//
+// Topic truth (migration 000009): when the report HAS a topic
+// (programStageID != ""), tiers 2-3 run with a strict session_stage_id filter
+// resolved via sessions.ListSessionStages — a photo flagged/newest under a
+// DIFFERENT topic, or a legacy no-stage photo, can never serve it. A report
+// without a topic keeps today's session-wide behavior (stageFilter = nil).
+func resolveReportPhoto(ctx context.Context, photos repository.PhotoRepository, sessions stageLister,
 	participantID, sessionID, programStageID string) (*entity.SmartPhoto, error) {
+	return resolveReportPhotoTiers(ctx, photos, sessions, participantID, sessionID, programStageID, false)
+}
+
+// resolveReportPhotoWithFallback = resolveReportPhoto (spec §4.1, tier pick →
+// is_report_photo) plus Fase-2 tier 3 for the parent mini-raport: when neither
+// a pick nor a flagged photo exists, the participant's newest gallery photo in
+// the session wins (ListPhotos orders created_at DESC, tie-break taken_at lalu
+// id), so "Momen Terbaik Hari Ini" falls back to a real photo before the
+// placeholder. The photo must belong to this participant+session (PhotoFilter
+// scoping) AND — like tier 2, when the report has a topic — to the report's
+// topic (same stage filter); no photo at all → (nil, nil) → placeholder.
+// Report routes ONLY (GetByAccessToken/GetAccessPhoto, after the ConsentPhoto
+// gate) — the public gallery keeps resolveReportPhoto so its computed
+// report_photo stays two-tier.
+func resolveReportPhotoWithFallback(ctx context.Context, photos repository.PhotoRepository, sessions stageLister,
+	participantID, sessionID, programStageID string) (*entity.SmartPhoto, error) {
+	return resolveReportPhotoTiers(ctx, photos, sessions, participantID, sessionID, programStageID, true)
+}
+
+// resolveReportPhotoTiers implements both helpers above; withFallback selects
+// whether tier 3 (newest gallery photo) runs after tier 2 misses.
+func resolveReportPhotoTiers(ctx context.Context, photos repository.PhotoRepository, sessions stageLister,
+	participantID, sessionID, programStageID string, withFallback bool) (*entity.SmartPhoto, error) {
+	// Tier 1 — explicit report_photo_picks row. The pick is already keyed by
+	// program_stage_id, so it is topic-true as stored; reads of EXISTING picks
+	// stay tolerant (the photo's own stage is not re-checked here).
 	pick, err := photos.GetReportPhotoPick(ctx, participantID, sessionID, programStageID)
 	if err != nil {
 		return nil, err
@@ -105,31 +149,40 @@ func resolveReportPhoto(ctx context.Context, photos repository.PhotoRepository,
 		// Pick's photo deleted/soft-removed: gugur — jatuh ke fallback
 		// is_report_photo di bawah (tanpa referensi menggantung).
 	}
+
+	// Topic scope for tiers 2-3. nil = no stage filter (legacy session-wide
+	// report: programStageID empty). Non-nil = strict session_stage_id equality.
+	var stageFilter *string
+	if programStageID != "" {
+		stages, err := sessions.ListSessionStages(ctx, sessionID)
+		if err != nil {
+			// Never degrade to an unscoped (cross-topic) query on failure —
+			// log the cause, then surface (middleware renders internal_error).
+			log.Printf("handler: report photo stage lookup failed (session=%s stage=%s): %v",
+				sessionID, programStageID, err)
+			return nil, err
+		}
+		var stageID string
+		for i := range stages {
+			if stages[i].ProgramStageID == programStageID {
+				stageID = stages[i].ID
+				break
+			}
+		}
+		if stageID == "" {
+			// The report's topic was never instantiated in this session: no
+			// photo can be proven topic-true for it, and an unscoped fallback
+			// would hand it a photo from another topic (legacy '' included).
+			return nil, nil
+		}
+		stageFilter = &stageID
+	}
+
+	// Tier 2 — exclusive is_report_photo default, scoped to the topic.
 	isTrue := true
 	page, err := photos.ListPhotos(ctx, repository.PhotoFilter{
-		ParticipantID: participantID, SessionID: sessionID, IsReportPhoto: &isTrue,
+		ParticipantID: participantID, SessionID: sessionID, IsReportPhoto: &isTrue, SessionStageID: stageFilter,
 	}, 1, 1)
-	if err != nil {
-		return nil, err
-	}
-	if len(page.Items) == 0 {
-		return nil, nil
-	}
-	return &page.Items[0], nil // Paginated.Items bersifat nilai (T, bukan *T)
-}
-
-// resolveReportPhotoWithFallback = resolveReportPhoto (spec §4.1, tier pick →
-// is_report_photo) plus Fase-2 tier 3 for the parent mini-raport: when neither
-// a pick nor a flagged photo exists, the participant's newest gallery photo in
-// the session wins (ListPhotos orders created_at DESC, tie-break taken_at lalu
-// id), so "Momen Terbaik Hari Ini" falls back to a real photo before the
-// placeholder. The photo must belong to this participant+session (PhotoFilter
-// scoping); no photo at all → (nil, nil) → placeholder. Report routes ONLY
-// (GetByAccessToken/GetAccessPhoto, after the ConsentPhoto gate) — the public
-// gallery keeps resolveReportPhoto so its computed report_photo is unchanged.
-func resolveReportPhotoWithFallback(ctx context.Context, photos repository.PhotoRepository,
-	participantID, sessionID, programStageID string) (*entity.SmartPhoto, error) {
-	rec, err := resolveReportPhoto(ctx, photos, participantID, sessionID, programStageID)
 	if err != nil {
 		// Repo failure (not "no photo"): log the cause before returning —
 		// middleware.ErrorHandler renders a generic internal_error envelope
@@ -138,11 +191,17 @@ func resolveReportPhotoWithFallback(ctx context.Context, photos repository.Photo
 			participantID, sessionID, programStageID, err)
 		return nil, err
 	}
-	if rec != nil {
-		return rec, nil
+	if len(page.Items) > 0 {
+		return &page.Items[0], nil // Paginated.Items bersifat nilai (T, bukan *T)
 	}
-	page, err := photos.ListPhotos(ctx, repository.PhotoFilter{
-		ParticipantID: participantID, SessionID: sessionID,
+	if !withFallback {
+		return nil, nil
+	}
+
+	// Tier 3 — newest gallery photo under the SAME topic scope (a plain gallery
+	// photo of another topic — or a legacy ''-stage photo — never wins).
+	page, err = photos.ListPhotos(ctx, repository.PhotoFilter{
+		ParticipantID: participantID, SessionID: sessionID, SessionStageID: stageFilter,
 	}, 1, 1)
 	if err != nil {
 		// Tier-3 gallery fallback failed: never degrade silently into a nil

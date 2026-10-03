@@ -11,6 +11,8 @@ const logError = (scope: string, error: unknown) => {
 interface UploadOptions {
   childId: string
   participant: Participant
+  /** Target topic bucket — REQUIRED by the upload endpoint (session_stages.id). */
+  sessionStageId: string
   takenBy: string
   blob: Blob
   frameId: string | null
@@ -32,11 +34,28 @@ export function useSmartPhotos(
   participantRef.current = participant
   const getParticipant = useCallback(() => participantRef.current, [])
 
+  // Topic of the LAST photo fetch ('' = legacy bucket, null/undefined = no
+  // topic filter). deletePhoto/uploadPhoto refresh with no argument so the
+  // grid always re-fetches the SAME bucket the user is looking at instead of
+  // silently reverting to all photos.
+  const photoTopicRef = useRef<string | null | undefined>(undefined)
+
   // Rejects on failure so callers render their own ErrorState/retry (the
   // photo grid must never present a failed fetch as an empty list).
-  const loadPhotos = useCallback(async () => {
+  // sessionStageId: undefined → argument omitted → keep the current bucket
+  // (first call: ALL photos); a string narrows to that one topic — '' being
+  // the legacy no-topic bucket (present-but-empty query param).
+  const loadPhotos = useCallback(async (sessionStageId?: string | null) => {
     if (!childId) return
-    const updated = await photoService.getByParticipant(childId)
+    if (sessionStageId !== undefined) photoTopicRef.current = sessionStageId
+    const topic = sessionStageId !== undefined ? sessionStageId : photoTopicRef.current
+    // "All photos" = options argument OMITTED entirely (the contract's
+    // absent-param semantics); a string narrows to that one bucket — '' being
+    // the legacy no-topic bucket (present-but-empty query param).
+    const updated =
+      topic === undefined || topic === null
+        ? await photoService.getByParticipant(childId)
+        : await photoService.getByParticipant(childId, { sessionStageId: topic })
     setPhotos(updated)
   }, [childId])
 
@@ -115,7 +134,7 @@ export function useSmartPhotos(
 
   const uploadPhoto = useCallback(
     async (
-      { childId: id, participant, takenBy, blob, frameId, isReportPhoto }: UploadOptions,
+      { childId: id, participant, sessionStageId, takenBy, blob, frameId, isReportPhoto }: UploadOptions,
       opts?: { onProgress?: (percent: number) => void },
     ) => {
       if (!participant.session_id) {
@@ -128,7 +147,13 @@ export function useSmartPhotos(
       const file = new File([blob], `photo-${Date.now()}.${ext}`, {
         type: blob.type || 'image/png',
       })
-      const photo = await photoService.upload(id, participant.session_id, file, opts)
+      const photo = await photoService.upload(
+        id,
+        participant.session_id,
+        sessionStageId,
+        file,
+        opts,
+      )
 
       if (frameId || isReportPhoto) {
         const updateData: Partial<SmartPhoto> = {}

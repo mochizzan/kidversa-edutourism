@@ -23,6 +23,9 @@ import ReportPage from '@/features/parent/pages/ReportPage'
 
 const useParentTokenMock = vi.mocked(useParentToken)
 
+/** Token parent yang disuntikkan renderReport — dipakai juga untuk memastikan src badge ber-?token=. */
+const TOKEN = 'tok-1'
+
 /** Baseline report; badge fields supplied per test to model legacy payloads. */
 function report(overrides: Record<string, unknown> = {}): PublicReport {
   return {
@@ -40,7 +43,7 @@ function report(overrides: Record<string, unknown> = {}): PublicReport {
 /** Renders the page with the payload and flushes the async HTML build. */
 async function renderReport(payload: unknown): Promise<HTMLElement> {
   useParentTokenMock.mockReturnValue({
-    token: 'tok-1',
+    token: TOKEN,
     report: payload as PublicReport,
     participant: null,
     loading: false,
@@ -104,6 +107,9 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
     // Section menampilkan gambar badge saja, maksimal 2 (topik pertama + final).
     const badgeImgs = (html ?? '').match(/<img[^>]*src="[^"]*badge-[^"]*"/g) ?? []
     expect(badgeImgs.length).toBeLessThanOrEqual(2)
+    // Kontrak badge_image_url: path badge + ?token= sesuai token mock (tanpa itu img 404 → capture gagal).
+    expect(html).toContain(`src="badge-topik-a.png?token=${TOKEN}"`)
+    expect(html).toContain(`src="badge-final.png?token=${TOKEN}"`)
     expect(html).not.toContain('Belum ada badge yang diraih.')
   })
 
@@ -124,6 +130,8 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
     const html = builtHtml(container)
     expect(html).not.toBeNull()
     expect(html).toContain('Badge Topik A')
+    // Slot kiri berisi <img> dengan src ber-?token= (kontrak badge_image_url).
+    expect(html).toContain(`src="badge-topik-a.png?token=${TOKEN}"`)
     expect(html).toMatch(/data-badge-slot="final">\s*<\/div>/)
     expect(html).not.toContain('Belum ada badge yang diraih.')
   })
@@ -145,6 +153,8 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
     const html = builtHtml(container)
     expect(html).not.toBeNull()
     expect(html).toContain('Badge Final Program')
+    // Slot kanan berisi <img> dengan src ber-?token= (kontrak badge_image_url).
+    expect(html).toContain(`src="badge-final-program.png?token=${TOKEN}"`)
     expect(html).toMatch(/data-badge-slot="topik">\s*<\/div>/)
     expect(html).not.toContain('Belum ada badge yang diraih.')
   })

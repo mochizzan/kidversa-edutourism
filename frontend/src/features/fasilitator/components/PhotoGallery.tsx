@@ -1,7 +1,21 @@
-import { Camera, FileText, X, Trash2 } from 'lucide-react'
+import { Camera, FileText, Plus, X, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getMediaUrl } from '../../../core/utils/media'
 import type { SmartPhoto, Participant } from '../../../core/types'
+
+/**
+ * "Tambah Foto" tile rendered inside the grid with EXACTLY the photo tile
+ * size (`aspect-[3/4] rounded-2xl`). `ariaLabel` is a distinct accessible
+ * name from the page header's Tambah Foto button; `disabled` + a visible
+ * `disabledReason` mirror the header button's lock semantics.
+ */
+export interface GalleryAddCard {
+ label: string
+ ariaLabel: string
+ onClick: () => void
+ disabled?: boolean
+ disabledReason?: string
+}
 
 interface PhotoGridProps {
  photos: SmartPhoto[]
@@ -22,6 +36,11 @@ interface PhotoGridProps {
  onDelete: (photo: SmartPhoto) => void
  /** When set, the delete buttons are disabled and this becomes their visible title/aria reason. */
  deleteDisabledReason?: string
+ /**
+ * First-cell add tile — rendered only while the active topic is below the
+ * 10-photo cap (undefined hides it entirely).
+ */
+ addCard?: GalleryAddCard
 }
 
 export const PhotoGallery = ({
@@ -33,17 +52,36 @@ export const PhotoGallery = ({
  pendingPhotoId,
  onDelete,
  deleteDisabledReason,
+ addCard,
 }: PhotoGridProps) => {
  const { t } = useTranslation()
+ // Same tile geometry as a photo tile so the grid never reflows when the
+ // add card appears/disappears (aspect-[3/4] rounded-2xl + shared surface).
+ const addTile = addCard ? (
+  <button
+   key="__add-photo"
+   type="button"
+   onClick={addCard.onClick}
+   disabled={addCard.disabled}
+   title={addCard.disabledReason}
+   aria-label={addCard.ariaLabel}
+   className="relative flex aspect-[3/4] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-surface-container-highest bg-surface-container-low text-on-surface-variant shadow-sm transition hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-40"
+  >
+   <Plus className="w-6 h-6" />
+   <span className="px-2 text-center text-xs font-medium">{addCard.label}</span>
+  </button>
+ ) : null
  return (
   <div className="w-full h-full overflow-y-auto bg-white rounded-3xl p-4 md:p-6">
    {photos.length === 0 ? (
     <div className="flex flex-col items-center justify-center h-full gap-3 text-on-surface-variant">
      <Camera className="w-16 h-16 opacity-30" />
      <p className="text-sm">{t('fasilitator.photos.emptyFor', { name: participant.child_name })}</p>
+     {addTile}
     </div>
    ) : (
     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+     {addTile}
      {photos.map((photo) => {
       // Select mode: badge/highlight tracks the pending selection;
       // otherwise the saved mini-rapor pick.

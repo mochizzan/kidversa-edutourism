@@ -606,8 +606,8 @@ func TestBadgeFlowRetroactivePublicView(t *testing.T) {
 	if last.BadgeType != entity.BadgeTypeFinal || last.ProgramStageID != "" || last.BadgeName != "Juara Akhir" {
 		t.Errorf("FINAL badge in view = %+v", last)
 	}
-	if last.BadgeImageURL != "/api/media/kiosk/content/final-img" {
-		t.Errorf("FINAL badge image = %q, want public kiosk route", last.BadgeImageURL)
+	if last.BadgeImageURL != "/api/reports/access/badge/final-img" {
+		t.Errorf("FINAL badge image = %q, want token-scoped badge media route", last.BadgeImageURL)
 	}
 	// Topic badges carry their Topik for the client-side split.
 	if after.Badges[0].BadgeType != entity.BadgeTypeSubtopik || after.Badges[0].ProgramStageID != "stageA" {

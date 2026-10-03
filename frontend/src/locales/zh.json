@@ -1272,6 +1272,9 @@
       "selectModeNoPhotos": "暂无可选择的照片。",
       "selectModeNothingSelected": "尚未选择照片。请先点击一张照片。",
       "noActiveTopic": "没有可用于选择报告照片的进行中主题。",
+      "legacyChip": "旧照片",
+      "legacyPickReason": "旧照片不属于任何主题 — 只能在主题内选择迷你报告照片。",
+      "addCardLabel": "向此主题添加照片",
       "topicLoadError": "加载主题列表失败。主题名称可能不完整。",
       "picksLoadError": "加载报告照片选择失败。",
       "groupGoneDesc": "在此活动中未找到该小组，可能已被删除。",
@@ -1305,6 +1308,8 @@
       "processingImage": "正在处理图像...",
       "galleryTitle": "照片库 — {{name}}",
       "photoCount": "{{count}}/{{max}} 张照片",
+      "noTopic": "没有可保存照片的活动主题。",
+      "takePhotoWithTopic": "拍照 — {{topic}}",
       "chooseFrame": "选择相框",
       "changeFrame": "更换相框",
       "deleteFrame": "删除相框",
@@ -1495,7 +1500,10 @@
       "revokedTitle": "图库已关闭",
       "revokedDesc": "此图库链接已被管理员关闭。请联系协调员。",
       "needHelp": "需要帮助？",
-      "contactUs": "联系我们"
+      "contactUs": "联系我们",
+      "topicsLabel": "选择主题",
+      "legacyChip": "旧照片",
+      "emptyTopic": "该主题暂无照片"
     },
     "consent": {
       "yes": "是的，同意",

@@ -46,4 +46,14 @@ type PhotoFilter struct {
 	SessionID     string
 	FrameID       *string
 	IsReportPhoto *bool
+	// SessionStageID narrows to one topic (session_stages row) — tri-state on
+	// purpose, because empty string is a MEANINGFUL value (the legacy/no-topic
+	// bucket sentinel from migration 000009):
+	//   nil  → no stage filter (any topic, session-wide);
+	//   &""  → strict `session_stage_id = ''` (legacy photos only);
+	//   &id  → strict `session_stage_id = id` (one topic).
+	// GET /api/photos maps query-param PRESENCE onto this: present (even
+	// empty) = set, absent = nil. Report photo resolution sets it only when
+	// the report has a topic.
+	SessionStageID *string
 }

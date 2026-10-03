@@ -38,6 +38,7 @@ type ReportHandler struct {
 	hub         *sse.Hub
 	consent     repository.ConsentRepository
 	photos      repository.PhotoRepository
+	contentRepo repository.ContentRepository
 	genMu       sync.Map
 	// sendQueue tracks in-flight POST /:id/send attempts per (tenant, session),
 	// backing the active_send envelope and the send_in_progress 409 guard.
@@ -45,8 +46,8 @@ type ReportHandler struct {
 }
 
 // NewReportHandler builds the report handler.
-func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository, hub *sse.Hub, consent repository.ConsentRepository, photos repository.PhotoRepository) *ReportHandler {
-	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo, hub: hub, consent: consent, photos: photos, sendQueue: NewReportSendQueue()}
+func NewReportHandler(uc *reportsuc.Usecase, cfg *config.Config, sessionRepo repository.SessionRepository, hub *sse.Hub, consent repository.ConsentRepository, photos repository.PhotoRepository, contentRepo repository.ContentRepository) *ReportHandler {
+	return &ReportHandler{uc: uc, cfg: cfg, sessionRepo: sessionRepo, hub: hub, consent: consent, photos: photos, contentRepo: contentRepo, sendQueue: NewReportSendQueue()}
 }
 
 // tenantGuard rejects an empty tenant ID with 400 "tenant_required" before any
@@ -86,7 +87,7 @@ func (h *ReportHandler) GetByAccessToken(c *echo.Context) error {
 		return err
 	}
 	if granted {
-		resolved, err := resolveReportPhotoWithFallback(ctx, h.photos, r.ParticipantID, r.SessionID, r.ProgramStageID)
+		resolved, err := resolveReportPhotoWithFallback(ctx, h.photos, h.sessionRepo, r.ParticipantID, r.SessionID, r.ProgramStageID)
 		if err != nil {
 			return err
 		}
@@ -121,7 +122,7 @@ func (h *ReportHandler) GetAccessPhoto(c *echo.Context) error {
 	if !granted {
 		return apperrors.Forbidden("consent_required", nil)
 	}
-	rec, err := resolveReportPhotoWithFallback(ctx, h.photos, r.ParticipantID, r.SessionID, r.ProgramStageID)
+	rec, err := resolveReportPhotoWithFallback(ctx, h.photos, h.sessionRepo, r.ParticipantID, r.SessionID, r.ProgramStageID)
 	if err != nil {
 		return err
 	}
@@ -130,6 +131,71 @@ func (h *ReportHandler) GetAccessPhoto(c *echo.Context) error {
 	}
 	// Pola media_handler.Get + batasi gambar (R10).
 	dest := filepath.Join(h.cfg.UploadDir, filepath.FromSlash(rec.OriginalFileURL))
+	if !withinDir(h.cfg.UploadDir, dest) {
+		return apperrors.NotFound("not_found", nil)
+	}
+	ext := strings.ToLower(filepath.Ext(dest))
+	if strings.EqualFold(ext, ".html") {
+		return apperrors.Forbidden("file_type_blocked", nil)
+	}
+	blob, err := os.ReadFile(dest)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return apperrors.NotFound("not_found", err)
+		}
+		return apperrors.Internal("internal_error", err)
+	}
+	ct := safeContentType(ext)
+	if ct == "" || !strings.HasPrefix(ct, "image/") {
+		return apperrors.Forbidden("file_type_blocked", nil)
+	}
+	return serveMediaBlob(c, ct, dest, blob)
+}
+
+// GetAccessBadge serves a badge image as raw bytes for the parent-facing
+// mini-raport <img> at /api/reports/access/badge/:contentId. Authn mirrors
+// GetAccessPhoto: a valid 64hex parent access token with spec §2.6 codes
+// (404 token_invalid / 403 token_expired from GetByToken). Anti-IDOR is badge
+// membership: the token's participant must own a badge whose image id equals
+// :contentId (an empty tenantID keeps ListBadgesByParticipant's legacy
+// tenant-less path — the participant-scoped membership IS the authorization).
+// There is NO consent gate: badges are achievement images, not child photos.
+// File gates mirror GetAccessPhoto (path inside UploadDir, blocked extensions,
+// image/* content type — media_handler.Get / R10).
+func (h *ReportHandler) GetAccessBadge(c *echo.Context) error {
+	ctx := (*c).Request().Context()
+	token := (*c).QueryParam("token")
+	if token == "" || !tokenFormat.MatchString(token) {
+		return apperrors.NotFound("token_invalid", nil) // spec §2.6 (404, bukan 400)
+	}
+	r, err := h.uc.Repo().GetByToken(ctx, token) // 404 token_invalid / 403 token_expired — persis GetByToken
+	if err != nil {
+		return err
+	}
+	contentID := (*c).Param("contentId")
+	badges, err := h.uc.ListBadges(ctx, r.ParticipantID, "")
+	if err != nil {
+		return err
+	}
+	owned := false
+	for _, b := range badges {
+		if b.BadgeImageURL == contentID && contentID != "" {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		return apperrors.NotFound("not_found", nil) // 404 — badge bukan milik peserta rapor ini
+	}
+	content, err := h.contentRepo.GetContentByID(ctx, contentID)
+	if err != nil {
+		return err // repo's 404 not_found (missing row) / 500 internal_error
+	}
+	if content == nil || content.FileURL == "" {
+		return apperrors.NotFound("not_found", nil)
+	}
+	// Pola media_handler.Get + batasi gambar (R10).
+	dest := filepath.Join(h.cfg.UploadDir, filepath.FromSlash(content.FileURL))
 	if !withinDir(h.cfg.UploadDir, dest) {
 		return apperrors.NotFound("not_found", nil)
 	}

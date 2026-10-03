@@ -10,6 +10,8 @@ import (
 
 // RegisterReportsRoutes mounts /api/reports/* on the given echo group.
 //   - GET  /api/reports/access?token=...   PUBLIC (anti-IDOR parent access)
+//   - GET  /api/reports/access/badge/:contentId?token=...  PUBLIC (badge image
+//     bytes for the parent mini-raport <img>; token authn + badge membership)
 //   - POST /api/reports/:id/generate/stream  (async AI narrative, 202 + SSE)
 //   - GET  /api/reports/:id/generate/stream  (SSE token stream)
 //   - POST /api/reports/:id/approve
@@ -27,6 +29,8 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	g.GET("/access", h.GetByAccessToken, appmiddleware.RateLimit(cfg.RateLimitPerMin))
 	// Token-validated photo bytes for the parent mini-raport <img>.
 	g.GET("/access/photo", h.GetAccessPhoto, appmiddleware.RateLimit(cfg.RateLimitPerMin))
+	// Token-validated badge image bytes for the parent mini-raport <img>.
+	g.GET("/access/badge/:contentId", h.GetAccessBadge, appmiddleware.RateLimit(cfg.RateLimitPerMin))
 	// Session-level generate: static route must precede /:id routes.
 	g.POST("/generate", h.GenerateForSession, authMW, scopeMW)
 	g.GET("", h.ListReports, authMW, scopeMW)

@@ -1,11 +1,11 @@
 import { RefObject } from 'react'
 import {
-  Camera,
-  AlertTriangle,
-  ChevronDown,
-  Monitor,
-  LayoutGrid,
-  Image,
+ Camera,
+ AlertTriangle,
+ ChevronDown,
+ Monitor,
+ LayoutGrid,
+ Image,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../../shared/components/ui/Button'
@@ -14,211 +14,218 @@ import type { CameraState } from '../hooks/useCamera'
 import type { Participant } from '../../../core/types'
 
 interface CameraViewportProps {
-  videoRef: RefObject<HTMLVideoElement | null>
-  cameraState: CameraState
-  // Reason behind the current denied/error state — rendered in the overlay
-  // so the failure stays visible after the toast expires.
-  cameraErrorMessage: string | null
-  onRetryCamera: () => void
-  showGrid: boolean
-  pageError: string | null
-  onRetryLoad: () => void
-  participant: Participant
-  devices: MediaDeviceInfo[]
-  selectedDeviceId: string
-  currentCameraLabel: string
-  cameraPickerOpen: boolean
-  onToggleCameraPicker: () => void
-  onCloseCameraPicker: () => void
-  onDeviceChange: (deviceId: string) => void
-  // Render-only view state: the Grid/Mirror toggle controls live in the gear
-  // panel outside the canvas box (see CameraSettings).
-  mirror: boolean
-  photoCount: number
-  maxPhotos: number
-  isMaxPhotos: boolean
-  onTakePhoto: () => void
-  onOpenGallery: () => void
-  onOpenFramePicker: () => void
-  disabled?: boolean
+ videoRef: RefObject<HTMLVideoElement | null>
+ cameraState: CameraState
+ // Reason behind the current denied/error state — rendered in the overlay
+ // so the failure stays visible after the toast expires.
+ cameraErrorMessage: string | null
+ onRetryCamera: () => void
+ showGrid: boolean
+ pageError: string | null
+ onRetryLoad: () => void
+ participant: Participant
+ devices: MediaDeviceInfo[]
+ selectedDeviceId: string
+ currentCameraLabel: string
+ cameraPickerOpen: boolean
+ onToggleCameraPicker: () => void
+ onCloseCameraPicker: () => void
+ onDeviceChange: (deviceId: string) => void
+ // Render-only view state: the Grid/Mirror toggle controls live in the gear
+ // panel outside the canvas box (see CameraSettings).
+ mirror: boolean
+ photoCount: number
+ maxPhotos: number
+ isMaxPhotos: boolean
+ /**
+  * Accessible name of the shutter — the page passes
+  * "Ambil Foto — <topik>" so the capture control names the ACTIVE topic.
+  */
+ takePhotoLabel: string
+ onTakePhoto: () => void
+ onOpenGallery: () => void
+ onOpenFramePicker: () => void
+ disabled?: boolean
 }
 
 export const CameraViewport = ({
-  videoRef,
-  cameraState,
-  cameraErrorMessage,
-  onRetryCamera,
-  showGrid,
-  pageError,
-  onRetryLoad,
-  participant,
-  devices,
-  selectedDeviceId,
-  currentCameraLabel,
-  cameraPickerOpen,
-  onToggleCameraPicker,
-  onCloseCameraPicker,
-  onDeviceChange,
-  mirror,
-  photoCount,
-  maxPhotos,
-  isMaxPhotos,
-  onTakePhoto,
-  onOpenGallery,
-  onOpenFramePicker,
-  disabled,
+ videoRef,
+ cameraState,
+ cameraErrorMessage,
+ onRetryCamera,
+ showGrid,
+ pageError,
+ onRetryLoad,
+ participant,
+ devices,
+ selectedDeviceId,
+ currentCameraLabel,
+ cameraPickerOpen,
+ onToggleCameraPicker,
+ onCloseCameraPicker,
+ onDeviceChange,
+ mirror,
+ photoCount,
+ maxPhotos,
+ isMaxPhotos,
+ takePhotoLabel,
+ onTakePhoto,
+ onOpenGallery,
+ onOpenFramePicker,
+ disabled,
 }: CameraViewportProps) => {
-  const { t } = useTranslation()
-  return (
-    <>
-      {pageError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-on-surface text-white z-10">
-          <AlertTriangle className="w-16 h-16 text-accent" />
-          <p className="text-sm text-white/70 text-center max-w-[280px]">{pageError}</p>
-          <Button variant="secondary" onClick={onRetryLoad}>
-            {t('fasilitator.photos.retry')}
-          </Button>
-        </div>
-      )}
+ const { t } = useTranslation()
+ return (
+  <>
+   {pageError && (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-on-surface text-white z-10">
+     <AlertTriangle className="w-16 h-16 text-accent" />
+     <p className="text-sm text-white/70 text-center max-w-[280px]">{pageError}</p>
+     <Button variant="secondary" onClick={onRetryLoad}>
+      {t('fasilitator.photos.retry')}
+     </Button>
+    </div>
+   )}
 
-      {cameraState === 'loading' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-on-surface text-white z-10">
-          <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
-          <p className="text-sm text-white/60">{t('fasilitator.camera.accessing')}</p>
-        </div>
-      )}
+   {cameraState === 'loading' && (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-on-surface text-white z-10">
+     <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
+     <p className="text-sm text-white/60">{t('fasilitator.camera.accessing')}</p>
+    </div>
+   )}
 
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={mirror ? { transform: 'scaleX(-1)' } : undefined}
-        className={cn(
-          'absolute inset-0 w-full h-full object-cover object-center z-0',
-          cameraState === 'active' ? 'opacity-100' : 'opacity-0',
-        )}
-      />
+   <video
+    ref={videoRef}
+    autoPlay
+    playsInline
+    muted
+    style={mirror ? { transform: 'scaleX(-1)' } : undefined}
+    className={cn(
+     'absolute inset-0 w-full h-full object-cover object-center z-0',
+     cameraState === 'active' ? 'opacity-100' : 'opacity-0',
+    )}
+   />
 
-      {cameraState === 'active' && showGrid && (
-        <div data-testid="grid-overlay" className="absolute inset-0 z-[5] pointer-events-none">
-          <div className="absolute top-0 left-1/3 w-px h-full bg-white/30" />
-          <div className="absolute top-0 left-2/3 w-px h-full bg-white/30" />
-          <div className="absolute top-1/3 left-0 h-px w-full bg-white/30" />
-          <div className="absolute top-2/3 left-0 h-px w-full bg-white/30" />
-        </div>
-      )}
+   {cameraState === 'active' && showGrid && (
+    <div data-testid="grid-overlay" className="absolute inset-0 z-[5] pointer-events-none">
+     <div className="absolute top-0 left-1/3 w-px h-full bg-white/30" />
+     <div className="absolute top-0 left-2/3 w-px h-full bg-white/30" />
+     <div className="absolute top-1/3 left-0 h-px w-full bg-white/30" />
+     <div className="absolute top-2/3 left-0 h-px w-full bg-white/30" />
+    </div>
+   )}
 
-      {cameraState !== 'loading' && (
-        <div className="absolute top-4 left-4 z-10 backdrop-blur-md bg-white/15 border border-white/20 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-lg">
-          {participant.child_name || t('fasilitator.camera.fallbackName')} ({participant.child_age || '5'} {t('fasilitator.camera.yearsShort')})
-        </div>
-      )}
+   {cameraState !== 'loading' && (
+    <div className="absolute top-4 left-4 z-10 backdrop-blur-md bg-white/15 border border-white/20 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-lg">
+     {participant.child_name || t('fasilitator.camera.fallbackName')} ({participant.child_age || '5'} {t('fasilitator.camera.yearsShort')})
+    </div>
+   )}
 
-      {(cameraState === 'denied' || cameraState === 'error') && (
-        <div
-          role="alert"
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 p-8 bg-on-surface text-white text-center"
-        >
-          <AlertTriangle className="w-12 h-12 text-error" />
-          <p className="text-sm font-medium text-white/90 max-w-[320px]">
-            {cameraErrorMessage || t('fasilitator.camera.errGeneric')}
-          </p>
-          <Button variant="secondary" onClick={onRetryCamera}>
-            {t('fasilitator.photos.retry')}
-          </Button>
-        </div>
-      )}
+   {(cameraState === 'denied' || cameraState === 'error') && (
+    <div
+     role="alert"
+     className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 p-8 bg-on-surface text-white text-center"
+    >
+     <AlertTriangle className="w-12 h-12 text-error" />
+     <p className="text-sm font-medium text-white/90 max-w-[320px]">
+      {cameraErrorMessage || t('fasilitator.camera.errGeneric')}
+     </p>
+     <Button variant="secondary" onClick={onRetryCamera}>
+      {t('fasilitator.photos.retry')}
+     </Button>
+    </div>
+   )}
 
-      {cameraState !== 'loading' && (
-        <div className="absolute top-4 right-4 z-10">
-          <button
-            onClick={onToggleCameraPicker}
-            className="flex items-center gap-2 backdrop-blur-md bg-white/15 border border-white/20 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-lg hover:bg-white/25 transition-all"
-          >
-            <Camera className="w-3.5 h-3.5 text-white/90" />
-            <span className="max-w-[120px] truncate">{currentCameraLabel}</span>
-            <ChevronDown className="w-3 h-3 text-white/70" />
-          </button>
+   {cameraState !== 'loading' && (
+    <div className="absolute top-4 right-4 z-10">
+     <button
+      onClick={onToggleCameraPicker}
+      className="flex items-center gap-2 backdrop-blur-md bg-white/15 border border-white/20 text-white text-xs font-bold px-3.5 py-1.5 rounded-full shadow-lg hover:bg-white/25 transition-all"
+     >
+      <Camera className="w-3.5 h-3.5 text-white/90" />
+      <span className="max-w-[120px] truncate">{currentCameraLabel}</span>
+      <ChevronDown className="w-3 h-3 text-white/70" />
+     </button>
 
-          {cameraPickerOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={onCloseCameraPicker} />
-              <div className="absolute right-0 top-full mt-2 w-64 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50">
-                <div className="p-1.5 space-y-1">
-                  <button
-                    onClick={() => {
-                      onDeviceChange('')
-                      onCloseCameraPicker()
-                    }}
-                    className={cn(
-                      'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
-                      !selectedDeviceId
-                        ? 'bg-primary-container text-primary'
-                        : 'hover:bg-surface-container-low text-on-surface',
-                    )}
-                  >
-                    <Camera className="w-4 h-4 text-primary" />
-                    <span>{t('fasilitator.camera.auto')}</span>
-                  </button>
-                  {devices.map((device) => {
-                    const isSelected = selectedDeviceId === device.deviceId
-                    return (
-                      <button
-                        key={device.deviceId}
-                        onClick={() => {
-                          onDeviceChange(device.deviceId)
-                          onCloseCameraPicker()
-                        }}
-                        className={cn(
-                          'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold truncate',
-                          isSelected
-                            ? 'bg-primary-container text-primary'
-                            : 'hover:bg-surface-container-low text-on-surface',
-                        )}
-                      >
-                        <Monitor className="w-4 h-4 text-on-surface-variant" />
-                        <span className="truncate">{device.label || t('fasilitator.camera.deviceFallback')}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </>
+     {cameraPickerOpen && (
+      <>
+       <div className="fixed inset-0 z-40" onClick={onCloseCameraPicker} />
+       <div className="absolute right-0 top-full mt-2 w-64 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50">
+        <div className="p-1.5 space-y-1">
+         <button
+          onClick={() => {
+           onDeviceChange('')
+           onCloseCameraPicker()
+          }}
+          className={cn(
+           'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold',
+           !selectedDeviceId
+            ? 'bg-primary-container text-primary'
+            : 'hover:bg-surface-container-low text-on-surface',
           )}
+         >
+          <Camera className="w-4 h-4 text-primary" />
+          <span>{t('fasilitator.camera.auto')}</span>
+         </button>
+         {devices.map((device) => {
+          const isSelected = selectedDeviceId === device.deviceId
+          return (
+           <button
+            key={device.deviceId}
+            onClick={() => {
+             onDeviceChange(device.deviceId)
+             onCloseCameraPicker()
+            }}
+            className={cn(
+             'w-full flex items-center gap-2.5 p-2.5 rounded-xl text-left transition-all text-xs font-bold truncate',
+             isSelected
+              ? 'bg-primary-container text-primary'
+              : 'hover:bg-surface-container-low text-on-surface',
+            )}
+           >
+            <Monitor className="w-4 h-4 text-on-surface-variant" />
+            <span className="truncate">{device.label || t('fasilitator.camera.deviceFallback')}</span>
+           </button>
+          )
+         })}
         </div>
-      )}
+       </div>
+      </>
+     )}
+    </div>
+   )}
 
-      {cameraState !== 'loading' && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 w-[90%] max-w-md backdrop-blur-md bg-black/50 border border-white/15 rounded-full px-5 py-3 flex items-center justify-between gap-4 shadow-lg">
-          <button
-            onClick={onOpenGallery}
-            className="flex items-center gap-1.5 text-xs font-extrabold text-white/80 hover:text-white transition-colors"
-          >
-            <Image className="w-3.5 h-3.5" />
-            <span>
-              {photoCount}/{maxPhotos}
-            </span>
-          </button>
+   {cameraState !== 'loading' && (
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 w-[90%] max-w-md backdrop-blur-md bg-black/50 border border-white/15 rounded-full px-5 py-3 flex items-center justify-between gap-4 shadow-lg">
+     <button
+      onClick={onOpenGallery}
+      className="flex items-center gap-1.5 text-xs font-extrabold text-white/80 hover:text-white transition-colors"
+     >
+      <Image className="w-3.5 h-3.5" />
+      <span>
+       {photoCount}/{maxPhotos}
+      </span>
+     </button>
 
-          <button
-            onClick={onTakePhoto}
-            disabled={isMaxPhotos || cameraState !== 'active' || disabled}
-            className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-lg active:scale-90 transition-all flex-shrink-0 relative group disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <div className="absolute inset-[3px] rounded-full border-2 border-primary/30 group-hover:border-primary/50 transition-all" />
-            <Camera className="w-6 h-6 text-primary" />
-          </button>
+     <button
+      onClick={onTakePhoto}
+      aria-label={takePhotoLabel}
+      disabled={isMaxPhotos || cameraState !== 'active' || disabled}
+      className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-lg active:scale-90 transition-all flex-shrink-0 relative group disabled:opacity-40 disabled:cursor-not-allowed"
+     >
+      <div className="absolute inset-[3px] rounded-full border-2 border-primary/30 group-hover:border-primary/50 transition-all" />
+      <Camera className="w-6 h-6 text-primary" />
+     </button>
 
-          <button
-            onClick={onOpenFramePicker}
-            className="flex items-center gap-1.5 text-xs font-extrabold text-white/80 hover:text-white transition-colors"
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            {t('fasilitator.frame.frameWord')}
-          </button>
-        </div>
-      )}
-    </>
-  )
+     <button
+      onClick={onOpenFramePicker}
+      className="flex items-center gap-1.5 text-xs font-extrabold text-white/80 hover:text-white transition-colors"
+     >
+      <LayoutGrid className="w-3.5 h-3.5" />
+      {t('fasilitator.frame.frameWord')}
+     </button>
+    </div>
+   )}
+  </>
+ )
 }

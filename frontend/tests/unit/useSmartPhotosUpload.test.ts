@@ -52,6 +52,8 @@ const PNG_BYTES = new Uint8Array([
 const baseArgs = {
   childId: 'child-1',
   participant,
+  // Per-topic upload (Perbaikan-2): the target session stage rides along.
+  sessionStageId: 'ss-1',
   takenBy: 'user-1',
   blob: new Blob([PNG_BYTES], { type: 'image/png' }),
   frameId: null as string | null,
@@ -82,9 +84,11 @@ describe('useSmartPhotos.uploadPhoto', () => {
 
     const uploadMock = vi.mocked(photoService.upload)
     expect(uploadMock).toHaveBeenCalledTimes(1)
-    const [participantId, sessionId, file] = uploadMock.mock.calls[0]
+    const [participantId, sessionId, sessionStageId, file] = uploadMock.mock.calls[0]
     expect(participantId).toBe('child-1')
     expect(sessionId).toBe('sess-1')
+    // The upload REQUIRES the topic bucket — forwarded verbatim.
+    expect(sessionStageId).toBe('ss-1')
     expect(file).toBeInstanceOf(File)
     expect(file.name).toMatch(/^photo-\d+\.png$/)
     expect(file.type).toBe('image/png')
@@ -102,7 +106,7 @@ describe('useSmartPhotos.uploadPhoto', () => {
       await result.current.uploadPhoto({ ...baseArgs, blob: jpegBlob })
     })
 
-    const [, , file] = vi.mocked(photoService.upload).mock.calls[0]
+    const [, , , file] = vi.mocked(photoService.upload).mock.calls[0]
     expect(file.name).toMatch(/^photo-\d+\.jpg$/)
     expect(file.type).toBe('image/jpeg')
   })
@@ -110,7 +114,7 @@ describe('useSmartPhotos.uploadPhoto', () => {
   it('forwards opts.onProgress to the service upload', async () => {
     const onProgress = vi.fn()
     vi.mocked(photoService.upload).mockImplementation(
-      async (_participantId, _sessionId, _file, opts) => {
+      async (_participantId, _sessionId, _sessionStageId, _file, opts) => {
         opts?.onProgress?.(42)
         return uploadedPhoto
       },
@@ -123,7 +127,7 @@ describe('useSmartPhotos.uploadPhoto', () => {
 
     // The hook handed OUR callback to the service, and a service-side progress
     // event reached it unchanged — end-to-end forwarding, not a stub echo.
-    const forwarded = vi.mocked(photoService.upload).mock.calls[0][3]
+    const forwarded = vi.mocked(photoService.upload).mock.calls[0][4]
     expect(forwarded).toBeDefined()
     expect(forwarded?.onProgress).toBe(onProgress)
     expect(onProgress).toHaveBeenCalledWith(42)

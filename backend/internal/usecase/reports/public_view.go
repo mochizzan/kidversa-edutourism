@@ -37,8 +37,9 @@ type PublicMission struct {
 	Title string `json:"title"`
 }
 
-// PublicBadge is an awarded badge. BadgeImageURL is already translated to the
-// PUBLIC kiosk media route — parents have no JWT for /api/media/content.
+// PublicBadge is an awarded badge. BadgeImageURL is translated to the
+// token-scoped badge media route /api/reports/access/badge/:contentId —
+// parents have no JWT, so the client appends ?token= exactly like photo_url.
 // BadgeType discriminates SUBTOPIK (per-Topik) from FINAL (program) awards and
 // ProgramStageID is the awarded Topik ("" for FINAL or legacy rows), so the
 // client can split the list without extra requests.
@@ -299,7 +300,8 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 	}
 
 	// Badges (badgeService.listByParticipant): full list, created_at ASC; the
-	// image id is translated to the public kiosk content route.
+	// image id is translated to the token-scoped badge media route (the
+	// client appends ?token=, same as photo_url).
 	badges, berr := u.sessionSubstageRepo.ListBadgesByParticipant(ctx, r.ParticipantID, tenant)
 	if berr != nil {
 		return nil, berr
@@ -308,7 +310,7 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 	for _, b := range badges {
 		img := ""
 		if b.BadgeImageURL != "" {
-			img = "/api/media/kiosk/content/" + b.BadgeImageURL
+			img = "/api/reports/access/badge/" + b.BadgeImageURL
 		}
 		view.Badges = append(view.Badges, PublicBadge{
 			BadgeName:      b.BadgeName,

@@ -56,6 +56,8 @@ type SessionUsecase struct {
 	attendanceRepo   repository.AttendanceRepository
 	userRepo         repository.UserRepository
 	badgeReconciler  BadgeReconciler
+	photoRepo        repository.PhotoRepository
+	uploadDir        string
 }
 
 // NewSessionUsecase builds the session usecase.
@@ -91,6 +93,17 @@ func (u *SessionUsecase) SetAttendanceRepo(attendanceRepo repository.AttendanceR
 // for the session detail view (so non-admin callers don't need GET /api/users).
 func (u *SessionUsecase) SetUserRepo(userRepo repository.UserRepository) {
 	u.userRepo = userRepo
+}
+
+// SetPhotoSnapshot injects the photo repo and UploadDir used to snapshot the
+// participant's gallery photos when they migrate to a new session of the same
+// program (LinkParticipant): each same-topic photo is copied WITH its own file
+// under UploadDir, so deleting a photo in one session never unlinks the other
+// session's file. Optional: unwired (nil repo or empty dir) skips the copy,
+// like the other optional LinkParticipant dependencies.
+func (u *SessionUsecase) SetPhotoSnapshot(photoRepo repository.PhotoRepository, uploadDir string) {
+	u.photoRepo = photoRepo
+	u.uploadDir = uploadDir
 }
 
 // SetBadgeReconciler injects the badge usecase used to reconcile the
@@ -788,13 +801,14 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 // Migration policy: when the participant already belongs to ANOTHER session,
 // source and target must be sessions of the SAME program — anything else is a
 // 400 program_mismatch before any data is copied. On a valid migration ALL of
-// the source session's assessments (including star = 0 rows) and the attendance
-// row are carried to the target session, and the participant remains
-// re-scored-able there. Every failure (duplicate, program mismatch, missing or
-// foreign-tenant source session, clone/carry failure) surfaces as an explicit
-// error; nothing is swallowed. If the participant was already linked to another
-// session, the previous session info is returned so the caller can display
-// migration context.
+// the source session's assessments (including star = 0 rows), the attendance
+// rows, and the same-topic gallery photos (each with its own copied file) are
+// carried to the target session, and the participant remains re-scored-able
+// there. Every failure (duplicate, program mismatch, missing or
+// foreign-tenant source session, clone/carry/snapshot failure) surfaces as an
+// explicit error; nothing is swallowed. If the participant was already linked
+// to another session, the previous session info is returned so the caller can
+// display migration context.
 func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, participantID, groupID, tenantID string) (*repository.LinkParticipantResult, error) {
 	// Session-scoped write: closed sessions reject new participants. The loaded
 	// target session feeds the same-program migration gate below.
@@ -847,20 +861,32 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	//  1. Clone ALL source assessments (star = 0 included) onto the target
 	//     session's Kegiatan leaves — a failure aborts while the participant is
 	//     still in the source session.
-	//  2. Carry the attendance row (idempotent upsert on participant+session).
-	//  3. Reconcile the FINAL badge (same-program migration only): the program
+	//  2. Carry the attendance rows (idempotent upsert on participant+session).
+	//  3. Snapshot the gallery photos: each same-topic source photo is copied
+	//     to the target session WITH its own file copy under UploadDir
+	//     (deterministic target path derived from the source row ID), so
+	//     deleting a photo in one session never unlinks the other session's
+	//     file. A missing source file skips that row (data condition, logged);
+	//     a copy I/O error aborts before the participant move. Retry converges
+	//     because the natural-key check (target row already holding the
+	//     deterministic path) skips photos copied by a previous attempt.
+	//  4. Reconcile the FINAL badge (same-program migration only): the program
 	//     may have grown Topik since the badge was earned — RecomputeFinalBadge
 	//     is the shared reconcile point (award iff every Topik has its SUBTOPIK
 	//     badge, revoke a stale FINAL otherwise) and never touches SUBTOPIK
 	//     rows, which are program-scoped and carry automatically. A failure
 	//     aborts while the participant is still in the source session.
-	//  4. Move the participant LAST (the commit step): if it fails after 1/2/3,
+	//  5. Move the participant LAST (the commit step): if it fails after 1/2/3/4,
 	//     a retry converges because the clone skips already-existing rows, the
-	//     attendance upsert is idempotent, and the badge reconcile is idempotent.
+	//     attendance upsert is idempotent, the photo copy skips already-copied
+	//     rows, and the badge reconcile is idempotent.
 	if err := u.cloneScoredAssessments(ctx, participantID, prevSessionID, sessionID, tenantID); err != nil {
 		return nil, err
 	}
 	if err := u.carryAttendance(ctx, participantID, prevSessionID, sessionID, tenantID); err != nil {
+		return nil, err
+	}
+	if err := u.copySessionPhotos(ctx, participantID, prevSessionID, sessionID, tenantID); err != nil {
 		return nil, err
 	}
 	if u.badgeReconciler != nil && prevSessionID != "" {
@@ -1105,6 +1131,41 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 	return nil
 }
 
+// sessionStageMaps builds the two remap tables the LinkParticipant carry steps
+// share to translate a source session's session_stages rows onto the target
+// session's rows through the shared program_stage identity:
+//
+//	programOfOld    : source session_stage_id → program_stage_id
+//	targetByProgram : program_stage_id → target session_stage_id
+//
+// The same-program gate upstream guarantees both sessions instantiate the same
+// program's Topik. When a target session accidentally has duplicate stages for
+// one Topik, the first row wins deterministically (mirrors how CreateSession
+// instantiates stages in program order). Used by carryAttendance (attendance
+// rows) and copySessionPhotos (gallery snapshot) — the mapping logic exists in
+// exactly one place.
+func (u *SessionUsecase) sessionStageMaps(ctx context.Context, oldSessionID, newSessionID string) (programOfOld, targetByProgram map[string]string, err error) {
+	oldStages, err := u.sessionRepo.ListSessionStages(ctx, oldSessionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	newStages, err := u.sessionRepo.ListSessionStages(ctx, newSessionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	programOfOld = make(map[string]string, len(oldStages))
+	for i := range oldStages {
+		programOfOld[oldStages[i].ID] = oldStages[i].ProgramStageID
+	}
+	targetByProgram = make(map[string]string, len(newStages))
+	for i := range newStages {
+		if _, dup := targetByProgram[newStages[i].ProgramStageID]; !dup {
+			targetByProgram[newStages[i].ProgramStageID] = newStages[i].ID
+		}
+	}
+	return programOfOld, targetByProgram, nil
+}
+
 // carryAttendance copies the participant's attendance rows from the source
 // session to the target session during LinkParticipant. Attendance is
 // per-Topik: every source row is remapped onto the target session's
@@ -1128,23 +1189,9 @@ func (u *SessionUsecase) carryAttendance(ctx context.Context, participantID, old
 	if len(srcRows) == 0 {
 		return nil
 	}
-	oldStages, err := u.sessionRepo.ListSessionStages(ctx, oldSessionID)
+	programOfOld, targetByProgram, err := u.sessionStageMaps(ctx, oldSessionID, newSessionID)
 	if err != nil {
 		return err
-	}
-	newStages, err := u.sessionRepo.ListSessionStages(ctx, newSessionID)
-	if err != nil {
-		return err
-	}
-	programOfOld := make(map[string]string, len(oldStages))
-	for i := range oldStages {
-		programOfOld[oldStages[i].ID] = oldStages[i].ProgramStageID
-	}
-	targetByProgram := make(map[string]string, len(newStages))
-	for i := range newStages {
-		if _, dup := targetByProgram[newStages[i].ProgramStageID]; !dup {
-			targetByProgram[newStages[i].ProgramStageID] = newStages[i].ID
-		}
 	}
 	for i := range srcRows {
 		src := srcRows[i]

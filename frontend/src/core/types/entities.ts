@@ -281,6 +281,12 @@ export interface SmartPhoto {
  id: string
  participant_id: string
  session_id: string
+ /**
+  * Topic bucket this photo was captured under (session_stages.id). `''` =
+  * legacy/no-topic row (photos uploaded before per-topic capture); the value
+  * is always present on current server responses.
+  */
+ session_stage_id?: string
  frame_id?: string
  original_file_url: string
  framed_file_url?: string

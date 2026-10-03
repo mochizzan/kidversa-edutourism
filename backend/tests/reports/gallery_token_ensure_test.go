@@ -89,9 +89,11 @@ func TestEnsureGalleryTokenMintsForReportWithoutToken(t *testing.T) {
 		row.SessionID != "session-1" || row.TenantID != testTenantID {
 		t.Errorf("gallery_tokens row scoped wrong: %+v", row)
 	}
-	if want := time.Now().Add(galleryTestTTL); row.ExpiresAt.Before(want.Add(-time.Minute)) ||
-		row.ExpiresAt.After(want.Add(time.Minute)) {
-		t.Errorf("ExpiresAt = %v, want ≈ now+%s", row.ExpiresAt, galleryTestTTL)
+	// Masa berlaku tersimpan = sentinel "tak pernah kedaluwarsa" (tahun 9999),
+	// BUKAN now+TTL: QR galeri tidak boleh pernah expired, dan state di baris
+	// gallery_tokens harus mencocoki semantik itu.
+	if row.ExpiresAt.Before(time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("ExpiresAt = %v, want far-future sentinel (year 9999) — gallery tokens never expire", row.ExpiresAt)
 	}
 
 	if len(reportRepo.updates) == 0 {
@@ -129,8 +131,11 @@ func TestEnsureGalleryTokenKeepsValidToken(t *testing.T) {
 	}
 }
 
-// TestEnsureGalleryTokenRemintsExpiredToken: an expired token renders a QR
-// that can only 404 on scan — Ensure must replace it with a fresh one.
+// TestEnsureGalleryTokenRemintsExpiredToken: tokens minted with the old short
+// TTL carry a past expires_at — Ensure upgrades them to a fresh mint (whose
+// expiry is the never-expire sentinel), so the report's canonical token and
+// its stored state converge on the no-expiry semantics. (Scanning an old QR
+// still works in the meantime: resolveGalleryToken ignores time.)
 func TestEnsureGalleryTokenRemintsExpiredToken(t *testing.T) {
 	rep := tokenlessReport()
 	rep.GalleryAccessToken = "stale-token"
@@ -206,7 +211,7 @@ func TestEnsureGalleryTokenHandlerEnvelope(t *testing.T) {
 	rep := tokenlessReport()
 	rep.ID = galleryReportUUID
 	uc, _, _ := newGalleryFixture(rep)
-	h := handler.NewReportHandler(uc, &config.Config{GalleryTokenTTL: galleryTestTTL}, nil, sse.NewHub(), nil, nil)
+	h := handler.NewReportHandler(uc, &config.Config{GalleryTokenTTL: galleryTestTTL}, nil, sse.NewHub(), nil, nil, nil)
 	e := echo.New()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/reports/"+galleryReportUUID+"/gallery-token", nil)

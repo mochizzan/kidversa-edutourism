@@ -1257,6 +1257,9 @@
       "selectModeNoPhotos": "Belum ada foto yang bisa dipilih.",
       "selectModeNothingSelected": "Belum ada foto yang dipilih. Klik satu foto terlebih dahulu.",
       "noActiveTopic": "Tidak ada topik aktif untuk memilih foto rapor.",
+      "legacyChip": "Foto Lama",
+      "legacyPickReason": "Foto lama tidak terikat topik mana pun — pilihan foto mini rapor hanya tersedia di dalam topik.",
+      "addCardLabel": "Tambah foto ke topik ini",
       "topicLoadError": "Gagal memuat daftar topik. Nama topik mungkin tidak lengkap.",
       "picksLoadError": "Gagal memuat pilihan foto rapor.",
       "groupGoneDesc": "Kelompok tidak ditemukan di sesi ini. Mungkin sudah dihapus.",
@@ -1290,6 +1293,8 @@
       "processingImage": "Memproses gambar...",
       "galleryTitle": "Galeri Foto — {{name}}",
       "photoCount": "{{count}}/{{max}} foto",
+      "noTopic": "Topik sesi belum tersedia untuk menyimpan foto.",
+      "takePhotoWithTopic": "Ambil Foto — {{topic}}",
       "chooseFrame": "Pilih Frame",
       "changeFrame": "Ganti Frame",
       "deleteFrame": "Hapus Frame",
@@ -1474,7 +1479,10 @@
       "revokedTitle": "Galeri ditutup",
       "revokedDesc": "Tautan galeri ini sudah ditutup oleh admin. Silakan hubungi koordinator.",
       "needHelp": "Butuh bantuan?",
-      "contactUs": "Hubungi Kami"
+      "contactUs": "Hubungi Kami",
+      "topicsLabel": "Pilih topik",
+      "legacyChip": "Foto Lama",
+      "emptyTopic": "Belum ada foto di topik ini"
     },
     "consent": {
       "yes": "Ya, Setuju",

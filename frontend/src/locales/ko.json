@@ -1272,6 +1272,9 @@
       "selectModeNoPhotos": "선택할 수 있는 사진이 아직 없습니다.",
       "selectModeNothingSelected": "아직 선택된 사진이 없습니다. 먼저 사진을 클릭하세요.",
       "noActiveTopic": "보고서 사진을 선택할 활성 주제가 없습니다.",
+      "legacyChip": "이전 사진",
+      "legacyPickReason": "이전 사진은 어떤 주제에도 연결되어 있지 않습니다. 미니 보고서 사진 선택은 주제 안에서만 가능합니다.",
+      "addCardLabel": "이 주제에 사진 추가",
       "topicLoadError": "주제 목록을 불러오지 못했습니다. 주제 이름이 불완전할 수 있습니다.",
       "picksLoadError": "보고서 사진 선택을 불러오지 못했습니다.",
       "groupGoneDesc": "이 세션에서 그룹을 찾을 수 없습니다. 삭제되었을 수 있습니다.",
@@ -1305,6 +1308,8 @@
       "processingImage": "이미지 처리 중...",
       "galleryTitle": "사진 갤러리 — {{name}}",
       "photoCount": "{{count}}/{{max}} 사진",
+      "noTopic": "사진을 저장할 세션 주제가 없습니다.",
+      "takePhotoWithTopic": "사진 촬영 — {{topic}}",
       "chooseFrame": "프레임 선택",
       "changeFrame": "프레임 변경",
       "deleteFrame": "프레임 삭제",
@@ -1495,7 +1500,10 @@
       "revokedTitle": "갤러리 닫힘",
       "revokedDesc": "이 갤러리 링크는 관리자에 의해 닫혔습니다. 코디네이터에게 문의하십시오.",
       "needHelp": "도움이 필요하신가요?",
-      "contactUs": "문의하기"
+      "contactUs": "문의하기",
+      "topicsLabel": "주제 선택",
+      "legacyChip": "이전 사진",
+      "emptyTopic": "이 주제의 사진이 아직 없습니다"
     },
     "consent": {
       "yes": "네, 동의합니다",

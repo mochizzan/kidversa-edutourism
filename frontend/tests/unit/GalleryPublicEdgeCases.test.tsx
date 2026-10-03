@@ -26,6 +26,9 @@ function makePhoto(id: string): GalleryPhoto {
     framed_file_url: `/files/${id}-framed.jpg`,
     is_report_photo: false,
     report_photo: false,
+    // Legacy-bucket row; topics: [] below → no switcher, flat grid (this
+    // suite pins the guard/error behavior, not the topic switcher).
+    session_stage_id: '',
     taken_at: '2026-01-01T07:00:00Z',
     taken_by: 'user-1',
   }
@@ -39,6 +42,7 @@ function makeGallery(photos: GalleryPhoto[]): GalleryData {
     group_name: 'Kelompok A',
     child_name: 'Ananda Bela',
     photos,
+    topics: [],
   }
 }
 

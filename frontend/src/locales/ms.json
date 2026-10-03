@@ -1272,6 +1272,9 @@
       "selectModeNoPhotos": "Tiada foto yang boleh dipilih lagi.",
       "selectModeNothingSelected": "Tiada foto dipilih lagi. Klik satu foto dahulu.",
       "noActiveTopic": "Tiada topik aktif untuk memilih foto laporan.",
+      "legacyChip": "Foto Lama",
+      "legacyPickReason": "Foto lama tidak terikat dengan mana-mana topik — pilihan foto mini laporan hanya tersedia di dalam topik.",
+      "addCardLabel": "Tambah foto ke topik ini",
       "topicLoadError": "Gagal memuat senarai topik. Nama topik mungkin tidak lengkap.",
       "picksLoadError": "Gagal memuat pilihan foto laporan.",
       "groupGoneDesc": "Kelompok tidak ditemui dalam sesi ini. Mungkin telah dipadam.",
@@ -1305,6 +1308,8 @@
       "processingImage": "Memproses imej...",
       "galleryTitle": "Galeri Foto — {{name}}",
       "photoCount": "{{count}}/{{max}} foto",
+      "noTopic": "Tiada topik sesi untuk menyimpan foto.",
+      "takePhotoWithTopic": "Ambil Foto — {{topic}}",
       "chooseFrame": "Pilih Bingkai",
       "changeFrame": "Tukar Bingkai",
       "deleteFrame": "Padam Bingkai",
@@ -1495,7 +1500,10 @@
       "revokedTitle": "Galeri ditutup",
       "revokedDesc": "Pautan galeri ini telah ditutup oleh admin. Sila hubungi penyelaras.",
       "needHelp": "Perlukan bantuan?",
-      "contactUs": "Hubungi Kami"
+      "contactUs": "Hubungi Kami",
+      "topicsLabel": "Pilih topik",
+      "legacyChip": "Foto Lama",
+      "emptyTopic": "Belum ada foto dalam topik ini"
     },
     "consent": {
       "yes": "Ya, Setuju",

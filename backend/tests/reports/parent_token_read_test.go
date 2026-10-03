@@ -139,7 +139,7 @@ func TestEnsureGalleryTokenHandlerCarriesParentAccessToken(t *testing.T) {
 	rep.ParentAccessToken = token
 
 	uc, _, _ := newGalleryFixture(rep)
-	h := handler.NewReportHandler(uc, &config.Config{GalleryTokenTTL: galleryTestTTL}, nil, sse.NewHub(), nil, nil)
+	h := handler.NewReportHandler(uc, &config.Config{GalleryTokenTTL: galleryTestTTL}, nil, sse.NewHub(), nil, nil, nil)
 	e := echo.New()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/reports/"+galleryReportUUID+"/gallery-token", nil)

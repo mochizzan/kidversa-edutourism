@@ -175,6 +175,11 @@ func (r *GormPhotoRepository) ListPhotos(ctx context.Context, f repository.Photo
 	if f.IsReportPhoto != nil {
 		q = q.Where("is_report_photo = ?", *f.IsReportPhoto)
 	}
+	if f.SessionStageID != nil {
+		// Tri-state: non-nil even when "" → strict equality (legacy bucket
+		// `session_stage_id = ''`); nil → no stage filter. See PhotoFilter.
+		q = q.Where("session_stage_id = ?", *f.SessionStageID)
+	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)

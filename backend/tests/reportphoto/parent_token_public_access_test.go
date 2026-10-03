@@ -47,7 +47,7 @@ func newAccessHandlerWithParentToken(token string) (*handler.ReportHandler, *ech
 		nil, // attendanceRepo
 	)
 	h := handler.NewReportHandler(uc, cfg, &accessSessionRepo{}, sse.NewHub(),
-		&accessConsentRepo{granted: false}, &accessPhotoPanicRepo{})
+		&accessConsentRepo{granted: false}, &accessPhotoPanicRepo{}, nil)
 	return h, echo.New()
 }
 

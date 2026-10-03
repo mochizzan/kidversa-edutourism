@@ -154,7 +154,7 @@ func newTopicHandlerFixture(t *testing.T, seed bool) (*handler.ReportHandler, *e
 	pm := newParticipantMissionFake()
 	uc := newMissionUsecase(repo, gen, sess, bank, pm)
 	cfg := &config.Config{ParentReportBaseURL: "http://localhost/parent/report", ReportTokenTTL: 168 * time.Hour}
-	h := handler.NewReportHandler(uc, cfg, sess, sse.NewHub(), nil, nil)
+	h := handler.NewReportHandler(uc, cfg, sess, sse.NewHub(), nil, nil, nil)
 	e := echo.New()
 	e.Validator = appmiddleware.NewValidator()
 	return h, e, repo, pm, gen, uc

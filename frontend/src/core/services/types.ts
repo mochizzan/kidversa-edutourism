@@ -126,8 +126,15 @@ export interface FrameService {
 // Photos
 export interface PhotoService {
  getBySession(sessionId: string): Promise<SmartPhoto[]>
- getByParticipant(participantId: string): Promise<SmartPhoto[]>
- upload(participantId: string, sessionId: string, file: File): Promise<SmartPhoto>
+ /**
+ * Photos of one participant, optionally narrowed to ONE topic bucket.
+ * `options.sessionStageId` maps 1:1 to the `session_stage_id` query param:
+ * a uuid → that topic strictly; `''` → the legacy no-topic bucket strictly;
+ * omitted entirely → all photos of the participant.
+ */
+ getByParticipant(participantId: string, options?: { sessionStageId?: string }): Promise<SmartPhoto[]>
+ /** Upload REQUIRES the target topic (server validates the uuid). */
+ upload(participantId: string, sessionId: string, sessionStageId: string, file: File): Promise<SmartPhoto>
  update(photoId: string, data: Partial<SmartPhoto>): Promise<SmartPhoto>
  delete(id: string): Promise<void>
  /** Exclusive session default for the mini-raport fallback (POST /:id/set-report-photo). */

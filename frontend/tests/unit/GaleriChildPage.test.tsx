@@ -486,7 +486,12 @@ describe('GaleriChildPage: failed photo loads and mutations surface readable err
   })
 
   it('replaces the photo grid with an error state when the photo fetch fails, then retries', async () => {
-    vi.mocked(photoService.getByParticipant).mockRejectedValueOnce(new TypeError('fetch failed'))
+    // Two fetches are in flight now: the legacy-bucket probe (best-effort —
+    // its rejection is swallowed) and the per-topic fetch that owns the
+    // grid's ErrorState. Both must fail for the grid error to surface.
+    vi.mocked(photoService.getByParticipant)
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
 
     await renderChildPage()
 

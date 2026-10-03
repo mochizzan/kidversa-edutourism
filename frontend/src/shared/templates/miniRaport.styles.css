@@ -2226,6 +2226,9 @@
   .ps-1 {
     padding-inline-start: var(--spacing);
   }
+  .ps-2 {
+    padding-inline-start: calc(var(--spacing) * 2);
+  }
   .pt-0 {
     padding-top: 0;
   }

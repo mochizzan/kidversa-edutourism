@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ChevronLeft, Lock } from 'lucide-react'
 import { Button } from '../../../shared/components/ui/Button'
@@ -9,6 +9,7 @@ import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { frameService } from '../../../core/services/frames'
 import { sessionService } from '../../../core/services/sessions'
+import { programService } from '../../../core/services/programs'
 import { useAuthStore } from '../../../core/stores/authStore'
 import { ROUTES } from '../../../core/constants/app'
 import { useCamera } from '../hooks/useCamera'
@@ -49,10 +50,21 @@ const SmartPhotoPage = () => {
  const navigate = useNavigate()
  const user = useAuthStore((s) => s.user)
  const { addToast, removeToast } = useGlobalToast()
- const { session, isMine } = useGroupOwnership(childId)
+ const { session, group, isMine, loading: ownershipLoading } = useGroupOwnership(childId)
  // Frame ownership: FramePicker filters RAW frames down to the ones allowed
  // for this program (undefined session → global-only frames, fails closed).
  const programId = session?.program_id
+
+ // Perbaikan-2: the ACTIVE topic arrives from the navigating page
+ // (GaleriChildPage / ChildAssessment quick action) as `?stage=<sessionStageId>`;
+ // empty `?stage=` is treated as absent. Resolved to a real session stage in
+ // loadTopic (fallback documented there) — null until then, so the upload and
+ // the per-topic photoCount/maxPhotos pill wait instead of guessing.
+ const [searchParams] = useSearchParams()
+ const stageParam = searchParams.get('stage') || undefined
+ const [topicStageId, setTopicStageId] = useState<string | null>(null)
+ // Display name of topicStageId (from program stages, best-effort).
+ const [topicName, setTopicName] = useState<string | undefined>(undefined)
 
  const captureCanvasRef = useRef<HTMLCanvasElement>(null)
  const editorCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -159,16 +171,66 @@ const SmartPhotoPage = () => {
    .catch(() => {
     setPageError(t('fasilitator.photos.frameLoadError'))
    })
-  if (childId) {
-   loadPhotos().catch(() => {
-    setPageError(t('fasilitator.photos.photoLoadError'))
-   })
-  }
- }, [childId, loadPhotos])
+  // Photo loading lives in loadTopic — the count is PER TOPIC, not session-wide.
+ }, [t])
 
  useEffect(() => {
   loadInitialData()
- }, [childId, loadInitialData])
+ }, [loadInitialData])
+
+ // Perbaikan-2: resolve the ACTIVE topic, then load ITS photo bucket — the
+ // per-topic count behind photoCount/maxPhotos + the shutter gate (max 10 per
+ // topic). `?stage=` wins; when absent the fallback is the group's
+ // current_session_stage_id, else the FIRST session stage — the same default
+ // chain GaleriChildPage uses (a comment-pinned choice: current topic keeps
+ // the camera aligned with the group page; first stage keeps a fresh camera
+ // on the session's opening topic; never a fabricated id). Runs only after
+ // the ownership fetch settles because its group feeds the fallback chain.
+ const loadTopic = useCallback(async () => {
+  if (!participant?.session_id || ownershipLoading) return
+  try {
+   const stages = await sessionService.getStages(participant.session_id)
+   if (loadCancelledRef.current) return
+   const resolved = stageParam ?? group?.current_session_stage_id ?? stages[0]?.id ?? null
+   setTopicStageId(resolved)
+   // Topic name for the header/shutter label — best-effort: without session/
+   // program data the label falls back to topicFallback (still names a topic).
+   if (session?.program_id) {
+    try {
+     const programStages = await programService.getStages(session.program_id)
+     const target = stages.find((s) => s.id === resolved)
+     setTopicName(
+      target
+       ? programStages.find((ps) => ps.id === target.program_stage_id)?.name
+       : undefined,
+     )
+    } catch {
+     setTopicName(undefined)
+    }
+   } else {
+    setTopicName(undefined)
+   }
+   try {
+    await loadPhotos(resolved)
+   } catch {
+    if (!loadCancelledRef.current) setPageError(t('fasilitator.photos.photoLoadError'))
+   }
+  } catch (err) {
+   if (!loadCancelledRef.current) setPageError(friendlyError(err))
+  }
+ }, [
+  participant?.session_id,
+  ownershipLoading,
+  stageParam,
+  group?.current_session_stage_id,
+  session?.program_id,
+  loadPhotos,
+  t,
+ ])
+
+ useEffect(() => {
+  void loadTopic()
+ }, [loadTopic])
 
  useEffect(() => {
   if (phase !== 'editor' || !capturedPhotoDataUrl || !editorCanvasRef.current) return
@@ -284,6 +346,12 @@ const SmartPhotoPage = () => {
    addToast({ type: 'error', message: t('fasilitator.photos.notInSession') })
    return
   }
+  // The upload endpoint REQUIRES a session_stage_id (uuid) — with no topic
+  // resolved (session without stages) fail loudly instead of POSTing ''.
+  if (!topicStageId) {
+   addToast({ type: 'error', message: t('fasilitator.photos.noTopic') })
+   return
+  }
   setIsSaving(true)
   // Upload toast lifecycle lives in the GLOBAL toast store (not component
   // state), so it keeps updating and can be cleared even if this page
@@ -312,6 +380,8 @@ const SmartPhotoPage = () => {
     {
      childId,
      participant: currentParticipant,
+     // Per-topic upload: the photo lands in the ACTIVE topic's bucket.
+     sessionStageId: topicStageId,
      takenBy: user.id,
      blob,
      frameId,
@@ -359,7 +429,7 @@ const SmartPhotoPage = () => {
    if (uploadingToastId) removeToast(uploadingToastId)
    setIsSaving(false)
   }
- }, [childId, user, isReportPhoto, uploadPhoto, addToast, removeToast, t])
+ }, [childId, user, isReportPhoto, topicStageId, uploadPhoto, addToast, removeToast, t])
 
  const handleBack = useCallback(() => {
   if (phase === 'editor') {
@@ -376,6 +446,15 @@ const SmartPhotoPage = () => {
   const device = devices.find((d) => d.deviceId === selectedDeviceId)
   return device?.label || t('fasilitator.camera.deviceFallback')
  })()
+
+ // Perbaikan-2: header + shutter carry the ACTIVE topic's name —
+ // "Ambil Foto — <topik>" (program-stage name, topicFallback while program
+ // data is unavailable); plain "Ambil Foto" only when no topic resolved at all.
+ const takePhotoLabel = topicStageId
+  ? t('fasilitator.photos.takePhotoWithTopic', {
+   topic: topicName ?? t('fasilitator.topicFallback'),
+  })
+  : t('fasilitator.takePhoto')
 
  const photoCount = photos.length
  const isMaxPhotos = photoCount >= MAX_PHOTOS
@@ -450,7 +529,7 @@ const SmartPhotoPage = () => {
      </button>
      <div>
       <h2 className="text-2xl md:text-3xl font-extrabold text-on-surface leading-tight">
-       {t('fasilitator.takePhoto')}
+       {takePhotoLabel}
       </h2>
       <p className="text-xs md:text-sm text-on-surface-variant font-medium">
        {t('fasilitator.photos.subtitle')}
@@ -475,6 +554,7 @@ const SmartPhotoPage = () => {
         onRetryLoad={() => {
          setPageError(null)
          loadInitialData()
+         void loadTopic()
         }}
         participant={participant}
         devices={devices}
@@ -488,6 +568,7 @@ const SmartPhotoPage = () => {
         photoCount={photoCount}
         maxPhotos={MAX_PHOTOS}
         isMaxPhotos={isMaxPhotos}
+        takePhotoLabel={takePhotoLabel}
         onTakePhoto={takePhoto}
         onOpenGallery={() => {
          if (childId) navigate(ROUTES.FASILITATOR.GALERI_CHILD(childId))

@@ -12,10 +12,10 @@ interface ContentRendererProps {
 /**
  * Centralized, purely presentational renderer for a single StageContent item.
  *
- * It is the defense-in-depth guard against the kiosk 404: when a content item
+ * It is the defense-in-depth guard against empty sources: when a content item
  * has NO playable source (e.g. a VIDEO whose file_url is empty and that is not
  * a YouTube link), it renders an inline fallback and NEVER issues a media
- * request — so the `/api/media/kiosk/content/:id` path is never taken.
+ * request for that item.
  */
 export function ContentRenderer({ content, isMuted, onEnded }: ContentRendererProps) {
  const { t } = useTranslation()

@@ -5,6 +5,7 @@ import { Images, Lock, Plus, Save, X } from 'lucide-react'
 import { useAuth } from '../../../../core/hooks/useAuth'
 import { sessionService } from '../../../../core/services/sessions'
 import { programService } from '../../../../core/services/programs'
+import { photoService } from '../../../../core/services/photos'
 import { ROUTES } from '../../../../core/constants/app'
 import { UserRole } from '../../../../core/types/enums'
 import { useGlobalToast } from '../../../../shared/components/feedback/Toast'
@@ -84,8 +85,21 @@ const GaleriChildPage = () => {
  const [notFound, setNotFound] = useState(false)
  const [participant, setParticipant] = useState<Participant | null>(null)
  const [group, setGroup] = useState<SessionGroup | undefined>(undefined)
- const [topics, setTopics] = useState<{ programStageId: string; name: string }[]>([])
+ // Chips keyed on the SESSION stage id (the photo bucket / ?stage= value the
+ // camera consumes); programStageId is kept only for the mini-rapor picks.
+ const [topics, setTopics] = useState<
+  { sessionStageId: string; programStageId: string; name: string }[]
+ >([])
+ // Session stage id of the ACTIVE chip. '' = legacy "Foto Lama" bucket,
+ // null = no topic resolved yet (or a session without stages).
  const [activeStageId, setActiveStageId] = useState<string | null>(null)
+ // Stages resolved → the photo fetch may key on activeStageId. Gates the
+ // first fetch so an all-photos request can never race (and clobber) the
+ // per-topic one before the default chip is known.
+ const [stageReady, setStageReady] = useState(false)
+ // Legacy '' bucket probe result — the extra chip is shown ONLY when that
+ // bucket really has rows.
+ const [hasLegacyPhotos, setHasLegacyPhotos] = useState(false)
  const [photosError, setPhotosError] = useState<string | null>(null)
  const [sortKey, setSortKey] = useState<GallerySortKey>('newest')
 
@@ -112,13 +126,12 @@ const GaleriChildPage = () => {
   }
  }, [])
 
- const { photos, loadPhotos, picks, loadPicks, setPick, deletePhoto } = useSmartPhotos(
-  childId,
-  participant,
- )
+ const { photos, loadPhotos, setPhotos, picks, loadPicks, setPick, deletePhoto } =
+  useSmartPhotos(childId, participant)
 
- // Urutan galeri (K) — client-side; photos sudah difilter server per
- // participant (GET /api/photos?participant_id=), tak ada filter topik di sini.
+ // Urutan galeri (K) — client-side; `photos` IS the active topic's bucket
+ // (GET /api/photos?participant_id=&session_stage_id=), jadi sort/counter/grid
+ // selalu membaca topik yang sedang aktif.
  const sortedPhotos = useMemo(() => sortPhotosForGallery(photos, sortKey), [photos, sortKey])
 
  const fetchData = useCallback(async (silent = false) => {
@@ -141,6 +154,9 @@ const GaleriChildPage = () => {
    if (!part.session_id) {
     setGroup(undefined)
     setTopics([])
+    // Sesi tanpa stages: tak ada topik untuk difilter — photo effect boleh
+    // jalan dengan activeStageId null (semua foto, perilaku lama).
+    setStageReady(true)
     return
    }
    const [detail, stages] = await Promise.all([
@@ -150,12 +166,13 @@ const GaleriChildPage = () => {
    const found = detail?.groups.find((g) => g.id === part.group_id)
    setGroup(found)
    // Default topik = current_session_stage_id grup, fallback stage pertama
-   // (pola SmartPhotoPage); pilihan user (activeStageId) menang.
+   // (pola SmartPhotoPage); pilihan user (activeStageId) menang. NOTE: nilai
+   // adalah SESSION stage id (bucket foto / ?stage=), bukan program stage.
    setActiveStageId(
     (prev) =>
      prev ??
-     stages.find((s) => s.id === found?.current_session_stage_id)?.program_stage_id ??
-     stages[0]?.program_stage_id ??
+     stages.find((s) => s.id === found?.current_session_stage_id)?.id ??
+     stages[0]?.id ??
      null,
    )
 
@@ -171,10 +188,13 @@ const GaleriChildPage = () => {
    }
    setTopics(
     stages.map((s) => ({
+     sessionStageId: s.id,
      programStageId: s.program_stage_id,
      name: names.get(s.program_stage_id) ?? t('fasilitator.topicFallback'),
     })),
    )
+   // Chips + default topik siap → photo effect berikut mengunci bucket-nya.
+   setStageReady(true)
   } catch (err) {
    setError(friendlyError(err))
   } finally {
@@ -201,18 +221,53 @@ const GaleriChildPage = () => {
   }
  }, [fetchData])
 
- // Muat foto + picks begitu participant siap (guard di hook menahan saat null).
- // A photo-fetch failure renders an ErrorState+retry instead of an empty grid.
+ // Legacy "Foto Lama" bucket probe — sekali per participant. Chip-nya hanya
+ // muncul bila bucket '' benar-benar berisi (session_stage_id= tanpa nilai =
+ // sinyal bucket legacy pada kontrak backend). Best-effort: probe gagal →
+ // chip disembunyikan, galeri tetap jalan.
+ useEffect(() => {
+  if (!childId || !participant) return
+  let cancelled = false
+  photoService
+   .getByParticipant(childId, { sessionStageId: '' })
+   .then((rows) => {
+    if (!cancelled) setHasLegacyPhotos(rows.length > 0)
+   })
+   .catch(() => {
+    if (!cancelled) setHasLegacyPhotos(false)
+   })
+  return () => {
+   cancelled = true
+  }
+ }, [childId, participant])
+
+ // Muat foto PER TOPIK: satu request session_stage_id= untuk chip yang aktif
+ // (maksimal 10 foto per bucket — tak pernah kena limit 100). stageReady
+ // menahan fetch pertama sampai default chip diketahui supaya request
+ // all-photos (activeStageId null) tak pernah balapan dengan request topik.
+ // Ganti chip → effect ini jalan lagi → counter/grid di-reset ke bucket baru.
+ // Kegagalan fetch dirender ErrorState+retry, bukan grid kosong.
+ useEffect(() => {
+  if (!participant || !stageReady) return
+  setPhotosError(null)
+  void loadPhotos(activeStageId ?? undefined).catch((err) =>
+   setPhotosError(friendlyError(err)),
+  )
+ }, [participant, stageReady, activeStageId, loadPhotos])
+
+ // Picks per participant+session (bukan per topik) — cukup sekali per load.
  useEffect(() => {
   if (!participant) return
-  setPhotosError(null)
-  void loadPhotos().catch((err) => setPhotosError(friendlyError(err)))
   void loadPicks()
- }, [participant, loadPhotos, loadPicks])
+ }, [participant, loadPicks])
 
  const retryLoadPhotos = () => {
   setPhotosError(null)
-  void loadPhotos().catch((err) => setPhotosError(friendlyError(err)))
+  // Argumen topik eksplisit → retry selalu mengambil bucket yang sedang aktif
+  // (bisa saja retry ditekan sebelum fetch pertama sempat mengisi topicRef).
+  void loadPhotos(activeStageId ?? undefined).catch((err) =>
+   setPhotosError(friendlyError(err)),
+  )
  }
 
  // Mirror useGroupOwnership: FASILITATOR hanya boleh beraksi pada kelompoknya.
@@ -220,13 +275,22 @@ const GaleriChildPage = () => {
  const consentOk = !!participant?.consent_photo
  const targetGroupId = participant?.group_id ?? group?.id
 
+ // Topik aktif dalam dua bentuk: sessionStageId (bucket foto / ?stage=) dan
+ // programStageId (kontrak report-picks). Legacy bucket ('') tak punya
+ // keduanya → pick mini rapor mustahil di sana.
+ const isLegacyActive = activeStageId === ''
+ const activeProgramStageId =
+  topics.find((tp) => tp.sessionStageId === activeStageId)?.programStageId ?? null
+
  const pickDisabledReason = !isMine
   ? t('fasilitator.notMyGroup')
   : !consentOk
    ? t('fasilitator.photos.consentRequired')
-   : !activeStageId
-    ? t('fasilitator.galeri.noActiveTopic')
-    : undefined
+   : isLegacyActive
+    ? t('fasilitator.galeri.legacyPickReason')
+    : !activeStageId
+     ? t('fasilitator.galeri.noActiveTopic')
+     : undefined
  const addPhotoDisabledReason = !targetGroupId
   ? t('fasilitator.group.notFound')
   : !isMine
@@ -235,7 +299,19 @@ const GaleriChildPage = () => {
     ? t('fasilitator.photos.consentRequired')
     : undefined
 
- const pickPhotoId = picks.find((p) => p.program_stage_id === activeStageId)?.photo_id ?? null
+ // "Tambah Foto" hanya di topik nyata dan selama di bawah batas 10 foto;
+ // bucket legacy disembunyikan (tak ada program stage untuk di-upload).
+ const showAddCard = activeStageId !== null && !isLegacyActive && photos.length < MAX_PHOTOS
+
+ // Rute kamera + topik AKTIF (?stage=) — SmartPhotoPage mengunggah ke session
+ // stage itu. Bucket legacy / belum ada topik → tanpa query → kamera fallback
+ // ke current/first stage grup (tak pernah memalsukan topik untuk foto lama).
+ const cameraTarget =
+  `/fasilitator/groups/${targetGroupId}/children/${childId}/photo` +
+  (activeStageId ? `?stage=${encodeURIComponent(activeStageId)}` : '')
+
+ const pickPhotoId =
+  picks.find((p) => p.program_stage_id === activeProgramStageId)?.photo_id ?? null
 
  // ── Toggle mini rapor (dua state) ──
  // Masuk mode pilih: hanya saat tak ada kendala; daftar foto kosong → toast
@@ -273,7 +349,9 @@ const GaleriChildPage = () => {
    addToast({ type: 'warning', message: t('fasilitator.galeri.selectModeNothingSelected') })
    return
   }
-  if (!activeStageId) {
+  // Pick dikirim dengan PROGRAM stage id (kontrak report-picks), bukan
+  // session stage id yang dipakai chip/foto.
+  if (!activeProgramStageId) {
    console.warn('[GaleriChildPage] saveSelection skipped: no active topic', { pendingPhotoId })
    addToast({ type: 'error', message: t('fasilitator.galeri.noActiveTopic') })
    return
@@ -281,7 +359,7 @@ const GaleriChildPage = () => {
   savingRef.current = true
   setSaving(true)
   try {
-   const saved = await setPick(activeStageId, pendingPhotoId)
+   const saved = await setPick(activeProgramStageId, pendingPhotoId)
    if (!saved) {
     addToast({ type: 'error', message: t('fasilitator.photos.pickError') })
     return
@@ -323,6 +401,16 @@ const GaleriChildPage = () => {
    return
   }
   setPendingPhotoId((prev) => (prev === photo.id ? null : photo.id))
+ }
+
+ // Ganti chip topik: reset counter/grid SEGERA (photos state selalu milik
+ // topik aktif) sambil effect fetch memuat bucket chip yang dipilih. Mode
+ // pilih tetap hidup — pilihan tertunda otomatis dibersihkan karena foto
+ // lama tak ada lagi di daftar.
+ const handleTopicSelect = (sessionStageId: string) => {
+  setActiveStageId(sessionStageId)
+  setPhotos([])
+  setPhotosError(null)
  }
 
  const header = (
@@ -387,9 +475,7 @@ const GaleriChildPage = () => {
      icon={<Plus className="w-4 h-4" />}
      disabled={!!addPhotoDisabledReason}
      tooltip={addPhotoDisabledReason}
-     onClick={() =>
-      navigate(`/fasilitator/groups/${targetGroupId}/children/${childId}/photo`)
-     }
+     onClick={() => navigate(cameraTarget)}
     >
      {t('fasilitator.galeri.addPhoto')}
     </Button>
@@ -442,10 +528,10 @@ const GaleriChildPage = () => {
     <div className="flex gap-2 overflow-x-auto pb-1">
      {topics.map((tp) => (
       <button
-       key={tp.programStageId}
+       key={tp.sessionStageId}
        type="button"
-       onClick={() => setActiveStageId(tp.programStageId)}
-       className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${tp.programStageId === activeStageId
+       onClick={() => handleTopicSelect(tp.sessionStageId)}
+       className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${tp.sessionStageId === activeStageId
         ? 'bg-primary text-white'
         : 'bg-surface-container-highest text-on-surface-variant hover:bg-primary/10'
         }`}
@@ -453,6 +539,19 @@ const GaleriChildPage = () => {
        {tp.name}
       </button>
      ))}
+     {hasLegacyPhotos && (
+      <button
+       key="__legacy"
+       type="button"
+       onClick={() => handleTopicSelect('')}
+       className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${isLegacyActive
+        ? 'bg-primary text-white'
+        : 'bg-surface-container-highest text-on-surface-variant hover:bg-primary/10'
+        }`}
+      >
+       {t('fasilitator.galeri.legacyChip')}
+      </button>
+     )}
     </div>
    )}
 
@@ -469,6 +568,17 @@ const GaleriChildPage = () => {
       pendingPhotoId={pendingPhotoId}
       onDelete={(photo) => setConfirmDeletePhoto(photo)}
       deleteDisabledReason={isMine ? undefined : t('fasilitator.notMyGroup')}
+      addCard={
+       showAddCard
+        ? {
+         label: t('fasilitator.galeri.addPhoto'),
+         ariaLabel: t('fasilitator.galeri.addCardLabel'),
+         onClick: () => navigate(cameraTarget),
+         disabled: !!addPhotoDisabledReason,
+         disabledReason: addPhotoDisabledReason,
+        }
+        : undefined
+      }
      />
     )}
    </div>

@@ -1272,6 +1272,9 @@
       "selectModeNoPhotos": "There are no photos to pick yet.",
       "selectModeNothingSelected": "No photo selected yet. Click a photo first.",
       "noActiveTopic": "No active topic to pick a report photo for.",
+      "legacyChip": "Older Photos",
+      "legacyPickReason": "Older photos are not tied to any topic — mini report picking is only available inside a topic.",
+      "addCardLabel": "Add a photo to this topic",
       "topicLoadError": "Failed to load the topic list. Topic names may be incomplete.",
       "picksLoadError": "Failed to load report photo picks.",
       "groupGoneDesc": "The group was not found in this session. It may have been deleted.",
@@ -1305,6 +1308,8 @@
       "processingImage": "Processing image...",
       "galleryTitle": "Photo Gallery — {{name}}",
       "photoCount": "{{count}}/{{max}} photos",
+      "noTopic": "No session topic available to save the photo.",
+      "takePhotoWithTopic": "Take Photo — {{topic}}",
       "chooseFrame": "Select Frame",
       "changeFrame": "Change Frame",
       "deleteFrame": "Remove Frame",
@@ -1495,7 +1500,10 @@
       "revokedTitle": "Gallery closed",
       "revokedDesc": "This gallery link has been closed by the admin. Please contact the coordinator.",
       "needHelp": "Need help?",
-      "contactUs": "Contact Us"
+      "contactUs": "Contact Us",
+      "topicsLabel": "Choose a topic",
+      "legacyChip": "Older Photos",
+      "emptyTopic": "No photos in this topic yet"
     },
     "consent": {
       "yes": "Yes, I Agree",

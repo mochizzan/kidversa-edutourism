@@ -1272,6 +1272,9 @@
       "selectModeNoPhotos": "選択できる写真がまだありません。",
       "selectModeNothingSelected": "まだ写真が選択されていません。先に写真を1枚クリックしてください。",
       "noActiveTopic": "報告写真を選択できるアクティブなトピックがありません。",
+      "legacyChip": "以前の写真",
+      "legacyPickReason": "以前の写真はどのトピックにも関連付けられていません。ミニレポート写真の選択はトピック内でのみ可能です。",
+      "addCardLabel": "このトピックに写真を追加",
       "topicLoadError": "トピック一覧の読み込みに失敗しました。トピック名が不完全な可能性があります。",
       "picksLoadError": "報告写真の選択状況の読み込みに失敗しました。",
       "groupGoneDesc": "このセッションにグループが見つかりません。削除された可能性があります。",
@@ -1305,6 +1308,8 @@
       "processingImage": "画像を処理中...",
       "galleryTitle": "フォトギャラリー — {{name}}",
       "photoCount": "{{count}}/{{max}}枚の写真",
+      "noTopic": "写真を保存できるセッションのトピックがありません。",
+      "takePhotoWithTopic": "写真を撮る — {{topic}}",
       "chooseFrame": "フレームを選択",
       "changeFrame": "フレームを変更",
       "deleteFrame": "フレームを削除",
@@ -1495,7 +1500,10 @@
       "revokedTitle": "ギャラリーは終了しました",
       "revokedDesc": "このギャラリーリンクは管理者によって終了されました。コーディネーターに連絡してください。",
       "needHelp": "ヘルプが必要ですか？",
-      "contactUs": "お問い合わせ"
+      "contactUs": "お問い合わせ",
+      "topicsLabel": "トピックを選択",
+      "legacyChip": "以前の写真",
+      "emptyTopic": "このトピックの写真はまだありません"
     },
     "consent": {
       "yes": "はい、同意します",

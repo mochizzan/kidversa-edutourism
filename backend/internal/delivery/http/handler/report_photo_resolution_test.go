@@ -26,6 +26,46 @@ type fakeResolutionPhotoRepo struct {
 	listErr func(filt repository.PhotoFilter) error
 }
 
+// Topic constants for the stage-listing fake: program topic A (programStageA,
+// equal to the tests' local stageID) instantiates session stage sessionStageID;
+// topic B (programStageB) instantiates sessionStageIDB. Photos are
+// topic-attributed through SmartPhoto.SessionStageID (migration 000009).
+const (
+	programStageA   = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+	programStageB   = "7b7b7b7b-7b7b-4b7b-8b7b-7b7b7b7b7b7b"
+	sessionStageID  = "99999999-9999-4999-8999-999999999999"
+	sessionStageIDB = "88888888-8888-4888-8888-888888888888"
+)
+
+// fakeStageLister is the stageLister slice the topic-scoped resolution reads
+// (mirror of GormSessionRepository.ListSessionStages).
+type fakeStageLister struct {
+	stages []entity.SessionStage
+	err    error
+	// calls counts ListSessionStages invocations (0 = the pick short-circuited
+	// before any stage lookup, or a legacy session-wide report).
+	calls int
+}
+
+func (f *fakeStageLister) ListSessionStages(context.Context, string) ([]entity.SessionStage, error) {
+	f.calls++
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.stages, nil
+}
+
+// topicAStages is the default session fixture: the session instantiates topic
+// A (programStageA → sessionStageID) and topic B (programStageB →
+// sessionStageIDB).
+func topicAStages() *fakeStageLister {
+	a := entity.SessionStage{ProgramStageID: programStageA}
+	a.ID = sessionStageID
+	b := entity.SessionStage{ProgramStageID: programStageB}
+	b.ID = sessionStageIDB
+	return &fakeStageLister{stages: []entity.SessionStage{a, b}}
+}
+
 func pickKey(participantID, sessionID, programStageID string) string {
 	return participantID + "|" + sessionID + "|" + programStageID
 }
@@ -63,6 +103,11 @@ func (f *fakeResolutionPhotoRepo) ListPhotos(_ context.Context, filt repository.
 			continue
 		}
 		if filt.IsReportPhoto != nil && p.IsReportPhoto != *filt.IsReportPhoto {
+			continue
+		}
+		// Mirror GormPhotoRepository.ListPhotos: a non-nil SessionStageID is a
+		// strict `session_stage_id = ?` (nil = no stage filter).
+		if filt.SessionStageID != nil && p.SessionStageID != *filt.SessionStageID {
 			continue
 		}
 		out = append(out, *p)
@@ -158,7 +203,7 @@ func TestResolveReportPhoto(t *testing.T) {
 	)
 
 	newPhoto := func(id string, isReportPhoto bool) *entity.SmartPhoto {
-		p := &entity.SmartPhoto{IsReportPhoto: isReportPhoto}
+		p := &entity.SmartPhoto{IsReportPhoto: isReportPhoto, SessionStageID: sessionStageID}
 		p.ID = id
 		p.ParticipantID = participantID
 		p.SessionID = sessionID
@@ -231,7 +276,7 @@ func TestResolveReportPhoto(t *testing.T) {
 				repo.picks[pickKey(participantID, sessionID, stageID)] = pick
 			}
 
-			got, err := resolveReportPhoto(context.Background(), repo, participantID, sessionID, stageID)
+			got, err := resolveReportPhoto(context.Background(), repo, topicAStages(), participantID, sessionID, stageID)
 			if err != nil {
 				t.Fatalf("resolveReportPhoto returned error: %v", err)
 			}
@@ -289,7 +334,7 @@ func TestResolveReportPhotoWithFallback(t *testing.T) {
 	)
 
 	newPhoto := func(id, owner string, isReport bool, createdAt, takenAt time.Time) *entity.SmartPhoto {
-		p := &entity.SmartPhoto{IsReportPhoto: isReport, TakenAt: takenAt}
+		p := &entity.SmartPhoto{IsReportPhoto: isReport, TakenAt: takenAt, SessionStageID: sessionStageID}
 		p.ID = id
 		p.ParticipantID = owner
 		p.SessionID = sessionID
@@ -398,7 +443,7 @@ func TestResolveReportPhotoWithFallback(t *testing.T) {
 				repo.picks[pickKey(participantID, sessionID, stageID)] = pick
 			}
 
-			got, err := resolveReportPhotoWithFallback(context.Background(), repo, participantID, sessionID, stageID)
+			got, err := resolveReportPhotoWithFallback(context.Background(), repo, topicAStages(), participantID, sessionID, stageID)
 			if err != nil {
 				t.Fatalf("resolveReportPhotoWithFallback returned error: %v", err)
 			}
@@ -469,7 +514,7 @@ func TestResolveReportPhotoWithFallback_RepoErrorIsLoud(t *testing.T) {
 				},
 			}
 
-			got, err := resolveReportPhotoWithFallback(context.Background(), repo, participantID, sessionID, stageID)
+			got, err := resolveReportPhotoWithFallback(context.Background(), repo, topicAStages(), participantID, sessionID, stageID)
 			if !errors.Is(err, boom) {
 				t.Fatalf("expected repo error %v, got %v", boom, err)
 			}
@@ -481,4 +526,172 @@ func TestResolveReportPhotoWithFallback_RepoErrorIsLoud(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestResolveReportPhoto_TopicTruth pins the per-topic truth of tiers 2-3
+// (migration 000009): for a report scoped to topic A, a photo flagged or
+// merely newest under topic B — or a legacy no-stage photo — must NEVER serve
+// it; the topic-true photo of A wins over a NEWER photo of B; tier-1 picks
+// stay tolerant of stored rows; an unresolvable topic yields no photo instead
+// of an unscoped cross-topic query; a stage-listing failure is loud; and a
+// legacy report WITHOUT a topic keeps today's session-wide behavior.
+func TestResolveReportPhoto_TopicTruth(t *testing.T) {
+	const (
+		participantID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+		sessionID     = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+		topicAPhotoID = "a1111111-1111-4111-8111-111111111111"
+		topicBPhotoID = "b2222222-2222-4222-8222-222222222222"
+		legacyPhotoID = "c3333333-3333-4333-8333-333333333333"
+		pickedPhotoID = "11111111-1111-4111-8111-111111111111"
+	)
+	var (
+		older  = time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+		newest = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	)
+
+	photo := func(id, stageID string, flagged bool, at time.Time) *entity.SmartPhoto {
+		p := &entity.SmartPhoto{IsReportPhoto: flagged, TakenAt: at, SessionStageID: stageID}
+		p.ID = id
+		p.ParticipantID = participantID
+		p.SessionID = sessionID
+		p.CreatedAt = at
+		return p
+	}
+	newRepo := func(photos ...*entity.SmartPhoto) *fakeResolutionPhotoRepo {
+		m := map[string]*entity.SmartPhoto{}
+		for _, p := range photos {
+			m[p.ID] = p
+		}
+		return &fakeResolutionPhotoRepo{photos: m, tenantOf: map[string]string{}, picks: map[string]entity.ReportPhotoPick{}}
+	}
+	requirePhoto := func(t *testing.T, got *entity.SmartPhoto, wantID string) {
+		t.Helper()
+		if wantID == "" {
+			if got != nil {
+				t.Fatalf("expected nil photo, got id=%q (topic-scoped tier served a wrong-topic photo)", got.ID)
+			}
+			return
+		}
+		if got == nil {
+			t.Fatalf("expected photo %q, got nil", wantID)
+		}
+		if got.ID != wantID {
+			t.Fatalf("expected photo %q, got %q", wantID, got.ID)
+		}
+	}
+
+	t.Run("tier 2: flagged photo of topic B does not serve topic A's report", func(t *testing.T) {
+		repo := newRepo(photo(topicBPhotoID, sessionStageIDB, true, newest))
+		got, err := resolveReportPhoto(context.Background(), repo, topicAStages(), participantID, sessionID, programStageA)
+		if err != nil {
+			t.Fatalf("resolveReportPhoto returned error: %v", err)
+		}
+		requirePhoto(t, got, "")
+		if repo.listCalls != 1 {
+			t.Fatalf("ListPhotos called %d time(s), want 1", repo.listCalls)
+		}
+	})
+
+	t.Run("tier 2: flagged legacy ('') photo does not satisfy topic A's scoped tier", func(t *testing.T) {
+		repo := newRepo(photo(legacyPhotoID, "", true, newest))
+		got, err := resolveReportPhoto(context.Background(), repo, topicAStages(), participantID, sessionID, programStageA)
+		if err != nil {
+			t.Fatalf("resolveReportPhoto returned error: %v", err)
+		}
+		requirePhoto(t, got, "")
+	})
+
+	t.Run("tier 3: newer topic-B photo loses to the older topic-A photo", func(t *testing.T) {
+		repo := newRepo(
+			photo(topicAPhotoID, sessionStageID, false, older),
+			photo(topicBPhotoID, sessionStageIDB, false, newest),
+		)
+		got, err := resolveReportPhotoWithFallback(context.Background(), repo, topicAStages(), participantID, sessionID, programStageA)
+		if err != nil {
+			t.Fatalf("resolveReportPhotoWithFallback returned error: %v", err)
+		}
+		requirePhoto(t, got, topicAPhotoID)
+		if repo.listCalls != 2 {
+			t.Fatalf("ListPhotos called %d time(s), want 2", repo.listCalls)
+		}
+	})
+
+	t.Run("tier 3: only topic-B photos → nil (placeholder, not a wrong-topic photo)", func(t *testing.T) {
+		repo := newRepo(photo(topicBPhotoID, sessionStageIDB, false, newest))
+		got, err := resolveReportPhotoWithFallback(context.Background(), repo, topicAStages(), participantID, sessionID, programStageA)
+		if err != nil {
+			t.Fatalf("resolveReportPhotoWithFallback returned error: %v", err)
+		}
+		requirePhoto(t, got, "")
+		if repo.listCalls != 2 {
+			t.Fatalf("ListPhotos called %d time(s), want 2", repo.listCalls)
+		}
+	})
+
+	t.Run("tier 1: existing pick of a legacy photo stays readable", func(t *testing.T) {
+		repo := newRepo(photo(pickedPhotoID, "", false, older))
+		pick := entity.ReportPhotoPick{
+			ParticipantID: participantID, SessionID: sessionID,
+			ProgramStageID: programStageA, PhotoID: pickedPhotoID,
+		}
+		pick.ID = "pick-00000000-0000-4000-8000-000000000009"
+		repo.picks[pickKey(participantID, sessionID, programStageA)] = pick
+
+		got, err := resolveReportPhotoWithFallback(context.Background(), repo, topicAStages(), participantID, sessionID, programStageA)
+		if err != nil {
+			t.Fatalf("resolveReportPhotoWithFallback returned error: %v", err)
+		}
+		requirePhoto(t, got, pickedPhotoID)
+		if repo.listCalls != 0 {
+			t.Fatalf("ListPhotos called %d time(s), want 0 (pick short-circuits)", repo.listCalls)
+		}
+	})
+
+	t.Run("unresolvable topic → nil without any unscoped ListPhotos", func(t *testing.T) {
+		// The session only instantiates topic B; the report is scoped to A.
+		onlyB := entity.SessionStage{ProgramStageID: programStageB}
+		onlyB.ID = sessionStageIDB
+		stages := &fakeStageLister{stages: []entity.SessionStage{onlyB}}
+		repo := newRepo(photo(topicBPhotoID, sessionStageIDB, true, newest))
+		got, err := resolveReportPhotoWithFallback(context.Background(), repo, stages, participantID, sessionID, programStageA)
+		if err != nil {
+			t.Fatalf("resolveReportPhotoWithFallback returned error: %v", err)
+		}
+		requirePhoto(t, got, "")
+		if repo.listCalls != 0 {
+			t.Fatalf("ListPhotos called %d time(s), want 0 (never fall back to an unscoped query)", repo.listCalls)
+		}
+	})
+
+	t.Run("stage-listing failure is loud, never a silent unscoped query", func(t *testing.T) {
+		boom := errors.New("stage list unavailable")
+		stages := &fakeStageLister{err: boom}
+		repo := newRepo(photo(topicAPhotoID, sessionStageID, true, newest))
+		got, err := resolveReportPhotoWithFallback(context.Background(), repo, stages, participantID, sessionID, programStageA)
+		if !errors.Is(err, boom) {
+			t.Fatalf("expected stage-list error %v, got %v", boom, err)
+		}
+		if got != nil {
+			t.Fatalf("expected nil photo alongside the error, got id=%q", got.ID)
+		}
+		if repo.listCalls != 0 {
+			t.Fatalf("ListPhotos called %d time(s), want 0", repo.listCalls)
+		}
+	})
+
+	t.Run("legacy report without topic keeps session-wide behavior", func(t *testing.T) {
+		repo := newRepo(photo(legacyPhotoID, "", true, older), photo(topicBPhotoID, sessionStageIDB, false, newest))
+		stages := topicAStages()
+		got, err := resolveReportPhotoWithFallback(context.Background(), repo, stages, participantID, sessionID, "")
+		if err != nil {
+			t.Fatalf("resolveReportPhotoWithFallback returned error: %v", err)
+		}
+		requirePhoto(t, got, legacyPhotoID) // session-wide: the flagged legacy photo still wins
+		if stages.calls != 0 {
+			t.Fatalf("ListSessionStages called %d time(s), want 0 (no topic → no stage lookup)", stages.calls)
+		}
+		if repo.listCalls != 1 {
+			t.Fatalf("ListPhotos called %d time(s), want 1 (tier 2 hits the flagged photo; no tier-3 needed)", repo.listCalls)
+		}
+	})
 }

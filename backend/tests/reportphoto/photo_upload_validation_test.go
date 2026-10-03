@@ -73,7 +73,8 @@ func uploadEcho() *echo.Echo {
 }
 
 // TestUpload_FormValidation: malformed/missing form IDs fail fast with 400
-// validation_error and never create a photo row.
+// validation_error and never create a photo row. session_stage_id is REQUIRED
+// (migration 000009): missing or non-UUID stage fails the same way.
 func TestUpload_FormValidation(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -82,28 +83,47 @@ func TestUpload_FormValidation(t *testing.T) {
 		{
 			name: "non-uuid participant_id",
 			fields: map[string]string{
-				"participant_id": "not-a-uuid",
-				"session_id":     testSessionID,
+				"participant_id":   "not-a-uuid",
+				"session_id":       testSessionID,
+				"session_stage_id": testSessionStageID,
 			},
 		},
 		{
 			name: "missing participant_id",
 			fields: map[string]string{
-				"session_id": testSessionID,
+				"session_id":       testSessionID,
+				"session_stage_id": testSessionStageID,
 			},
 		},
 		{
 			name: "missing session_id",
 			fields: map[string]string{
+				"participant_id":   testParticipantID,
+				"session_stage_id": testSessionStageID,
+			},
+		},
+		{
+			name: "missing session_stage_id",
+			fields: map[string]string{
 				"participant_id": testParticipantID,
+				"session_id":     testSessionID,
+			},
+		},
+		{
+			name: "non-uuid session_stage_id",
+			fields: map[string]string{
+				"participant_id":   testParticipantID,
+				"session_id":       testSessionID,
+				"session_stage_id": "not-a-uuid",
 			},
 		},
 		{
 			name: "non-uuid frame_id",
 			fields: map[string]string{
-				"participant_id": testParticipantID,
-				"session_id":     testSessionID,
-				"frame_id":       "nope",
+				"participant_id":   testParticipantID,
+				"session_id":       testSessionID,
+				"session_stage_id": testSessionStageID,
+				"frame_id":         "nope",
 			},
 		},
 	}
@@ -119,10 +139,84 @@ func TestUpload_FormValidation(t *testing.T) {
 			if rec.Code != http.StatusBadRequest {
 				t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
 			}
+			if !strings.Contains(rec.Body.String(), `"code":"validation_error"`) {
+				t.Fatalf("expected validation_error envelope, got: %s", rec.Body.String())
+			}
 			if len(photos.photos) != 0 {
 				t.Fatalf("photo row created despite invalid form: %+v", photos.photos)
 			}
 		})
+	}
+}
+
+// TestUpload_ForeignStageRejected: a well-formed session_stage_id that is NOT
+// one of this session's stages (unknown, or staged for a different session)
+// is client input — 400 validation_error before any disk write, so a photo can
+// never be filed under another session's topic.
+func TestUpload_ForeignStageRejected(t *testing.T) {
+	photos := newFakePhotoRepo()
+	sessions := defaultSessions()
+	// A stage of ANOTHER session: it exists somewhere, but not in this one.
+	otherSessionStage := entity.SessionStage{ProgramStageID: testStageID, SessionID: "another-session"}
+	otherSessionStage.ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+	sessions.stages["another-session"] = []entity.SessionStage{otherSessionStage}
+	h := newUpload(photos, sessions, t.TempDir())
+
+	for _, stageID := range []string{
+		"ffffffff-ffff-4fff-8fff-ffffffffffff", // valid UUID, unknown everywhere
+		otherSessionStage.ID,                   // real stage — of a different session
+	} {
+		c, rec := newMultipartRequest(uploadEcho(), map[string]string{
+			"participant_id":   testParticipantID,
+			"session_id":       testSessionID,
+			"session_stage_id": stageID,
+		})
+
+		if err := h.UploadPhoto(c); err != nil {
+			t.Fatalf("UploadPhoto(stage=%s) returned error: %v", stageID, err)
+		}
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for foreign stage %s, got %d: %s", stageID, rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), `"code":"validation_error"`) {
+			t.Fatalf("expected validation_error envelope, got: %s", rec.Body.String())
+		}
+	}
+	if len(photos.photos) != 0 {
+		t.Fatalf("photo row created for a foreign session stage: %+v", photos.photos)
+	}
+}
+
+// TestUpload_StoresTopic: the happy path persists the full topic key —
+// (participant_id, session_id, session_stage_id) — on the SmartPhoto row
+// (migration 000009), so per-topic gallery/mini-raport queries can find it.
+func TestUpload_StoresTopic(t *testing.T) {
+	photos := newFakePhotoRepo()
+	h := newUpload(photos, defaultSessions(), t.TempDir())
+	jpeg := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F'}
+	c, rec := newMultipartRequestWithFile(uploadEcho(), map[string]string{
+		"participant_id":   testParticipantID,
+		"session_id":       testSessionID,
+		"session_stage_id": testSessionStageID,
+		"taken_by":         "fac-1",
+	}, jpeg)
+
+	if err := h.UploadPhoto(c); err != nil {
+		t.Fatalf("UploadPhoto returned error: %v", err)
+	}
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(photos.photos) != 1 {
+		t.Fatalf("expected exactly 1 stored photo, got %d", len(photos.photos))
+	}
+	for _, p := range photos.photos {
+		if p.ParticipantID != testParticipantID || p.SessionID != testSessionID {
+			t.Fatalf("wrong (participant, session) key: %s / %s", p.ParticipantID, p.SessionID)
+		}
+		if p.SessionStageID != testSessionStageID {
+			t.Fatalf("SessionStageID = %q, want %q — the topic must be stored", p.SessionStageID, testSessionStageID)
+		}
 	}
 }
 
@@ -133,8 +227,9 @@ func TestUpload_NonexistentParticipantIs400(t *testing.T) {
 	sessions := newFakeSessionRepo() // no participants seeded
 	h := newUpload(photos, sessions, t.TempDir())
 	c, rec := newMultipartRequest(uploadEcho(), map[string]string{
-		"participant_id": testParticipantID,
-		"session_id":     testSessionID,
+		"participant_id":   testParticipantID,
+		"session_id":       testSessionID,
+		"session_stage_id": testSessionStageID,
 	})
 
 	if err := h.UploadPhoto(c); err != nil {
@@ -157,8 +252,9 @@ func TestUpload_CrossTenantSessionRejected(t *testing.T) {
 	h := newUpload(photos, sessions, t.TempDir())
 
 	c, _ := newMultipartRequest(uploadEcho(), map[string]string{
-		"participant_id": testParticipantID,
-		"session_id":     testSessionID,
+		"participant_id":   testParticipantID,
+		"session_id":       testSessionID,
+		"session_stage_id": testSessionStageID,
 	})
 	c.Set(appmiddleware.CtxTenantID, testTenantID)
 
@@ -233,8 +329,9 @@ func TestUpload_FileValidationGates(t *testing.T) {
 			photos := newFakePhotoRepo()
 			h := newUpload(photos, defaultSessions(), t.TempDir())
 			c, rec := newMultipartRequestWithFile(uploadEcho(), map[string]string{
-				"participant_id": testParticipantID,
-				"session_id":     testSessionID,
+				"participant_id":   testParticipantID,
+				"session_id":       testSessionID,
+				"session_stage_id": testSessionStageID,
 			}, tc.fileBody)
 
 			err := h.UploadPhoto(c)

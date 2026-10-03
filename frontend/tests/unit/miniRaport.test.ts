@@ -50,10 +50,14 @@ describe('generateMiniRaportHTML — foto rapor vs placeholder', () => {
  })
 })
 
-describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → galeri terbaru)', () => {
+describe('resolveReportPhoto — foto rapor admin per-topik (pick topik → flag topik → galeri topik)', () => {
  const participantId = 'p1'
  const topicA = 'stage-a'
  const topicB = 'stage-b'
+ // Bucket foto (session_stage) milik masing-masing topik — kontrak tier-2/3
+ // server: scope ketat session_stage_id topik aktif.
+ const stageA = 'sa'
+ const stageB = 'sb'
 
  const photo = (
   id: string,
@@ -64,6 +68,7 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → ga
   id,
   participant_id: owner,
   session_id: 's1',
+  session_stage_id: stageA,
   original_file_url: `photos/${id}.jpg`,
   is_report_photo: isReportPhoto,
   taken_by: 'fac-1',
@@ -76,40 +81,74 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → ga
   photo_id: photoId,
  })
 
- it('pick with a live photo wins over the flag AND a newer gallery photo', () => {
+ it('pick topik menang atas flag DAN galeri terbaru — walau foto pick beda bucket (server: pick dibaca apa adanya)', () => {
   const photos = [
    photo('default', true),
-   photo('picked', false),
+   photo('picked', false, participantId, { session_stage_id: stageB }),
    photo('newest', false, participantId, { created_at: '2026-10-01T12:00:00Z' }),
   ]
   const picks = [pick(topicA, 'picked')]
-  expect(resolveReportPhoto(picks, photos, participantId, topicA)?.id).toBe('picked')
+  expect(resolveReportPhoto(picks, photos, participantId, topicA, stageA)?.id).toBe('picked')
  })
 
- it('pick whose photo was deleted → is_report_photo, tetap di atas galeri terbaru', () => {
+ it('pick whose photo was deleted → is_report_photo TOPIK, tetap di atas galeri terbaru', () => {
   const photos = [
    photo('default', true, participantId, { created_at: '2026-10-01T00:00:00Z' }),
    photo('newest', false, participantId, { created_at: '2026-10-01T12:00:00Z' }),
   ] // pick's photo is gone
   const picks = [pick(topicA, 'deleted')]
-  expect(resolveReportPhoto(picks, photos, participantId, topicA)?.id).toBe('default')
+  expect(resolveReportPhoto(picks, photos, participantId, topicA, stageA)?.id).toBe('default')
  })
 
  it('pick deleted, no flag, galeri hanya berisi foto peserta lain → null', () => {
   const photos = [photo('plain', false, 'other', { created_at: '2026-10-01T12:00:00Z' })]
   const picks = [pick(topicA, 'deleted')]
-  expect(resolveReportPhoto(picks, photos, participantId, topicA)).toBe(null)
+  expect(resolveReportPhoto(picks, photos, participantId, topicA, stageA)).toBe(null)
  })
 
- it('no pick for active topic, or picks not loaded → is_report_photo sebelum fallback galeri', () => {
+ it('no pick for active topic, or picks not loaded → is_report_photo TOPIK sebelum fallback galeri', () => {
   const photos = [
    photo('default', true, participantId, { created_at: '2026-10-01T00:00:00Z' }),
    photo('newest', false, participantId, { created_at: '2026-10-01T12:00:00Z' }),
   ]
-  expect(resolveReportPhoto([pick(topicB, 'x')], photos, participantId, topicA)?.id).toBe(
+  expect(resolveReportPhoto([pick(topicB, 'x')], photos, participantId, topicA, stageA)?.id).toBe(
    'default',
   )
-  expect(resolveReportPhoto(null, photos, participantId, topicA)?.id).toBe('default')
+  expect(resolveReportPhoto(null, photos, participantId, topicA, stageA)?.id).toBe('default')
+ })
+
+ it('tier-2/3 TERSKOPI topik: foto is_report_photo / terbaru TOPIK LAIN tak pernah menang', () => {
+  const photos = [
+   photo('flag-other-topic', true, participantId, { session_stage_id: stageB }),
+   photo('newest-other-topic', false, participantId, {
+    session_stage_id: stageB,
+    created_at: '2026-10-01T12:00:00Z',
+   }),
+  ]
+  // Topik A tak punya foto sama sekali → null (placeholder), bukan foto topik B.
+  expect(resolveReportPhoto(null, photos, participantId, topicA, stageA)).toBe(null)
+  // Topik yang sama saat diaktifkan → flag topik itu menang.
+  expect(resolveReportPhoto(null, photos, participantId, topicB, stageB)?.id).toBe(
+   'flag-other-topic',
+  )
+ })
+
+ it('topik aktif tak terinstansiasi (session stage null) → null; pick tetap lebih dulu', () => {
+  const photos = [photo('flag-a', true)]
+  // Tanpa pick → tak pernah jatuh ke foto lintas topik (sejajar server stageID=="" → nil).
+  expect(resolveReportPhoto(null, photos, participantId, topicA, null)).toBe(null)
+  // Tier-1 tetap di depan (server juga): pick hidup menang meski bucket topik tak ada.
+  expect(
+   resolveReportPhoto([pick(topicA, 'flag-a')], photos, participantId, topicA, null)?.id,
+  ).toBe('flag-a')
+ })
+
+ it('foto legacy (session_stage_id "") kalah dari topik terskopi; menang hanya tanpa topik', () => {
+  const photos = [photo('legacy-flag', true, participantId, { session_stage_id: '' })]
+  // Dengan topik: strict equality → foto legacy tak pernah melayani topik.
+  expect(resolveReportPhoto(null, photos, participantId, topicA, stageA)).toBe(null)
+  // Laporan legacy tanpa topik: perilaku sesi-lebar lama tetap berlaku.
+  expect(resolveReportPhoto(null, photos, participantId, null, null)?.id).toBe('legacy-flag')
  })
 
  it('tanpa foto rapor → foto galeri terbaru milik peserta dipakai (created_at DESC)', () => {
@@ -120,9 +159,9 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → ga
    // Foto peserta lain justru paling baru — tidak boleh menang.
    photo('other-newest', false, 'other', { created_at: '2026-10-01T13:00:00Z' }),
   ]
-  expect(resolveReportPhoto(null, photos, participantId, topicA)?.id).toBe('newest')
-  // Tanpa topik aktif pun tier-3 tetap berlaku (server juga: pick → flag → galeri).
-  expect(resolveReportPhoto(null, photos, participantId, null)?.id).toBe('newest')
+  expect(resolveReportPhoto(null, photos, participantId, topicA, stageA)?.id).toBe('newest')
+  // Tanpa topik aktif pun tier-3 tetap berlaku sesi-lebar (server juga: pick → flag → galeri).
+  expect(resolveReportPhoto(null, photos, participantId, null, null)?.id).toBe('newest')
  })
 
  it('created_at identik → tie-break taken_at lalu id DESC (sejajar urutan server)', () => {
@@ -131,7 +170,7 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → ga
    photo('tie-a', false, participantId, { ...tie, taken_at: '2026-10-01T09:00:00Z' }),
    photo('tie-b', false, participantId, { ...tie, taken_at: '2026-10-01T09:30:00Z' }),
   ]
-  expect(resolveReportPhoto(null, photos, participantId, topicA)?.id).toBe('tie-b')
+  expect(resolveReportPhoto(null, photos, participantId, topicA, stageA)?.id).toBe('tie-b')
 
   const same = {
    created_at: '2026-10-01T10:00:00Z',
@@ -141,25 +180,25 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → ga
    photo('aaa-tie', false, participantId, same),
    photo('zzz-tie', false, participantId, same),
   ]
-  expect(resolveReportPhoto(null, idTie, participantId, topicA)?.id).toBe('zzz-tie')
+  expect(resolveReportPhoto(null, idTie, participantId, topicA, stageA)?.id).toBe('zzz-tie')
  })
 
  it('galeri kosong → null (buildRaportHtml maps null ke photoUrl undefined → placeholder)', () => {
-  expect(resolveReportPhoto(null, [], participantId, topicA)).toBe(null)
-  expect(resolveReportPhoto(null, [], participantId, null)).toBe(null)
+  expect(resolveReportPhoto(null, [], participantId, topicA, stageA)).toBe(null)
+  expect(resolveReportPhoto(null, [], participantId, null, null)).toBe(null)
  })
 
  it('photos null/undefined/bukan array → TIDAK melempar, hasil null (placeholder)', () => {
   // Payload rusak dari API: harus degradasi ke placeholder, bukan TypeError.
-  expect(resolveReportPhoto(null, null as unknown as SmartPhoto[], participantId, topicA)).toBe(
-   null,
-  )
   expect(
-   resolveReportPhoto(null, undefined as unknown as SmartPhoto[], participantId, topicA),
+   resolveReportPhoto(null, null as unknown as SmartPhoto[], participantId, topicA, stageA),
   ).toBe(null)
-  expect(resolveReportPhoto(null, {} as unknown as SmartPhoto[], participantId, topicA)).toBe(
-   null,
-  )
+  expect(
+   resolveReportPhoto(null, undefined as unknown as SmartPhoto[], participantId, topicA, stageA),
+  ).toBe(null)
+  expect(
+   resolveReportPhoto(null, {} as unknown as SmartPhoto[], participantId, topicA, stageA),
+  ).toBe(null)
  })
 
  it('elemen photos null/undefined → dilewati tanpa TypeError; foto valid tetap menang', () => {
@@ -168,7 +207,7 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → ga
    photo('valid', false, participantId, { created_at: '2026-10-01T12:00:00Z' }),
    undefined,
   ] as unknown as SmartPhoto[]
-  expect(resolveReportPhoto(null, photos, participantId, topicA)?.id).toBe('valid')
+  expect(resolveReportPhoto(null, photos, participantId, topicA, stageA)?.id).toBe('valid')
  })
 
  it('created_at bukan string (angka/null) atau tidak terparse → diperlakukan paling tua', () => {
@@ -179,17 +218,17 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → ga
    photo('valid-newest', false, participantId, { created_at: '2026-10-01T12:00:00Z' }),
   ]
   // Semua invalid kalah dari satu created_at valid yang sah — tanpa throw.
-  expect(resolveReportPhoto(null, photos, participantId, topicA)?.id).toBe('valid-newest')
+  expect(resolveReportPhoto(null, photos, participantId, topicA, stageA)?.id).toBe('valid-newest')
 
   // Bahkan created_at valid TUA menang atas yang invalid (invalid = paling tua).
   const oldVsInvalid = [
    photo('invalid', false, participantId, { created_at: 'garbage', taken_at: '2099-01-01T00:00:00Z' }),
    photo('valid-2020', false, participantId, { created_at: '2020-01-01T00:00:00Z' }),
   ]
-  expect(resolveReportPhoto(null, oldVsInvalid, participantId, topicA)?.id).toBe('valid-2020')
+  expect(resolveReportPhoto(null, oldVsInvalid, participantId, topicA, stageA)?.id).toBe('valid-2020')
  })
 
- it('dua created_at sama-sama invalid → tie-break taken_at lalu id DESC (sejajar server)', () => {
+ it('dua created_at sama-sama invalid → tie-break taken_at lalu id DESC (sejajar urutan server)', () => {
   const photos = [
    photo('inv-old-taken', false, participantId, {
     created_at: 'garbage',
@@ -200,20 +239,21 @@ describe('resolveReportPhoto — resolusi foto rapor admin (pick → flag → ga
     taken_at: '2026-10-01T09:00:00Z',
    }),
   ]
-  expect(resolveReportPhoto(null, photos, participantId, topicA)?.id).toBe('inv-new-taken')
+  expect(resolveReportPhoto(null, photos, participantId, topicA, stageA)?.id).toBe('inv-new-taken')
 
   const same = { created_at: 'garbage', taken_at: '2026-10-01T09:00:00Z' }
   const idTie = [
    photo('aaa-inv', false, participantId, same),
    photo('zzz-inv', false, participantId, same),
   ]
-  expect(resolveReportPhoto(null, idTie, participantId, topicA)?.id).toBe('zzz-inv')
+  expect(resolveReportPhoto(null, idTie, participantId, topicA, stageA)?.id).toBe('zzz-inv')
  })
 
- it('picks bukan array (payload rusak) → fallback tingkat 2/3 tetap, tanpa throw', () => {
+ it('picks bukan array (payload rusak) → fallback tingkat 2/3 terskopi topik tetap, tanpa throw', () => {
   const photos = [photo('default', true, participantId, { created_at: '2026-10-01T00:00:00Z' })]
   expect(
-   resolveReportPhoto({} as unknown as ReportPhotoPick[], photos, participantId, topicA)?.id,
+   resolveReportPhoto({} as unknown as ReportPhotoPick[], photos, participantId, topicA, stageA)
+    ?.id,
   ).toBe('default')
  })
 })

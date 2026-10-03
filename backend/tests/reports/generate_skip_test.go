@@ -114,7 +114,7 @@ func TestGenerateBothPhasesSkippedEnvelopeContract(t *testing.T) {
 	uc := newMissionUsecaseWithAssess(repo, gen, sess, &missionBankFake{} /* empty bank */, pm,
 		&assessmentListFake{noFor: map[string]bool{"p-a": true}})
 	cfg := &config.Config{ParentReportBaseURL: "http://localhost/parent/report", ReportTokenTTL: 168 * time.Hour}
-	h := handler.NewReportHandler(uc, cfg, sess, sse.NewHub(), nil, nil)
+	h := handler.NewReportHandler(uc, cfg, sess, sse.NewHub(), nil, nil, nil)
 	e := echo.New()
 	e.Validator = appmiddleware.NewValidator()
 

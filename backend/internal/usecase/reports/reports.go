@@ -37,6 +37,12 @@ type MissionLLMClient interface {
 // MaxReportMissions caps the number of recommended/selected missions per report.
 const MaxReportMissions = 4
 
+// galleryTokenNeverExpires is the expires_at stored at every gallery-token
+// mint: a far-future sentinel (year 9999, inside MariaDB DATETIME range) so
+// stored state matches the never-expiring QR semantics — the public gallery
+// never denies on time, only on explicit revocation.
+var galleryTokenNeverExpires = time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)
+
 // Usecase implements report business logic: anti-IDOR parent tokens + narrative
 // + AI mission recommendation + gallery token generation.
 type Usecase struct {
@@ -106,6 +112,12 @@ func NewUsecase(
 // Repo exposes the report repository (used by handlers for token lookups).
 func (u *Usecase) Repo() repository.ReportRepository { return u.repo }
 
+// ListBadges exposes a participant's badges — backs the public badge media
+// endpoint (GET /api/reports/access/badge/:contentId).
+func (u *Usecase) ListBadges(ctx context.Context, participantID, tenantID string) ([]entity.ParticipantBadge, error) {
+	return u.sessionSubstageRepo.ListBadgesByParticipant(ctx, participantID, tenantID)
+}
+
 // Approve marks a report approved and persists the approver.
 func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy string, narrativeFinal string, missionIDs []string) (*entity.Report, error) {
 	r, err := u.repo.GetByID(ctx, reportID, tenantID)
@@ -170,6 +182,13 @@ func (u *Usecase) Approve(ctx context.Context, reportID, tenantID, approvedBy st
 // gallery_access_token column on the report. Every failure is returned (never
 // swallowed) so the caller decides whether it is fatal (EnsureGalleryToken)
 // or best-effort-but-logged (Approve).
+//
+// expires_at is stored as a FAR-FUTURE sentinel (year 9999), never as
+// now+GalleryTokenTTL: gallery QR URLs must never stop working — the public
+// gallery no longer denies on time (resolveGalleryToken only honors
+// revocation), and the stored row must match that semantics. Tokens minted
+// before this change with a short TTL are retroactively un-expired at read
+// time and upgraded to the sentinel on their next EnsureGalleryToken mint.
 func (u *Usecase) mintGalleryToken(ctx context.Context, r *entity.Report, tenantID string) error {
 	tok, err := util.RandomToken()
 	if err != nil {
@@ -181,7 +200,7 @@ func (u *Usecase) mintGalleryToken(ctx context.Context, r *entity.Report, tenant
 		SessionID:     r.SessionID,
 		TenantID:      tenantID,
 		Token:         tok,
-		ExpiresAt:     time.Now().UTC().Add(u.cfg.GalleryTokenTTL),
+		ExpiresAt:     galleryTokenNeverExpires,
 	}
 	if err := u.galleryRepo.Create(ctx, gt); err != nil {
 		return fmt.Errorf("persist gallery_tokens row: %w", err)
@@ -204,7 +223,10 @@ func (u *Usecase) mintGalleryToken(ctx context.Context, r *entity.Report, tenant
 // token is revoked/expired. The admin preview calls this before rendering the
 // QR footer so the footer never silently degrades to the "[ QR CODE ]"
 // placeholder while the token could be minted. Failures are logged AND
-// returned (HTTP error) so the client can surface them.
+// returned (HTTP error) so the client can surface them. The expired branch is
+// an upgrade path for tokens minted with a short TTL: it re-mints to the
+// never-expire sentinel — it does NOT invalidate anything, because the old
+// gallery_tokens row stays readable (resolveGalleryToken ignores time).
 func (u *Usecase) EnsureGalleryToken(ctx context.Context, reportID, tenantID string) (*entity.Report, error) {
 	r, err := u.repo.GetByID(ctx, reportID, tenantID)
 	if err != nil {

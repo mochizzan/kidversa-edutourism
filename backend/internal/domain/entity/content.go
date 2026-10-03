@@ -19,8 +19,13 @@ type Assessment struct {
 // SmartPhoto is a captured photo of a participant, optionally framed.
 type SmartPhoto struct {
 	BaseModel
-	ParticipantID   string    `json:"participant_id"`
-	SessionID       string    `json:"session_id"`
+	ParticipantID string `json:"participant_id"`
+	SessionID     string `json:"session_id"`
+	// SessionStageID is the topic (session_stages row) the photo was captured
+	// for. "" (legacy, sentinel from migration 000009) means "no topic known" —
+	// never a real topic. GORM maps it to session_stage_id (same default
+	// naming as Attendance.SessionStageID).
+	SessionStageID  string    `json:"session_stage_id"`
 	FrameID         *string   `json:"frame_id,omitempty"`
 	OriginalFileURL string    `json:"original_file_url"`
 	FramedFileURL   string    `json:"framed_file_url,omitempty"`

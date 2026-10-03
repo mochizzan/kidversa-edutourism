@@ -315,8 +315,8 @@ func TestBuildPublicReportViewMirrorsAdminPreview(t *testing.T) {
 	if len(view.Badges) != 2 {
 		t.Fatalf("len(Badges) = %d, want 2", len(view.Badges))
 	}
-	if view.Badges[0].BadgeImageURL != "/api/media/kiosk/content/content-123" {
-		t.Errorf("badge image = %q, want public kiosk route", view.Badges[0].BadgeImageURL)
+	if view.Badges[0].BadgeImageURL != "/api/reports/access/badge/content-123" {
+		t.Errorf("badge image = %q, want token-scoped badge media route", view.Badges[0].BadgeImageURL)
 	}
 	if view.Badges[1].BadgeImageURL != "" {
 		t.Errorf("badge without image = %q", view.Badges[1].BadgeImageURL)

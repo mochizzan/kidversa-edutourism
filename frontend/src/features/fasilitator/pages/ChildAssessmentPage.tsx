@@ -273,7 +273,14 @@ const ChildAssessmentPage = () => {
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-medium text-sm hover:bg-primary-container/80 transition-colors"
                 onClick={() =>
                   navigate(
-                    `/fasilitator/groups/${groupId}/children/${childId}/photo`,
+                    // Perbaikan-2: forward the ACTIVE topic so the camera
+                    // uploads to this session stage (?stage=, same convention
+                    // as the GroupPage → here handoff). No stage resolved →
+                    // plain route; SmartPhotoPage falls back to its own
+                    // current/first-stage default.
+                    stageId
+                      ? `/fasilitator/groups/${groupId}/children/${childId}/photo?stage=${encodeURIComponent(stageId)}`
+                      : `/fasilitator/groups/${groupId}/children/${childId}/photo`,
                   )
                 }
               >

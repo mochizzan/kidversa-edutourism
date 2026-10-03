@@ -80,6 +80,11 @@ func (f *fakePhotoRepo) ListPhotos(_ context.Context, filt repository.PhotoFilte
 		if filt.IsReportPhoto != nil && p.IsReportPhoto != *filt.IsReportPhoto {
 			continue
 		}
+		// Mirror GormPhotoRepository: non-nil SessionStageID = strict equality
+		// (nil = no stage filter).
+		if filt.SessionStageID != nil && p.SessionStageID != *filt.SessionStageID {
+			continue
+		}
 		out = append(out, *p)
 	}
 	return &repository.Paginated[entity.SmartPhoto]{Items: out, Total: len(out)}, nil
@@ -89,14 +94,20 @@ func (f *fakePhotoRepo) GetReportPhotoPick(context.Context, string, string, stri
 	return nil, nil // tanpa pick → fallback is_report_photo di resolveReportPhoto
 }
 
-// fakeSessionRepo menyediakan peserta untuk DTO GetByToken.
+// fakeSessionRepo menyediakan peserta dan topik (session_stages) untuk DTO
+// GetByToken serta resolusi foto rapor bertopik (migrasi 000009).
 type fakeSessionRepo struct {
 	repository.SessionRepository
 	participant *entity.Participant
+	stages      []entity.SessionStage
 }
 
 func (f *fakeSessionRepo) GetParticipantByID(context.Context, string, string) (*entity.Participant, error) {
 	return f.participant, nil
+}
+
+func (f *fakeSessionRepo) ListSessionStages(context.Context, string) ([]entity.SessionStage, error) {
+	return f.stages, nil
 }
 
 // fakeReportRepo menyediakan report untuk DTO GetByToken.
@@ -167,8 +178,12 @@ func newFixture(t *testing.T) *fixture {
 	}
 	report.ID = reportID
 
+	// Sesi menginstansiasi topik report tersebut sebagai stage-session-1.
+	stage := entity.SessionStage{ProgramStageID: report.ProgramStageID, SessionID: sessID, ProgramStageName: "Topik 1"}
+	stage.ID = "stage-session-1"
+
 	h := handler.NewGalleryHandler(cfg, f.gallery, &fakeReportRepo{report: report},
-		f.photos, &fakeSessionRepo{participant: participant}, f.consent)
+		f.photos, &fakeSessionRepo{participant: participant, stages: []entity.SessionStage{stage}}, f.consent)
 
 	e := echo.New()
 	e.HTTPErrorHandler = appmiddleware.ErrorHandler // sama seperti router produksi
@@ -271,8 +286,9 @@ func TestGalleryPhotoEndpoint_ServesBytesWithVariant(t *testing.T) {
 
 // TestGalleryPhotoEndpoint_TokenGates: validasi token di-share dengan
 // GetByToken — format salah → 400, tak dikenal → 404 token_invalid, dicabut →
-// 410 token_revoked, kedaluwarsa → 410 token_expired. Tak satu pun dari
-// galat ini boleh menyajikan byte.
+// 410 token_revoked. Tak satu pun dari galat ini boleh menyajikan byte.
+// Kedaluwarsa BUKAN penolak: masa berlaku QR galeri tidak pernah habis —
+// token lampau tetap menyajikan byte (subtest tersendiri di bawah).
 func TestGalleryPhotoEndpoint_TokenGates(t *testing.T) {
 	f := newFixture(t)
 	f.putFile("photos/orig.png", "BYTES-ORIG")
@@ -293,9 +309,6 @@ func TestGalleryPhotoEndpoint_TokenGates(t *testing.T) {
 		{"token dicabut", validToken, func() {
 			f.gallery.gt.Revoked = true
 		}, http.StatusGone, "token_revoked"},
-		{"token kedaluwarsa", validToken, func() {
-			f.gallery.gt.ExpiresAt = time.Now().Add(-time.Minute)
-		}, http.StatusGone, "token_expired"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -314,6 +327,22 @@ func TestGalleryPhotoEndpoint_TokenGates(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("token kedaluwarsa tetap menyajikan byte", func(t *testing.T) {
+		// QR yang sudah tercetak tidak boleh pernah expired: expires_at lampau
+		// tidak menolak dan tidak menyembunyikan byte.
+		gt := f.validGT
+		f.gallery.gt = &gt
+		f.gallery.err = nil
+		f.gallery.gt.ExpiresAt = time.Now().Add(-time.Minute)
+		rec := f.get(f.photoURL(photoID, "?token="+validToken))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (token kedaluwarsa tidak boleh ditolak): %s", rec.Code, rec.Body.String())
+		}
+		if got := rec.Body.String(); got != "BYTES-ORIG" {
+			t.Fatalf("body = %q, want BYTES-ORIG", got)
+		}
+	})
 }
 
 // TestGalleryPhotoEndpoint_ConsentGate: gerbang consent IDENTIK dengan
@@ -383,7 +412,8 @@ func TestGalleryPhotoEndpoint_FileGates(t *testing.T) {
 // TestGetByToken_EnvelopeUnchangedByShareHelper: regresi refactor
 // share-helper — GetByToken tetap menjawab 200 dengan DTO berisi id foto +
 // field file yang ARTINYA TIDAK BERUBAH (path relatif apa adanya), 403
-// consent_required saat consent OFF, dan 410 token_expired bila kedaluwarsa.
+// consent_required saat consent OFF, dan token kedaluwarsa TETAP 200 (QR
+// galeri tak pernah kedaluwarsa).
 func TestGetByToken_EnvelopeUnchangedByShareHelper(t *testing.T) {
 	t.Run("daftar foto utuh", func(t *testing.T) {
 		f := newFixture(t)
@@ -415,10 +445,14 @@ func TestGetByToken_EnvelopeUnchangedByShareHelper(t *testing.T) {
 		rec := f.get("/api/reports/gallery?token=" + validToken)
 		requireStatusAndCode(t, rec, http.StatusForbidden, "consent_required")
 	})
-	t.Run("token kedaluwarsa tetap 410", func(t *testing.T) {
+	t.Run("token kedaluwarsa tetap 200", func(t *testing.T) {
 		f := newFixture(t)
+		f.putFile("photos/orig.png", "BYTES-ORIG")
+		f.addPhoto(photoID, partID, sessID, "photos/orig.png", "")
 		f.gallery.gt.ExpiresAt = time.Now().Add(-time.Minute)
 		rec := f.get("/api/reports/gallery?token=" + validToken)
-		requireStatusAndCode(t, rec, http.StatusGone, "token_expired")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (token kedaluwarsa tidak boleh ditolak): %s", rec.Code, rec.Body.String())
+		}
 	})
 }

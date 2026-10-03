@@ -44,7 +44,12 @@ const (
 	cachePartID    = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 	cacheSessID    = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 	cacheStageID   = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
-	cacheToken64   = "abababababababababababababababababababababababababababababababab"
+	// cacheSessionStageID is the session_stages row instantiating cacheStageID
+	// (the report's topic) inside cacheSessID — photos carry it as their
+	// session_stage_id (migration 000009), and topic-true resolution matches on
+	// it.
+	cacheSessionStageID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+	cacheToken64        = "abababababababababababababababababababababababababababababababab"
 	// cacheRelPath mirrors the upload layout; one real file serves all three
 	// handlers (each resolves its own stored path to the same bytes).
 	cacheRelPath = "contents/cached.png"
@@ -73,6 +78,16 @@ type emptyConsentRepo struct{ repository.ConsentRepository }
 type emptySessionRepo struct{ repository.SessionRepository }
 type emptyFrameRepo struct{ repository.FrameRepository }
 type emptyUserRepo struct{ repository.UserRepository }
+
+// ListSessionStages feeds the report-photo resolution (and the gallery topics
+// list): the session instantiates cacheStageID's topic as cacheSessionStageID.
+// Every other method stays on the embedded nil interface — calling it panics
+// loudly, which is this file's convention.
+func (f *emptySessionRepo) ListSessionStages(context.Context, string) ([]entity.SessionStage, error) {
+	st := entity.SessionStage{ProgramStageID: cacheStageID, SessionID: cacheSessID}
+	st.ID = cacheSessionStageID
+	return []entity.SessionStage{st}, nil
+}
 
 // fakeGalleryRepo serves the single gallery token under test.
 type fakeGalleryRepo struct {
@@ -162,6 +177,7 @@ func newEnv(t *testing.T) *env {
 	photo := &entity.SmartPhoto{
 		ParticipantID:   cachePartID,
 		SessionID:       cacheSessID,
+		SessionStageID:  cacheSessionStageID,
 		OriginalFileURL: cacheRelPath,
 		IsReportPhoto:   true,
 	}
@@ -203,7 +219,7 @@ func newEnv(t *testing.T) *env {
 		gal: handler.NewGalleryHandler(cfg, &fakeGalleryRepo{gt: gt}, reportRepo,
 			photoRepo, &emptySessionRepo{}, consent),
 		rep: handler.NewReportHandler(uc, cfg, &emptySessionRepo{}, sse.NewHub(),
-			consent, photoRepo),
+			consent, photoRepo, nil),
 		e: echo.New(),
 	}
 }

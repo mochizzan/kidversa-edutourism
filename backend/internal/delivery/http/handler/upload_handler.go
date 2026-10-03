@@ -72,7 +72,16 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 	if sessionID == "" {
 		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "session_id wajib diisi")
 	}
-	if uuid.Validate(participantID) != nil || uuid.Validate(sessionID) != nil {
+	// session_stage_id (topic) is REQUIRED — a photo without a topic cannot be
+	// placed per-topic in the gallery/mini-raport (migration 000009). Same
+	// pattern as participant_id/session_id: missing → 400 validation_error,
+	// malformed → 400. The stage→session membership check runs below, right
+	// after the session read.
+	sessionStageID := (*c).FormValue("session_stage_id")
+	if sessionStageID == "" {
+		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "session_stage_id wajib diisi")
+	}
+	if uuid.Validate(participantID) != nil || uuid.Validate(sessionID) != nil || uuid.Validate(sessionStageID) != nil {
 		return appresp.Fail(c, http.StatusBadRequest, "validation_error")
 	}
 	frameID := strings.TrimSpace((*c).FormValue("frame_id"))
@@ -96,6 +105,24 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 	}
 	if _, err := h.sessions.GetSessionByID(ctx, sessionID, tenantID); err != nil {
 		return err // missing/cross-tenant session -> 404 not_found
+	}
+	// The stage must BELONG to the uploaded session: a valid-but-foreign
+	// session_stage_id would file the photo under another session's topic.
+	// Resolved via the existing session-stage listing (no new repo method):
+	// unknown stage in this session → 400 validation_error (request input).
+	stages, err := h.sessions.ListSessionStages(ctx, sessionID)
+	if err != nil {
+		return err
+	}
+	stageInSession := false
+	for i := range stages {
+		if stages[i].ID == sessionStageID {
+			stageInSession = true
+			break
+		}
+	}
+	if !stageInSession {
+		return appresp.FailMsg(c, http.StatusBadRequest, "validation_error", "session_stage_id bukan topik sesi ini")
 	}
 
 	// Facilitator ownership (§5.B): a FASILITATOR may only upload photos for
@@ -138,6 +165,7 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 		BaseModel:       entity.BaseModel{ID: uuid.NewString()},
 		ParticipantID:   participantID,
 		SessionID:       sessionID,
+		SessionStageID:  sessionStageID, // topic attribution (migration 000009); never ""
 		OriginalFileURL: storedRel,
 		FileSize:        &fileSize,
 		TakenBy:         takenBy,

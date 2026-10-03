@@ -247,7 +247,7 @@ func newUsecaseFixture(repo repository.ReportRepository, gen reports.NarrativeGe
 func newDeliveryHandlerFixture(repo *genRepo, gen *blockingGen, sess *genSessionRepo, msg repository.MessagingService) (*handler.ReportHandler, *echo.Echo) {
 	cfg := &config.Config{ParentReportBaseURL: "http://localhost/parent/report", ReportTokenTTL: 168 * time.Hour}
 	uc := newUsecaseFixture(repo, gen, sess, msg)
-	h := handler.NewReportHandler(uc, cfg, sess, sse.NewHub(), nil, nil)
+	h := handler.NewReportHandler(uc, cfg, sess, sse.NewHub(), nil, nil, nil)
 	e := echo.New()
 	e.Validator = appmiddleware.NewValidator()
 	return h, e

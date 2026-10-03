@@ -26,6 +26,7 @@ export interface PublicReportMission {
 
 export interface PublicReportBadge {
   badge_name: string
+  /** Token-free `/api/reports/access/badge/{contentId}` path; caller must append `?token=` (same contract as photo_url). */
   badge_image_url?: string
   /** "SUBTOPIK" | "FINAL"; absent on legacy payloads (split falls back). */
   badge_type?: string | null

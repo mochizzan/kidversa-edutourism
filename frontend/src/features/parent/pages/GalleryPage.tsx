@@ -9,6 +9,17 @@ import type { GalleryPhoto } from '../../../core/types'
 // Indonesian because this change intentionally leaves the locale catalogs untouched.
 const PHOTO_UNAVAILABLE = 'Foto tidak tersedia'
 
+// Chip pill styling — mirrors the facilitator gallery's topic chips
+// (GaleriChildPage) so the switcher reads as the same control everywhere.
+const chipClass = (active: boolean) =>
+  `shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition ${active
+    ? 'bg-primary text-white'
+    : 'bg-surface-container-highest text-on-surface-variant hover:bg-primary/10'
+  }`
+
+/** Topic bucket of a photo, tolerating a stale payload that predates per-topic rows. */
+const stageOf = (photo: GalleryPhoto): string => photo.session_stage_id ?? ''
+
 /* ── Inner gallery component ── */
 function GalleryView() {
   const { t } = useTranslation()
@@ -17,8 +28,38 @@ function GalleryView() {
   // Photos whose bytes failed to load — each one degrades independently so a
   // single missing file never blanks the rest of the grid.
   const [failedIds, setFailedIds] = useState<ReadonlySet<string>>(new Set())
+  // User's chip choice (session_stage_id; '' = legacy "Foto Lama"). null = not
+  // chosen yet → the default-topic rule below picks the opening chip.
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
 
   if (loading || !gallery) return null
+
+  // Payload guards: a stale/cached response without the new topic fields
+  // degrades to the old flat grid instead of crashing the switcher.
+  const topics = Array.isArray(gallery.topics) ? gallery.topics : []
+  const photos = Array.isArray(gallery.photos) ? gallery.photos : []
+  const hasLegacy = photos.some((p) => stageOf(p) === '')
+
+  // Default chip: the topic of the photo backing THIS report's mini-raport
+  // (server-computed report_photo marker — pick wins), so the QR scanned from
+  // a topic's rapor opens on that topic. Fallback: first topic in sequence.
+  // No topics at all → null → unfiltered per-session grid (legacy behavior).
+  const reportPhoto = photos.find((p) => p.report_photo)
+  const flaggedStage = reportPhoto ? stageOf(reportPhoto) : null
+  const activeStage: string | null =
+    topics.length === 0
+      ? null
+      : selectedTopic !== null
+        ? selectedTopic
+        : flaggedStage !== null &&
+          (flaggedStage === ''
+            ? hasLegacy
+            : topics.some((tp) => tp.session_stage_id === flaggedStage))
+          ? flaggedStage
+          : topics[0].session_stage_id
+
+  const visiblePhotos =
+    activeStage === null ? photos : photos.filter((p) => stageOf(p) === activeStage)
 
   return (
     <div className="min-h-screen bg-surface">
@@ -38,14 +79,49 @@ function GalleryView() {
 
       {/* Photo grid */}
       <div className="max-w-lg mx-auto px-4 py-4">
-        {gallery.photos.length === 0 ? (
+        {/* Topic switcher — session topics in sequence + the legacy bucket
+            chip, which appears ONLY when legacy ('') photos really exist. */}
+        {topics.length > 0 && (
+          <div
+            role="group"
+            aria-label={t('parent.gallery.topicsLabel')}
+            className="flex gap-2 overflow-x-auto pb-3"
+          >
+            {topics.map((tp) => (
+              <button
+                key={tp.session_stage_id}
+                type="button"
+                aria-pressed={tp.session_stage_id === activeStage}
+                onClick={() => setSelectedTopic(tp.session_stage_id)}
+                className={chipClass(tp.session_stage_id === activeStage)}
+              >
+                {tp.name}
+              </button>
+            ))}
+            {hasLegacy && (
+              <button
+                key="__legacy"
+                type="button"
+                aria-pressed={activeStage === ''}
+                onClick={() => setSelectedTopic('')}
+                className={chipClass(activeStage === '')}
+              >
+                {t('parent.gallery.legacyChip')}
+              </button>
+            )}
+          </div>
+        )}
+
+        {visiblePhotos.length === 0 ? (
           <div className="text-center py-16">
             <Camera className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-3" />
-            <p className="text-sm text-on-surface-variant">{t('parent.gallery.empty')}</p>
+            <p className="text-sm text-on-surface-variant">
+              {photos.length === 0 ? t('parent.gallery.empty') : t('parent.gallery.emptyTopic')}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {gallery.photos.map((photo) => {
+            {visiblePhotos.map((photo) => {
               const failed = failedIds.has(photo.id)
               return (
                 <button
