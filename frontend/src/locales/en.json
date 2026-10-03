@@ -843,7 +843,7 @@
       "noSessionTitle": "No sessions",
       "noSessionDesc": "No sessions match the selected filters.",
       "filterHas": "Reports Available",
-      "filterNone": "None Yet",
+      "filterUnfinished": "Not Completed",
       "countLaporan": "{{count}} reports",
       "countSent": "{{count}} sent",
       "countDraft": "{{count}} drafts",

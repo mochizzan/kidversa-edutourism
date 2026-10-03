@@ -843,7 +843,7 @@
       "noSessionTitle": "没有课程",
       "noSessionDesc": "没有符合所选筛选条件的课程。",
       "filterHas": "有报告",
-      "filterNone": "暂无",
+      "filterUnfinished": "未完成",
       "countLaporan": "{{count}} 份报告",
       "countSent": "已发送 {{count}} 份",
       "countDraft": "{{count}} 份草稿",

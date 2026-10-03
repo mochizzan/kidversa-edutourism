@@ -843,7 +843,7 @@
       "noSessionTitle": "세션 없음",
       "noSessionDesc": "선택한 필터와 일치하는 세션이 없습니다.",
       "filterHas": "보고서 있음",
-      "filterNone": "없음",
+      "filterUnfinished": "미완료",
       "countLaporan": "{{count}}개의 보고서",
       "countSent": "{{count}}개 전송됨",
       "countDraft": "{{count}}개의 초안",

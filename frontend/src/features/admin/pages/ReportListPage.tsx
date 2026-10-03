@@ -11,7 +11,7 @@ import { reportService } from '../../../core/services/reports'
 import { CompactPagination } from '../../../shared/components/data/CompactPagination'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { Session, Report } from '../../../core/types'
-import { ReportStatus } from '../../../core/types/enums'
+import { ReportStatus, SessionStatus } from '../../../core/types/enums'
 import { cn } from '../../../core/utils'
 import { formatDate } from '../../../shared/utils'
 import { useTranslation } from 'react-i18next'
@@ -95,10 +95,15 @@ const ReportListPage = () => {
 
   const filteredSessions = useMemo(() => {
     if (filter === 'all') return sessions
-    if (filter === 'has_reports') return sessions.filter((s) => s.reportCount > 0)
-    if (filter === 'no_reports') return sessions.filter((s) => s.reportCount === 0)
-    if (filter === 'draft') return sessions.filter((s) => s.draftCount > 0)
-    if (filter === 'sent') return sessions.filter((s) => s.sentCount > 0)
+    if (filter === 'completed')
+      return sessions.filter((s) => s.session.status === SessionStatus.COMPLETED)
+    if (filter === 'unfinished')
+      return sessions.filter(
+        (s) =>
+          s.session.status === SessionStatus.DRAFT || s.session.status === SessionStatus.ACTIVE,
+      )
+    if (filter === 'cancelled')
+      return sessions.filter((s) => s.session.status === SessionStatus.CANCELLED)
     return sessions
   }, [sessions, filter])
 
@@ -154,10 +159,9 @@ const ReportListPage = () => {
   /* ── Filters ── */
   const filters = [
     { key: 'all', label: t('admin.common.all') },
-    { key: 'has_reports', label: t('admin.reports.filterHas') },
-    { key: 'no_reports', label: t('admin.reports.filterNone') },
-    { key: 'draft', label: t('admin.reportStatus.draft') },
-    { key: 'sent', label: t('admin.reportStatus.sent') },
+    { key: 'completed', label: t('admin.status.completed') },
+    { key: 'unfinished', label: t('admin.reports.filterUnfinished') },
+    { key: 'cancelled', label: t('admin.status.cancelled') },
   ]
 
   /* ── Render ── */

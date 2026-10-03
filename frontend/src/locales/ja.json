@@ -843,7 +843,7 @@
       "noSessionTitle": "セッションなし",
       "noSessionDesc": "選択したフィルターに一致するセッションはありません。",
       "filterHas": "レポートあり",
-      "filterNone": "未作成",
+      "filterUnfinished": "未完了",
       "countLaporan": "{{count}}件のレポート",
       "countSent": "{{count}}件送信済み",
       "countDraft": "{{count}}件のドラフト",

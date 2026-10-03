@@ -843,7 +843,7 @@
       "noSessionTitle": "Walang sesyon",
       "noSessionDesc": "Walang sesyong tumutugma sa napiling filter.",
       "filterHas": "May Ulat",
-      "filterNone": "Wala pa",
+      "filterUnfinished": "Hindi Pa Tapos",
       "countLaporan": "{{count}} ulat",
       "countSent": "{{count}} naipadala",
       "countDraft": "{{count}} draft",

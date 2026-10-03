@@ -843,7 +843,7 @@
       "noSessionTitle": "Không có phiên",
       "noSessionDesc": "Không có phiên nào phù hợp với bộ lọc đã chọn.",
       "filterHas": "Có báo cáo",
-      "filterNone": "Chưa có",
+      "filterUnfinished": "Chưa hoàn thành",
       "countLaporan": "{{count}} báo cáo",
       "countSent": "{{count}} đã gửi",
       "countDraft": "{{count}} bản nháp",

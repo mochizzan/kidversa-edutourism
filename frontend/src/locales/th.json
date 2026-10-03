@@ -843,7 +843,7 @@
       "noSessionTitle": "ไม่มีเซสชัน",
       "noSessionDesc": "ไม่พบเซสชันที่ตรงกับตัวกรองที่เลือก",
       "filterHas": "มีรายงาน",
-      "filterNone": "ยังไม่มี",
+      "filterUnfinished": "ยังไม่เสร็จสมบูรณ์",
       "countLaporan": "{{count}} รายงาน",
       "countSent": "{{count}} ส่งแล้ว",
       "countDraft": "{{count}} ฉบับร่าง",

@@ -978,7 +978,7 @@
       "noSessionTitle": "Tidak ada sesi",
       "noSessionDesc": "Tidak ada sesi yang sesuai dengan filter yang dipilih.",
       "filterHas": "Ada Laporan",
-      "filterNone": "Belum Ada",
+      "filterUnfinished": "Belum Selesai",
       "countLaporan": "{{count}} laporan",
       "countSent": "{{count}} terkirim",
       "countDraft": "{{count}} draft",

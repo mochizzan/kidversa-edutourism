@@ -40,6 +40,7 @@ import {
   generateSkipReasonLabel,
 } from '../../../core/constants/reportStatus'
 import { useReportSession } from '../hooks/useReportSession'
+import type { ReportListItem } from '../hooks/useReportSession'
 import { CompactPagination } from '../../../shared/components/data/CompactPagination'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import type { Participant } from '../../../core/types'
@@ -78,10 +79,30 @@ const ReportSessionPage = () => {
     handleSendAll,
   } = useReportSession(sessionId)
 
+  const [reportFilter, setReportFilter] = useState<string>('all')
+
+  // Display-only report-state filter (rows + pagination); bulk actions and
+  // summary cards below keep operating on the unfiltered topic data.
+  const matchesReportFilter = (item: ReportListItem, key: string) => {
+    if (key === 'all') return true
+    if (key === 'no_report') return !item.report
+    if (key === 'has_report') return !!item.report
+    if (key === 'draft')
+      return (
+        !!item.report &&
+        (item.report.status === ReportStatus.DRAFT ||
+          item.report.status === ReportStatus.PENDING_REVIEW)
+      )
+    if (key === 'sent') return item.report?.status === ReportStatus.SENT
+    return true
+  }
+
   // Per-Topic view: only rows for the active Topic are shown; summary cards
   // and bulk counts below are scoped to that Topic.
   const topicReports = reports.filter((r) => r.topicId === activeTopicId)
-  const topicFilteredReports = filteredReports.filter((r) => r.topicId === activeTopicId)
+  const topicFilteredReports = filteredReports.filter(
+    (r) => r.topicId === activeTopicId && matchesReportFilter(r, reportFilter),
+  )
   // Sendable = APPROVED + SEND_FAILED (failed deliveries are retried by Send All).
   const topicSendable = topicReports.filter(
     (r) => r.report && isSendableReportStatus(r.report.status),
@@ -129,7 +150,7 @@ const ReportSessionPage = () => {
 
   useEffect(() => {
     setReportPage(1)
-  }, [activeTopicId, search])
+  }, [activeTopicId, search, reportFilter])
 
   const reportTotalPages = Math.max(1, Math.ceil(topicFilteredReports.length / REPORT_PAGE_SIZE))
   const safeReportPage = Math.min(reportPage, reportTotalPages)
@@ -331,6 +352,30 @@ const ReportSessionPage = () => {
         </div>
       )}
 
+      {/* Report-state filter chips (display only) */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: 'all', label: t('admin.common.all') },
+          { key: 'no_report', label: t('admin.reportStatus.noReport') },
+          { key: 'has_report', label: t('admin.reports.filterHas') },
+          { key: 'draft', label: t('admin.reportStatus.draft') },
+          { key: 'sent', label: t('admin.reportStatus.sent') },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setReportFilter(f.key)}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+              reportFilter === f.key
+                ? 'bg-primary text-white'
+                : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container'
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
         <input
@@ -345,9 +390,15 @@ const ReportSessionPage = () => {
       {topicFilteredReports.length === 0 ? (
         <EmptyState
           icon={<FileText className="w-12 h-12" />}
-          title={search ? t('admin.reports.notFoundTitle') : t('admin.participants.emptyTitle')}
+          title={
+            search || reportFilter !== 'all'
+              ? t('admin.reports.notFoundTitle')
+              : t('admin.participants.emptyTitle')
+          }
           description={
-            search ? t('admin.reports.notFoundDesc') : t('admin.reports.emptyDesc2')
+            search || reportFilter !== 'all'
+              ? t('admin.reports.notFoundDesc')
+              : t('admin.reports.emptyDesc2')
           }
         />
       ) : (
