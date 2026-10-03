@@ -89,7 +89,6 @@ func loadedStage() entity.ProgramStage {
 		Name:          "Topik Lama",
 		Description:   "deskripsi lama",
 		ContentType:   entity.ContentTypeVideo,
-		IsPhotoStage:  true,
 		BadgeName:     "Penjelajah Senior",
 		BadgeImageURL: "https://cdn.example/badge/old.png",
 	}

@@ -193,7 +193,6 @@ func (r *GormProgramRepository) UpdateStage(ctx context.Context, s *entity.Progr
 		"name":            s.Name,
 		"description":     s.Description,
 		"content_type":    s.ContentType,
-		"is_photo_stage":  s.IsPhotoStage,
 		"badge_name":      s.BadgeName,
 		"badge_image_url": s.BadgeImageURL,
 	}

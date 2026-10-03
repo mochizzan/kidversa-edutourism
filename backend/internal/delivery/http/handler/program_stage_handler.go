@@ -50,7 +50,7 @@ func (h *ProgramHandler) CreateStage(c *echo.Context) error {
 	}
 	s := &entity.ProgramStage{
 		ProgramID: programID, SequenceOrder: req.SequenceOrder, Name: req.Name,
-		Description: req.Description, ContentType: req.ContentType, IsPhotoStage: req.IsPhotoStage,
+		Description: req.Description, ContentType: req.ContentType,
 	}
 	if err := h.repo.CreateStage((*c).Request().Context(), s); err != nil {
 		return err
@@ -82,7 +82,6 @@ func (h *ProgramHandler) UpdateStage(c *echo.Context) error {
 		s.ContentType = req.ContentType
 	}
 	s.SequenceOrder = req.SequenceOrder
-	s.IsPhotoStage = req.IsPhotoStage
 	if req.BadgeName != nil {
 		s.BadgeName = *req.BadgeName
 	}

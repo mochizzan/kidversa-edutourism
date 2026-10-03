@@ -17,7 +17,6 @@ type ProgramStageRequest struct {
 	Name          string             `json:"name" validate:"required"`
 	Description   string             `json:"description,omitempty"`
 	ContentType   entity.ContentType `json:"content_type" validate:"required"`
-	IsPhotoStage  bool               `json:"is_photo_stage,omitempty"`
 	// Badge fields follow the pointer convention of ProgramRequest: absent key
 	// -> nil -> leave the stored value untouched; present (even "") -> set/clear.
 	BadgeName     *string `json:"badge_name,omitempty"`
