@@ -42,7 +42,6 @@ const TopicFormPage = () => {
   const [programId, setProgramId] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [isPhotoStage, setIsPhotoStage] = useState(true)
   const [badgeName, setBadgeName] = useState('')
   const [badgeImageUrl, setBadgeImageUrl] = useState('')
 
@@ -81,7 +80,6 @@ const TopicFormPage = () => {
               setProgramId(program.id)
               setName(found.name)
               setDescription(found.description || '')
-              setIsPhotoStage(found.is_photo_stage)
               setBadgeName(found.badge_name || '')
               setBadgeImageUrl(found.badge_image_url || '')
               break
@@ -131,7 +129,6 @@ const TopicFormPage = () => {
           name: name.trim(),
           description: description.trim() || undefined,
           content_type: ContentType.MIXED,
-          is_photo_stage: isPhotoStage,
         })
         if (badgeName.trim() || badgeImageUrl.trim()) {
           try {
@@ -153,7 +150,6 @@ const TopicFormPage = () => {
         await programService.updateStage(programId, topicId, {
           name: name.trim(),
           description: description.trim() || undefined,
-          is_photo_stage: isPhotoStage,
           content_type: ContentType.MIXED,
           badge_name: badgeName.trim(),
           badge_image_url: badgeImageUrl.trim(),

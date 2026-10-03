@@ -18,6 +18,7 @@ import TopicDetailPage from '@/features/admin/pages/TopicDetailPage'
 import { programService } from '@/core/services/programs'
 import { programSubstageService } from '@/core/services/program-substages'
 import { useToastStore } from '@/core/stores/toastStore'
+import { i18n } from '@/core/i18n'
 import type { ProgramStage, ProgramSubstage } from '@/core/types'
 
 const topicId = 'topic-1'
@@ -31,7 +32,6 @@ const stage: ProgramStage = {
   name: 'Topik Sejarah',
   description: 'Deskripsi topik',
   content_type: 'MIXED',
-  is_photo_stage: false,
   created_at: '2026-01-01T00:00:00Z',
 } as ProgramStage
 
@@ -88,5 +88,52 @@ describe('TopicDetailPage kegiatan tab count', () => {
     const errorToasts = useToastStore.getState().toasts.filter((t) => t.type === 'error')
     expect(errorToasts.length).toBeGreaterThan(0)
     expect(errorToasts[0].message).toBe('Terjadi kesalahan. Silakan coba lagi.')
+  })
+})
+
+describe('TopicDetailPage badge block (S4)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
+  })
+
+  // badge_image_url holds a Content id — display must go through
+  // getMediaUrl('content', id) (tenant mocked to null → no query string).
+  const renderWithBadge = async (badge: Partial<ProgramStage>) => {
+    vi.mocked(programService.getAll).mockResolvedValue({ data: [program] } as never)
+    vi.mocked(programService.getStages).mockResolvedValue([{ ...stage, ...badge }] as never)
+    vi.mocked(programSubstageService.listByStage).mockResolvedValue([])
+    const result = renderPage()
+    await act(async () => { })
+    return result
+  }
+
+  const notSet = () => i18n.t('admin.topic.badgeNotSet')
+
+  it('name + image: renders the media URL image and the badge name, no "Badge belum diatur"', async () => {
+    const { container } = await renderWithBadge({
+      badge_name: 'Penjelajah',
+      badge_image_url: 'cont-named',
+    })
+
+    expect(container.querySelector('img[src="/api/media/content/cont-named"]')).not.toBeNull()
+    expect(container.querySelector('img[src="cont-named"]')).toBeNull()
+    expect(screen.getByText('Penjelajah')).toBeInTheDocument()
+    expect(screen.queryByText(notSet())).toBeNull()
+  })
+
+  it('image only: badge block renders (media URL image), no "Badge belum diatur"', async () => {
+    const { container } = await renderWithBadge({ badge_image_url: 'cont-imgonly' })
+
+    expect(container.querySelector('img[src="/api/media/content/cont-imgonly"]')).not.toBeNull()
+    expect(container.querySelector('img[src="cont-imgonly"]')).toBeNull()
+    expect(screen.queryByText(notSet())).toBeNull()
+  })
+
+  it('no badge at all: "Badge belum diatur" appears only when both fields are empty', async () => {
+    const { container } = await renderWithBadge({})
+
+    expect(screen.getByText(notSet())).toBeInTheDocument()
+    expect(container.querySelector('img')).toBeNull()
   })
 })

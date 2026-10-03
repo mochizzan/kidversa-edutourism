@@ -153,7 +153,7 @@ describe('GaleriChildPage: setPick that REJECTS (contract escape hatch)', () => 
       { id: 'ss1', session_id: 's-1', program_stage_id: 'ps1', status: 'IN_PROGRESS' },
     ] as never)
     vi.mocked(programService.getStages).mockResolvedValue([
-      { id: 'ps1', program_id: 'p1', sequence_order: 1, name: 'Topik Satu', content_type: 'TEXT', is_photo_stage: false },
+      { id: 'ps1', program_id: 'p1', sequence_order: 1, name: 'Topik Satu', content_type: 'TEXT' },
     ] as never)
     useToastStore.setState({ toasts: [] })
     mockHook()

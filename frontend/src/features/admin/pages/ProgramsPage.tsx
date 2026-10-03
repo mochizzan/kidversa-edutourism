@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { ROUTES, programDetailPath, programEditPath, topicListPath, topicNewPath, topicDetailPath, topicEditPath } from '../../../core/constants/app'
 import { withOrigin } from '../../../core/utils/navigation'
+import { getMediaUrl } from '../../../core/utils/media'
 import { Button } from '../../../shared/components/ui/Button'
 import { StatusToggle } from '../../../shared/components/ui/StatusToggle'
 import { Badge } from '../../../shared/components/ui/Badge'
@@ -132,7 +133,7 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
               <div className="flex items-center gap-3 min-w-0">
                 {stage.badge_image_url ? (
                   <img
-                    src={stage.badge_image_url}
+                    src={getMediaUrl('content', stage.badge_image_url)}
                     alt={stage.badge_name || t('admin.programs.badgeAlt')}
                     className="h-10 w-10 rounded-full object-cover border border-outline-variant"
                   />
@@ -144,9 +145,11 @@ function ExpandedTopicsPanel({ programId }: ExpandedTopicsPanelProps) {
                 <div className="min-w-0">
                   <p className="font-medium text-on-surface truncate">{stage.name}</p>
                   <p className="text-xs text-on-surface-variant truncate">
-                    {stage.badge_name ? t('admin.programs.badgeLine', { name: stage.badge_name }) : t('admin.programs.noBadge')}
-                    {' · '}
-                    {stage.is_photo_stage ? t('admin.programs.photoStage') : t('admin.programs.notPhotoStage')}
+                    {stage.badge_name
+                      ? t('admin.programs.badgeLine', { name: stage.badge_name })
+                      : stage.badge_image_url
+                        ? t('admin.topic.badgeTitle')
+                        : t('admin.programs.noBadge')}
                     {' · '}
                     {t('admin.programs.activityCount', { count: counts[stage.id] ?? 0 })}
                   </p>

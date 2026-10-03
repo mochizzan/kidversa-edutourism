@@ -69,7 +69,6 @@ export const programService: ProgramService = {
       name: data.name,
       description: data.description,
       content_type: data.content_type,
-      is_photo_stage: data.is_photo_stage,
     }),
 
   updateStage: (programId, stageId, data: UpdateStageDTO) =>
@@ -78,7 +77,6 @@ export const programService: ProgramService = {
       name: data.name,
       description: data.description,
       content_type: data.content_type,
-      is_photo_stage: data.is_photo_stage,
       badge_name: data.badge_name,
       badge_image_url: data.badge_image_url,
     }),

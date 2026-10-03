@@ -99,7 +99,7 @@ async function renderGroupPage(groupStatus: string) {
   vi.mocked(sessionService.getById).mockResolvedValue(makeDetail(groupStatus) as never)
   vi.mocked(sessionService.getSubstages).mockResolvedValue([] as never)
   vi.mocked(programService.getStages).mockResolvedValue([
-    { id: 'ps1', program_id: 'p1', sequence_order: 1, name: 'Topik Satu', content_type: 'TEXT', is_photo_stage: false },
+    { id: 'ps1', program_id: 'p1', sequence_order: 1, name: 'Topik Satu', content_type: 'TEXT' },
   ] as never)
   vi.mocked(assessmentService.getBySession).mockResolvedValue([] as never)
   vi.mocked(attendanceService.getBySession).mockResolvedValue([] as never)

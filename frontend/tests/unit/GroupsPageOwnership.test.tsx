@@ -58,7 +58,6 @@ const programStages = [
     sequence_order: 1,
     name: 'Topik Satu',
     content_type: 'TEXT',
-    is_photo_stage: false,
   },
 ]
 

@@ -4,7 +4,6 @@ import { Plus, Pencil, FolderOpen, ImageOff } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
-import { Badge } from '../../../shared/components/ui/Badge'
 import { Tabs } from '../../../shared/components/ui/Tabs'
 import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
@@ -144,27 +143,17 @@ const TopicDetailPage = () => {
               </p>
               <p className="text-sm text-on-surface">{stage.description || '-'}</p>
             </div>
-            <div className="flex items-center gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                  {t('admin.topic.photoStageCol')}
-                </p>
-                <Badge variant={stage.is_photo_stage ? 'success' : 'neutral'}>
-                  {stage.is_photo_stage ? t('admin.topic.yes') : t('admin.topic.no')}
-                </Badge>
-              </div>
-            </div>
 
             <div className="border-t border-outline-variant/50 pt-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-2">
                 {t('admin.topic.badgeTitle')}
               </p>
-              {stage.badge_name ? (
+              {stage.badge_name || stage.badge_image_url ? (
                 <div className="flex items-center gap-3">
                   {stage.badge_image_url ? (
                     <img
                       src={getMediaUrl('content', stage.badge_image_url)}
-                      alt={stage.badge_name}
+                      alt={stage.badge_name || t('admin.programs.badgeAlt')}
                       className="w-12 h-12 rounded-xl object-cover border border-outline-variant"
                       onError={(e) => {
                         ; (e.target as HTMLImageElement).style.display = 'none'
@@ -176,7 +165,9 @@ const TopicDetailPage = () => {
                     </div>
                   )}
                   <div>
-                    <p className="text-sm font-medium text-on-surface">{stage.badge_name}</p>
+                    {stage.badge_name && (
+                      <p className="text-sm font-medium text-on-surface">{stage.badge_name}</p>
+                    )}
                     {stage.badge_image_url && (
                       <p className="text-xs text-on-surface-variant break-all">{stage.badge_image_url}</p>
                     )}

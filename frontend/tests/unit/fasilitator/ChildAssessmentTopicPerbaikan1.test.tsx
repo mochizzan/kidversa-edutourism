@@ -135,8 +135,8 @@ function seedMocks(progress: unknown[] = []) {
   vi.mocked(sessionService.getById).mockResolvedValue(makeDetail() as never)
   vi.mocked(sessionService.getSubstages).mockResolvedValue(allLeaves as never)
   vi.mocked(programService.getStages).mockResolvedValue([
-    { id: 'ps1', program_id: 'p1', sequence_order: 1, name: 'Topik Satu', content_type: 'TEXT', is_photo_stage: false },
-    { id: 'ps2', program_id: 'p1', sequence_order: 2, name: 'Topik Dua', content_type: 'TEXT', is_photo_stage: false },
+    { id: 'ps1', program_id: 'p1', sequence_order: 1, name: 'Topik Satu', content_type: 'TEXT' },
+    { id: 'ps2', program_id: 'p1', sequence_order: 2, name: 'Topik Dua', content_type: 'TEXT' },
   ] as never)
   vi.mocked(programSubstageService.listByStage).mockImplementation(async (stageId: string) => {
     if (stageId === 'ps1') {

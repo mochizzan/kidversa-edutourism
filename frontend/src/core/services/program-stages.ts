@@ -25,7 +25,6 @@ export interface CreateProgramStageDTO {
   name: string
   description?: string
   content_type: string
-  is_photo_stage?: boolean
 }
 
 export type UpdateProgramStageDTO = Partial<CreateProgramStageDTO>
@@ -77,7 +76,6 @@ export const programStageService: ProgramStageService = {
       name: data.name,
       description: data.description,
       content_type: data.content_type,
-      is_photo_stage: data.is_photo_stage,
     }),
 
   update: async (id, data) => {
@@ -90,7 +88,6 @@ export const programStageService: ProgramStageService = {
     if (data.name !== undefined) body.name = data.name
     if (data.description !== undefined) body.description = data.description
     if (data.content_type !== undefined) body.content_type = data.content_type
-    if (data.is_photo_stage !== undefined) body.is_photo_stage = data.is_photo_stage
     return itemRequest<ProgramStage>('PUT', API_ROUTES.PROGRAMS.STAGE_DETAIL(programId, id), body)
   },
 

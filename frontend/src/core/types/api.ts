@@ -36,7 +36,6 @@ export interface CreateStageDTO {
  name: string
  description?: string
  content_type: ContentType
- is_photo_stage?: boolean
 }
 
 export interface UpdateStageDTO extends Partial<CreateStageDTO> {

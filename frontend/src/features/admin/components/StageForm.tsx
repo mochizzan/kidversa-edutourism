@@ -10,7 +10,6 @@ interface StageFormProps {
   onSubmit: (data: {
     name: string
     description: string
-    is_photo_stage: boolean
     badge_name: string
     badge_image_url: string
   }) => void
@@ -22,9 +21,6 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
   const { t } = useTranslation()
   const [name, setName] = useState(editingStage?.name ?? '')
   const [description, setDescription] = useState(editingStage?.description ?? '')
-  const [isPhotoStage, setIsPhotoStage] = useState<boolean>(
-    editingStage?.is_photo_stage ?? true
-  )
   const [badgeName, setBadgeName] = useState(editingStage?.badge_name ?? '')
   const [badgeImageUrl, setBadgeImageUrl] = useState(editingStage?.badge_image_url ?? '')
 
@@ -33,7 +29,6 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
     onSubmit({
       name,
       description,
-      is_photo_stage: isPhotoStage,
       badge_name: badgeName,
       badge_image_url: badgeImageUrl,
     })
@@ -54,18 +49,6 @@ export function StageForm({ editingStage, onSubmit, onCancel, submitting = false
         onChange={(e) => setDescription(e.target.value)}
         placeholder={t('admin.topic.stageDescPlaceholder')}
       />
-      <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-on-surface">
-          <input
-            type="checkbox"
-            checked={isPhotoStage}
-            onChange={(e) => setIsPhotoStage(e.target.checked)}
-            className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
-          />
-          {t('admin.topic.photoToggle')}
-        </label>
-      </div>
-
       <BadgeEditor
         title={t('admin.topic.badgeTitle')}
         variant="subtopik"

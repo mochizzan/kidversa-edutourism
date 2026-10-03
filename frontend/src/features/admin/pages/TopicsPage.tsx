@@ -23,6 +23,7 @@ import { programSubstageService } from '../../../core/services/program-substages
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import { topicNewPath, topicDetailPath, topicEditPath } from '../../../core/constants/app'
 import { withOrigin } from '../../../core/utils/navigation'
+import { getMediaUrl } from '../../../core/utils/media'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import type { Column } from '../../../shared/components/data/DataTable'
 import type { ProgramStage, ProgramSubstage } from '../../../core/types'
@@ -192,6 +193,12 @@ const TopicsPage = () => {
       render: (item) =>
         item.badge_name ? (
           <Badge variant="accent">{item.badge_name}</Badge>
+        ) : item.badge_image_url ? (
+          <img
+            src={getMediaUrl('content', item.badge_image_url)}
+            alt={t('admin.programs.badgeAlt')}
+            className="w-8 h-8 rounded-lg object-cover border border-outline-variant"
+          />
         ) : (
           <span className="text-sm text-on-surface-variant">-</span>
         ),

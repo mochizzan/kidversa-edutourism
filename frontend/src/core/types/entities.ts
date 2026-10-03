@@ -57,7 +57,6 @@ export interface ProgramStage {
  name: string
  description?: string
  content_type: ContentType
- is_photo_stage: boolean
  // Badge SubTopik (per-SubTopik award; shown after all Kegiatan are scored).
  badge_name?: string
  badge_image_url?: string
