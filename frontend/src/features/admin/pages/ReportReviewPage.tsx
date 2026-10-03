@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../../core/constants/app'
 import {
@@ -19,12 +19,13 @@ import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { ReportStatus } from '../../../core/types/enums'
 import { isSendableReportStatus } from '../../../core/constants/reportStatus'
-import { formatDate } from '../../../shared/utils'
 import { getMediaUrl } from '../../../core/utils/media'
+import { reportService } from '../../../core/services/reports'
 import { useReportReview } from '../hooks/useReportReview'
 import { ReportStatusBanner } from '../components/ReportStatusBanner'
 import { ReportAssessmentScores } from '../components/ReportAssessmentScores'
 import { ReportMissionSelector } from '../components/ReportMissionSelector'
+import { ReportSentSummaryCard } from '../components/ReportSentSummaryCard'
 import { BadgeList } from '../../../shared/components/data/BadgeList'
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
 import { useTranslation, Trans } from 'react-i18next'
@@ -69,6 +70,43 @@ const ReportReviewPage = () => {
   const [showSendConfirm, setShowSendConfirm] = useState(false)
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
+
+  // "Ringkasan yang Dikirim" = teks WhatsApp yang TEPAT dikirim server untuk
+  // laporan ini (template tunggal di backend) — diambil sekali per report.id,
+  // di-reset saat laporan berganti; balasan basi dari laporan sebelumnya
+  // diabaikan (cancelled), dan gagal muat tidak pernah merusak halaman.
+  const [sentMessage, setSentMessage] = useState<string | null>(null)
+  const [sentMessageLoading, setSentMessageLoading] = useState(false)
+  const [sentMessageError, setSentMessageError] = useState(false)
+
+  useEffect(() => {
+    const fetchId = report?.status === ReportStatus.SENT ? report.id : null
+    if (!fetchId) {
+      setSentMessage(null)
+      setSentMessageLoading(false)
+      setSentMessageError(false)
+      return
+    }
+    let cancelled = false
+    setSentMessage(null)
+    setSentMessageLoading(true)
+    setSentMessageError(false)
+    reportService
+      .getMessage(fetchId)
+      .then((res) => {
+        if (cancelled) return
+        setSentMessage(res?.message ?? '')
+        setSentMessageLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setSentMessageError(true)
+        setSentMessageLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [report?.id, report?.status])
 
   const handleCopyLink = async (link: string) => {
     try {
@@ -189,50 +227,12 @@ const ReportReviewPage = () => {
       )}
 
       {report.status === ReportStatus.SENT && (
-        <Card title={t('admin.review.sentSummaryTitle')} subtitle={t('admin.review.sentSummarySubtitle')}>
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
-                {t('admin.review.narrativeLabel')}
-              </p>
-              <p className="text-sm text-on-surface whitespace-pre-wrap">{narrativeText || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
-                {t('admin.review.missionLabel')}
-              </p>
-              {assignedMissionIds.length === 0 ? (
-                <p className="text-sm text-on-surface-variant">{t('admin.review.noMission')}</p>
-              ) : (
-                <ul className="text-sm text-on-surface space-y-1">
-                  {missions
-                    .filter((m) => assignedMissionIds.includes(m.id))
-                    .map((m) => (
-                      <li key={m.id} className="flex items-start gap-2">
-                        <span>•</span>
-                        <span>{m.title}</span>
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </div>
-            {photo && (
-              <div>
-                <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wider mb-1">
-                  {t('admin.review.photoLabel')}
-                </p>
-                <img
-                  src={getMediaUrl('photo', photo.id)}
-                  alt={participant.child_name}
-                  className="w-24 h-24 object-cover rounded-xl"
-                />
-              </div>
-            )}
-            <p className="text-xs text-on-surface-variant">
-              {t('admin.review.sentAt', { date: report.sent_at ? formatDate(report.sent_at) : '-' })}
-            </p>
-          </div>
-        </Card>
+        <ReportSentSummaryCard
+          message={sentMessage}
+          loading={sentMessageLoading}
+          error={sentMessageError}
+          sentAt={report.sent_at}
+        />
       )}
 
       <div className="grid gap-6 print-report">

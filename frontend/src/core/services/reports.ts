@@ -1,5 +1,10 @@
 import type { PublicReport, Report } from '../types'
-import type { ReportService, ReportSessionResult, ReportTokenResponse } from './types'
+import type {
+  ReportService,
+  ReportSessionResult,
+  ReportTokenResponse,
+  ReportMessageResponse,
+} from './types'
 import { apiRequest } from './backend-client'
 import { itemRequest, itemsWithExtrasRequest } from './api-envelope'
 import { useAuthStore } from '../stores/authStore'
@@ -137,6 +142,13 @@ const getPublicReport = async (token: string): Promise<PublicReport | null> => {
   return res ?? null
 }
 
+// getMessage returns the exact WhatsApp text the server sends for this report
+// (the backend owns the single template). itemRequest unwraps the `{ data }`
+// envelope, so the caller receives `{ message }` ready to render verbatim.
+const getMessage = async (reportId: string): Promise<ReportMessageResponse> => {
+  return itemRequest<ReportMessageResponse>('GET', API_ROUTES.REPORTS.MESSAGE(reportId))
+}
+
 export const reportService: ReportService = {
   getBySession,
   generate,
@@ -147,6 +159,7 @@ export const reportService: ReportService = {
   ensureGalleryToken,
   suggestMissions,
   generateNarrativeStream,
+  getMessage,
 }
 
 // Helpers used by the public parent flow (P1/P2, out of Fase 4 scope but kept

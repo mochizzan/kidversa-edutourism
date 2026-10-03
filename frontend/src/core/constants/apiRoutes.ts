@@ -135,6 +135,9 @@ export const API_ROUTES = {
   // On-demand gallery token for the mini-raport QR footer (mint-if-missing).
   ENSURE_GALLERY_TOKEN: (id: string) =>
    `/api/reports/${encodeURIComponent(id)}/gallery-token`,
+  // Exact WhatsApp text the server sends for this report (the backend owns
+  // the single template) — the admin summary renders it verbatim.
+  MESSAGE: (id: string) => `/api/reports/${encodeURIComponent(id)}/message`,
   ACCESS: '/api/reports/access',
   ACCESS_PHOTO: '/api/reports/access/photo',
   GALLERY: '/api/reports/gallery',

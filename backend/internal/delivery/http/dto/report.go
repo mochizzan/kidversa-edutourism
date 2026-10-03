@@ -227,6 +227,13 @@ func NewReportTokenResponse(r *entity.Report) *ReportTokenResponse {
 	}
 }
 
+// ReportMessageResponse carries the rendered WhatsApp delivery text for the
+// admin message preview (GET /api/reports/:id/message): the exact text Send
+// delivers, assembled by the same builder.
+type ReportMessageResponse struct {
+	Message string `json:"message"`
+}
+
 // ReportApproveRequest carries the approver identity plus optional finalized
 // narrative and mission selections.
 type ReportApproveRequest struct {

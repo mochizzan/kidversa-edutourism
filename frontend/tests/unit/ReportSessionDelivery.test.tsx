@@ -882,27 +882,47 @@ describe('generate all — topic-scoped eligibility and payload (Bug 3)', () => 
  })
 })
 
-describe('generate all — progress banner + 409 already_generating (Perbaikan-3)', () => {
+describe('generate all — no aggregate progress bar + 409 already_generating (Perbaikan-3)', () => {
  beforeEach(() => {
   vi.clearAllMocks()
   useToastStore.getState().dismissAll()
  })
 
- it('renders progress %/ETA from active_generate Total/Succeeded while the run is live', async () => {
-  const items = [reportAna(ReportStatus.DRAFT), reportBela(ReportStatus.DRAFT)]
+ it('after generate-all there is no progress banner: the run shows on the button + per-row labels', async () => {
+  // p1 is ready_to_generate (no report + an assessment) → the run is eligible;
+  // p2 already has a report, so its row carries the per-row queued label.
+  let runLive = false
   setupMocks(async () => ({
-   items,
-   extras: activeGenerate({ queued_ids: ['r-ana'], processing_ids: ['r-bela'] }),
+   items: [reportBela(ReportStatus.DRAFT)],
+   extras: runLive ? activeGenerate({ queued_ids: ['r-bela'], processing_ids: [] }) : {},
   }))
+  vi.mocked(sessionService.getSubstages).mockResolvedValue([
+   { id: 'sub1', session_stage_id: 'st1' },
+  ] as never)
+  vi.mocked(assessmentService.getBySession).mockResolvedValue([
+   { participant_id: 'p1', session_substage_id: 'sub1', star_rating: 5 },
+  ] as never)
+  vi.mocked(reportService.generate).mockResolvedValue(undefined)
 
   renderPage()
   await flush()
 
-  // 2 total, 0 terminal → 0/2 · 0%.
-  const banner = screen.getByTestId('report-generate-progress')
-  expect(banner).toHaveTextContent('0/2')
-  expect(banner).toHaveTextContent('0%')
-  expect(banner.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('0')
+  const generateBtn = screen.getByRole('button', { name: i18n.t('admin.reports.generateAll') })
+  expect(generateBtn).toBeEnabled()
+  // The 202 registers the run server-side → the post-generate fetch carries
+  // active_generate (the state that used to feed the aggregate banner).
+  runLive = true
+  await act(async () => { generateBtn.click() })
+  await flush(4)
+
+  expect(reportService.generate).toHaveBeenCalledTimes(1)
+  // The aggregate progress banner/progressbar is gone for good.
+  expect(screen.queryByTestId('report-generate-progress')).toBeNull()
+  expect(screen.queryByRole('progressbar')).toBeNull()
+  // The run is still fully visible: the button's loading state + the
+  // server-driven per-row labels.
+  expect(screen.getByRole('button', { name: i18n.t('admin.reports.generating') })).toBeDisabled()
+  expect(screen.getByText(i18n.t('admin.status.queued'))).toBeInTheDocument()
  })
 
  it('a 409 already_generating names the live run instead of a generic error', async () => {

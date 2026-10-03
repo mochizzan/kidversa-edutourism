@@ -310,49 +310,6 @@ const ReportSessionPage = () => {
         </Button>
       </div>
 
-      {activeGenerate && activeGenerate.total > 0 && (() => {
-        // Progress reads straight from the server's active_generate snapshot
-        // (polled via GET /api/reports, NOT an SSE stream — session progress
-        // has no SSE channel; see useReportSession pollTick). done counts
-        // every terminal item (success/error/skip); ETA extrapolates the
-        // observed rate over the remaining items.
-        const total = activeGenerate.total
-        const done = total - activeGenerate.queued - activeGenerate.processing
-        const pct = Math.min(100, Math.round((done / total) * 100))
-        const startedMs = Date.parse(activeGenerate.started_at ?? '')
-        const elapsedSec = !Number.isNaN(startedMs) ? Math.max(0, (Date.now() - startedMs) / 1000) : 0
-        const rate = elapsedSec > 0 && done > 0 ? done / elapsedSec : 0
-        const remainingSec = rate > 0 ? Math.ceil((total - done) / rate) : null
-        const eta =
-          remainingSec === null
-            ? '—'
-            : remainingSec < 60
-              ? `${remainingSec}s`
-              : `${Math.floor(remainingSec / 60)}m ${remainingSec % 60}s`
-        return (
-          <div
-            className="bg-primary-container text-on-primary-container rounded-2xl p-4 text-sm space-y-2"
-            data-testid="report-generate-progress"
-          >
-            <div className="flex items-center gap-2 font-medium">
-              <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
-              <span>
-                {done}/{total} · {pct}% · ETA {eta}
-              </span>
-            </div>
-            <div
-              className="h-2 rounded-full bg-surface-variant overflow-hidden"
-              role="progressbar"
-              aria-valuenow={pct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-            </div>
-          </div>
-        )
-      })()}
-
       {genError && (
         <div className="bg-error-container text-on-error-container rounded-2xl p-4 text-sm flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />

@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 interface ConsentTableProps {
   items: ConsentFlatItem[]
   sending: Record<string, boolean>
+  batchSending?: boolean
   onSend: (participantId: string) => void
   onResend: (participantId: string) => void
   page: number
@@ -22,6 +23,7 @@ interface ConsentTableProps {
 export function ConsentTable({
   items,
   sending,
+  batchSending = false,
   onSend,
   onResend,
   page,
@@ -55,7 +57,7 @@ export function ConsentTable({
         ) : (
           items.map((item) => {
             const action = getConsentRowAction(item)
-            const rowSending = sending[item.participant_id]
+            const rowSending = sending[item.participant_id] || batchSending
             return (
               <div
                 key={item.participant_id}

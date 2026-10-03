@@ -17,6 +17,8 @@ import (
 //   - POST /api/reports/:id/approve
 //   - POST /api/reports/:id/send            (mints parent token + delivers the
 //     link to the parent's WhatsApp; SENT only after the gateway confirms)
+//   - GET  /api/reports/:id/message         (exact WhatsApp text Send delivers,
+//     shared builder; no token mint, no send, no status change)
 //
 // The public access endpoint is intentionally OUTSIDE JWTAuth; the token itself
 // is the authorization mechanism.
@@ -43,6 +45,8 @@ func RegisterReportsRoutes(g *echo.Group, h *ReportHandler, jm *auth.JWTManager,
 	// On-demand gallery token for the admin preview QR footer (mint-if-missing).
 	g.POST("/:id/gallery-token", h.EnsureGalleryToken, authMW, scopeMW)
 	g.POST("/:id/send", h.Send, authMW, scopeMW)
+	// Admin message preview: the exact text /send delivers (shared builder).
+	g.GET("/:id/message", h.MessagePreview, authMW, scopeMW)
 	// TODO: DELETE /api/reports/:id is not yet exposed. If added, it MUST use a
 	// HARD delete (db.Unscoped().Delete) — the soft-delete in GormReportRepository.Delete
 	// leaves the (session_id, participant_id) row in uq_reports_session_participant and

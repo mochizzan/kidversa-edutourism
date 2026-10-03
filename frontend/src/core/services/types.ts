@@ -164,6 +164,11 @@ export interface ReportTokenResponse {
  status: string
 }
 
+/** GET /api/reports/:id/message — the exact WhatsApp text the server sends. */
+export interface ReportMessageResponse {
+ message: string
+}
+
 /**
  * Per-report lifecycle phase inside an active generate run: the AI narrative
  * pass and the mission-selection pass run concurrently per worklist report.
@@ -265,6 +270,12 @@ export interface ReportService {
  send(reportId: string, tenantId?: string | null, queue?: string[]): Promise<ReportTokenResponse>
  suggestMissions(reportId: string, tenantId?: string | null): Promise<string[]>
  generateNarrativeStream(reportId: string, force?: boolean, tenantId?: string | null): Promise<void>
+ /**
+  * GET /:id/message — the exact WhatsApp text the server sends for this
+  * report (the backend owns the single template). The admin "sent summary"
+  * card renders it verbatim instead of re-assembling the parts locally.
+  */
+ getMessage(reportId: string): Promise<ReportMessageResponse>
 }
 
 // Consent

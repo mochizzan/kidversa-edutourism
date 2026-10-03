@@ -153,6 +153,7 @@ const ConsentMonitorPage = () => {
           <ConsentTable
             items={paged}
             sending={sending}
+            batchSending={batchSending}
             onSend={sendSingle}
             onResend={(id) => sendSingle(id, true)}
             page={page}

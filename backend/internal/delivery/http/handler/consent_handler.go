@@ -496,22 +496,55 @@ func formatSessionDateID(raw string) string {
 	return raw
 }
 
+// Placeholders rendered by buildConsentMessage when a field is empty, so the
+// message line structure stays intact instead of collapsing.
+const (
+	msgPlaceholderNA   = "[tidak tersedia]"
+	msgPlaceholderLink = "[tautan tidak tersedia]"
+)
+
+// msgVal returns s, or fallback when s is empty.
+func msgVal(s, fallback string) string {
+	if s == "" {
+		return fallback
+	}
+	return s
+}
+
 // buildConsentMessage composes the Indonesian WhatsApp consent request.
+// Empty fields render placeholders (inside the surrounding formatting) so the
+// line structure stays intact. There is no trailing newline.
 func buildConsentMessage(parentName, childName, sessionName, sessionDate, location, url string) string {
-	return fmt.Sprintf(`Kidversa Edutourism 🎓
+	return fmt.Sprintf(`🎓 *KIDVERSA EDUTOURISM*
+_Formulir Persetujuan Dokumentasi Kegiatan_
 
-Halo Bapak/Ibu %s,
+Yth. Bapak/Ibu *%s*,
 
-Kami dari Kidversa Edutourism meminta persetujuan Bpk / Ibu  untuk kegiatan edutourism atas nama  %s (peserta)
+Salam hangat dari Kidversa! 🌟
 
-📋 Sesi: %s
-📅 Tanggal: %s
-📍 Lokasi: %s
+Dalam rangka mendokumentasikan proses pembelajaran dan aktivitas peserta didik, kami memohon kesediaan serta perizinan Bapak/Ibu terkait pengambilan foto ananda *%s* selama kegiatan berlangsung.
 
-Kami mohon diberikan izin untuk pengambilan gambar Selama kegiatan untuk proses dokumetasi pembelajaran.
+📌 *DETAIL KEGIATAN*
+• *Sesi:* %s
+• *Tanggal:* %s
+• *Lokasi:* %s
 
-Klik tautan berikut untuk memberikan persetujuan:
+ℹ️ *Maksud & Tujuan Dokumentasi:*
+> _Foto yang diambil akan digunakan untuk portofolio perkembangan belajar siswa, laporan kegiatan kepada orang tua, serta dokumentasi resmi Kidversa Edutourism dengan tetap memrioritaskan privasi dan kenyamanan ananda._
+
+✍️ *KONFIRMASI PERSETUJUAN*
+Silakan klik tautan di bawah ini untuk memberikan konfirmasi persetujuan Bapak/Ibu:
 %s
 
-Terima kasih 🙏`, parentName, childName, sessionName, sessionDate, location, url)
+Atas perhatian, kepercayaan, dan kerja sama Bapak/Ibu, kami ucapkan terima kasih 🙏
+
+---
+_Salam hangat,_
+*Tim Kidversa Edutourism*`,
+		msgVal(parentName, msgPlaceholderNA),
+		msgVal(childName, msgPlaceholderNA),
+		msgVal(sessionName, msgPlaceholderNA),
+		msgVal(sessionDate, msgPlaceholderNA),
+		msgVal(location, msgPlaceholderNA),
+		msgVal(url, msgPlaceholderLink))
 }

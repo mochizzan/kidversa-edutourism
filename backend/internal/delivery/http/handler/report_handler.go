@@ -499,6 +499,27 @@ func (h *ReportHandler) Send(c *echo.Context) error {
 	return appresp.OK(c, dto.NewReportTokenResponse(r))
 }
 
+// MessagePreview handles GET /api/reports/:id/message: returns the exact
+// WhatsApp text Send would deliver for this report (same shared builder, the
+// stored parent token instead of a freshly minted one) so the admin
+// "Ringkasan yang Dikirim" preview can never drift from the real message.
+// It never mints a token, never sends, and never changes the report status.
+func (h *ReportHandler) MessagePreview(c *echo.Context) error {
+	id, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
+	tenantID := appmiddleware.GetTenantID(c)
+	if err := tenantGuard(c, tenantID); err != nil {
+		return err
+	}
+	msg, err := h.uc.PreviewMessage((*c).Request().Context(), id, tenantID)
+	if err != nil {
+		return err
+	}
+	return appresp.OK(c, dto.ReportMessageResponse{Message: msg})
+}
+
 // SuggestMissions handles POST /api/reports/:id/suggest-missions.
 // Returns up to MaxReportMissions mission IDs recommended for the report's
 // Topic (program_stage), scoped strictly to that Topic's active missions. No

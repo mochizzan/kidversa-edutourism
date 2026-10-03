@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -317,7 +319,7 @@ func (u *Usecase) Send(ctx context.Context, reportID, tenantID string, ttlHours 
 		return nil, err
 	}
 	link := u.cfg.ParentReportBaseURL + "?token=" + tok
-	msg := buildReportMessage(participant.ParentName, participant.ChildName, u.sessionName(ctx, r, tenantID), link)
+	msg := u.buildParentMessage(ctx, r, participant, tenantID, link)
 	if serr := u.messaging.SendTextMessage(ctx, digits+"@c.us", msg); serr != nil {
 		log.Printf("reports: whatsapp delivery failed for report %s: %v", r.ID, serr)
 		return nil, u.markSendFailed(ctx, r, apperrors.New(http.StatusBadGateway, "whatsapp_send_failed", serr))
@@ -341,28 +343,180 @@ func (u *Usecase) markSendFailed(ctx context.Context, r *entity.Report, cause er
 	return cause
 }
 
-// sessionName resolves the session label used in the delivery message
-// (best-effort: a lookup failure must not block the send).
-func (u *Usecase) sessionName(ctx context.Context, r *entity.Report, tenantID string) string {
-	s, err := u.sessionRepo.GetSessionByID(ctx, r.SessionID, tenantID)
-	if err != nil || s == nil {
-		return ""
+// PreviewMessage returns the exact WhatsApp text that Send delivers for this
+// report (same builder, stored parent token instead of a freshly minted one).
+// It never mints a token, never sends, and never changes the report status.
+func (u *Usecase) PreviewMessage(ctx context.Context, reportID, tenantID string) (string, error) {
+	r, err := u.repo.GetByID(ctx, reportID, tenantID)
+	if err != nil {
+		return "", err
 	}
-	return s.Name
+	participant, err := u.sessionRepo.GetParticipantByID(ctx, r.ParticipantID, tenantID)
+	if err != nil {
+		return "", err
+	}
+	link := ""
+	if u.cfg.ParentReportBaseURL != "" && r.ParentAccessToken != "" {
+		link = u.cfg.ParentReportBaseURL + "?token=" + r.ParentAccessToken
+	}
+	return u.buildParentMessage(ctx, r, participant, tenantID, link), nil
 }
 
-// buildReportMessage composes the WhatsApp text carrying the parent link.
-func buildReportMessage(parentName, childName, sessionName, link string) string {
-	return fmt.Sprintf(`Kidversa Edutourism 🎓
+// buildParentMessage assembles the WhatsApp report text for r using the given
+// parent report link; shared by Send and the admin message-preview endpoint
+// (GET /api/reports/:id/message) so both deliver byte-identical text.
+// Resolution is best-effort: a failed lookup degrades to the builder's
+// placeholder instead of failing the call.
+func (u *Usecase) buildParentMessage(ctx context.Context, r *entity.Report, participant *entity.Participant, tenantID, reportLink string) string {
+	// Session label; the session's program feeds the Program line (one lookup).
+	var sessionName, programName string
+	if s, err := u.sessionRepo.GetSessionByID(ctx, r.SessionID, tenantID); err == nil && s != nil {
+		sessionName = s.Name
+		if s.ProgramID != "" {
+			if p, perr := u.programRepo.GetProgramByID(ctx, s.ProgramID); perr == nil && p != nil {
+				programName = p.Name
+			}
+		}
+	}
+	// Topic (program stage).
+	topicName := ""
+	if r.ProgramStageID != "" {
+		if st, serr := u.programRepo.GetStageByID(ctx, r.ProgramStageID); serr == nil && st != nil {
+			topicName = st.Name
+		}
+	}
+	// Narrative: finalized text wins over the draft.
+	narrative := r.AINarrativeFinal
+	if narrative == "" {
+		narrative = r.AINarrativeDraft
+	}
+	// Mission titles in report order; failed or empty lookups are skipped
+	// (an all-skipped list renders the placeholder bullet).
+	missionTitles := make([]string, 0, len(r.MissionIDs))
+	for _, mid := range r.MissionIDs {
+		m, merr := u.missionRepo.GetByID(ctx, mid, tenantID)
+		if merr != nil || m == nil || m.Title == "" {
+			continue
+		}
+		missionTitles = append(missionTitles, m.Title)
+	}
+	return buildReportMessage(reportMessageData{
+		parentName:    participant.ParentName,
+		childName:     participant.ChildName,
+		sessionName:   sessionName,
+		programName:   programName,
+		topicName:     topicName,
+		reportLink:    reportLink,
+		galleryLink:   u.galleryLink(r),
+		narrative:     narrative,
+		missionTitles: missionTitles,
+	})
+}
 
-Halo Bapak/Ibu %s,
+// galleryLink derives the public gallery URL from the configured parent report
+// origin (frontend route: origin + "/gallery?token=" + token). Returns "" when
+// the token or the base URL is missing or unparseable — the message builder
+// renders its placeholder instead. No extra env var: the origin is reused.
+func (u *Usecase) galleryLink(r *entity.Report) string {
+	if r.GalleryAccessToken == "" || u.cfg.ParentReportBaseURL == "" {
+		return ""
+	}
+	parsed, err := url.Parse(u.cfg.ParentReportBaseURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	return parsed.Scheme + "://" + parsed.Host + "/gallery?token=" + r.GalleryAccessToken
+}
 
-Rapor %s sudah selesai dan telah disetujui.
+// Placeholders rendered by buildReportMessage when a field is empty, so the
+// message line structure stays intact instead of collapsing.
+const (
+	msgPlaceholderNA        = "[tidak tersedia]"
+	msgPlaceholderLink      = "[tautan tidak tersedia]"
+	msgPlaceholderNarrative = "[narasi belum tersedia]"
+	msgPlaceholderMission   = "[misi belum tersedia]"
+)
 
-Silakan lihat rapor melalui tautan berikut:
+// msgVal returns s, or fallback when s is empty.
+func msgVal(s, fallback string) string {
+	if s == "" {
+		return fallback
+	}
+	return s
+}
+
+// reportMessageData is the fully resolved input of buildReportMessage.
+type reportMessageData struct {
+	parentName    string
+	childName     string
+	sessionName   string
+	programName   string
+	topicName     string
+	reportLink    string
+	galleryLink   string
+	narrative     string
+	missionTitles []string
+}
+
+// buildReportMessage composes the Indonesian WhatsApp report text.
+// Empty fields render placeholders (inside the surrounding formatting) so the
+// line structure stays intact; mission titles render one bullet each (0..4,
+// capped upstream), with a placeholder bullet when there are none. There is no
+// trailing newline.
+func buildReportMessage(d reportMessageData) string {
+	missionLines := make([]string, 0, len(d.missionTitles)+1)
+	for _, title := range d.missionTitles {
+		if title == "" {
+			continue
+		}
+		missionLines = append(missionLines, "• "+title)
+	}
+	if len(missionLines) == 0 {
+		missionLines = append(missionLines, "• "+msgPlaceholderMission)
+	}
+	return fmt.Sprintf(`🎓 *KIDVERSA EDUTOURISM*
+_Laporan Perkembangan Peserta Didik_
+
+Yth. Bapak/Ibu *%s*,
+
+Salam hangat dari Kidversa! 🌟
+
+Rapor perkembangan ananda *%s* untuk kegiatan edukasi telah selesai diproses dan disetujui.
+
+📌 *DETAIL KEGIATAN*
+• *Sesi:* %s
+• *Program:* %s
+• *Topik:* %s
+
+🔗 *TAUTAN RAPOR & FOTO KEGIATAN*
+• 📄 *Rapor Digital:* 
 %s
 
-Terima kasih 🙏`, parentName, childName, link)
+• 📸 *Galeri Foto Kegiatan:* 
+%s
+
+---
+
+📝 *CATATAN PERKEMBANGAN*
+> _"%s"_
+
+🎯 *MISI LANJUTAN DI RUMAH*
+%s
+
+---
+
+Mari bersama-sama mendukung tumbuh kembang dan kesiapsiagaan ananda! Jika ada pertanyaan terkait laporan ini, silakan hubungi kami.
+
+Terima kasih atas kepercayaan Bapak/Ibu 🙏`,
+		msgVal(d.parentName, msgPlaceholderNA),
+		msgVal(d.childName, msgPlaceholderNA),
+		msgVal(d.sessionName, msgPlaceholderNA),
+		msgVal(d.programName, msgPlaceholderNA),
+		msgVal(d.topicName, msgPlaceholderNA),
+		msgVal(d.reportLink, msgPlaceholderLink),
+		msgVal(d.galleryLink, msgPlaceholderLink),
+		msgVal(d.narrative, msgPlaceholderNarrative),
+		strings.Join(missionLines, "\n"))
 }
 
 // StreamNarrative produces an AI narrative for a single report, streaming
