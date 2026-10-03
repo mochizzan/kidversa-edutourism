@@ -438,8 +438,21 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   const wasSent = report.status === ReportStatus.SENT
   setActionLoading('send')
   try {
-   await reportService.send(report.id, saTenant)
+   const sent = await reportService.send(report.id, saTenant)
    await loadData()
+   // Token parent dari respons /send (bukan tebakan klien): simpan ke state
+   // rapor aktif supaya banner merender aksi link orang tua. Muat ulang daftar
+   // di atas juga membawa token yang sama (respons baca scoped-staff), jadi
+   // kedua sumber memberi hasil identik; merge ini menutup kasus daftar tak
+   // lagi membawa token.
+   if (sent?.parent_access_token) {
+    setReportsByTopic((prev) => {
+     const key = activeTopicId
+     const cur = key ? prev[key] : undefined
+     if (!key || !cur) return prev
+     return { ...prev, [key]: { ...cur, parent_access_token: sent.parent_access_token } }
+    })
+   }
    addToast({
     type: 'success',
     message: i18n.t(wasSent ? 'admin.reportReview.resendOk' : 'admin.reportReview.sendOk'),

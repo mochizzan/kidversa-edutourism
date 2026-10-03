@@ -8,15 +8,27 @@ import (
 	reportsuc "kidversa-edutourism-backend/internal/usecase/reports"
 )
 
-// ReportResponse is the authenticated read representation of a report.
+// ReportResponse is the authenticated read representation of a report. It is
+// emitted ONLY on the JWT + tenant-scoped staff routes (GET /api/reports and
+// POST /api/reports/:id/{approve,missions,gallery-token}); the public,
+// token-scoped parent view is PublicReportDTO, a separate struct that never
+// embeds this type.
 type ReportResponse struct {
 	*entity.Report
+	// ParentAccessToken is the parent share token, distributed to scoped
+	// STAFF readers so the admin review page can render the parent link /
+	// copy-link actions. The entity keeps json:"-" (every other serialization
+	// path of the entity stays token-free); the DTO field is always present
+	// ("" when the report has not been sent yet) to match the frontend
+	// Report.parent_access_token: string contract.
+	ParentAccessToken string `json:"parent_access_token"`
 }
 
-// NewReportResponse wraps a report entity. Note: ParentAccessToken and token
-// expiry/revoke are json:"-" on the entity, so they are never serialized here.
+// NewReportResponse wraps a report entity. Token expiry/revoke stay json:"-"
+// on the entity and are NOT copied here; only the parent access token is
+// distributed explicitly, via the field above.
 func NewReportResponse(r *entity.Report) *ReportResponse {
-	return &ReportResponse{Report: r}
+	return &ReportResponse{Report: r, ParentAccessToken: r.ParentAccessToken}
 }
 
 // ReportListResponse carries a page of reports with pagination meta plus the
@@ -111,7 +123,7 @@ type ReportActiveSend struct {
 func NewReportListResponse(items []entity.Report) *ReportListResponse {
 	out := make([]ReportResponse, 0, len(items))
 	for i := range items {
-		out = append(out, ReportResponse{Report: &items[i]})
+		out = append(out, ReportResponse{Report: &items[i], ParentAccessToken: items[i].ParentAccessToken})
 	}
 	return &ReportListResponse{Items: out}
 }
