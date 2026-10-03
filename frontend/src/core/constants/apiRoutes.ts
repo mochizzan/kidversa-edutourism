@@ -140,6 +140,11 @@ export const API_ROUTES = {
   GALLERY: '/api/reports/gallery',
   GALLERY_PHOTO: (photoId: string) =>
    `/api/reports/gallery/photo/${encodeURIComponent(photoId)}`,
+  // Full-resolution download of the ORIGINAL file (server replies with
+  // Content-Disposition: attachment) — the fullscreen preview's download
+  // button. Never used for <img src>; see GALLERY_PHOTO for inline bytes.
+  GALLERY_PHOTO_DOWNLOAD: (photoId: string) =>
+   `/api/reports/gallery/photo/${encodeURIComponent(photoId)}/download`,
  },
 
  MISSIONS: {

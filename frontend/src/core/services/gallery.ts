@@ -32,4 +32,16 @@ const photoUrl = (token: string, photoId: string, variant?: 'framed' | 'original
  return version ? `${withVariant}&v=${encodeURIComponent(version)}` : withVariant
 }
 
-export const galleryService = { getByToken, photoUrl }
+/**
+ * URL that downloads ONE gallery photo's ORIGINAL bytes from the public
+ * GET /api/reports/gallery/photo/:photoId/download endpoint — the fullscreen
+ * preview's download button. The gallery token is again the credential
+ * (?token=), and the server answers with Content-Disposition: attachment so
+ * the browser SAVES the stored file (full resolution, no re-encode) instead
+ * of rendering it. This must never be reused as an <img src>: that is
+ * photoUrl's job.
+ */
+const photoDownloadUrl = (token: string, photoId: string): string =>
+ `${API_ROUTES.REPORTS.GALLERY_PHOTO_DOWNLOAD(photoId)}?token=${encodeURIComponent(token)}`
+
+export const galleryService = { getByToken, photoUrl, photoDownloadUrl }

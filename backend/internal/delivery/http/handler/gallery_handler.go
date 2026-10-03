@@ -156,49 +156,46 @@ func (h *GalleryHandler) GetByToken(c *echo.Context) error {
 	return appresp.OK(c, dto.NewPublicGalleryDTO(report, participant, photos.Items, reportPhotoID, topics))
 }
 
-// GetPhoto handles GET /api/reports/gallery/photo/:photoId?token={64hex}&variant=framed|original
-// (PUBLIC): serves the raw bytes of ONE gallery photo for the public gallery
-// <img>. The gallery token is the authn — token validation
-// (resolveGalleryToken) and the consent gate (requirePhotoConsent) are shared
-// with GetByToken so the two routes cannot drift, and NO byte is served before
-// both pass.
-//
-// Anti-IDOR: the photo must belong to the token's participant+session — any
-// other photo ID (another child's, another session's, a deleted row) answers
-// 404, so a token can never read a gallery it does not own.
-//
-// Path selection: variant=framed → framed_file_url when present, falling back
-// to original_file_url; anything else (absent/"original") → original_file_url.
-// The bytes are read from cfg.UploadDir with the same disk-safety pattern as
-// report_handler.GetAccessPhoto (withinDir bounds check, HTML refused,
-// image/*-only content type, 404 when the file is missing).
-func (h *GalleryHandler) GetPhoto(c *echo.Context) error {
+// resolveGalleryPhoto runs the shared gates of the two photo-bytes routes
+// (GetPhoto and DownloadPhoto) so they can never drift: gallery token
+// validation (resolveGalleryToken), the PHOTO-consent gate
+// (requirePhotoConsent), then the anti-IDOR lookup — the photo must belong to
+// the token's participant+session (another child's, another session's, a
+// deleted row → 404), so a token can never read a gallery it does not own.
+// NO byte is served before all three pass. Returns (nil, nil) when a failure
+// response was already written — the caller must then return nil immediately;
+// (nil, err) means a real error to propagate.
+func (h *GalleryHandler) resolveGalleryPhoto(c *echo.Context) (*entity.SmartPhoto, error) {
 	gt, err := h.resolveGalleryToken(c)
 	if err != nil || gt == nil {
-		return err
+		return nil, err
 	}
 	if ok, err := h.requirePhotoConsent(c, gt); err != nil || !ok {
-		return err
+		return nil, err
 	}
-	ctx := (*c).Request().Context()
-
-	// Anti-IDOR: lookup by id, then scope-check against THIS token's gallery.
-	photo, err := h.photoRepo.GetPhotoByID(ctx, (*c).Param("photoId"), "")
+	photo, err := h.photoRepo.GetPhotoByID((*c).Request().Context(), (*c).Param("photoId"), "")
 	if err != nil {
-		return err // unknown photo → repo's 404 not_found
+		return nil, err // unknown photo → repo's 404 not_found
 	}
 	if photo.ParticipantID != gt.ParticipantID || photo.SessionID != gt.SessionID {
-		return apperrors.NotFound("not_found", nil)
+		return nil, apperrors.NotFound("not_found", nil)
 	}
+	return photo, nil
+}
 
-	rel := photo.OriginalFileURL
-	if (*c).QueryParam("variant") == "framed" && photo.FramedFileURL != "" {
-		rel = photo.FramedFileURL
-	}
+// serveGalleryPhotoFile is the shared disk path of GetPhoto and
+// DownloadPhoto: bytes are read from cfg.UploadDir with the same disk-safety
+// pattern as report_handler.GetAccessPhoto (withinDir bounds check, HTML
+// refused, image/*-only content type, 404 when the file is missing).
+// attachmentName non-empty additionally sets Content-Disposition: attachment
+// so the browser SAVES the bytes instead of rendering them inline (the
+// download route); empty keeps the inline <img> behavior of GetPhoto. The
+// header is set only after the content-type whitelist passed, and the name
+// itself is a stored UUID + a whitelisted extension, so its charset is safe.
+func (h *GalleryHandler) serveGalleryPhotoFile(c *echo.Context, rel, attachmentName string) error {
 	if rel == "" {
 		return apperrors.NotFound("not_found", nil)
 	}
-
 	dest := filepath.Join(h.cfg.UploadDir, filepath.FromSlash(rel))
 	if !withinDir(h.cfg.UploadDir, dest) {
 		return apperrors.NotFound("not_found", nil)
@@ -218,5 +215,44 @@ func (h *GalleryHandler) GetPhoto(c *echo.Context) error {
 	if ct == "" || !strings.HasPrefix(ct, "image/") {
 		return apperrors.Forbidden("file_type_blocked", nil)
 	}
+	if attachmentName != "" {
+		(*c).Response().Header().Set("Content-Disposition", `attachment; filename="`+attachmentName+`"`)
+	}
 	return serveMediaBlob(c, ct, dest, blob)
+}
+
+// GetPhoto handles GET /api/reports/gallery/photo/:photoId?token={64hex}&variant=framed|original
+// (PUBLIC): serves the raw bytes of ONE gallery photo INLINE for the public
+// gallery <img>. The gallery token is the authn; gates live in
+// resolveGalleryPhoto, disk safety in serveGalleryPhotoFile.
+//
+// Path selection: variant=framed → framed_file_url when present, falling back
+// to original_file_url; anything else (absent/"original") → original_file_url.
+func (h *GalleryHandler) GetPhoto(c *echo.Context) error {
+	photo, err := h.resolveGalleryPhoto(c)
+	if err != nil || photo == nil {
+		return err
+	}
+	rel := photo.OriginalFileURL
+	if (*c).QueryParam("variant") == "framed" && photo.FramedFileURL != "" {
+		rel = photo.FramedFileURL
+	}
+	return h.serveGalleryPhotoFile(c, rel, "")
+}
+
+// DownloadPhoto handles GET /api/reports/gallery/photo/:photoId/download?token={64hex}
+// (PUBLIC): the fullscreen preview's download button. The gates are IDENTICAL
+// to GetPhoto (shared resolveGalleryPhoto — token, consent, anti-IDOR), but
+// the path selection is FIXED to original_file_url (NEVER the framed variant)
+// and the response carries Content-Disposition: attachment, so the browser
+// saves the stored bytes byte-for-byte: written at upload via io.Copy with no
+// re-encode and served without any resize/quality parameter → full resolution,
+// uncompressed.
+func (h *GalleryHandler) DownloadPhoto(c *echo.Context) error {
+	photo, err := h.resolveGalleryPhoto(c)
+	if err != nil || photo == nil {
+		return err
+	}
+	name := "photo-" + photo.ID + strings.ToLower(filepath.Ext(photo.OriginalFileURL))
+	return h.serveGalleryPhotoFile(c, photo.OriginalFileURL, name)
 }

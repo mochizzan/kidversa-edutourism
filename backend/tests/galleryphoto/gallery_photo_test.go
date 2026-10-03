@@ -409,6 +409,61 @@ func TestGalleryPhotoEndpoint_FileGates(t *testing.T) {
 	})
 }
 
+// TestGalleryPhotoDownloadEndpoint: rute unduh (tombol unduh pada preview
+// fullscreen) — route TERDAFTAR (200 lewat router), byte yang disimpan adalah
+// file ORIGINAL apa adanya (bukan framed, tanpa kompresi/rescale), dan
+// respons membawa Content-Disposition: attachment dengan nama file berbasis
+// id foto. Gerbang token ikut berlaku: tanpa token → 400 dan tak ada byte
+// yang bocor.
+func TestGalleryPhotoDownloadEndpoint(t *testing.T) {
+	f := newFixture(t)
+	f.putFile("photos/orig.png", "BYTES-ORIG")
+	f.putFile("photos/framed.png", "BYTES-FRAMED")
+	f.addPhoto(photoID, partID, sessID, "photos/orig.png", "photos/framed.png")
+
+	t.Run("200 attachment, byte ORIGINAL apa adanya", func(t *testing.T) {
+		rec := f.get(f.photoURL(photoID, "/download?token="+validToken))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (route terdaftar & byte tersaji): %s", rec.Code, rec.Body.String())
+		}
+		wantCD := `attachment; filename="photo-` + photoID + `.png"`
+		if cd := rec.Header().Get("Content-Disposition"); cd != wantCD {
+			t.Fatalf("Content-Disposition = %q, want %q", cd, wantCD)
+		}
+		if got := rec.Body.String(); got != "BYTES-ORIG" {
+			t.Fatalf("body = %q, want BYTES-ORIG (original, bukan framed/terkompresi)", got)
+		}
+		if ct := rec.Header().Get("Content-Type"); ct != "image/png" {
+			t.Fatalf("Content-Type = %q, want image/png", ct)
+		}
+	})
+
+	t.Run("tanpa token → 400, byte tak pernah bocor", func(t *testing.T) {
+		rec := f.get(f.photoURL(photoID, "/download"))
+		requireStatusAndCode(t, rec, http.StatusBadRequest, "bad_request")
+		if strings.Contains(rec.Body.String(), "BYTES") {
+			t.Fatalf("byte tersaji meski token ditolak: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("consent OFF → 403, byte tak pernah bocor", func(t *testing.T) {
+		f.consent.granted = false
+		defer func() { f.consent.granted = true }()
+		rec := f.get(f.photoURL(photoID, "/download?token="+validToken))
+		requireStatusAndCode(t, rec, http.StatusForbidden, "consent_required")
+		if strings.Contains(rec.Body.String(), "BYTES") {
+			t.Fatalf("byte tersaji meski consent OFF: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("foto milik peserta lain → 404 (anti-IDOR)", func(t *testing.T) {
+		other := photoID2
+		f.addPhoto(other, otherPartID, sessID, "photos/orig.png", "")
+		rec := f.get(f.photoURL(other, "/download?token="+validToken))
+		requireStatusAndCode(t, rec, http.StatusNotFound, "not_found")
+	})
+}
+
 // TestGetByToken_EnvelopeUnchangedByShareHelper: regresi refactor
 // share-helper — GetByToken tetap menjawab 200 dengan DTO berisi id foto +
 // field file yang ARTINYA TIDAK BERUBAH (path relatif apa adanya), 403

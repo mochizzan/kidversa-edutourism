@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Camera, Award, ImageOff, X } from 'lucide-react'
+import { Camera, Award, Download, ImageOff, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { GalleryTokenGuard, useGalleryToken } from '../components/GalleryTokenGuard'
 import { galleryService } from '../../../core/services/gallery'
@@ -8,6 +8,10 @@ import type { GalleryPhoto } from '../../../core/types'
 // Placeholder for a photo whose file failed to load (deleted/404). Inlined in
 // Indonesian because this change intentionally leaves the locale catalogs untouched.
 const PHOTO_UNAVAILABLE = 'Foto tidak tersedia'
+
+// Download-button label of the fullscreen overlay — inlined in Indonesian for
+// the same reason as PHOTO_UNAVAILABLE above.
+const PHOTO_DOWNLOAD = 'Unduh foto'
 
 // Chip pill styling — mirrors the facilitator gallery's topic chips
 // (GaleriChildPage) so the switcher reads as the same control everywhere.
@@ -186,6 +190,21 @@ function GalleryView() {
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
           onClick={() => setSelectedPhoto(null)}
         >
+          {/* Download the ORIGINAL file from the server (/download →
+              Content-Disposition: attachment) — not a re-save of the rendered
+              <img>. Hidden when the photo failed to load: that download would
+              only ever 404. */}
+          {!failedIds.has(selectedPhoto.id) && (
+            <a
+              href={galleryService.photoDownloadUrl(token, selectedPhoto.id)}
+              download
+              aria-label={PHOTO_DOWNLOAD}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-4 right-14 text-white/80 hover:text-white z-10"
+            >
+              <Download className="w-8 h-8" />
+            </a>
+          )}
           <button
             type="button"
             className="absolute top-4 right-4 text-white/80 hover:text-white z-10"

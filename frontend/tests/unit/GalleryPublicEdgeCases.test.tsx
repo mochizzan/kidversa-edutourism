@@ -12,6 +12,7 @@ vi.mock('@/core/services/gallery', () => ({
   galleryService: {
     getByToken: vi.fn(),
     photoUrl: vi.fn(),
+    photoDownloadUrl: vi.fn(),
   },
 }))
 
@@ -66,6 +67,10 @@ beforeEach(() => {
   vi.mocked(galleryService.photoUrl).mockReset()
   vi.mocked(galleryService.photoUrl).mockImplementation(
     (_token, photoId, variant) => `/mock-photo/${photoId}${variant ? `?variant=${variant}` : ''}`,
+  )
+  vi.mocked(galleryService.photoDownloadUrl).mockReset()
+  vi.mocked(galleryService.photoDownloadUrl).mockImplementation(
+    (_token, photoId) => `/mock-download/${photoId}`,
   )
 })
 
