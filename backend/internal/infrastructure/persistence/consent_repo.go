@@ -108,6 +108,13 @@ func (r *GormConsentRepository) RespondConsent(ctx context.Context, participantI
 // SendConsentRequest records that a consent request was sent. It upserts the
 // (participant, session, type) row: if a row already exists, updates sent_at
 // and clears responded_at (re-send scenario). Otherwise creates a new row.
+// Pairing invariant: whenever the log row ends up UNANSWERED (responded_at
+// NULL, value false) — re-send or fresh request — the denormalized
+// participants.consent_photo/consent_at projection for that participant is
+// cleared too, so the flag never claims granted consent while the log row is
+// absent/unanswered (frontend guards read the flag; the server gate reads the
+// log). The combined token pair is deliberately NOT touched: callers (SendSingle)
+// mint the fresh token BEFORE this audit write.
 func (r *GormConsentRepository) SendConsentRequest(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) error {
 	now := time.Now().UTC()
 	m := ConsentLogModel{
@@ -134,7 +141,7 @@ func (r *GormConsentRepository) SendConsentRequest(ctx context.Context, particip
 			}).Error; uerr != nil {
 			return apperrors.Internal("internal_error", uerr)
 		}
-		return nil
+		return r.clearConsentProjection(ctx, participantID, consentType)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return apperrors.Internal("internal_error", err)
@@ -145,6 +152,29 @@ func (r *GormConsentRepository) SendConsentRequest(ctx context.Context, particip
 			return apperrors.Conflict("conflict", cerr)
 		}
 		return apperrors.Internal("internal_error", cerr)
+	}
+	return r.clearConsentProjection(ctx, participantID, consentType)
+}
+
+// clearConsentProjection clears the PHOTO consent projection on the participant
+// row after the (participant, session, type) log row was reset/created
+// unanswered — the denormalized flag must never outlive the grant it mirrors.
+// consent_at marks the grant timestamp and goes with it; the combined token
+// pair stays (a pending request still owns its token) — see SendConsentRequest.
+// Only the PHOTO projection exists on participants, so other consent types are
+// a no-op.
+func (r *GormConsentRepository) clearConsentProjection(ctx context.Context, participantID string, consentType entity.ConsentType) error {
+	if consentType != entity.ConsentPhoto {
+		return nil
+	}
+	if uerr := r.db.WithContext(ctx).
+		Model(&ParticipantModel{}).
+		Where("id = ?", participantID).
+		Updates(map[string]interface{}{
+			"consent_photo": false,
+			"consent_at":    nil,
+		}).Error; uerr != nil {
+		return apperrors.Internal("internal_error", uerr)
 	}
 	return nil
 }

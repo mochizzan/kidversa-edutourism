@@ -93,3 +93,60 @@ func TestConsentSendRequest_CreateError_Internal(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+// Projection pairing: whenever SendConsentRequest leaves the log row
+// UNANSWERED (re-send clears responded_at/value, fresh send creates it that
+// way), the denormalized participants.consent_photo/consent_at projection must
+// be cleared in the SAME flow — the flag never claims granted consent while the
+// log row is absent/unanswered. The combined token pair is deliberately NOT
+// touched (SendSingle mints the fresh token before this audit write).
+func TestConsentSendRequest_ClearsParticipantProjection(t *testing.T) {
+	expectProjectionClear := func(mock sqlmock.Sqlmock) {
+		mock.ExpectBegin()
+		mock.ExpectExec("UPDATE `participants`").WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectCommit()
+	}
+
+	t.Run("re_send_resets_log_then_clears_projection", func(t *testing.T) {
+		db, mock := newConsentMockDB(t)
+		repo := persistence.NewConsentRepository(db, 0)
+
+		// Existing (already granted) row → reset: sent_at=now, responded_at
+		// NULL, value false…
+		mock.ExpectQuery("SELECT.*consent_logs").
+			WillReturnRows(sqlmock.NewRows([]string{"id", "participant_id", "session_id", "consent_type", "value"}).
+				AddRow("log-1", "p-1", "s-1", "PHOTO", true))
+		mock.ExpectBegin()
+		mock.ExpectExec("UPDATE `consent_logs`").WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectCommit()
+		// …and the paired projection clear on the participant row.
+		expectProjectionClear(mock)
+
+		if err := repo.SendConsentRequest(context.Background(), "p-1", "s-1", entity.ConsentPhoto); err != nil {
+			t.Fatalf("re-send must succeed, got %v", err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("unmet expectations: %v", err)
+		}
+	})
+
+	t.Run("fresh_row_clears_projection", func(t *testing.T) {
+		db, mock := newConsentMockDB(t)
+		repo := persistence.NewConsentRepository(db, 0)
+
+		// Miss → create path, then the paired projection clear.
+		mock.ExpectQuery("SELECT.*consent_logs").
+			WillReturnRows(sqlmock.NewRows([]string{"id"}))
+		mock.ExpectBegin()
+		mock.ExpectExec("INSERT INTO `consent_logs`").WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectCommit()
+		expectProjectionClear(mock)
+
+		if err := repo.SendConsentRequest(context.Background(), "p-1", "s-1", entity.ConsentPhoto); err != nil {
+			t.Fatalf("fresh send must succeed, got %v", err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("unmet expectations: %v", err)
+		}
+	})
+}

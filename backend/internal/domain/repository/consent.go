@@ -20,6 +20,9 @@ type ConsentRepository interface {
 	// SendConsentRequest records that a consent request was sent (audit trail).
 	// Creates a consent_logs row with sent_at=now and responded_at=NULL.
 	// If a row already exists for this (participant, session, type), it updates sent_at.
+	// The implementation also clears the participant's denormalized
+	// consent_photo/consent_at projection, so the flag never claims granted
+	// consent while the log row is unanswered.
 	SendConsentRequest(ctx context.Context, participantID, sessionID string, consentType entity.ConsentType) error
 	// ListConsentFlat returns a flat projection joining participants, sessions, and consent_logs.
 	ListConsentFlat(ctx context.Context, tenantID string) ([]ConsentFlatRow, error)
