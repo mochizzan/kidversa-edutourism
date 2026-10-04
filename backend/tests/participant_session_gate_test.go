@@ -1,8 +1,10 @@
 package auth_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"kidversa-edutourism-backend/internal/config"
 	"kidversa-edutourism-backend/internal/delivery/http/handler"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
@@ -43,8 +46,11 @@ type fakeSessionFlowRepo struct {
 	// by LinkParticipant (unique per participant+session, like the DB table).
 	memberships []entity.ParticipantSessionMembership
 
-	created        []*entity.Participant
-	updated        *entity.Participant
+	created []*entity.Participant
+	updated *entity.Participant
+	// fieldUpdates records every UpdateParticipantFields (map) write in order,
+	// so tests can assert WHICH columns were persisted explicitly.
+	fieldUpdates   []map[string]interface{}
 	transactionRan bool
 }
 
@@ -160,6 +166,33 @@ func (r *fakeSessionFlowRepo) GetParticipantByID(_ context.Context, id, _ string
 func (r *fakeSessionFlowRepo) UpdateParticipant(_ context.Context, p *entity.Participant) error {
 	cp := *p
 	r.updated = &cp
+	return nil
+}
+
+// UpdateParticipantFields applies the column map to the stored participant the
+// way GORM's map update does — explicitly, so false/nil persist (the struct
+// Updates path of UpdateParticipant would skip zero values). Only the consent
+// columns the tests exercise are mapped; the recorded maps are the assertion
+// surface for "the reset really hit the DB".
+func (r *fakeSessionFlowRepo) UpdateParticipantFields(_ context.Context, id string, fields map[string]interface{}) error {
+	if r.participant == nil || r.participant.ID != id {
+		return apperrors.NotFound("not_found", nil)
+	}
+	r.fieldUpdates = append(r.fieldUpdates, fields)
+	for k, v := range fields {
+		switch k {
+		case "consent_photo":
+			if b, ok := v.(bool); ok {
+				r.participant.ConsentPhoto = b
+			}
+		case "consent_at":
+			r.participant.ConsentAt, _ = v.(*time.Time)
+		case "consent_combined_token":
+			r.participant.ConsentCombinedToken, _ = v.(*string)
+		case "consent_combined_token_expires_at":
+			r.participant.ConsentCombinedTokenExpiresAt, _ = v.(*time.Time)
+		}
+	}
 	return nil
 }
 
@@ -1186,5 +1219,231 @@ func TestLinkParticipantUnchangedProgramKeepsFinalBadge(t *testing.T) {
 	}
 	if !sawSub || !sawFinal {
 		t.Fatalf("retained badges = %+v, want TOPIK stage-1 AND FINAL prog-A", rows)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Consent migration invariant (SETIAP SESI WAJIB CONSENT ULANG): consent is
+// keyed per (participant, session) in consent_logs; a LinkParticipant move must
+// leave NOTHING of it behind on the moved participant, and the server upload
+// gate (upload_handler.go: consent read from consent_logs, fresh per request)
+// must deny the target session until a fresh parent consent arrives.
+// ---------------------------------------------------------------------------
+
+// fakeLinkConsentRepo models consent_logs' UNIQUE (participant, session,
+// consent_type) key in memory. GetConsentValue is the exact session-scoped read
+// the upload gate consults, so asserting through it proves what the gate sees.
+// Other interface methods panic through the embedded nil interface.
+type fakeLinkConsentRepo struct {
+	repository.ConsentRepository
+	logs map[string]entity.ConsentLog // "<pid>|<sid>|<type>" → latest row
+}
+
+func linkConsentKey(pid, sid string, ct entity.ConsentType) string {
+	return pid + "|" + sid + "|" + string(ct)
+}
+
+func (f *fakeLinkConsentRepo) GetConsentValue(_ context.Context, pid, sid string, ct entity.ConsentType) (bool, error) {
+	row, ok := f.logs[linkConsentKey(pid, sid, ct)]
+	return ok && row.Value && row.RespondedAt != nil, nil
+}
+
+// assertConsentReset asserts every participant-level consent projection field
+// carried by entity.Participant is cleared — the exact field set
+// RespondCombined writes on grant (consent_handler.go).
+func assertConsentReset(t *testing.T, what string, p *entity.Participant) {
+	t.Helper()
+	if p == nil {
+		t.Fatalf("%s: participant is nil", what)
+	}
+	if p.ConsentPhoto {
+		t.Fatalf("%s: consent_photo must be false after migration, got true", what)
+	}
+	if p.ConsentAt != nil {
+		t.Fatalf("%s: consent_at must be nil after migration, got %v", what, *p.ConsentAt)
+	}
+	if p.ConsentCombinedToken != nil {
+		t.Fatalf("%s: consent_combined_token must be nil after migration, got %q", what, *p.ConsentCombinedToken)
+	}
+	if p.ConsentCombinedTokenExpiresAt != nil {
+		t.Fatalf("%s: consent_combined_token_expires_at must be nil after migration, got %v", what, *p.ConsentCombinedTokenExpiresAt)
+	}
+}
+
+// TestLinkParticipantResetsConsentProjectionForTargetSession: a participant
+// granted PHOTO consent in session A (log row + denormalized projection) that
+// migrates to session B of the SAME program must end up with the projection
+// cleared on the returned AND the persisted entity, written through the
+// map-based UpdateParticipantFields (struct Updates skip zero values), with NO
+// consent_logs row for session B — so every existing facilitator guard reads an
+// honest consent_photo=false and the gate input for session B denies.
+func TestLinkParticipantResetsConsentProjectionForTargetSession(t *testing.T) {
+	f := newLinkMigrationFixture("prog-A", "prog-A")
+	grantedAt := time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC)
+	tok := "src-session-token"
+	f.repo.participant.ConsentPhoto = true
+	f.repo.participant.ConsentAt = &grantedAt
+	f.repo.participant.ConsentCombinedToken = &tok
+	f.repo.participant.ConsentCombinedTokenExpiresAt = &grantedAt
+
+	consent := &fakeLinkConsentRepo{logs: map[string]entity.ConsentLog{
+		linkConsentKey("pid-1", "sess-src", entity.ConsentPhoto): {
+			ParticipantID: "pid-1", SessionID: "sess-src", ConsentType: entity.ConsentPhoto,
+			Value: true, RespondedAt: &grantedAt,
+		},
+	}}
+	if granted, _ := consent.GetConsentValue(context.Background(), "pid-1", "sess-src", entity.ConsentPhoto); !granted {
+		t.Fatal("precondition: source session must hold granted consent")
+	}
+
+	res, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1")
+	if err != nil {
+		t.Fatalf("same-program link must succeed, got: %v", err)
+	}
+
+	// Returned + moved entity: every consent projection field cleared.
+	assertConsentReset(t, "LinkParticipantResult.Participant", &res.Participant)
+	if f.repo.updated == nil {
+		t.Fatal("participant must be moved")
+	}
+	assertConsentReset(t, "moved entity handed to UpdateParticipant", f.repo.updated)
+
+	// Persisted through the map update: false/nil actually reach the DB (the
+	// struct-based UpdateParticipant would silently skip every zero value).
+	var reset map[string]interface{}
+	for _, u := range f.repo.fieldUpdates {
+		if _, ok := u["consent_photo"]; ok {
+			reset = u
+		}
+	}
+	if reset == nil {
+		t.Fatal("consent reset must be persisted via UpdateParticipantFields (struct Updates skip false/nil)")
+	}
+	if v, ok := reset["consent_photo"].(bool); !ok || v {
+		t.Fatalf("consent_photo must be written as false, got %v", reset["consent_photo"])
+	}
+	for _, k := range []string{"consent_at", "consent_combined_token", "consent_combined_token_expires_at"} {
+		v, ok := reset[k]
+		if !ok {
+			t.Fatalf("reset map must write %s explicitly, keys: %v", k, keysOf(reset))
+		}
+		if v != nil {
+			t.Fatalf("%s must be written as nil, got %v", k, v)
+		}
+	}
+
+	// consent_logs: nothing copied to session B; the source grant survives.
+	if _, ok := consent.logs[linkConsentKey("pid-1", "sess-1", entity.ConsentPhoto)]; ok {
+		t.Fatal("migration must not create a consent_logs row for the target session")
+	}
+	if granted, _ := consent.GetConsentValue(context.Background(), "pid-1", "sess-src", entity.ConsentPhoto); !granted {
+		t.Fatal("source session's grant must be untouched")
+	}
+	// The exact read the server upload gate performs for session B → deny.
+	if granted, _ := consent.GetConsentValue(context.Background(), "pid-1", "sess-1", entity.ConsentPhoto); granted {
+		t.Fatal("upload gate input for the target session must deny (no fresh consent there)")
+	}
+}
+
+func keysOf(m map[string]interface{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+// uploadNeverTouch panics the test if the upload handler touches the photo repo
+// (any method call hits the nil embedded interface) — proving the consent gate
+// denies BEFORE anything is written.
+type uploadNeverTouch struct{ repository.PhotoRepository }
+
+// TestUploadGateDeniesMigratedParticipantUntilFreshConsent: end-to-end at the
+// consumer boundary — after LinkParticipant moves the participant (same
+// program) from session A to session B, POST /api/photos/upload for session B
+// answers 403 consent_required, while the source session's granted log row
+// still reads true. UUID-shaped ids because the endpoint validates them.
+func TestUploadGateDeniesMigratedParticipantUntilFreshConsent(t *testing.T) {
+	const (
+		pid     = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+		sessA   = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+		sessB   = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+		stageB  = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+		program = "prog-A"
+	)
+	ctx := context.Background()
+	src := sessA
+	repo := &fakeSessionFlowRepo{
+		session: &entity.Session{
+			BaseModel: entity.BaseModel{ID: sessB}, ProgramID: program, Status: entity.SessionActive,
+		},
+		extraSessions: map[string]*entity.Session{
+			sessA: {BaseModel: entity.BaseModel{ID: sessA}, ProgramID: program, Status: entity.SessionCompleted},
+		},
+		stages: map[string][]entity.SessionStage{
+			sessB: {{BaseModel: entity.BaseModel{ID: stageB}, SessionID: sessB, ProgramStageID: "stage-1"}},
+		},
+		groups:  map[string]*entity.SessionGroup{},
+		members: map[string][]entity.Participant{},
+		participant: &entity.Participant{
+			BaseModel:    entity.BaseModel{ID: pid},
+			SessionID:    &src,
+			ConsentPhoto: true, // stale projection inherited from session A
+		},
+	}
+	grantedAt := time.Date(2026, 2, 1, 10, 0, 0, 0, time.UTC)
+	consent := &fakeLinkConsentRepo{logs: map[string]entity.ConsentLog{
+		linkConsentKey(pid, sessA, entity.ConsentPhoto): {
+			ParticipantID: pid, SessionID: sessA, ConsentType: entity.ConsentPhoto,
+			Value: true, RespondedAt: &grantedAt,
+		},
+	}}
+	if granted, _ := consent.GetConsentValue(ctx, pid, sessA, entity.ConsentPhoto); !granted {
+		t.Fatal("precondition: source session must hold granted consent")
+	}
+
+	// Same-program migration (optional carry deps unwired → all copy steps skip).
+	uc := usecase.NewSessionUsecase(repo, nil)
+	if _, err := uc.LinkParticipant(ctx, sessB, pid, "", "tenant-1"); err != nil {
+		t.Fatalf("same-program link must succeed, got: %v", err)
+	}
+	if _, ok := consent.logs[linkConsentKey(pid, sessB, entity.ConsentPhoto)]; ok {
+		t.Fatal("migration must not carry a consent_logs row into the target session")
+	}
+
+	// The REAL upload handler over the same fakes: gate reads consent_logs.
+	h := handler.NewUploadHandler(
+		&config.Config{UploadDir: t.TempDir()},
+		uploadNeverTouch{}, nil, nil, nil, consent, repo,
+	)
+
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	for k, v := range map[string]string{
+		"participant_id":   pid,
+		"session_id":       sessB,
+		"session_stage_id": stageB,
+	} {
+		if err := w.WriteField(k, v); err != nil {
+			t.Fatalf("write field %s: %v", k, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/photos/upload", &buf)
+	req.Header.Set(echo.HeaderContentType, w.FormDataContentType())
+	rec := httptest.NewRecorder()
+	e := echo.New()
+	c := e.NewContext(req, rec)
+
+	if err := h.UploadPhoto(c); err != nil {
+		t.Fatalf("upload for the target session must answer with the 403 envelope, got error: %v", err)
+	}
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for session B without fresh consent, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"consent_required"`) {
+		t.Fatalf("expected consent_required envelope, got: %s", rec.Body.String())
 	}
 }

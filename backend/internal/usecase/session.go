@@ -843,7 +843,11 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 // scratch (the link itself still happens). Either way, the source membership
 // is recorded in participant_session_memberships BEFORE the move, so readers
 // of the old session (report generation, group tabs) keep seeing the
-// participant. Every failure (duplicate, missing or foreign-tenant source
+// participant. Consent is NEVER migrated (SETIAP SESI WAJIB CONSENT ULANG):
+// consent_logs rows stay keyed to the source session, and the denormalized
+// participants consent projection (consent_photo/consent_at/combined token) is
+// reset before the move so the target session starts with consent_photo=false
+// and must collect a fresh parent consent. Every failure (duplicate, missing or foreign-tenant source
 // session, clone/carry/snapshot/report-clone failure, history write failure)
 // surfaces as an explicit error; nothing is swallowed. If the participant was
 // already linked to another session, the previous session info is returned so
@@ -978,6 +982,35 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 		if err := u.sessionRepo.RecordMembership(ctx, m); err != nil {
 			return nil, err
 		}
+	}
+
+	// Consent invariant — SETIAP SESI WAJIB CONSENT ULANG: consent is keyed per
+	// (participant, session) in consent_logs, so NOTHING of it travels with the
+	// move. The denormalized participants.consent_* projection belongs to the
+	// SOURCE session only and is reset HERE, before the move (same
+	// abort-before-move ordering as the clone steps — a failure leaves the
+	// participant in the source session and a retry converges, while a
+	// participant that moved with a stale projection would claim granted
+	// consent it never gave in the target). The reset mirrors exactly what
+	// RespondCombined writes on grant (consent_handler): consent_photo,
+	// consent_at and the combined token pair — so after migration the
+	// participant reports consent_photo=false (every facilitator guard goes
+	// honest), the target session has no consent of any kind, and the old
+	// session's parent link (token) can never grant into the new session.
+	// Persistence uses the map-based UpdateParticipantFields, NOT the move's
+	// struct-based UpdateParticipant: GORM skips zero-value struct fields, so
+	// false/nil would never reach the DB (the C2 zero-value bug).
+	p.ConsentPhoto = false
+	p.ConsentAt = nil
+	p.ConsentCombinedToken = nil
+	p.ConsentCombinedTokenExpiresAt = nil
+	if err := u.sessionRepo.UpdateParticipantFields(ctx, participantID, map[string]interface{}{
+		"consent_photo":                     false,
+		"consent_at":                        nil,
+		"consent_combined_token":            nil,
+		"consent_combined_token_expires_at": nil,
+	}); err != nil {
+		return nil, err
 	}
 
 	sid := sessionID
