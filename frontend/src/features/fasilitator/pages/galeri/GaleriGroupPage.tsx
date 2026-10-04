@@ -213,9 +213,15 @@ const GaleriGroupPage = () => {
     <Card padding="sm">
      <div className="space-y-2">
       {participants.map((p) => (
+       // Row stays navigable (galeri viewing tetap bisa dibuka); the reason
+       // capture is unavailable downstream is surfaced here like CameraPage's
+       // consent rows — native title + badge + Lock instead of ChevronRight.
        <button
         key={p.id}
         onClick={() => navigate(ROUTES.FASILITATOR.GALERI_CHILD(p.id))}
+        title={
+         !p.consent_photo ? t('fasilitator.photos.consentRequired') : undefined
+        }
         className="w-full flex items-center justify-between gap-3 py-3 px-3 rounded-xl hover:bg-surface-container-low transition-colors text-left"
        >
         <div className="flex items-center gap-3 min-w-0">
@@ -233,7 +239,11 @@ const GaleriGroupPage = () => {
          {!p.consent_photo && (
           <Badge variant="warning" size="sm">{t('fasilitator.camera.noConsentBadge')}</Badge>
          )}
-         <ChevronRight className="w-4 h-4 text-on-surface-variant" />
+         {!p.consent_photo ? (
+          <Lock className="w-4 h-4 text-on-surface-variant" />
+         ) : (
+          <ChevronRight className="w-4 h-4 text-on-surface-variant" />
+         )}
         </div>
        </button>
       ))}

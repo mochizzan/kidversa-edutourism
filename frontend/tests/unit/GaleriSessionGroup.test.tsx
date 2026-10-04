@@ -217,7 +217,32 @@ describe('GaleriGroupPage: participants list and guard', () => {
     expect(screen.getByText('Budi')).toBeInTheDocument()
     expect(screen.getByText('Kelompok Milik Saya')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Budi/ }))
+    const row = screen.getByRole('button', { name: /Budi/ })
+    // Granted consent: no lock reason on the row.
+    expect(row.getAttribute('title')).toBeNull()
+
+    fireEvent.click(row)
+    expect(screen.getByText('HALAMAN PESERTA')).toBeInTheDocument()
+  })
+
+  it('flags missing consent on the row (reason + lock) while the gallery entry stays reachable', async () => {
+    vi.mocked(participantService.getAll).mockResolvedValue(
+      envelope([{ ...participant, consent_photo: false }]),
+    )
+
+    await renderGroupPage('/fasilitator/galeri/kelompok/g-mine', { sessionId: 's-1', sessionName: 'Sesi Galeri' })
+
+    const row = screen.getByRole('button', { name: /Budi/ })
+    // Visible WHY: the same Indonesian reason the capture guards use as their
+    // disabled tooltip, surfaced as the row's native title…
+    expect(row.getAttribute('title')).toBe('Izin foto belum diberikan')
+    // …plus the existing warning badge (CameraPage's consent-row pattern).
+    expect(within(row).getByText('Tidak ada izin')).toBeInTheDocument()
+
+    // Gallery viewing remains reachable: the row still opens the per-peserta
+    // gallery. Capture itself is gated on THAT page (Tambah Foto/add-card),
+    // on CameraPage's /photo rows and by SmartPhotoPage's lock screen.
+    fireEvent.click(row)
     expect(screen.getByText('HALAMAN PESERTA')).toBeInTheDocument()
   })
 

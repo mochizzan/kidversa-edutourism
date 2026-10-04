@@ -416,8 +416,12 @@ const SmartPhotoPage = () => {
    if (e.message === 'MAX_PHOTOS_REACHED') {
     addToast({ type: 'error', message: t('fasilitator.photos.maxPhotos', { max: MAX_PHOTOS }) })
    } else if (e.code === 'consent_required') {
-    // Toast only — no navigate(-1): the user stays put with the capture intact.
+    // The server gate is authoritative (fresh consent_logs read per request).
+    // Refresh the participant so a STALE consent_photo=true flips to the lock
+    // screen instead of leaving the capture UI offered. Toast only — no
+    // navigate(-1): the re-render (lock screen) replaces the capture.
     addToast({ type: 'error', message: t('fasilitator.photos.consentRequired') })
+    void loadParticipant()
    } else {
     // Surface the backend's readable message (validation codes, file gates…)
     // with friendlyError's errors.<code>/default fallbacks. Also covers
@@ -429,7 +433,7 @@ const SmartPhotoPage = () => {
    if (uploadingToastId) removeToast(uploadingToastId)
    setIsSaving(false)
   }
- }, [childId, user, isReportPhoto, topicStageId, uploadPhoto, addToast, removeToast, t])
+ }, [childId, user, isReportPhoto, topicStageId, uploadPhoto, addToast, removeToast, t, loadParticipant])
 
  const handleBack = useCallback(() => {
   if (phase === 'editor') {

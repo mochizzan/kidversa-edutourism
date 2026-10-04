@@ -335,7 +335,12 @@ describe('GaleriChildPage: actions and locks', () => {
     expect(screen.getByRole('button', { name: START_LABEL })).toBeDisabled()
 
     // Tambah Foto is also locked with the same visible reason
-    expect(screen.getByRole('button', { name: 'Tambah Foto' })).toBeDisabled()
+    const addPhoto = screen.getByRole('button', { name: 'Tambah Foto' })
+    expect(addPhoto).toBeDisabled()
+    // Capture path stays ZERO while consent is missing: even a click attempt
+    // on the disabled entry must never reach the capture route.
+    await click(addPhoto)
+    expect(screen.queryByText('HALAMAN KAMERA')).toBeNull()
 
     await click(screen.getByRole('button', { name: START_LABEL }))
     expect(screen.queryByRole('button', { name: SAVE_LABEL })).toBeNull()

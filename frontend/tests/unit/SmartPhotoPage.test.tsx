@@ -329,6 +329,88 @@ describe('SmartPhotoPage: upload failure surfaces a toast and recovers', () => {
   })
 })
 
+// ── Consent lock: stale flag, mid-flight 403, refetch re-evaluation ────────
+describe('SmartPhotoPage: consent lock and mid-flight consent_required', () => {
+  beforeAll(() => {
+    // jsdom has no canvas rendering — stub the 2D surface used by capture/save.
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as never)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,AAAA')
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function(cb: BlobCallback) {
+      cb(new Blob(['x'], { type: 'image/jpeg' }))
+    } as never)
+  })
+
+  afterAll(() => {
+    vi.restoreAllMocks()
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useToastStore.setState({ toasts: [] })
+    useAuthStore.setState({
+      user: { id: 'u1', name: 'Fasil', role: 'FASILITATOR' },
+    } as never)
+    vi.mocked(frameService.getAll).mockResolvedValue({ data: [] } as never)
+    vi.mocked(photoService.getByParticipant).mockResolvedValue([] as never)
+    vi.mocked(photoService.getReportPicks).mockResolvedValue([] as never)
+    vi.mocked(sessionService.getParticipantById).mockResolvedValue(participant as never)
+  })
+
+  it('locks the capture page when consent is missing and unlocks after a refetch grants it', async () => {
+    vi.mocked(sessionService.getParticipantById).mockResolvedValue({
+      ...participant,
+      consent_photo: false,
+    } as never)
+
+    await renderPage()
+
+    // Lock screen — NOT the camera: Indonesian copy from the photos namespace.
+    expect(screen.getByText('Akses Foto Diblokir')).toBeInTheDocument()
+    expect(
+      screen.getByText('Izin foto untuk anak ini belum diberikan oleh orang tua.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pengaturan' })).toBeNull()
+
+    // Re-evaluation on refetch: the participant now reports consent granted.
+    vi.mocked(sessionService.getParticipantById).mockResolvedValue(participant as never)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Coba lagi' }))
+    })
+
+    expect(screen.queryByText('Akses Foto Diblokir')).toBeNull()
+    expect(screen.getByText('Ambil Foto — Topik')).toBeInTheDocument()
+  })
+
+  it('mid-flight 403 consent_required: consent toast, participant refetch, lock replaces the capture', async () => {
+    // First load is STALE (consent still true); the refetch after the 403
+    // reports the revoked/migrated state — same shape as the migration bug.
+    vi.mocked(sessionService.getParticipantById)
+      .mockResolvedValueOnce(participant as never)
+      .mockResolvedValue({ ...participant, consent_photo: false } as never)
+    vi.mocked(photoService.upload).mockRejectedValue(
+      new ApiError('Persetujuan orang tua diperlukan', 'consent_required', 403),
+    )
+
+    await renderPage()
+    await captureAndOpenEditor()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Simpan' }))
+    })
+
+    // Clear user-facing outcome for the mid-flight 403 — never a dead end…
+    expect(
+      errorToasts().some((t) => t.message === i18n.t('fasilitator.photos.consentRequired')),
+    ).toBe(true)
+    // …and the stale flag flips: the refetched participant re-evaluates the
+    // lock screen, so the capture UI stops being offered.
+    expect(await screen.findByText('Akses Foto Diblokir')).toBeInTheDocument()
+    expect(sessionService.getParticipantById).toHaveBeenCalledTimes(2)
+  })
+})
+
 // ── Capture without a frame, mirror-at-capture, base-load failure ──────────
 describe('SmartPhotoPage: capture edge cases', () => {
   interface CtxCall {
