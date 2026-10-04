@@ -26,7 +26,7 @@ func TestCompleteSession_PerTopicGate(t *testing.T) {
 		TenantID:  completeGateTenant(tenantID),
 		Status:    entity.SessionActive,
 	}
-	groups := []entity.SessionGroup{{BaseModel: entity.BaseModel{ID: groupID}, SessionID: sessionID, Name: "Kelompok Kuning", Status: entity.GroupInProgress}}
+	groups := []entity.SessionGroup{{BaseModel: entity.BaseModel{ID: groupID}, SessionID: sessionID, Name: "Kelompok Kuning", Status: entity.GroupCompleted}}
 	parts := []entity.Participant{{BaseModel: entity.BaseModel{ID: partID}, GroupID: &gid, ChildName: "Citra Lestari"}}
 	subs := []entity.SessionSubstage{
 		{BaseModel: entity.BaseModel{ID: topic1}, SessionID: sessionID},

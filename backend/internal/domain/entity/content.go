@@ -8,6 +8,8 @@ type Assessment struct {
 	ParticipantID     string    `json:"participant_id"`
 	SessionID         string    `json:"session_id"`
 	SessionSubstageID string    `json:"session_substage_id" gorm:"column:session_substage_id"`
+	SessionStageID    string    `json:"session_stage_id,omitempty" gorm:"column:session_stage_id"`
+	ProgramStageID    string    `json:"program_stage_id,omitempty" gorm:"column:program_stage_id"`
 	StarRating        int       `json:"star_rating"`
 	Comment           string    `json:"comment,omitempty"`
 	AssessedBy        string    `json:"assessed_by"`

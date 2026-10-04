@@ -9,6 +9,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
+	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/persistence"
 )
@@ -123,6 +124,135 @@ func TestSessionRepository_ListSessions_EnrichesTopicsAndActivityCount(t *testin
 	}
 	if s2.StartTime != nil || s2.EndTime != nil {
 		t.Errorf("expected s2 to keep nil time window, got %v/%v", s2.StartTime, s2.EndTime)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// participant_session_memberships (000002): history union reads + history
+// writes backing LinkParticipant's isolation guarantee.
+// ---------------------------------------------------------------------------
+
+// unionPattern matches the single-SELECT pointer ∪ membership-history query of
+// ListParticipants/ListParticipantsPaginated: both branches project the SAME
+// participants row, so a participant can appear at most once (structural dedup
+// for the A → B → A case) while session AND group filters apply to both.
+const unionPattern = `(?s)FROM .+participants.+session_id = \? AND group_id = \? OR EXISTS.+participant_session_memberships.+m\.participant_id = participants\.id.+m\.session_id = \? AND m\.group_id = \?`
+
+// TestSessionRepository_ListParticipantsUnionsMembershipHistory: the session
+// reader must consult the recorded membership history, not only the pointer —
+// a participant whose pointer already names the NEW session still comes back
+// for the OLD session, filtered by session, group, and tenant.
+func TestSessionRepository_ListParticipantsUnionsMembershipHistory(t *testing.T) {
+	repo, mock := newMockRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery(unionPattern).
+		WithArgs("sess-a", "grp-1", "sess-a", "grp-1", "tenant-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "child_name", "session_id"}).
+			AddRow("pid-1", "Budi", "sess-b"))
+
+	got, err := repo.ListParticipants(ctx, "sess-a", "grp-1", "tenant-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "pid-1" {
+		t.Fatalf("expected the history-backed row pid-1, got %+v", got)
+	}
+	// The history branch surfaces the participant WITHOUT rewriting their
+	// pointer: session_id still names the new session (sess-b).
+	if got[0].SessionID == nil || *got[0].SessionID != "sess-b" {
+		t.Fatalf("expected the untouched pointer row (sess-b), got %+v", got[0].SessionID)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestSessionRepository_ListParticipantsPaginatedUnionsMembershipHistory: the
+// paginated reader applies the same union to BOTH its count and its page
+// query (tenant filter first, as this reader applies it).
+func TestSessionRepository_ListParticipantsPaginatedUnionsMembershipHistory(t *testing.T) {
+	repo, mock := newMockRepo(t)
+	ctx := context.Background()
+
+	// Count and page share the WHERE; only the page query carries LIMIT/OFFSET
+	// (args intentionally unasserted there).
+	mock.ExpectQuery(`(?s)SELECT count.+FROM .+participants.+session_id = \? OR EXISTS.+participant_session_memberships`).
+		WithArgs("tenant-1", "sess-a", "sess-a").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectQuery(`(?s)FROM .+participants.+session_id = \? OR EXISTS.+participant_session_memberships.+m\.session_id = \?`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "child_name"}).AddRow("pid-1", "Budi"))
+
+	res, err := repo.ListParticipantsPaginated(ctx, "tenant-1", "sess-a", "", "", 1, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Total != 1 || len(res.Items) != 1 || res.Items[0].ID != "pid-1" {
+		t.Fatalf("expected one unioned row, got total=%d items=%+v", res.Total, res.Items)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestSessionRepository_RecordMembershipInsertsIdempotently: the history write
+// is an idempotent INSERT (UNIQUE participant+session → ON DUPLICATE KEY no-op)
+// that stamps the generated id on the entity.
+func TestSessionRepository_RecordMembershipInsertsIdempotently(t *testing.T) {
+	repo, mock := newMockRepo(t)
+	ctx := context.Background()
+
+	// GORM wraps writes in its default transaction (SkipDefaultTransaction is
+	// off): Begin → INSERT … ON DUPLICATE KEY (idempotent) → Commit.
+	mock.ExpectBegin()
+	mock.ExpectExec(`INSERT INTO .participant_session_memberships.*ON DUPLICATE KEY UPDATE`).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	m := &entity.ParticipantSessionMembership{
+		ParticipantID: "pid-1",
+		SessionID:     "sess-a",
+	}
+	if err := repo.RecordMembership(ctx, m); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m.ID == "" {
+		t.Fatal("RecordMembership must stamp the generated id")
+	}
+	if m.SessionID != "sess-a" {
+		t.Fatalf("SessionID = %q, want sess-a", m.SessionID)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+// TestSessionRepository_ListSessionMembershipsFiltersSessionAndTenant: the
+// per-session history read is scoped by session and tenant.
+func TestSessionRepository_ListSessionMembershipsFiltersSessionAndTenant(t *testing.T) {
+	repo, mock := newMockRepo(t)
+	ctx := context.Background()
+	now := time.Now()
+
+	mock.ExpectQuery(`SELECT .+FROM .participant_session_memberships`).
+		WithArgs("sess-a", "tenant-1").
+		WillReturnRows(sqlmock.NewRows(
+			[]string{"id", "participant_id", "session_id", "group_id", "joined_at", "created_at"}).
+			AddRow("m-1", "pid-1", "sess-a", nil, now, now))
+
+	rows, err := repo.ListSessionMemberships(ctx, "sess-a", "tenant-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rows) != 1 || rows[0].ID != "m-1" || rows[0].ParticipantID != "pid-1" || rows[0].SessionID != "sess-a" {
+		t.Fatalf("expected one membership row for sess-a, got %+v", rows)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

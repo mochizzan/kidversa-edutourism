@@ -51,7 +51,7 @@ Component → core/services/<domain>.ts shim → api-envelope.ts (unwrap/normali
 | `backend/internal/domain/` | `entity/` (models, enums) + `repository/` (interfaces, filters, `Paginated[T]`) |
 | `backend/internal/infrastructure/` | `persistence/` (GORM `*_repo.go`/`*_model.go`), `auth/` (JWT, revoker, auth/user/tenant usecases), `ai/`, `messaging/`, `migration/` |
 | `backend/internal/pkg/` | `errors/ response/ sse/ constants/ util/ phoneutil/` |
-| `backend/migrations/` | `000001_init_schema` … `000004_report_photo_picks` (`.up.sql`/`.down.sql`) |
+|`backend/migrations/`|`000001_init_schema` (`.up.sql`/`.down.sql`) — skema final tunggal hasil konsolidasi 000001–000010; riwayat migrasi lama dipindahkan ke `backups/`|
 | `frontend/src/app/` | `router.tsx` + `routes/` tables + guard helpers (`guardedRoute`, `lazyRoute`) |
 | `frontend/src/core/` | `services/` (shims + `backend-client` + `api-envelope`), `stores/`, `hooks/`, `types/`, `constants/`, `utils/`, `i18n/` |
 | `frontend/src/features/` | Role dirs: `admin/ fasilitator/ parent/ learner/ auth/` (pages/components/hooks) |

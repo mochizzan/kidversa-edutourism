@@ -56,6 +56,14 @@ type fakeSessionRepo struct {
 	err      error
 	group    *entity.SessionGroup
 	groupErr error
+	// participant returned by GetParticipantByID; nil means the default fixture
+	// participant-1 enrolled in session-1 (the session every existing fixture
+	// scores), so the membership gate passes unless a test opts out.
+	participant *entity.Participant
+	// ownsNoGroup flips FacilitatorOwnsAnyGroup to false: a facilitator who
+	// owns no group of the scored session (zero-value = owns one, keeping the
+	// existing fixtures on the success side of the session-level gate).
+	ownsNoGroup bool
 }
 
 func (r *fakeSessionRepo) CreateSession(ctx context.Context, s *entity.Session) error { return nil }
@@ -102,7 +110,12 @@ func (r *fakeSessionRepo) CreateParticipant(ctx context.Context, p *entity.Parti
 	return nil
 }
 func (r *fakeSessionRepo) GetParticipantByID(ctx context.Context, id, tenantID string) (*entity.Participant, error) {
-	return nil, nil
+	if r.participant != nil {
+		return r.participant, nil
+	}
+	// Default fixture: participant-1 enrolled in session-1.
+	sid := "session-1"
+	return &entity.Participant{BaseModel: entity.BaseModel{ID: id}, SessionID: &sid}, nil
 }
 func (r *fakeSessionRepo) GetParticipantGlobal(ctx context.Context, id, tenantID string) (*entity.Participant, error) {
 	return nil, nil
@@ -111,6 +124,12 @@ func (r *fakeSessionRepo) ListParticipants(ctx context.Context, sessionID, group
 	return nil, nil
 }
 func (r *fakeSessionRepo) ListParticipantsPaginated(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*repository.Paginated[entity.Participant], error) {
+	return nil, nil
+}
+func (r *fakeSessionRepo) RecordMembership(ctx context.Context, m *entity.ParticipantSessionMembership) error {
+	return nil
+}
+func (r *fakeSessionRepo) ListSessionMemberships(ctx context.Context, sessionID, tenantID string) ([]entity.ParticipantSessionMembership, error) {
 	return nil, nil
 }
 func (r *fakeSessionRepo) UpdateParticipant(ctx context.Context, p *entity.Participant) error {
@@ -148,7 +167,7 @@ func (r *fakeSessionRepo) GetGroupFacilitatorID(ctx context.Context, groupID str
 	return nil, nil
 }
 func (r *fakeSessionRepo) FacilitatorOwnsAnyGroup(ctx context.Context, sessionID, facilitatorID string) (bool, error) {
-	return false, nil
+	return !r.ownsNoGroup, nil
 }
 func (r *fakeSessionRepo) GetSessionGroupByParticipant(ctx context.Context, participantID string) (*entity.SessionGroup, error) {
 	return r.group, r.groupErr
@@ -363,5 +382,130 @@ func TestUsecase_Upsert_NoGroup_Succeeds(t *testing.T) {
 	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
 	if err != nil {
 		t.Fatalf("expected success for participant without group, got %v", err)
+	}
+}
+
+// ── Strict session-ownership scoring gate (membership + session-level
+// facilitator ownership, both enforced BEFORE any write) ──
+
+// (a) An ACTIVE session where the facilitator owns NO group closes scoring:
+// the session-level gate rejects even though the finer-grained
+// participant-group lookup (session-blind) would have passed — that is
+// exactly the gap the session-level rule fills.
+func TestUsecase_Upsert_FacilitatorWithoutAnySessionGroup_Forbidden(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		session:     &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+		ownsNoGroup: true,
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	requireAppErrorCode(t, err, "not_group_owner")
+	if assessmentRepo.created != nil {
+		t.Fatal("expected no assessment write when the facilitator owns no group of the session")
+	}
+}
+
+// (b) Nobody may score a participant who is not enrolled in the session being
+// scored — membership applies to ALL roles (facilitator variant).
+func TestUsecase_Upsert_ParticipantOfAnotherSession_Forbidden(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	otherSession := "session-2"
+	sessionRepo := &fakeSessionRepo{
+		session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+		participant: &entity.Participant{
+			BaseModel: entity.BaseModel{ID: "participant-1"},
+			SessionID: &otherSession,
+		},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	requireAppErrorCode(t, err, "participant_not_in_session")
+	if assessmentRepo.created != nil {
+		t.Fatal("expected no assessment write for a participant of another session")
+	}
+}
+
+// (b, admin variant) The membership gate is NOT facilitator-only: ADMIN
+// bypasses both ownership checks but never the enrollment check.
+func TestUsecase_Upsert_ParticipantOfAnotherSession_AdminForbidden(t *testing.T) {
+	assessmentRepo := &fakeAssessmentRepo{}
+	otherSession := "session-2"
+	sessionRepo := &fakeSessionRepo{
+		session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+		participant: &entity.Participant{
+			BaseModel: entity.BaseModel{ID: "participant-1"},
+			SessionID: &otherSession,
+		},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "", "admin-1", "admin-1", string(entity.RoleAdmin), time.Now(), "tenant-1")
+	requireAppErrorCode(t, err, "participant_not_in_session")
+	if assessmentRepo.created != nil {
+		t.Fatal("expected no assessment write for an admin scoring a foreign participant")
+	}
+}
+
+// (c) Both gates pass: the facilitator owns the participant's group, owns a
+// group of the ACTIVE session, and the participant is enrolled in it — the
+// score still succeeds.
+func TestUsecase_Upsert_OwningFacilitatorActiveSession_Succeeds(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	if err != nil {
+		t.Fatalf("expected success for the owning facilitator in the active session, got %v", err)
+	}
+	if assessmentRepo.created == nil {
+		t.Fatal("expected assessment to be written")
+	}
+}
+
+// (d) The session-state gate keeps precedence: a NON-ACTIVE session still
+// rejects with session_not_active even when the facilitator also owns no
+// group of it (the ownership gates sit inside the active-session check).
+func TestUsecase_Upsert_NonActiveSession_KeepsSessionGateOverOwnership(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		session:     &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionDraft},
+		ownsNoGroup: true,
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	requireAppErrorCode(t, err, "session_not_active")
+	if assessmentRepo.created != nil {
+		t.Fatal("expected no assessment write on a non-active session")
 	}
 }

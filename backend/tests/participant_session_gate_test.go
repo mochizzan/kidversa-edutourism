@@ -39,6 +39,9 @@ type fakeSessionFlowRepo struct {
 	members        map[string][]entity.Participant // groupID -> existing members
 	participant    *entity.Participant
 	nameExists     bool
+	// memberships are the participant_session_memberships history rows recorded
+	// by LinkParticipant (unique per participant+session, like the DB table).
+	memberships []entity.ParticipantSessionMembership
 
 	created        []*entity.Participant
 	updated        *entity.Participant
@@ -75,8 +78,65 @@ func (r *fakeSessionFlowRepo) ListSessionStages(_ context.Context, sessionID str
 	return r.stages[sessionID], nil
 }
 
-func (r *fakeSessionFlowRepo) ListParticipants(_ context.Context, _, groupID, _ string) ([]entity.Participant, error) {
-	return r.members[groupID], nil
+// ListParticipants mirrors the production pointer ∪ membership-history read:
+// the CURRENT pointer row matches, OR a recorded history row matches (the
+// fake keeps one row per participant, so the dedup keeps A → B → A listing
+// that participant exactly once — the pointer side wins). The members roster
+// (group capacity seeds) is still returned for group-scoped reads.
+func (r *fakeSessionFlowRepo) ListParticipants(_ context.Context, sessionID, groupID, _ string) ([]entity.Participant, error) {
+	seen := map[string]bool{}
+	out := make([]entity.Participant, 0, len(r.members[groupID])+1)
+	p := r.participant
+	if p != nil &&
+		(sessionID == "" || (p.SessionID != nil && *p.SessionID == sessionID)) &&
+		(groupID == "" || (p.GroupID != nil && *p.GroupID == groupID)) {
+		out = append(out, *p)
+		seen[p.ID] = true
+	}
+	if sessionID != "" && p != nil {
+		for _, m := range r.memberships {
+			if m.SessionID != sessionID || m.ParticipantID != p.ID || seen[m.ParticipantID] {
+				continue
+			}
+			if groupID != "" && (m.GroupID == nil || *m.GroupID != groupID) {
+				continue
+			}
+			out = append(out, *p)
+			seen[m.ParticipantID] = true
+		}
+	}
+	for _, mb := range r.members[groupID] {
+		if mb.ID != "" && seen[mb.ID] {
+			continue
+		}
+		out = append(out, mb)
+	}
+	return out, nil
+}
+
+// RecordMembership emulates the table's UNIQUE(participant_id, session_id)
+// with insert-DO-NOTHING semantics: a repeated source record (link retry,
+// A → B → A round trip) keeps the first row instead of failing the link.
+func (r *fakeSessionFlowRepo) RecordMembership(_ context.Context, m *entity.ParticipantSessionMembership) error {
+	for i := range r.memberships {
+		if r.memberships[i].ParticipantID == m.ParticipantID && r.memberships[i].SessionID == m.SessionID {
+			return nil
+		}
+	}
+	cp := *m
+	r.memberships = append(r.memberships, cp)
+	return nil
+}
+
+// ListSessionMemberships returns the recorded history rows of a session.
+func (r *fakeSessionFlowRepo) ListSessionMemberships(_ context.Context, sessionID, _ string) ([]entity.ParticipantSessionMembership, error) {
+	out := make([]entity.ParticipantSessionMembership, 0, len(r.memberships))
+	for i := range r.memberships {
+		if r.memberships[i].SessionID == sessionID {
+			out = append(out, r.memberships[i])
+		}
+	}
+	return out, nil
 }
 
 func (r *fakeSessionFlowRepo) ParticipantNameExists(context.Context, string, string) (bool, error) {
@@ -130,6 +190,17 @@ func fillGroup(repo *fakeSessionFlowRepo, groupID string, n int) {
 		ms = append(ms, entity.Participant{ChildName: fmt.Sprintf("Anak %d", i+1)})
 	}
 	repo.members[groupID] = ms
+}
+
+// hasMembership reports whether the fake recorded a history row for the pair
+// in participant_session_memberships.
+func hasMembership(repo *fakeSessionFlowRepo, participantID, sessionID string) bool {
+	for i := range repo.memberships {
+		if repo.memberships[i].ParticipantID == participantID && repo.memberships[i].SessionID == sessionID {
+			return true
+		}
+	}
+	return false
 }
 
 // TestCreateParticipantSessionScopedAttachesToGroup: session-scoped create
@@ -480,7 +551,7 @@ func (r *fakeLinkSubstageRepo) GetSessionSubstageByKeys(_ context.Context, sessi
 	return nil, apperrors.NotFound("not_found", nil)
 }
 
-// CreateBadge emulates the DB uniques (one SUBTOPIK per Topik, one FINAL per
+// CreateBadge emulates the DB uniques (one TOPIK per Topik, one FINAL per
 // program) so an accidental double award fails loudly as a conflict.
 func (r *fakeLinkSubstageRepo) CreateBadge(_ context.Context, b *entity.ParticipantBadge) error {
 	for i := range r.badges {
@@ -488,7 +559,7 @@ func (r *fakeLinkSubstageRepo) CreateBadge(_ context.Context, b *entity.Particip
 		if ex.ParticipantID != b.ParticipantID {
 			continue
 		}
-		if b.BadgeType == entity.BadgeTypeSubtopik && ex.BadgeType == entity.BadgeTypeSubtopik &&
+		if b.BadgeType == entity.BadgeTypeTopik && ex.BadgeType == entity.BadgeTypeTopik &&
 			ex.ProgramStageID != nil && b.ProgramStageID != nil && *ex.ProgramStageID == *b.ProgramStageID {
 			return apperrors.Conflict("conflict", nil)
 		}
@@ -504,7 +575,7 @@ func (r *fakeLinkSubstageRepo) ListBadgesByParticipantStage(_ context.Context, p
 	out := make([]entity.ParticipantBadge, 0, 1)
 	for i := range r.badges {
 		b := r.badges[i]
-		if b.ParticipantID == participantID && b.BadgeType == entity.BadgeTypeSubtopik &&
+		if b.ParticipantID == participantID && b.BadgeType == entity.BadgeTypeTopik &&
 			b.ProgramStageID != nil && *b.ProgramStageID == programStageID {
 			out = append(out, b)
 		}
@@ -524,7 +595,7 @@ func (r *fakeLinkSubstageRepo) ListFinalBadgesByParticipant(_ context.Context, p
 }
 
 // RevokeFinalBadge drops the FINAL rows — soft-delete emulation: a revoked row
-// leaves every list result. SUBTOPIK rows are never touched.
+// leaves every list result. TOPIK rows are never touched.
 func (r *fakeLinkSubstageRepo) RevokeFinalBadge(_ context.Context, participantID, programID string) error {
 	kept := make([]entity.ParticipantBadge, 0, len(r.badges))
 	for i := range r.badges {
@@ -642,7 +713,8 @@ func (r *fakeLinkAttendanceRepo) Upsert(_ context.Context, a *entity.Participant
 // linkMigrationFixture wires a usecase for participant-migration links:
 // target session "sess-1", source session "sess-src", participant pid-1 in the
 // source, two source assessments (star 5 and star 0), and one attendance row.
-// targetProgram/srcProgram differ to exercise the program_mismatch gate.
+// targetProgram/srcProgram differ to exercise the cross-program scratch path
+// (same program → clone/carry, different program → link without any copy).
 type linkMigrationFixture struct {
 	repo *fakeSessionFlowRepo
 	asmt *fakeLinkAssessmentRepo
@@ -736,6 +808,13 @@ func TestLinkParticipantSameProgramCarriesAllAssessmentsAndAttendance(t *testing
 		t.Fatalf("migration context lost: %+v", res)
 	}
 
+	// The same-program copy goes together with the history write: the source
+	// membership is recorded BEFORE the move, so session sess-src keeps
+	// listing pid-1 afterwards (report pages / group tabs of the old session).
+	if !hasMembership(f.repo, "pid-1", "sess-src") {
+		t.Fatalf("source membership must be recorded, got %+v", f.repo.memberships)
+	}
+
 	// The source assessment read must carry the caller's tenant — without it the
 	// production repo rejects with tenant_required and the clone silently dies.
 	if len(f.asmt.listCalls) != 1 {
@@ -795,24 +874,29 @@ func TestLinkParticipantSameProgramCarriesAllAssessmentsAndAttendance(t *testing
 	}
 }
 
-// TestLinkParticipantRejectsCrossProgramMigration: sessions of DIFFERENT
-// programs must fail with 400 program_mismatch before anything is copied or
-// moved — no assessment read/write, no attendance write, no participant move,
-// and NO badge recompute at all (a rejected link is not a migration).
-func TestLinkParticipantRejectsCrossProgramMigration(t *testing.T) {
+// TestLinkParticipantCrossProgramScratchData: sessions of DIFFERENT programs
+// now link successfully WITHOUT copying anything — the target session starts
+// scratch (no assessment read/write, no attendance write, NO badge recompute,
+// badges untouched), yet the link still moves the participant and records the
+// source membership so the old session keeps its history.
+func TestLinkParticipantCrossProgramScratchData(t *testing.T) {
 	f := newLinkMigrationFixture("prog-A", "prog-B")
-	// Seed badges so any (forbidden) badge mutation would be observable.
+	// Seed badges so any (unexpected) badge mutation would be observable.
 	stage1 := "stage-1"
 	f.sub.badges = append(f.sub.badges,
-		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeSubtopik, BadgeName: "Topik 1"},
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeTopik, BadgeName: "Topik 1"},
 		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-final"}, ParticipantID: "pid-1", ProgramID: "prog-A", BadgeType: entity.BadgeTypeFinal, BadgeName: "Juara Akhir"},
 	)
 
-	_, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1")
-	requireAppErrorCode(t, err, "program_mismatch")
-
-	if f.repo.updated != nil {
-		t.Fatal("cross-program link must not move the participant")
+	res, err := f.uc.LinkParticipant(context.Background(), "sess-1", "pid-1", "", "tenant-1")
+	if err != nil {
+		t.Fatalf("cross-program link must succeed (scratch path), got: %v", err)
+	}
+	if f.repo.updated == nil || f.repo.updated.SessionID == nil || *f.repo.updated.SessionID != "sess-1" {
+		t.Fatalf("participant must still move to sess-1, got %+v", f.repo.updated)
+	}
+	if res.PreviousSessionID != "sess-src" || res.PreviousProgramID != "prog-B" {
+		t.Fatalf("migration context lost: %+v", res)
 	}
 	if len(f.asmt.listCalls) != 0 || len(f.asmt.created) != 0 {
 		t.Fatalf("cross-program link must not touch assessments: list=%d created=%d",
@@ -823,10 +907,104 @@ func TestLinkParticipantRejectsCrossProgramMigration(t *testing.T) {
 			len(f.att.upserts), len(f.att.rows))
 	}
 	if f.prog.listStagesCalls != 0 {
-		t.Fatalf("cross-program rejection must not trigger badge recompute, got %d runs", f.prog.listStagesCalls)
+		t.Fatalf("cross-program link must not trigger badge recompute, got %d runs", f.prog.listStagesCalls)
 	}
 	if rows := badgesFor(f.sub, "pid-1"); len(rows) != 2 {
 		t.Fatalf("cross-program link must leave badges untouched, got %d rows (%+v)", len(rows), rows)
+	}
+	// The scratch path still records the SOURCE membership (history write).
+	if !hasMembership(f.repo, "pid-1", "sess-src") {
+		t.Fatalf("source membership must be recorded, got %+v", f.repo.memberships)
+	}
+}
+
+// TestLinkParticipantRetainsSourceSessionHistory: linking A → B must NOT empty
+// session A — the source membership is recorded and ListParticipants still
+// returns the participant for the old session (report pages / group tabs),
+// while the new session sees them through the pointer.
+func TestLinkParticipantRetainsSourceSessionHistory(t *testing.T) {
+	f := newLinkMigrationFixture("prog-A", "prog-B")
+	ctx := context.Background()
+
+	if _, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1"); err != nil {
+		t.Fatalf("cross-program link must succeed, got: %v", err)
+	}
+	// Model the persisted pointer move: the fake does not write through
+	// UpdateParticipant (the retry tests rely on the stale pointer).
+	moved := "sess-1"
+	f.repo.participant.SessionID = &moved
+
+	old, err := f.uc.GetParticipants(ctx, "sess-src", "", "tenant-1")
+	if err != nil {
+		t.Fatalf("listing the source session failed: %v", err)
+	}
+	if len(old) != 1 || old[0].ID != "pid-1" {
+		t.Fatalf("source session must still list the moved participant, got %+v", old)
+	}
+
+	cur, err := f.uc.GetParticipants(ctx, "sess-1", "", "tenant-1")
+	if err != nil {
+		t.Fatalf("listing the target session failed: %v", err)
+	}
+	if len(cur) != 1 || cur[0].ID != "pid-1" {
+		t.Fatalf("target session must list the participant via its pointer, got %+v", cur)
+	}
+}
+
+// TestLinkParticipantRoundTripKeepsOneRowPerSession: A → B → A → B must never
+// duplicate history rows (the write is idempotent against UNIQUE
+// participant+session) nor list a participant twice — in the A → B → A case
+// both the pointer and a history row match session A, and the dedup keeps a
+// single row.
+func TestLinkParticipantRoundTripKeepsOneRowPerSession(t *testing.T) {
+	f := newLinkMigrationFixture("prog-A", "prog-A")
+	// The source session must accept the return link (fixture default is
+	// COMPLETED, which rejects writes as a closed session).
+	f.repo.extraSessions["sess-src"].Status = entity.SessionActive
+	ctx := context.Background()
+
+	// A → B (sess-src → sess-1)
+	if _, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1"); err != nil {
+		t.Fatalf("first link must succeed, got: %v", err)
+	}
+	moved1 := "sess-1"
+	f.repo.participant.SessionID = &moved1 // simulate the persisted move
+
+	// B → A
+	if _, err := f.uc.LinkParticipant(ctx, "sess-src", "pid-1", "", "tenant-1"); err != nil {
+		t.Fatalf("return link must succeed, got: %v", err)
+	}
+	moved2 := "sess-src"
+	f.repo.participant.SessionID = &moved2
+
+	// A → B again: the repeated source record for (pid-1, sess-src) must be a
+	// no-op — the fake emulates the UNIQUE key with insert-DO-NOTHING.
+	if _, err := f.uc.LinkParticipant(ctx, "sess-1", "pid-1", "", "tenant-1"); err != nil {
+		t.Fatalf("repeated link must succeed, got: %v", err)
+	}
+	moved3 := "sess-1"
+	f.repo.participant.SessionID = &moved3
+
+	if len(f.repo.memberships) != 2 {
+		t.Fatalf("expected exactly 2 unique history rows (sess-src, sess-1), got %d (%+v)",
+			len(f.repo.memberships), f.repo.memberships)
+	}
+	for _, sid := range []string{"sess-src", "sess-1"} {
+		if !hasMembership(f.repo, "pid-1", sid) {
+			t.Fatalf("missing history row for %s, got %+v", sid, f.repo.memberships)
+		}
+	}
+
+	// Both sessions list pid-1 EXACTLY once: pointer-only (B), and
+	// pointer+history deduplicated (A).
+	for _, sid := range []string{"sess-src", "sess-1"} {
+		ps, err := f.uc.GetParticipants(ctx, sid, "", "tenant-1")
+		if err != nil {
+			t.Fatalf("listing %s failed: %v", sid, err)
+		}
+		if len(ps) != 1 || ps[0].ID != "pid-1" {
+			t.Fatalf("%s must list pid-1 exactly once, got %+v", sid, ps)
+		}
 	}
 }
 
@@ -930,10 +1108,10 @@ func TestLinkParticipantRejectsForeignTenantSourceSession(t *testing.T) {
 }
 
 // TestLinkParticipantGrownProgramRevokesStaleFinalBadge is the Bug-4
-// migration contract: the participant earned the stage-1 SUBTOPIK badge and
+// migration contract: the participant earned the stage-1 TOPIK badge and
 // the FINAL badge back when prog-A had a single Topik; the program has since
 // grown to three. The same-program migration must REVOKE the stale FINAL
-// immediately while KEEPING the already-earned SUBTOPIK badge (program-scoped
+// immediately while KEEPING the already-earned TOPIK badge (program-scoped
 // rows always carry across sessions).
 func TestLinkParticipantGrownProgramRevokesStaleFinalBadge(t *testing.T) {
 	f := newLinkMigrationFixture("prog-A", "prog-A")
@@ -945,7 +1123,7 @@ func TestLinkParticipantGrownProgramRevokesStaleFinalBadge(t *testing.T) {
 	}
 	stage1 := "stage-1"
 	f.sub.badges = append(f.sub.badges,
-		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeSubtopik, BadgeName: "Topik 1"},
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeTopik, BadgeName: "Topik 1"},
 		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-final"}, ParticipantID: "pid-1", ProgramID: "prog-A", BadgeType: entity.BadgeTypeFinal, BadgeName: "Juara Akhir"},
 	)
 
@@ -965,23 +1143,23 @@ func TestLinkParticipantGrownProgramRevokesStaleFinalBadge(t *testing.T) {
 	}
 	rows := badgesFor(f.sub, "pid-1")
 	if len(rows) != 1 {
-		t.Fatalf("badge rows = %d (%+v), want 1 (stale FINAL revoked, SUBTOPIK kept)", len(rows), rows)
+		t.Fatalf("badge rows = %d (%+v), want 1 (stale FINAL revoked, TOPIK kept)", len(rows), rows)
 	}
 	got := rows[0]
-	if got.BadgeType != entity.BadgeTypeSubtopik || got.ProgramStageID == nil || *got.ProgramStageID != "stage-1" {
-		t.Fatalf("surviving badge = %+v, want the SUBTOPIK badge of stage-1", got)
+	if got.BadgeType != entity.BadgeTypeTopik || got.ProgramStageID == nil || *got.ProgramStageID != "stage-1" {
+		t.Fatalf("surviving badge = %+v, want the TOPIK badge of stage-1", got)
 	}
 }
 
 // TestLinkParticipantUnchangedProgramKeepsFinalBadge: same-program migration
 // with an UNCHANGED Topik count and every Topik assessed — the reconcile must
-// retain BOTH the FINAL and the SUBTOPIK badge (migration never strips a
+// retain BOTH the FINAL and the TOPIK badge (migration never strips a
 // still-earned badge).
 func TestLinkParticipantUnchangedProgramKeepsFinalBadge(t *testing.T) {
 	f := newLinkMigrationFixture("prog-A", "prog-A") // prog-A: 1 Topik, unchanged
 	stage1 := "stage-1"
 	f.sub.badges = append(f.sub.badges,
-		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeSubtopik, BadgeName: "Topik 1"},
+		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-sub-1"}, ParticipantID: "pid-1", ProgramID: "prog-A", ProgramStageID: &stage1, BadgeType: entity.BadgeTypeTopik, BadgeName: "Topik 1"},
 		entity.ParticipantBadge{BaseModel: entity.BaseModel{ID: "b-final"}, ParticipantID: "pid-1", ProgramID: "prog-A", BadgeType: entity.BadgeTypeFinal, BadgeName: "Juara Akhir"},
 	)
 
@@ -995,18 +1173,18 @@ func TestLinkParticipantUnchangedProgramKeepsFinalBadge(t *testing.T) {
 	}
 	rows := badgesFor(f.sub, "pid-1")
 	if len(rows) != 2 {
-		t.Fatalf("badge rows = %d (%+v), want 2 (FINAL and SUBTOPIK retained)", len(rows), rows)
+		t.Fatalf("badge rows = %d (%+v), want 2 (FINAL and TOPIK retained)", len(rows), rows)
 	}
 	var sawSub, sawFinal bool
 	for i := range rows {
 		switch rows[i].BadgeType {
-		case entity.BadgeTypeSubtopik:
+		case entity.BadgeTypeTopik:
 			sawSub = rows[i].ProgramStageID != nil && *rows[i].ProgramStageID == "stage-1"
 		case entity.BadgeTypeFinal:
 			sawFinal = rows[i].ProgramID == "prog-A"
 		}
 	}
 	if !sawSub || !sawFinal {
-		t.Fatalf("retained badges = %+v, want SUBTOPIK stage-1 AND FINAL prog-A", rows)
+		t.Fatalf("retained badges = %+v, want TOPIK stage-1 AND FINAL prog-A", rows)
 	}
 }

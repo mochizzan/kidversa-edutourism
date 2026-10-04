@@ -36,7 +36,8 @@ func (h *AssessmentHandler) Upsert(c *echo.Context) error {
 	return appresp.Created(c, dto.NewAssessmentResponse(a))
 }
 
-// List handles GET /api/assessments (filter by ?participant_id= or ?session_id=).
+// List handles GET /api/assessments (filter by ?participant_id=, ?session_id=
+// or ?session_stage_id=).
 func (h *AssessmentHandler) List(c *echo.Context) error {
 	tenantID := appmiddleware.GetTenantID(c)
 	if err := tenantGuard(c, tenantID); err != nil {
@@ -46,6 +47,7 @@ func (h *AssessmentHandler) List(c *echo.Context) error {
 		ParticipantID:     (*c).QueryParam("participant_id"),
 		SessionID:         (*c).QueryParam("session_id"),
 		SessionSubstageID: (*c).QueryParam("session_substage_id"),
+		SessionStageID:    (*c).QueryParam("session_stage_id"),
 		TenantID:          tenantID,
 	}
 	page, limit := pagination(c)

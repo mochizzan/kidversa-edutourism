@@ -94,6 +94,11 @@ func main() {
 	// LinkParticipant reconciles the participant's FINAL badge after a
 	// same-program migration (a grown program revokes the stale FINAL).
 	sessionUC.SetBadgeReconciler(badgeUC)
+	// Report clone: a same-program LinkParticipant copies the participant's
+	// reports (rapor) + participant_missions to the target session — each copy
+	// gets a fresh parent token and starts undelivered (sent_at = nil).
+	// Mandatory wiring: unwired (nil) deps skip the clone.
+	sessionUC.SetReportCloneDeps(reportRepo, participantMissionRepo)
 	liveSvc := liveuc.NewService(liveRepo, notifRepo, hub, badgeUC)
 	assessmentUC := assessmentuc.NewUsecase(assessmentRepo, sessionRepo, badgeUC)
 	attendanceUC := attendanceuc.NewUsecase(attendanceRepo, sessionRepo)

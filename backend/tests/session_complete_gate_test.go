@@ -159,7 +159,7 @@ func TestCompleteSession_AllGraded_Completes(t *testing.T) {
 	}
 	uc, repo := newCompleteGateUsecase(
 		sess,
-		[]entity.SessionGroup{{BaseModel: entity.BaseModel{ID: groupID}, SessionID: sessionID, Name: "Kelompok Merah", Status: entity.GroupInProgress}},
+		[]entity.SessionGroup{{BaseModel: entity.BaseModel{ID: groupID}, SessionID: sessionID, Name: "Kelompok Merah", Status: entity.GroupCompleted}},
 		[]entity.Participant{{BaseModel: entity.BaseModel{ID: partID}, GroupID: &gid, ChildName: "Budi Santoso"}},
 		[]entity.SessionSubstage{
 			{BaseModel: entity.BaseModel{ID: subStageID1}, SessionID: sessionID},
@@ -266,5 +266,187 @@ func TestCompleteSession_StarZero_Rejected(t *testing.T) {
 	requireAppErrorCode(t, err, "grading_incomplete")
 	if repo.session.Status != entity.SessionActive {
 		t.Fatalf("session must stay %q on rejection, got %q", entity.SessionActive, repo.session.Status)
+	}
+}
+
+// TestCompleteSession_PresentGraded_FacilitatorGroupPending_Rejected pins
+// scenario (c): a present, fully graded participant whose group has NOT been
+// completed by its facilitator rejects with the new group_completion_pending
+// code. The gate runs before the first mutation, so the session stays ACTIVE
+// and no cascade write may have happened (atomic pre-mutation rejection).
+func TestCompleteSession_PresentGraded_FacilitatorGroupPending_Rejected(t *testing.T) {
+	const (
+		sessionID   = "session-gate-group-pending"
+		partID      = "participant-1"
+		groupID     = "group-1"
+		tenantID    = "tenant-real"
+		subStageID1 = "ssub-1"
+		subStageID2 = "ssub-2"
+	)
+	gid := groupID
+	sess := &entity.Session{
+		BaseModel: entity.BaseModel{ID: sessionID},
+		TenantID:  completeGateTenant(tenantID),
+		Status:    entity.SessionActive,
+	}
+	assess := &fakeCompleteGateAssessmentRepo{
+		tenantID: tenantID,
+		scores: map[string]int{
+			// Fully graded: both leaves have a star >= 1.
+			partID + "|" + subStageID1: 5,
+			partID + "|" + subStageID2: 3,
+		},
+	}
+	uc, repo := newCompleteGateUsecase(
+		sess,
+		[]entity.SessionGroup{{BaseModel: entity.BaseModel{ID: groupID}, SessionID: sessionID, Name: "Kelompok Jingga", Status: entity.GroupInProgress}},
+		[]entity.Participant{{BaseModel: entity.BaseModel{ID: partID}, GroupID: &gid, ChildName: "Budi Santoso"}},
+		[]entity.SessionSubstage{
+			{BaseModel: entity.BaseModel{ID: subStageID1}, SessionID: sessionID},
+			{BaseModel: entity.BaseModel{ID: subStageID2}, SessionID: sessionID},
+		},
+		assess,
+	)
+	uc.SetAttendanceRepo(&fakeSessionGateAttendanceRepo{rows: []entity.ParticipantAttendance{{
+		BaseModel:     entity.BaseModel{ID: "a1"},
+		ParticipantID: partID,
+		SessionID:     sessionID,
+		IsPresent:     true,
+	}}})
+
+	_, err := uc.CompleteSession(context.Background(), sessionID, tenantID)
+	requireAppErrorCode(t, err, "group_completion_pending")
+	if repo.session.Status != entity.SessionActive {
+		t.Fatalf("session must stay %q on rejection, got %q", entity.SessionActive, repo.session.Status)
+	}
+	if repo.stageUpdates != 0 || repo.groupUpdates != 0 {
+		t.Fatalf("no cascade may run on rejection, got stages=%d groups=%d", repo.stageUpdates, repo.groupUpdates)
+	}
+	if len(assess.seenTenants) == 0 {
+		t.Fatal("grading gate never queried the assessment repo")
+	}
+	for i := range assess.seenTenants {
+		if assess.seenTenants[i] != tenantID {
+			t.Fatalf("gate queried with tenant %q, want the session tenant %q", assess.seenTenants[i], tenantID)
+		}
+	}
+}
+
+// TestCompleteSession_PresentGraded_GroupCompleted_Completes pins scenario (d):
+// present + fully graded + group COMPLETED by its facilitator allows the
+// completion, and the stage/group cascade still runs.
+func TestCompleteSession_PresentGraded_GroupCompleted_Completes(t *testing.T) {
+	const (
+		sessionID   = "session-gate-group-completed"
+		partID      = "participant-1"
+		groupID     = "group-1"
+		tenantID    = "tenant-real"
+		subStageID1 = "ssub-1"
+		subStageID2 = "ssub-2"
+	)
+	gid := groupID
+	sess := &entity.Session{
+		BaseModel: entity.BaseModel{ID: sessionID},
+		TenantID:  completeGateTenant(tenantID),
+		Status:    entity.SessionActive,
+	}
+	assess := &fakeCompleteGateAssessmentRepo{
+		tenantID: tenantID,
+		scores: map[string]int{
+			partID + "|" + subStageID1: 5,
+			partID + "|" + subStageID2: 3,
+		},
+	}
+	uc, repo := newCompleteGateUsecase(
+		sess,
+		[]entity.SessionGroup{{BaseModel: entity.BaseModel{ID: groupID}, SessionID: sessionID, Name: "Kelompok Nila", Status: entity.GroupCompleted}},
+		[]entity.Participant{{BaseModel: entity.BaseModel{ID: partID}, GroupID: &gid, ChildName: "Budi Santoso"}},
+		[]entity.SessionSubstage{
+			{BaseModel: entity.BaseModel{ID: subStageID1}, SessionID: sessionID},
+			{BaseModel: entity.BaseModel{ID: subStageID2}, SessionID: sessionID},
+		},
+		assess,
+	)
+	uc.SetAttendanceRepo(&fakeSessionGateAttendanceRepo{rows: []entity.ParticipantAttendance{{
+		BaseModel:     entity.BaseModel{ID: "a1"},
+		ParticipantID: partID,
+		SessionID:     sessionID,
+		IsPresent:     true,
+	}}})
+
+	got, err := uc.CompleteSession(context.Background(), sessionID, tenantID)
+	if err != nil {
+		t.Fatalf("CompleteSession must succeed when the facilitator completed the group: %v", err)
+	}
+	if got.Status != entity.SessionCompleted {
+		t.Fatalf("expected status %q, got %q", entity.SessionCompleted, got.Status)
+	}
+	if repo.stageUpdates == 0 || repo.groupUpdates == 0 {
+		t.Fatalf("expected stage/group cascade, got stages=%d groups=%d", repo.stageUpdates, repo.groupUpdates)
+	}
+}
+
+// TestCompleteSession_GradingIncomplete_BeatsGroupCompletionPending pins the
+// global precedence of the grading gate: the grading gate runs to completion
+// across ALL groups before the facilitator gate runs at all, so a present
+// ungraded participant always yields grading_incomplete — even when another
+// group is also pending facilitator completion, regardless of group
+// iteration order.
+func TestCompleteSession_GradingIncomplete_BeatsGroupCompletionPending(t *testing.T) {
+	const (
+		sessionID   = "session-gate-precedence"
+		g1ID        = "group-1"
+		g2ID        = "group-2"
+		partG1      = "participant-g1"
+		partG2      = "participant-g2"
+		tenantID    = "tenant-real"
+		subStageID1 = "ssub-1"
+		subStageID2 = "ssub-2"
+	)
+	g1, g2 := g1ID, g2ID
+	sess := &entity.Session{
+		BaseModel: entity.BaseModel{ID: sessionID},
+		TenantID:  completeGateTenant(tenantID),
+		Status:    entity.SessionActive,
+	}
+	assess := &fakeCompleteGateAssessmentRepo{
+		tenantID: tenantID,
+		scores: map[string]int{
+			// g1 fully graded; g2 only one of two leaves graded.
+			partG1 + "|" + subStageID1: 5,
+			partG1 + "|" + subStageID2: 3,
+			partG2 + "|" + subStageID1: 4,
+		},
+	}
+	uc, repo := newCompleteGateUsecase(
+		sess,
+		[]entity.SessionGroup{
+			// g1 pending facilitator completion but fully graded; g2 completed
+			// by the facilitator but a participant is still ungraded.
+			{BaseModel: entity.BaseModel{ID: g1ID}, SessionID: sessionID, Name: "Kelompok Cempaka", Status: entity.GroupInProgress},
+			{BaseModel: entity.BaseModel{ID: g2ID}, SessionID: sessionID, Name: "Kelompok Dahlia", Status: entity.GroupCompleted},
+		},
+		[]entity.Participant{
+			{BaseModel: entity.BaseModel{ID: partG1}, GroupID: &g1, ChildName: "Budi Santoso"},
+			{BaseModel: entity.BaseModel{ID: partG2}, GroupID: &g2, ChildName: "Siti Aminah"},
+		},
+		[]entity.SessionSubstage{
+			{BaseModel: entity.BaseModel{ID: subStageID1}, SessionID: sessionID},
+			{BaseModel: entity.BaseModel{ID: subStageID2}, SessionID: sessionID},
+		},
+		assess,
+	)
+	uc.SetAttendanceRepo(&fakeSessionGateAttendanceRepo{rows: []entity.ParticipantAttendance{
+		{BaseModel: entity.BaseModel{ID: "a1"}, ParticipantID: partG1, SessionID: sessionID, IsPresent: true},
+		{BaseModel: entity.BaseModel{ID: "a2"}, ParticipantID: partG2, SessionID: sessionID, IsPresent: true},
+	}})
+
+	_, err := uc.CompleteSession(context.Background(), sessionID, tenantID)
+	requireAppErrorCode(t, err, "grading_incomplete")
+	if repo.session.Status != entity.SessionActive {
+		t.Fatalf("session must stay %q on rejection, got %q", entity.SessionActive, repo.session.Status)
+	}
+	if repo.stageUpdates != 0 || repo.groupUpdates != 0 {
+		t.Fatalf("no cascade may run on rejection, got stages=%d groups=%d", repo.stageUpdates, repo.groupUpdates)
 	}
 }

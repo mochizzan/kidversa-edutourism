@@ -211,7 +211,7 @@ export const API_ROUTES = {
   DETAIL: (id: string) => `/api/program-substages/${encodeURIComponent(id)}`,
  },
 
- // Participant badges (read-only; SUBTOPIK + FINAL awards).
+ // Participant badges (read-only; TOPIK/legacy SUBTOPIK + FINAL awards).
  BADGES: {
   BASE: '/api/badges',
   BY_PARTICIPANT: (participantId: string) =>

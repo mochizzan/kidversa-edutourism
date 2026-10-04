@@ -24,6 +24,33 @@ func NewAssessmentRepository(db *gorm.DB) repository.AssessmentRepository {
 }
 
 func (r *GormAssessmentRepository) Create(ctx context.Context, a *entity.Assessment) error {
+	// Resolve the denormalized Topic keys (migration 000010): ONE lookup
+	// session_substages -> session_stages yields BOTH scoping columns
+	// (session_stage_id + program_stage_id) that feed report/badge scoping.
+	// A query FAILURE is returned as an explicit internal error (never
+	// log-swallowed: a failed write here would silently break per-Topic
+	// scoping); a missing row or empty stage ids leaves the '' sentinel for
+	// both columns (mirrors the kegiatan_name precedent below — no fabrication).
+	if a.SessionStageID == "" && a.SessionSubstageID != "" {
+		var keys struct {
+			SessionStageID string `gorm:"column:session_stage_id"`
+			ProgramStageID string `gorm:"column:program_stage_id"`
+		}
+		if err := r.db.WithContext(ctx).
+			Table("session_substages AS ssub").
+			Select("ssub.session_stage_id, ss.program_stage_id").
+			Joins("JOIN session_stages ss ON ss.id = ssub.session_stage_id").
+			Where("ssub.id = ?", a.SessionSubstageID).
+			Scan(&keys).Error; err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+		if keys.SessionStageID == "" || keys.ProgramStageID == "" {
+			log.Printf("assessments: resolve topic keys skipped for session_substage %s: session_stage_id=%q program_stage_id=%q (left as '' sentinel)", a.SessionSubstageID, keys.SessionStageID, keys.ProgramStageID)
+		} else {
+			a.SessionStageID = keys.SessionStageID
+			a.ProgramStageID = keys.ProgramStageID
+		}
+	}
 	// Denormalize: fetch participant name and kegiatan name if not set.
 	// Kegiatan names live on program_substages.name (session_substages has NO
 	// name column), so resolve via session_substages.program_substage_id.
@@ -139,28 +166,25 @@ func (r *GormAssessmentRepository) List(ctx context.Context, f repository.Assess
 	if f.SessionSubstageID != "" {
 		q = q.Where("session_substage_id = ?", f.SessionSubstageID)
 	}
-	// Per-Topic scoping: restrict to assessments whose Kegiatan (session_substage)
-	// belongs to the given Topic (program_stage). Join path:
-	// assessments.session_substage_id -> session_substages -> session_stages -> program_stages.
+	if len(f.SessionSubstageIDs) > 0 {
+		q = q.Where("session_substage_id IN ?", f.SessionSubstageIDs)
+	}
+	// Per-Topic scoping: direct equality on the denormalized columns
+	// (migration 000010) — no JOINs, so the tenant scope below always applies
+	// to the base table with no ambiguous columns. Per-Topic scoping prevents
+	// cross-topic leakage in report reads.
+	if f.SessionStageID != "" {
+		q = q.Where("assessments.session_stage_id = ?", f.SessionStageID)
+	}
 	if f.ProgramStageID != "" {
-		q = q.
-			Joins("JOIN session_substages ssub ON ssub.id = assessments.session_substage_id").
-			Joins("JOIN session_stages ss ON ss.id = ssub.session_stage_id").
-			Where("ss.program_stage_id = ?", f.ProgramStageID)
+		q = q.Where("assessments.program_stage_id = ?", f.ProgramStageID)
 	}
 	// Tenant scoping (cross-tenant READ IDOR defense): scope to the tenant owning
 	// the assessment's session. Empty TenantID is rejected as a required scope.
 	if f.TenantID == "" {
 		return nil, apperrors.BadRequest("tenant_required", errors.New("tenant ID is required"))
 	}
-	// When the Topic join is active, session_substages/session_stages also carry
-	// session_id, so qualify the tenant scope to the base table to avoid the
-	// "Column 'session_id' is ambiguous" error.
-	if f.ProgramStageID != "" {
-		q = q.Where("assessments.session_id IN (SELECT id FROM sessions WHERE tenant_id = ?)", f.TenantID)
-	} else {
-		q = scopeByTenant(q, f.TenantID)
-	}
+	q = scopeByTenant(q, f.TenantID)
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -193,6 +217,8 @@ func (r *GormAssessmentRepository) Update(ctx context.Context, a *entity.Assessm
 		"participant_id":      a.ParticipantID,
 		"session_id":          a.SessionID,
 		"session_substage_id": a.SessionSubstageID,
+		"session_stage_id":    a.SessionStageID,
+		"program_stage_id":    a.ProgramStageID,
 		"star_rating":         a.StarRating,
 		"comment":             a.Comment,
 		"assessed_by":         a.AssessedBy,
@@ -218,6 +244,8 @@ func (r *GormAssessmentRepository) Revive(ctx context.Context, a *entity.Assessm
 		"participant_id":      a.ParticipantID,
 		"session_id":          a.SessionID,
 		"session_substage_id": a.SessionSubstageID,
+		"session_stage_id":    a.SessionStageID,
+		"program_stage_id":    a.ProgramStageID,
 		"star_rating":         a.StarRating,
 		"comment":             a.Comment,
 		"assessed_by":         a.AssessedBy,

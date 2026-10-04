@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
@@ -393,13 +394,47 @@ func (r *GormSessionRepository) GetParticipantGlobal(ctx context.Context, id, te
 	return m.ToEntity(), nil
 }
 
-func (r *GormSessionRepository) ListParticipants(ctx context.Context, sessionID, groupID, tenantID string) ([]entity.Participant, error) {
-	q := r.db.WithContext(ctx).Model(&ParticipantModel{})
+// participantScopeCondition builds the pointer ∪ membership-history WHERE
+// fragment shared by ListParticipants and ListParticipantsPaginated. A row
+// matches when the participant's CURRENT pointer (participants.session_id /
+// group_id) satisfies the session/group filters, OR when a recorded history
+// row (participant_session_memberships) for that participant satisfies them —
+// both branches project the same single participants row, so the result is
+// structurally deduplicated per participant_id: in the A → B → A case the
+// pointer row wins because the history branch can never add a second copy of
+// it. Returns "" when neither filter is set.
+func participantScopeCondition(sessionID, groupID string) (string, []interface{}) {
+	if sessionID == "" && groupID == "" {
+		return "", nil
+	}
+	ptr := make([]string, 0, 2)
+	ptrArgs := make([]interface{}, 0, 2)
+	hist := []string{"m.participant_id = participants.id"}
+	histArgs := make([]interface{}, 0, 2)
 	if sessionID != "" {
-		q = q.Where("session_id = ?", sessionID)
+		ptr = append(ptr, "session_id = ?")
+		ptrArgs = append(ptrArgs, sessionID)
+		hist = append(hist, "m.session_id = ?")
+		histArgs = append(histArgs, sessionID)
 	}
 	if groupID != "" {
-		q = q.Where("group_id = ?", groupID)
+		ptr = append(ptr, "group_id = ?")
+		ptrArgs = append(ptrArgs, groupID)
+		hist = append(hist, "m.group_id = ?")
+		histArgs = append(histArgs, groupID)
+	}
+	cond := "(" + strings.Join(ptr, " AND ") +
+		" OR EXISTS (SELECT 1 FROM participant_session_memberships m WHERE " +
+		strings.Join(hist, " AND ") + "))"
+	// Placeholder order follows the SQL text: pointer branch first, then EXISTS.
+	args := append(ptrArgs, histArgs...)
+	return cond, args
+}
+
+func (r *GormSessionRepository) ListParticipants(ctx context.Context, sessionID, groupID, tenantID string) ([]entity.Participant, error) {
+	q := r.db.WithContext(ctx).Model(&ParticipantModel{})
+	if cond, condArgs := participantScopeCondition(sessionID, groupID); cond != "" {
+		q = q.Where(cond, condArgs...)
 	}
 	if tenantID != "" {
 		q = q.Where("tenant_id = ?", tenantID)
@@ -423,11 +458,8 @@ func (r *GormSessionRepository) ListParticipantsPaginated(ctx context.Context, t
 	if tenantID != "" {
 		q = q.Where("tenant_id = ?", tenantID)
 	}
-	if sessionID != "" {
-		q = q.Where("session_id = ?", sessionID)
-	}
-	if groupID != "" {
-		q = q.Where("group_id = ?", groupID)
+	if cond, condArgs := participantScopeCondition(sessionID, groupID); cond != "" {
+		q = q.Where(cond, condArgs...)
 	}
 	if search != "" {
 		like := "%" + strings.ToLower(search) + "%"
@@ -446,6 +478,39 @@ func (r *GormSessionRepository) ListParticipantsPaginated(ctx context.Context, t
 		items = append(items, *models[i].ToEntity())
 	}
 	return &repository.Paginated[entity.Participant]{Items: items, Total: int(total)}, nil
+}
+
+// RecordMembership writes one participant ↔ session history row. The insert is
+// idempotent against UNIQUE(participant_id, session_id): a repeated record
+// (link retry, A → B → A round trip) keeps the existing row instead of
+// failing the link.
+func (r *GormSessionRepository) RecordMembership(ctx context.Context, m *entity.ParticipantSessionMembership) error {
+	mm := participantSessionMembershipModelFromEntity(m)
+	if err := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(mm).Error; err != nil {
+		return apperrors.Internal("internal_error", err)
+	}
+	*m = *mm.ToEntity()
+	return nil
+}
+
+// ListSessionMemberships returns the recorded history rows of one session,
+// tenant-scoped, ordered by joined_at.
+func (r *GormSessionRepository) ListSessionMemberships(ctx context.Context, sessionID, tenantID string) ([]entity.ParticipantSessionMembership, error) {
+	q := r.db.WithContext(ctx).Where("session_id = ?", sessionID)
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	var models []ParticipantSessionMembershipModel
+	if err := q.Order("joined_at ASC").Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.ParticipantSessionMembership, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return items, nil
 }
 
 func (r *GormSessionRepository) UpdateParticipant(ctx context.Context, p *entity.Participant) error {

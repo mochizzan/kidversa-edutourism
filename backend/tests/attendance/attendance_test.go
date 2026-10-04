@@ -145,6 +145,12 @@ func (r *fakeSessionRepo) ListParticipants(ctx context.Context, sessionID, group
 func (r *fakeSessionRepo) ListParticipantsPaginated(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*repository.Paginated[entity.Participant], error) {
 	return nil, nil
 }
+func (r *fakeSessionRepo) RecordMembership(ctx context.Context, m *entity.ParticipantSessionMembership) error {
+	return nil
+}
+func (r *fakeSessionRepo) ListSessionMemberships(ctx context.Context, sessionID, tenantID string) ([]entity.ParticipantSessionMembership, error) {
+	return nil, nil
+}
 func (r *fakeSessionRepo) UpdateParticipant(ctx context.Context, p *entity.Participant) error {
 	return nil
 }

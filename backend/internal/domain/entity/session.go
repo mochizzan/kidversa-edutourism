@@ -106,3 +106,21 @@ func (p *Participant) SessionIDValue() string {
 	}
 	return ""
 }
+
+// ParticipantSessionMembership is one row of participant ↔ session history in
+// participant_session_memberships (migration 000002). LinkParticipant records
+// the SOURCE session here before overwriting participants.session_id, so
+// per-session readers (report generation, group tabs) keep seeing members that
+// later moved away. UNIQUE(participant_id, session_id) is the natural key.
+// Deliberately NOT BaseModel: the 000002 schema carries created_at but no
+// updated_at column, and mapping BaseModel.UpdatedAt would emit a phantom
+// column on INSERT.
+type ParticipantSessionMembership struct {
+	ID            string    `json:"id"`
+	TenantID      *string   `json:"tenant_id,omitempty"`
+	ParticipantID string    `json:"participant_id"`
+	SessionID     string    `json:"session_id"`
+	GroupID       *string   `json:"group_id,omitempty"`
+	JoinedAt      time.Time `json:"joined_at"`
+	CreatedAt     time.Time `json:"created_at"`
+}

@@ -85,7 +85,7 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
   })
 
   it('D5-3 badge lama tanpa badge_type/program_stage_id → split fallback tetap memilih slot', async () => {
-    // Row legacy: punya stage id tapi tanpa type → diperlakukan SUBTOPIK;
+    // Row legacy: punya stage id tapi tanpa type → diperlakukan topik;
     // row tanpa stage id dan tanpa type → diperlakukan FINAL.
     // Catatan: isi section kini hanya <img> (tanpa ikon/nama) — badge_image_url
     // disertakan agar pemilihan slot split tetap teramati lewat gambar.
@@ -113,7 +113,7 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
     expect(html).not.toContain('Belum ada badge yang diraih.')
   })
 
-  it('D5-1 program tanpa badge final (hanya SUBTOPIK rapor ini) → slot kanan kosong, tanpa crash', async () => {
+  it('D5-1 program tanpa badge final (hanya badge topik TOPIK di rapor ini) → slot kanan kosong, tanpa crash', async () => {
     const container = await renderReport(
       report({
         program_stage_id: 'stage-a',
@@ -121,7 +121,7 @@ describe('ReportPage — badge slots mengikuti payload rapor (kontrak Fase 2 D5)
           {
             badge_name: 'Badge Topik A',
             badge_image_url: 'badge-topik-a.png',
-            badge_type: 'SUBTOPIK',
+            badge_type: 'TOPIK',
             program_stage_id: 'stage-a',
           },
         ],

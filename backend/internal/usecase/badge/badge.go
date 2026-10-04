@@ -63,19 +63,19 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 	if eerr != nil {
 		// A failed idempotency pre-check must not be ignored: continuing would
 		// risk a duplicate award and hides a real repo failure.
-		return nil, fmt.Errorf("badge: list SUBTOPIK badges participant=%s stage=%s: %w", participantID, programStageID, eerr)
+		return nil, fmt.Errorf("badge: list TOPIK badges participant=%s stage=%s: %w", participantID, programStageID, eerr)
 	}
 	// Empty name template → no row (log, not an error): the award is simply
 	// not configurable for this Topik yet.
 	if prog.BadgeName == "" {
-		log.Printf("badge: skip SUBTOPIK award participant=%s stage=%s: program_stages.badge_name is empty", participantID, programStageID)
+		log.Printf("badge: skip TOPIK award participant=%s stage=%s: program_stages.badge_name is empty", participantID, programStageID)
 		return nil, nil
 	}
 	b := &entity.ParticipantBadge{
 		ParticipantID:  participantID,
 		ProgramID:      prog.ProgramID,
 		ProgramStageID: &programStageID,
-		BadgeType:      entity.BadgeTypeSubtopik,
+		BadgeType:      entity.BadgeTypeTopik,
 		BadgeName:      prog.BadgeName,
 		BadgeImageURL:  prog.BadgeImageURL,
 	}
@@ -86,7 +86,7 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 				return &got[0], nil
 			}
 			if gerr != nil {
-				log.Printf("badge: duplicate-recovery list SUBTOPIK badges participant=%s stage=%s failed: %v", participantID, programStageID, gerr)
+				log.Printf("badge: duplicate-recovery list TOPIK badges participant=%s stage=%s failed: %v", participantID, programStageID, gerr)
 			}
 		}
 		return nil, err
@@ -96,7 +96,7 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 
 // RecomputeFinalBadge reconciles the participant's FINAL badge for the program
 // against the CURRENT program content. Completion means: every Topik
-// (program_stage) of the program has an awarded SUBTOPIK badge for the
+// (program_stage) of the program has an awarded TOPIK badge for the
 // participant.
 //   - all Topik assessed → ensure exactly one FINAL row exists (idempotent
 //     award; an existing row is returned unchanged — Enforces exactly one
@@ -106,7 +106,7 @@ func (u *Usecase) AwardSubtopikBadge(ctx context.Context, participantID, program
 //     existing FINAL row (soft delete via RevokeFinalBadge); a no-op when
 //     none exists.
 //
-// SUBTOPIK rows are never touched here — they are program-scoped and always
+// TOPIK rows are never touched here — they are program-scoped and always
 // carry across migrations. Returns (nil, nil) when there is nothing to do.
 // When the program's final_badge_name template is empty no row is created —
 // the skip is logged at info level. Every lookup/revoke failure is returned;
@@ -139,7 +139,7 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 		if gerr != nil {
 			// A lookup failure must not be treated as "not awarded": that would
 			// silently withhold (or wrongly revoke) the FINAL badge on a repo error.
-			return nil, fmt.Errorf("badge: list SUBTOPIK badge participant=%s stage=%s: %w", participantID, stages[i].ID, gerr)
+			return nil, fmt.Errorf("badge: list TOPIK badge participant=%s stage=%s: %w", participantID, stages[i].ID, gerr)
 		}
 		if len(got) == 0 {
 			// Not every Topik is assessed (yet): a stale FINAL must not survive
@@ -154,7 +154,7 @@ func (u *Usecase) RecomputeFinalBadge(ctx context.Context, participantID, progra
 			return nil, nil
 		}
 	}
-	// Every Topik has its SUBTOPIK badge: the FINAL must exist — but only the
+	// Every Topik has its TOPIK badge: the FINAL must exist — but only the
 	// completion check above may grant it (the pre-check alone must never
 	// bypass a re-evaluation of grown program content).
 	if len(existing) > 0 {
@@ -223,41 +223,40 @@ func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, se
 	if err != nil {
 		return err
 	}
-	allScored := true
+	ids := make([]string, 0, len(allSubs))
 	for i := range allSubs {
-		if allSubs[i].SessionStageID != sub.SessionStageID {
-			continue
-		}
-		scored, lerr := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
-			ParticipantID:     participantID,
-			SessionSubstageID: allSubs[i].ID,
-			TenantID:          tenantID,
-		}, 1, 10)
-		if lerr != nil {
-			// A lookup failure must not masquerade as "not scored": return an
-			// explicit error so the badge gap is never silently swallowed.
-			return fmt.Errorf("badge: list assessments failed for participant=%s substage=%s: %w", participantID, allSubs[i].ID, lerr)
-		}
-		if len(scored.Items) == 0 {
-			allScored = false
-			break
-		}
-		scoredEnough := false
-		for j := range scored.Items {
-			if scored.Items[j].StarRating >= 1 {
-				scoredEnough = true
-				break
-			}
-		}
-		if !scoredEnough {
-			allScored = false
-			break
+		if allSubs[i].SessionStageID == sub.SessionStageID {
+			ids = append(ids, allSubs[i].ID)
 		}
 	}
-	// Reaching here means every per-Kegiatan query above succeeded: this is the
-	// genuine "not all scored yet" policy outcome, not a swallowed failure.
-	if !allScored {
-		return nil
+	// ONE batched lookup for every Kegiatan of the Topic (replaces the former
+	// one-GetByParticipantStage-per-Kegiatan N+1). Star 0 (or a missing row)
+	// means "not scored": only rows with star >= 1 land in the map, and the
+	// Topic is complete only when EVERY Kegiatan id is present.
+	scored, lerr := u.assessmentRepo.List(ctx, repository.AssessmentFilter{
+		ParticipantID:      participantID,
+		SessionID:          sub.SessionID,
+		SessionSubstageIDs: ids,
+		TenantID:           tenantID,
+	}, 1, 1000)
+	if lerr != nil {
+		// A lookup failure must not masquerade as "not scored": return an
+		// explicit error so the badge gap is never silently swallowed.
+		return fmt.Errorf("badge: list assessments failed for participant=%s session=%s substages=%v: %w", participantID, sub.SessionID, ids, lerr)
+	}
+	synced := make(map[string]bool, len(scored.Items))
+	for i := range scored.Items {
+		if scored.Items[i].StarRating >= 1 {
+			synced[scored.Items[i].SessionSubstageID] = true
+		}
+	}
+	// Reaching here means the single query above succeeded: an incomplete map
+	// is the genuine "not all scored yet" policy outcome, not a swallowed
+	// failure.
+	for j := range ids {
+		if !synced[ids[j]] {
+			return nil
+		}
 	}
 
 	if _, err := u.AwardSubtopikBadge(ctx, participantID, programStageID); err != nil {
@@ -460,7 +459,7 @@ func (u *Usecase) CheckAndCompleteGroup(ctx context.Context, sessionID, groupID,
 	return u.backfillGroupBadges(ctx, group, tenantID)
 }
 
-// backfillGroupBadges creates any missing SUBTOPIK/FINAL badges from scores
+// backfillGroupBadges creates any missing TOPIK/FINAL badges from scores
 // that already exist — no new scoring event is required. For every participant
 // of the group it re-runs badge evaluation once per session Topik (the first
 // session Kegiatan of each session stage is enough: evaluation checks all

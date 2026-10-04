@@ -11,6 +11,14 @@
 #
 # Conventions:
 #   - Bind mounts only (relative to this file / cwd). No named volumes.
+#     MariaDB datadir stays `./data/mariadb` BY DECISION — but note the
+#     Windows+WSL2 constraint: drvfs bind mounts break the SECOND InnoDB
+#     table rebuild (rename) of the SAME table with errno 194 "Tablespace
+#     is missing for a table" (MariaDB MDEV-24189/MDEV-36911, root cause
+#     microsoft/WSL#8443; both closed "Not a Bug — Windows docker
+#     container only"). Migration files MUST therefore keep every table to
+#     at most one MODIFY/rebuild per run (000010 section 4 does widen +
+#     data rewrite only — no enum narrowing).
 #   - Simple, default container config (no read_only/tmpfs/cap_drop) for
 #     reliable startup; resource limits via deploy.resources still applied.
 #   - Secrets come from the host file ./backend/.env (never baked into images).
@@ -30,6 +38,8 @@ services:
       # Bind mount — data lives on the host under ./data/mariadb.
       # NOTE: `compose down` never removes this; to reset, empty the folder
       # via File Explorer / WSL2, not `down -v` (bind mounts aren't removed).
+      # Windows/WSL2 caveat (MDEV-24189): a table may be rebuilt (renamed)
+      # only ONCE per server session here — see "Conventions" above.
       - ./data/mariadb:/var/lib/mysql
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]

@@ -130,6 +130,17 @@ type SessionRepository interface {
 	// the eligibility filter re-includes those participants on the next send.
 	ClearParticipantTokens(ctx context.Context, sessionID, tenantID string) error
 
+	// Membership history (participant_session_memberships): LinkParticipant
+	// records the SOURCE session membership at its single pointer-overwrite
+	// point, so per-session readers keep seeing members that moved away.
+	// RecordMembership inserts the row idempotently — a repeat of the same
+	// (participant_id, session_id) pair is a no-op, not an error (the table's
+	// UNIQUE key plus a link retry / A→B→A round trip must converge).
+	RecordMembership(ctx context.Context, m *entity.ParticipantSessionMembership) error
+	// ListSessionMemberships returns the recorded history rows of one session,
+	// tenant-scoped, ordered by joined_at.
+	ListSessionMemberships(ctx context.Context, sessionID, tenantID string) ([]entity.ParticipantSessionMembership, error)
+
 	// FindParticipantSessionInfo returns session context for a batch of participant IDs.
 	// Used by the "add participant" modal to show which session/program a participant
 	// is currently linked to.

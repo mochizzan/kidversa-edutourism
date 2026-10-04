@@ -88,9 +88,13 @@ export interface SessionSubstage {
  completed_at?: string
 }
 
-export type BadgeType = 'SUBTOPIK' | 'FINAL'
+// 'TOPIK' is the current value (badge attribute renamed by migration 000010);
+// 'SUBTOPIK' is legacy — only found on pre-000010 rows (still accepted on read);
+// 'FINAL' is the cross-session program award.
+export type BadgeType = 'TOPIK' | 'SUBTOPIK' | 'FINAL'
 
-// Participant badge row (SUBTOPIK rows carry program_stage_id; FINAL rows carry null).
+// Participant badge row (TOPIK/legacy SUBTOPIK rows carry program_stage_id;
+// FINAL rows carry null).
 export interface ParticipantBadge {
  id: string
  participant_id: string
@@ -270,6 +274,9 @@ export interface Assessment {
  participant_id: string
  /** Kegiatan-level FK (session_substages.id). */
  session_substage_id: string
+ // Denormalized topic keys (migration 000010); '' on legacy rows.
+ session_stage_id?: string
+ program_stage_id?: string
  star_rating: number
  comment?: string
  assessed_by: string

@@ -1,7 +1,7 @@
 // badges.ts — backend-backed participant badge reads (Fase 5).
 //
 // GET /api/badges?participant_id= returns every ParticipantBadge for a child
-// (SUBTOPIK rows carry program_stage_id; FINAL rows carry null). Read-only and
+// (TOPIK/legacy SUBTOPIK rows carry program_stage_id; FINAL rows carry null). Read-only and
 // JWT + TenantScope guarded by the backend; uses the shared envelope helpers.
 
 import type { ParticipantBadge } from '../types'

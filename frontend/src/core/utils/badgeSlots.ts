@@ -18,15 +18,16 @@ export interface BadgeSlots {
 const hasValue = (v?: string | null): v is string => typeof v === 'string' && v.trim() !== ''
 
 /**
- * Split daftar badge campur (SUBTOPIK + FINAL) menjadi dua slot mini rapor
+ * Split daftar badge campur (topik + FINAL) menjadi dua slot mini rapor
  * (kontrak Fase 2 D2):
  *
- * - `topicBadges` = badge_type `SUBTOPIK` yang `program_stage_id`-nya sama
- *   dengan `programStageId` yang sedang direview; `programStageId` kosong
- *   (report legacy) → SEMUA SUBTOPIK (kompat mundur).
+ * - `topicBadges` = badge bertipe topik (`TOPIK` saat ini; `SUBTOPIK` untuk baris
+ *   legacy pre-000010) yang `program_stage_id`-nya sama dengan `programStageId`
+ *   yang sedang direview; `programStageId` kosong (report legacy) → SEMUA badge
+ *   topik (kompat mundur).
  * - `finalBadge` = item `badge_type` `FINAL` PERTAMA (0..1).
  * - Fallback toleran untuk data lama (field hilang): type undefined/kosong +
- *   punya `program_stage_id` → diperlakukan SUBTOPIK; type undefined/kosong +
+ *   punya `program_stage_id` → diperlakukan topik; type undefined/kosong +
  *   tanpa `program_stage_id` (null/''/undefined) → diperlakukan FINAL.
  */
 export function splitBadgeSlots(
@@ -49,9 +50,9 @@ export function splitBadgeSlots(
    continue
   }
 
-  // SUBTOPIK eksplisit; selain itu (type hilang/ tak dikenal) fallback: row
-  // membawa stage id → diperlakukan SUBTOPIK.
-  const isTopic = type === 'SUBTOPIK' || badgeStage !== ''
+  // TOPIK (tipe saat ini), lalu SUBTOPIK (legacy pre-000010); selain itu
+  // (type hilang/ tak dikenal) fallback: row membawa stage id → topik.
+  const isTopic = type === 'TOPIK' || type === 'SUBTOPIK' || badgeStage !== ''
   if (isTopic) {
    // Report legacy (tanpa stage key) → semua topik masuk slot kiri.
    if (isLegacy || badgeStage === stageKey) topicBadges.push(badge)

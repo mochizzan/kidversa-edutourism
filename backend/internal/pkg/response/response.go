@@ -159,6 +159,8 @@ func MessageForCode(code string) string {
 		return "Kelompok sudah diselesaikan; kehadiran dan penilaian tidak dapat diubah lagi."
 	case "group_already_completed":
 		return "Kelompok sudah diselesaikan dan tidak dapat diselesaikan kembali."
+	case "group_completion_pending":
+		return "Masih ada kelompok yang belum diselesaikan fasilitator"
 	case "substage_completed":
 		return "Penilaian kegiatan ini sudah diselesaikan; tidak dapat diubah lagi."
 	case "topic_completed":

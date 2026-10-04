@@ -194,3 +194,40 @@ func (m *ParticipantModel) ToEntity() *entity.Participant {
 func participantModelFromEntity(e *entity.Participant) *ParticipantModel {
 	return &ParticipantModel{Participant: *e}
 }
+
+// ParticipantSessionMembershipModel is the GORM persistence model for the
+// participant ↔ session membership history. The 000002 table has no
+// deleted_at/updated_at, so the model maps exactly its columns.
+type ParticipantSessionMembershipModel struct {
+	entity.ParticipantSessionMembership
+}
+
+// TableName pins the table name.
+func (ParticipantSessionMembershipModel) TableName() string {
+	return "participant_session_memberships"
+}
+
+// BeforeCreate generates a UUID and stamps created_at/joined_at if missing
+// (joined_at defaults to the record time — the schema has no per-join column).
+func (m *ParticipantSessionMembershipModel) BeforeCreate(*gorm.DB) error {
+	if m.ID == "" {
+		m.ID = newUUID()
+	}
+	if m.CreatedAt.IsZero() {
+		m.CreatedAt = time.Now()
+	}
+	if m.JoinedAt.IsZero() {
+		m.JoinedAt = m.CreatedAt
+	}
+	return nil
+}
+
+// ToEntity maps the model back to the domain entity.
+func (m *ParticipantSessionMembershipModel) ToEntity() *entity.ParticipantSessionMembership {
+	e := m.ParticipantSessionMembership
+	return &e
+}
+
+func participantSessionMembershipModelFromEntity(e *entity.ParticipantSessionMembership) *ParticipantSessionMembershipModel {
+	return &ParticipantSessionMembershipModel{ParticipantSessionMembership: *e}
+}

@@ -9,16 +9,17 @@ import { friendlyError } from '../../../core/utils/errorMessages'
 interface BadgeListProps {
  participantId: string | undefined
  /**
-  * Optional topic scope (program_stage_id): SUBTOPIK badge cards are limited
-  * to this topic; the FINAL badge always shows. Omitted → every SUBTOPIK
-  * badge (legacy/parent usage unchanged).
+  * Optional topic scope (program_stage_id): TOPIK badge cards are limited
+  * to this topic; the FINAL badge always shows. Omitted → every topic badge
+  * (legacy/parent usage unchanged).
   */
  programStageId?: string | null
 }
 
-// Renders the child's earned badges: per-SubTopik (SUBTOPIK) and the cross-
-// session Final Program award (FINAL). Badge images are served through the
-// authenticated, tenant-scoped media endpoint (kind "content").
+// Renders the child's earned badges: per-Topik (TOPIK; SUBTOPIK only on legacy
+// pre-000010 rows) and the cross-session Final Program award (FINAL). Badge
+// images are served through the authenticated, tenant-scoped media endpoint
+// (kind "content").
 export function BadgeList({ participantId, programStageId }: BadgeListProps) {
  const [badges, setBadges] = useState<ParticipantBadge[]>([])
  const [loading, setLoading] = useState(false)
@@ -45,8 +46,10 @@ export function BadgeList({ participantId, programStageId }: BadgeListProps) {
   }
  }, [participantId])
 
- const subtopik = badges.filter(
-  (b) => b.badge_type === 'SUBTOPIK' && (!programStageId || b.program_stage_id === programStageId),
+ const topik = badges.filter(
+  (b) =>
+   (b.badge_type === 'TOPIK' || b.badge_type === 'SUBTOPIK') &&
+   (!programStageId || b.program_stage_id === programStageId),
  )
  const finalBadge = badges.find((b) => b.badge_type === 'FINAL')
 
@@ -73,8 +76,8 @@ export function BadgeList({ participantId, programStageId }: BadgeListProps) {
  }
 
  // Empty when nothing is visible: no badges at all, or the topic scope
- // filtered every SUBTOPIK card out with no FINAL badge to show.
- if (badges.length === 0 || (!finalBadge && subtopik.length === 0)) {
+ // filtered every topic card out with no FINAL badge to show.
+ if (badges.length === 0 || (!finalBadge && topik.length === 0)) {
   return (
    <Card>
     <div className="flex items-center gap-2 text-sm text-on-surface-variant">
@@ -112,14 +115,14 @@ export function BadgeList({ participantId, programStageId }: BadgeListProps) {
     </Card>
    )}
 
-   {subtopik.length > 0 && (
+   {topik.length > 0 && (
     <Card>
      <h3 className="text-sm font-semibold text-on-surface mb-3 flex items-center gap-2">
       <Star className="w-4 h-4 text-accent" />
       Badge Topik
      </h3>
      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      {subtopik.map((b) => (
+      {topik.map((b) => (
        <div
         key={b.id}
         className="flex flex-col items-center text-center p-3 rounded-xl bg-surface-variant"

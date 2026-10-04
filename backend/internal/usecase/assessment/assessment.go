@@ -44,8 +44,21 @@ func isNotFound(err error) bool {
 
 // Upsert creates or updates an assessment keyed on (participant_id, session_substage_id).
 // starRating 0 is a valid "absent/not-yet-scored" marker (DB DEFAULT 1); the
-// contract treats >=1 as scored. actorRole gates the write to the participant's
-// group owner when the actor is a FASILITATOR; ADMIN/KOORDINATOR/SUPER_ADMIN bypass.
+// contract treats >=1 as scored.
+//
+// Scoring gate (every check runs BEFORE any write, existing precedence kept):
+//  1. Membership — ALL roles: nobody may score a participant who is not
+//     enrolled in the session being scored (403 participant_not_in_session).
+//  2. Session-level facilitator gate — for a FASILITATOR: an ACTIVE session
+//     where the actor owns no group means scoring is closed (403
+//     not_group_owner, via FacilitatorOwnsAnyGroup).
+//  3. Participant-group ownership (assertOwnership) — the finer-grained rule
+//     that stays in place: a FASILITATOR must also own the participant's own
+//     group (403 not_group_owner). ADMIN/KOORDINATOR/SUPER_ADMIN bypass the
+//     two facilitator ownership checks, never the membership check.
+//
+// session_not_active / group_completed / substage_completed keep their
+// existing positions and codes for every other path.
 func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy, actorID, actorRole string, assessedAt time.Time, tenantID string) (*entity.Assessment, error) {
 	if req.ParticipantID == "" || req.SessionSubstageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
@@ -65,6 +78,28 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	}
 	if sess.Status != entity.SessionActive {
 		return nil, apperrors.Forbidden("session_not_active", errors.New("assessment can only be submitted when session is active"))
+	}
+	// Strict session-ownership gate (rule 1 + 2 above, before any write).
+	// Membership applies to every role; the session-level group-ownership rule
+	// applies to FASILITATOR only and sits above the finer-grained
+	// participant-group check (assertOwnership) run earlier.
+	p, perr := u.sessionRepo.GetParticipantByID(ctx, req.ParticipantID, tenantID)
+	if perr != nil {
+		return nil, perr
+	}
+	if p == nil || p.SessionID == nil || *p.SessionID != req.SessionID {
+		return nil, apperrors.Forbidden("participant_not_in_session",
+			errors.New("participant is not enrolled in the session being scored"))
+	}
+	if entity.UserRole(actorRole) == entity.RoleFasilitator {
+		ownsAny, oerr := u.sessionRepo.FacilitatorOwnsAnyGroup(ctx, req.SessionID, actorID)
+		if oerr != nil {
+			return nil, oerr
+		}
+		if !ownsAny {
+			return nil, apperrors.Forbidden("not_group_owner",
+				errors.New("facilitator owns no group in the scored session"))
+		}
 	}
 	g, err := u.sessionRepo.GetSessionGroupByParticipant(ctx, req.ParticipantID)
 	if err != nil {

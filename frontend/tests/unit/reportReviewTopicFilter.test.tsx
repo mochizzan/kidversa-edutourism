@@ -221,7 +221,7 @@ const BADGES: ParticipantBadge[] = [
     participant_id: 'c-1',
     program_id: 'p1',
     program_stage_id: 'ps1',
-    badge_type: 'SUBTOPIK',
+    badge_type: 'TOPIK',
     badge_name: 'Badge Kebakaran',
     badge_image_url: 'badges/kebakaran.png',
     awarded_at: '2026-09-01T00:00:00Z',
@@ -231,7 +231,7 @@ const BADGES: ParticipantBadge[] = [
     participant_id: 'c-1',
     program_id: 'p1',
     program_stage_id: 'ps2',
-    badge_type: 'SUBTOPIK',
+    badge_type: 'TOPIK',
     badge_name: 'Badge Gempa',
     badge_image_url: 'badges/gempa.png',
     awarded_at: '2026-09-02T00:00:00Z',
@@ -241,7 +241,7 @@ const BADGES: ParticipantBadge[] = [
     participant_id: 'c-1',
     program_id: 'p1',
     program_stage_id: 'ps3',
-    badge_type: 'SUBTOPIK',
+    badge_type: 'TOPIK',
     badge_name: 'Badge Banjir',
     badge_image_url: 'badges/banjir.png',
     awarded_at: '2026-09-03T00:00:00Z',
@@ -412,7 +412,7 @@ describe('useReportReview — activeTopicId sebagai sumber tunggal (multi-topik)
     expect(screen.queryByText('Kegiatan Kebakaran A')).toBeNull()
     expect(screen.queryByText('Kegiatan Banjir A')).toBeNull()
 
-    // Kartu badge SUBTOPIK ikut topik aktif; badge FINAL tetap tampil.
+    // Kartu badge topik (TOPIK) ikut topik aktif; badge FINAL tetap tampil.
     expect(screen.getByText('Badge Gempa')).toBeTruthy()
     expect(screen.queryByText('Badge Kebakaran')).toBeNull()
     expect(screen.queryByText('Badge Banjir')).toBeNull()
@@ -504,7 +504,7 @@ describe('BadgeList — scope topik opsional', () => {
     expect(screen.queryByText('Badge Banjir')).toBeNull()
   })
 
-  it('scope topik tanpa badge SUBTOPIK dan tanpa FINAL → empty-state, bukan kartu kosong', async () => {
+  it('scope topik tanpa badge topik dan tanpa FINAL → empty-state, bukan kartu kosong', async () => {
     setupMocks('multi')
     vi.mocked(badgeService.listByParticipant).mockResolvedValue([BADGES[0]] as never)
     render(<BadgeList participantId="c-1" programStageId="ps2" />)

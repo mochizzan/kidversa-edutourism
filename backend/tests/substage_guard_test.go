@@ -66,6 +66,20 @@ func (r *subGuardSessionRepo) GetSessionByID(_ context.Context, _, _ string) (*e
 	return r.session, r.sessErr
 }
 
+// GetParticipantByID: the scored participant is always enrolled in the guarded
+// session, so the assessment usecase's membership gate passes and the tests
+// keep pinning the substage/group locks.
+func (r *subGuardSessionRepo) GetParticipantByID(_ context.Context, id, _ string) (*entity.Participant, error) {
+	sid := "sess-subguard"
+	return &entity.Participant{BaseModel: entity.BaseModel{ID: id}, SessionID: &sid}, nil
+}
+
+// FacilitatorOwnsAnyGroup: the fixture facilitator owns a group of the session
+// (the session-level ownership gate passes; these tests target the locks).
+func (r *subGuardSessionRepo) FacilitatorOwnsAnyGroup(_ context.Context, _, _ string) (bool, error) {
+	return true, nil
+}
+
 func (r *subGuardSessionRepo) GetSessionGroupByParticipant(_ context.Context, _ string) (*entity.SessionGroup, error) {
 	return r.group, r.groupErr
 }

@@ -34,8 +34,8 @@ type SessionSubstage struct {
 // BadgeType discriminates a participant badge as a per-Kegiatan award or the
 // cross-session Final program award.
 const (
-	BadgeTypeSubtopik = "SUBTOPIK"
-	BadgeTypeFinal    = "FINAL"
+	BadgeTypeTopik = "TOPIK"
+	BadgeTypeFinal = "FINAL"
 )
 
 // ParticipantBadge is an awarded badge row for a participant.

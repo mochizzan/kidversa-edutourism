@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -87,7 +88,7 @@ func (s *badgeStore) UpdateSessionSubstage(ctx context.Context, sub *entity.Sess
 }
 
 // CreateBadge emulates the DB uniques: uq_participant_subtopik_badge for
-// SUBTOPIK rows and one FINAL per (participant, program). createErrFor injects
+// TOPIK rows and one FINAL per (participant, program). createErrFor injects
 // a write failure for one participant (best-effort loop tests).
 func (s *badgeStore) CreateBadge(ctx context.Context, b *entity.ParticipantBadge) error {
 	if s.createErrFor != "" && b.ParticipantID == s.createErrFor {
@@ -98,8 +99,8 @@ func (s *badgeStore) CreateBadge(ctx context.Context, b *entity.ParticipantBadge
 		if ex.ParticipantID != b.ParticipantID {
 			continue
 		}
-		if b.BadgeType == entity.BadgeTypeSubtopik &&
-			ex.BadgeType == entity.BadgeTypeSubtopik && stageKey(&ex) == stageKey(b) {
+		if b.BadgeType == entity.BadgeTypeTopik &&
+			ex.BadgeType == entity.BadgeTypeTopik && stageKey(&ex) == stageKey(b) {
 			return apperrors.Conflict("conflict", nil)
 		}
 		if b.BadgeType == entity.BadgeTypeFinal &&
@@ -132,7 +133,7 @@ func (s *badgeStore) ListBadgesByParticipantStage(ctx context.Context, participa
 	out := make([]entity.ParticipantBadge, 0, 1)
 	for i := range s.badges {
 		if s.badges[i].ParticipantID == participantID &&
-			s.badges[i].BadgeType == entity.BadgeTypeSubtopik && stageKey(&s.badges[i]) == programStageID {
+			s.badges[i].BadgeType == entity.BadgeTypeTopik && stageKey(&s.badges[i]) == programStageID {
 			out = append(out, s.badges[i])
 		}
 	}
@@ -152,7 +153,7 @@ func (s *badgeStore) ListFinalBadgesByParticipant(ctx context.Context, participa
 
 // RevokeFinalBadge emulates the production soft delete: revoked rows leave the
 // active list (the fake has no deleted_at — a dropped row behaves exactly like
-// a GORM soft-deleted row, invisible to every list query) and SUBTOPIK rows are
+// a GORM soft-deleted row, invisible to every list query) and TOPIK rows are
 // never touched. revokeErr injects a write failure.
 func (s *badgeStore) RevokeFinalBadge(ctx context.Context, participantID, programID string) error {
 	if s.revokeErr != nil {
@@ -268,6 +269,9 @@ func (r *fakeAssessmentRepo) List(ctx context.Context, flt repository.Assessment
 			continue
 		}
 		if flt.SessionSubstageID != "" && a.SessionSubstageID != flt.SessionSubstageID {
+			continue
+		}
+		if len(flt.SessionSubstageIDs) > 0 && !slices.Contains(flt.SessionSubstageIDs, a.SessionSubstageID) {
 			continue
 		}
 		out = append(out, a)
@@ -392,8 +396,9 @@ func newFixture() *fixture {
 		order: []string{"subA1", "subA2", "subB1", "subB2"},
 	}
 	assess := &fakeAssessmentRepo{listErr: map[string]error{}}
+	sessID := testSessionID
 	sessRepo := &fakeSessionRepo{
-		participant: &entity.Participant{TenantID: &tenant, ChildName: "Budi Santoso", ChildAge: 7},
+		participant: &entity.Participant{TenantID: &tenant, SessionID: &sessID, ChildName: "Budi Santoso", ChildAge: 7},
 		session: &entity.Session{
 			BaseModel:   entity.BaseModel{ID: testSessionID},
 			TenantID:    &tenant,
@@ -501,24 +506,24 @@ func TestBadgeFlowTwoTopicsLastTopicAwardsFinal(t *testing.T) {
 	f.completeTopic(t, "subA1")
 	assertBadges(t, f.badges(t), nil)
 
-	// Topik A complete → SUBTOPIK A only; FINAL must NOT exist yet.
+	// Topik A complete → TOPIK A only; FINAL must NOT exist yet.
 	f.completeTopic(t, "subA2")
 	assertBadges(t, f.badges(t), []wantBadge{
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
 	})
 
 	// Topik B, first Kegiatan scored → still only badge A.
 	f.completeTopic(t, "subB1")
 	assertBadges(t, f.badges(t), []wantBadge{
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
 	})
 
 	// Topik B (the last topic of the 1:1 cloned session) complete →
-	// SUBTOPIK B + FINAL appear together: set-completion == "last topic done".
+	// TOPIK B + FINAL appear together: set-completion == "last topic done".
 	f.completeTopic(t, "subB2")
 	assertBadges(t, f.badges(t), []wantBadge{
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageB", name: "Ahli Topik B"},
 		{badgeType: entity.BadgeTypeFinal, stageID: "", name: "Juara Akhir"},
 	})
 }
@@ -532,14 +537,14 @@ func TestBadgeFlowFinalFollowsLastCompletedTopic(t *testing.T) {
 	// Topic B (sequence 2) completes FIRST → no FINAL (Topik A still missing).
 	f.completeTopic(t, "subB1", "subB2")
 	assertBadges(t, f.badges(t), []wantBadge{
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageB", name: "Ahli Topik B"},
 	})
 
 	// Topic A completes → the set is complete → FINAL.
 	f.completeTopic(t, "subA1", "subA2")
 	assertBadges(t, f.badges(t), []wantBadge{
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageB", name: "Ahli Topik B"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
 		{badgeType: entity.BadgeTypeFinal, stageID: "", name: "Juara Akhir"},
 	})
 }
@@ -550,8 +555,8 @@ func TestBadgeFlowEvaluateIsIdempotent(t *testing.T) {
 	f := newFixture()
 	f.completeTopic(t, "subA1", "subA2", "subB1", "subB2")
 	assertBadges(t, f.badges(t), []wantBadge{
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageB", name: "Ahli Topik B"},
 		{badgeType: entity.BadgeTypeFinal, stageID: "", name: "Juara Akhir"},
 	})
 
@@ -567,8 +572,8 @@ func TestBadgeFlowEvaluateIsIdempotent(t *testing.T) {
 		t.Fatalf("RecomputeFinalBadge: %v", err)
 	}
 	assertBadges(t, f.badges(t), []wantBadge{
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageB", name: "Ahli Topik B"},
 		{badgeType: entity.BadgeTypeFinal, stageID: "", name: "Juara Akhir"},
 	})
 }
@@ -586,8 +591,8 @@ func TestBadgeFlowRetroactivePublicView(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPublicReportView (before FINAL): %v", err)
 	}
-	if len(before.Badges) != 1 || before.Badges[0].BadgeType != entity.BadgeTypeSubtopik {
-		t.Fatalf("before FINAL: badges = %+v, want 1 SUBTOPIK", before.Badges)
+	if len(before.Badges) != 1 || before.Badges[0].BadgeType != entity.BadgeTypeTopik {
+		t.Fatalf("before FINAL: badges = %+v, want 1 TOPIK", before.Badges)
 	}
 
 	// Topik B completes → the FINAL row exists now.
@@ -610,8 +615,8 @@ func TestBadgeFlowRetroactivePublicView(t *testing.T) {
 		t.Errorf("FINAL badge image = %q, want token-scoped badge media route", last.BadgeImageURL)
 	}
 	// Topic badges carry their Topik for the client-side split.
-	if after.Badges[0].BadgeType != entity.BadgeTypeSubtopik || after.Badges[0].ProgramStageID != "stageA" {
-		t.Errorf("badge[0] = %+v, want SUBTOPIK/stageA", after.Badges[0])
+	if after.Badges[0].BadgeType != entity.BadgeTypeTopik || after.Badges[0].ProgramStageID != "stageA" {
+		t.Errorf("badge[0] = %+v, want TOPIK/stageA", after.Badges[0])
 	}
 
 	// D2 contract fields survive JSON: every badge item exposes badge_type and
@@ -672,7 +677,7 @@ func TestBadgeFlowEmptyNameTemplateSkipsAward(t *testing.T) {
 		// because Topik A never earned a badge (set-completion unmet).
 		f.completeTopic(t, "subB1", "subB2")
 		assertBadges(t, f.badges(t), []wantBadge{
-			{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
+			{badgeType: entity.BadgeTypeTopik, stageID: "stageB", name: "Ahli Topik B"},
 		})
 	})
 
@@ -682,14 +687,14 @@ func TestBadgeFlowEmptyNameTemplateSkipsAward(t *testing.T) {
 
 		f.completeTopic(t, "subA1", "subA2", "subB1", "subB2")
 		assertBadges(t, f.badges(t), []wantBadge{
-			{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
-			{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
+			{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
+			{badgeType: entity.BadgeTypeTopik, stageID: "stageB", name: "Ahli Topik B"},
 		})
 	})
 
 	out := buf.String()
-	if !strings.Contains(out, "badge: skip SUBTOPIK award participant=p1 stage=stageA: program_stages.badge_name is empty") {
-		t.Errorf("missing SUBTOPIK skip log, got:\n%s", out)
+	if !strings.Contains(out, "badge: skip TOPIK award participant=p1 stage=stageA: program_stages.badge_name is empty") {
+		t.Errorf("missing TOPIK skip log, got:\n%s", out)
 	}
 	if !strings.Contains(out, "badge: skip FINAL award participant=p1 program=prog1: programs.final_badge_name is empty") {
 		t.Errorf("missing FINAL skip log, got:\n%s", out)
@@ -783,8 +788,8 @@ func TestEvaluateAfterAssessmentReturnsAssessmentListError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "assessment db down") ||
 		!strings.Contains(err.Error(), "participant=p1") ||
-		!strings.Contains(err.Error(), "substage=subB1") {
-		t.Errorf("error must carry participant/substage context, got: %v", err)
+		!strings.Contains(err.Error(), "substages=[subB1 subB2]") {
+		t.Errorf("error must carry participant/substage-list context, got: %v", err)
 	}
 	if rows := f.badges(t); len(rows) != 0 {
 		t.Fatalf("badges = %+v, want none (no award on error)", rows)
@@ -828,8 +833,8 @@ func TestCheckAndCompleteGroupBackfillsMissingBadges(t *testing.T) {
 		t.Fatalf("CheckAndCompleteGroup heal path: %v", err)
 	}
 	want := []wantBadge{
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageA", name: "Ahli Topik A"},
-		{badgeType: entity.BadgeTypeSubtopik, stageID: "stageB", name: "Ahli Topik B"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageB", name: "Ahli Topik B"},
 		{badgeType: entity.BadgeTypeFinal, stageID: "", name: "Juara Akhir"},
 	}
 	assertBadges(t, f.badges(t), want)
@@ -869,7 +874,7 @@ func TestBadgeListHandlerAlwaysSerializesProgramStageID(t *testing.T) {
 		t.Fatalf("items = %d, want 3", len(env.Data))
 	}
 	wantStages := []string{"stageA", "stageB", ""}
-	wantTypes := []string{entity.BadgeTypeSubtopik, entity.BadgeTypeSubtopik, entity.BadgeTypeFinal}
+	wantTypes := []string{entity.BadgeTypeTopik, entity.BadgeTypeTopik, entity.BadgeTypeFinal}
 	for i, item := range env.Data {
 		raw, ok := item["program_stage_id"]
 		if !ok {

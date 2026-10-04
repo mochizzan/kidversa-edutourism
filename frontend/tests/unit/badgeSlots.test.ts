@@ -7,11 +7,11 @@ const badge = (
 ): SplitBadge => ({ badgeName: name, ...extra })
 
 describe('splitBadgeSlots — split dua slot (kontrak Fase 2 D2)', () => {
-  it('split by type + stage: SUBTOPIK stage aktif → kiri; stage lain → gugur; FINAL → kanan', () => {
+  it('split by type + stage: TOPIK (tipe saat ini) stage aktif → kiri; stage lain → gugur; FINAL → kanan', () => {
     const result = splitBadgeSlots(
       [
-        badge('Topik A', { badge_type: 'SUBTOPIK', program_stage_id: 'stage-a' }),
-        badge('Topik B', { badge_type: 'SUBTOPIK', program_stage_id: 'stage-b' }),
+        badge('Topik A', { badge_type: 'TOPIK', program_stage_id: 'stage-a' }),
+        badge('Topik B', { badge_type: 'TOPIK', program_stage_id: 'stage-b' }),
         badge('Final', { badge_type: 'FINAL', program_stage_id: null }),
       ],
       'stage-a',
@@ -20,11 +20,20 @@ describe('splitBadgeSlots — split dua slot (kontrak Fase 2 D2)', () => {
     expect(result.finalBadge?.badgeName).toBe('Final')
   })
 
-  it('report legacy (programStageId kosong) → SEMUA SUBTOPIK di slot kiri', () => {
+  it('TOPIK dikenali sebagai topik tanpa fallback stage: tipe eksplisit + stage kosong di report legacy → slot kiri', () => {
+    const result = splitBadgeSlots(
+      [badge('Topik Tanpa Stage', { badge_type: 'TOPIK', program_stage_id: null })],
+      '',
+    )
+    expect(result.topicBadges.map((b) => b.badgeName)).toEqual(['Topik Tanpa Stage'])
+    expect(result.finalBadge).toBeUndefined()
+  })
+
+  it('report legacy (programStageId kosong) → SEMUA badge topik di slot kiri', () => {
     const result = splitBadgeSlots(
       [
-        badge('Topik A', { badge_type: 'SUBTOPIK', program_stage_id: 'stage-a' }),
-        badge('Topik B', { badge_type: 'SUBTOPIK', program_stage_id: 'stage-b' }),
+        badge('Topik A', { badge_type: 'TOPIK', program_stage_id: 'stage-a' }),
+        badge('Topik B', { badge_type: 'TOPIK', program_stage_id: 'stage-b' }),
         badge('Final', { badge_type: 'FINAL', program_stage_id: null }),
       ],
       '',
@@ -33,7 +42,7 @@ describe('splitBadgeSlots — split dua slot (kontrak Fase 2 D2)', () => {
     expect(result.finalBadge?.badgeName).toBe('Final')
   })
 
-  it('programStageId undefined/null → diperlakukan legacy (semua SUBTOPIK di kiri)', () => {
+  it('baris legacy (tipe SUBTOPIK) + programStageId undefined/null → semua badge topik di kiri', () => {
     const rows = [badge('Topik A', { badge_type: 'SUBTOPIK', program_stage_id: 'stage-a' })]
     expect(splitBadgeSlots(rows, undefined).topicBadges).toHaveLength(1)
     expect(splitBadgeSlots(rows, null).topicBadges).toHaveLength(1)
@@ -51,10 +60,10 @@ describe('splitBadgeSlots — split dua slot (kontrak Fase 2 D2)', () => {
     expect(result.finalBadge?.badgeName).toBe('Final 1')
   })
 
-  it('field type/stage undefined → fallback: tanpa stage = FINAL, dengan stage = SUBTOPIK', () => {
+  it('field type/stage undefined → fallback: tanpa stage = FINAL, dengan stage = topik', () => {
     const result = splitBadgeSlots(
       [
-        // type hilang + ada stage id → diperlakukan SUBTOPIK (cocok stage aktif).
+        // type hilang + ada stage id → diperlakukan topik (cocok stage aktif).
         badge('Tanpa Type', { program_stage_id: 'stage-a' }),
         // type hilang + tanpa stage id → diperlakukan FINAL.
         badge('Tanpa Type Final', { program_stage_id: null }),
@@ -74,10 +83,10 @@ describe('splitBadgeSlots — split dua slot (kontrak Fase 2 D2)', () => {
     expect(result.finalBadge?.badgeName).toBe('Legacy Final')
   })
 
-  it('badge_type case-insensitive ("final"/"subtopik") tetap ter-split', () => {
+  it('badge_type case-insensitive ("final"/"topik") tetap ter-split', () => {
     const result = splitBadgeSlots(
       [
-        badge('T', { badge_type: 'subtopik', program_stage_id: 'stage-a' }),
+        badge('T', { badge_type: 'topik', program_stage_id: 'stage-a' }),
         badge('F', { badge_type: 'final', program_stage_id: null }),
       ],
       'stage-a',
@@ -97,7 +106,7 @@ describe('splitBadgeSlots — split dua slot (kontrak Fase 2 D2)', () => {
   })
 
   it('data utuh: field split TIDAK diubah (identitas objek dipertahankan untuk mapping)', () => {
-    const row = badge('Topik A', { badge_type: 'SUBTOPIK', program_stage_id: 'stage-a' })
+    const row = badge('Topik A', { badge_type: 'TOPIK', program_stage_id: 'stage-a' })
     const result = splitBadgeSlots([row], 'stage-a')
     expect(result.topicBadges[0]).toBe(row)
   })
