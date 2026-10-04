@@ -223,7 +223,11 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 	}
 
 	// Admin stageInfos equivalent: session stages in session order, skipping
-	// stages whose program Topik no longer exists.
+	// stages whose program Topik no longer exists. 1 topic = 1 rapor: a
+	// per-topic report (ProgramStageID set) renders ONLY its own Topik's
+	// stage in LEVEL KEGIATAN — the same scoping TopicName/missions/photo
+	// already apply above. Legacy session-wide rows (empty ProgramStageID)
+	// keep the merged session view unchanged.
 	type stageKegiatan struct {
 		name   string
 		rating int
@@ -235,6 +239,9 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 	}
 	stageInfos := make([]stageInfo, 0, len(sessStages))
 	for _, ss := range sessStages {
+		if r.ProgramStageID != "" && ss.ProgramStageID != r.ProgramStageID {
+			continue // other Topik's stage — never merges into this report
+		}
 		ps, perr := progStageOf(ss.ProgramStageID)
 		if perr != nil {
 			return nil, perr

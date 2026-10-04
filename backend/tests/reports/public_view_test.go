@@ -248,10 +248,12 @@ func assertStrings(t *testing.T, what string, got, want []string) {
 }
 
 // TestBuildPublicReportViewMirrorsAdminPreview covers the assembled payload:
-// child/program/session fields, live group + facilitator fallback, stage order
-// with deleted-Topic skip, first-wins star ratings, kegiatan name fallback,
-// public badge URLs, and the empty mission list when no missions are assigned
-// (there is no fallback auto-pick — the frontend hides the section).
+// child/program/session fields, live group + facilitator fallback, the
+// topic-scoped stage assembly (1 topik = 1 rapor — only the report's own
+// Topik reaches LEVEL KEGIATAN), first-wins star ratings, kegiatan name
+// fallback, public badge URLs, and the empty mission list when no missions
+// are assigned (there is no fallback auto-pick — the frontend hides the
+// section). Legacy session-wide rows are pinned separately below.
 func TestBuildPublicReportViewMirrorsAdminPreview(t *testing.T) {
 	f := newViewFixture()
 	view, err := f.uc.BuildPublicReportView(context.Background(), newViewReport())
@@ -278,9 +280,10 @@ func TestBuildPublicReportViewMirrorsAdminPreview(t *testing.T) {
 		t.Errorf("FacilitatorName = %q, want group→user fallback", view.FacilitatorName)
 	}
 
-	// Deleted program Topik (ss3) is skipped; the rest keep session order.
-	if len(view.Stages) != 3 {
-		t.Fatalf("len(Stages) = %d, want 3 (deleted Topik skipped)", len(view.Stages))
+	// 1 topic = 1 rapor: the report row carries stage1, so LEVEL KEGIATAN
+	// must expose ONLY that Topik's stage — never the session's others.
+	if len(view.Stages) != 1 {
+		t.Fatalf("len(Stages) = %d, want 1 (report's Topik only)", len(view.Stages))
 	}
 	s1 := view.Stages[0]
 	if s1.Name != "Topik 1" || s1.SequenceOrder != 1 {
@@ -295,12 +298,6 @@ func TestBuildPublicReportViewMirrorsAdminPreview(t *testing.T) {
 	// Deleted program Kegiatan → raw id, rating 0 (admin fallbacks).
 	if s1.Kegiatan[1].Name != "psGone" || s1.Kegiatan[1].StarRating != 0 {
 		t.Errorf("kegiatan[1] = %q/%d", s1.Kegiatan[1].Name, s1.Kegiatan[1].StarRating)
-	}
-	if view.Stages[1].Name != "Topik 2" || view.Stages[1].Kegiatan[0].StarRating != 1 {
-		t.Errorf("stage[1] = %q rating %d", view.Stages[1].Name, view.Stages[1].Kegiatan[0].StarRating)
-	}
-	if view.Stages[2].Name != "Topik 3" || view.Stages[2].Kegiatan[0].StarRating != 5 {
-		t.Errorf("stage[2] = %q rating %d", view.Stages[2].Name, view.Stages[2].Kegiatan[0].StarRating)
 	}
 
 	// No assigned missions → empty list (NOT nil, so JSON serializes as []),
@@ -356,5 +353,80 @@ func TestBuildPublicReportViewAssignedMissions(t *testing.T) {
 	}
 	if f.missions.lastGetIDTen != "t-1" {
 		t.Errorf("GetByID tenant = %q, want session tenant", f.missions.lastGetIDTen)
+	}
+}
+
+// TestBuildPublicReportViewStagesScopedToReportTopic is the regression test
+// for the merged LEVEL KEGIATAN bug: every per-topic report row must expose
+// ONLY its own Topik's stage. Three topic reports → three distinct payloads,
+// never the session's other topics.
+func TestBuildPublicReportViewStagesScopedToReportTopic(t *testing.T) {
+	cases := []struct {
+		topicID  string
+		wantName string
+		kegiatan string
+		rating   int
+	}{
+		{topicID: "stage2", wantName: "Topik 2", kegiatan: "Kegiatan C", rating: 1},
+		{topicID: "stage3", wantName: "Topik 3", kegiatan: "Kegiatan D", rating: 5},
+	}
+	for _, tc := range cases {
+		t.Run(tc.topicID, func(t *testing.T) {
+			f := newViewFixture()
+			r := newViewReport()
+			r.ProgramStageID = tc.topicID
+
+			view, err := f.uc.BuildPublicReportView(context.Background(), r)
+			if err != nil {
+				t.Fatalf("BuildPublicReportView: %v", err)
+			}
+			if len(view.Stages) != 1 {
+				t.Fatalf("len(Stages) = %d, want 1 (report's Topik only)", len(view.Stages))
+			}
+			got := view.Stages[0]
+			if got.Name != tc.wantName {
+				t.Errorf("stage name = %q, want %q", got.Name, tc.wantName)
+			}
+			if len(got.Kegiatan) != 1 || got.Kegiatan[0].Name != tc.kegiatan || got.Kegiatan[0].StarRating != tc.rating {
+				t.Errorf("kegiatan = %+v, want single %q with rating %d", got.Kegiatan, tc.kegiatan, tc.rating)
+			}
+			if view.TopicName != tc.wantName {
+				t.Errorf("TopicName = %q, want %q", view.TopicName, tc.wantName)
+			}
+		})
+	}
+}
+
+// TestBuildPublicReportViewLegacyKeepsSessionWideStages pins the legacy
+// contract: report rows created before the per-topic split (empty
+// ProgramStageID) keep the merged session-wide stages view — session order,
+// deleted-Topik skip, and cross-topic ratings intact.
+func TestBuildPublicReportViewLegacyKeepsSessionWideStages(t *testing.T) {
+	f := newViewFixture()
+	r := newViewReport()
+	r.ProgramStageID = ""
+
+	view, err := f.uc.BuildPublicReportView(context.Background(), r)
+	if err != nil {
+		t.Fatalf("BuildPublicReportView: %v", err)
+	}
+	if view.TopicName != "" {
+		t.Errorf("TopicName = %q, want empty for a session-wide legacy row", view.TopicName)
+	}
+	// Deleted program Topik (ss3) is skipped; the rest keep session order.
+	if len(view.Stages) != 3 {
+		t.Fatalf("len(Stages) = %d, want 3 (deleted Topik skipped)", len(view.Stages))
+	}
+	want := []string{"Topik 1", "Topik 2", "Topik 3"}
+	for i, name := range want {
+		if view.Stages[i].Name != name {
+			t.Errorf("stage[%d] = %q, want %q", i, view.Stages[i].Name, name)
+		}
+	}
+	if view.Stages[1].Kegiatan[0].StarRating != 1 {
+		t.Errorf("stage[1] rating = %d, want 1", view.Stages[1].Kegiatan[0].StarRating)
+	}
+	if view.Stages[2].Kegiatan[0].StarRating != 5 {
+		t.Errorf("stage[2] rating = %d, want 5", view.Stages[2].Kegiatan[0].StarRating)
 	}
 }
