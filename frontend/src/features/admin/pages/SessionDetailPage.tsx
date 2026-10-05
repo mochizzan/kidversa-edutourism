@@ -23,6 +23,7 @@ import { SessionInfoTab } from '../components/SessionInfoTab'
 import { SessionStagesTab } from '../components/SessionStagesTab'
 import { SessionGroupsTab } from '../components/SessionGroupsTab'
 import { useTranslation } from 'react-i18next'
+import { sessionStatusLabel } from '../../../core/utils/sessionStatus'
 
 const SessionDetailPage = () => {
   const { t } = useTranslation()
@@ -181,7 +182,7 @@ const SessionDetailPage = () => {
     <div className="space-y-6">
       <PageHeader title={session.name} subtitle={`${session.location} · ${formatDate(session.session_date)}`}
         breadcrumbs={[{ label: t('admin.sidebar.sessions'), href: ROUTES.ADMIN.SESSIONS }, { label: session.name }]}
-        actions={<Badge variant={session.status === 'ACTIVE' ? 'success' : session.status === 'COMPLETED' ? 'primary' : 'neutral'}>{session.status}</Badge>}
+        actions={<Badge variant={session.status === 'ACTIVE' ? 'success' : session.status === 'COMPLETED' ? 'primary' : session.status === 'CANCELLED' ? 'danger' : 'neutral'}>{sessionStatusLabel(session.status)}</Badge>}
       />
 
       <Tabs tabs={[{ key: 'info', label: t('admin.common.detail') }, { key: 'stages', label: t('admin.topic.pageTitle') }, { key: 'groups', label: t('admin.sessions.groupsTab') }]}

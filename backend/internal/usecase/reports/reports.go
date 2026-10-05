@@ -529,6 +529,16 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 	if err != nil {
 		return "", err
 	}
+	// Session-status gate at the write point: the handler gates before queueing
+	// the run, this re-read covers a session cancelled in between — a CANCELLED
+	// session never persists a narrative.
+	sess, err := u.sessionRepo.GetSessionByID(ctx, r.SessionID, tenantID)
+	if err != nil {
+		return "", err
+	}
+	if sess.Status == entity.SessionCancelled {
+		return "", apperrors.Forbidden("session_not_active", errors.New("report narrative cannot be generated for a cancelled session"))
+	}
 	if !force && r.AINarrativeDraft != "" {
 		return r.AINarrativeDraft, nil
 	}
@@ -578,6 +588,16 @@ func (u *Usecase) StreamNarrative(ctx context.Context, reportID, tenantID string
 // Topik stays eligible even when absent in another.
 func (u *Usecase) GenerateForSession(ctx context.Context, sessionID, tenantID string, participants []entity.Participant, topicIDs []string) ([]entity.Report, error) {
 	runStarted := time.Now()
+	// Session-status gate at the write point: the handler gates before queueing,
+	// but this run is detached — re-reading the session here means a session
+	// cancelled after the 202 never creates or updates a single report row.
+	sess, err := u.sessionRepo.GetSessionByID(ctx, sessionID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if sess.Status == entity.SessionCancelled {
+		return nil, apperrors.Forbidden("session_not_active", errors.New("reports cannot be generated for a cancelled session"))
+	}
 	attendance, err := u.attendanceRepo.ListBySession(ctx, sessionID, tenantID)
 	if err != nil {
 		return nil, err

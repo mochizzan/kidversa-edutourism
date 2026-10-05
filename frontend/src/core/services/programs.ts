@@ -58,7 +58,8 @@ export const programService: ProgramService = {
   toggleActive: (id) =>
     itemRequest<ToggleActiveResult>('POST', API_ROUTES.PROGRAMS.TOGGLE_ACTIVE(id)),
 
-  delete: (id) => voidRequest('DELETE', API_ROUTES.PROGRAMS.DETAIL(id)),
+  delete: (id, options) =>
+    voidRequest('DELETE', API_ROUTES.PROGRAMS.DETAIL(id) + (options?.force ? '?force=true' : '')),
 
   getStages: (programId) =>
     arrayRequest<ProgramStage>('GET', API_ROUTES.PROGRAMS.STAGES(programId)).then(sortStages),

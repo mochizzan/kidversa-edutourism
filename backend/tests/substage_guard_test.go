@@ -66,6 +66,17 @@ func (r *subGuardSessionRepo) GetSessionByID(_ context.Context, _, _ string) (*e
 	return r.session, r.sessErr
 }
 
+// GetSessionByIDForUpdate mirrors GetSessionByID (no status change modeled
+// here); Transaction runs fn against this fake — the locked write phase of
+// assessment.Upsert (audit #14) needs both to exercise its happy path.
+func (r *subGuardSessionRepo) GetSessionByIDForUpdate(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	return r.GetSessionByID(ctx, id, tenantID)
+}
+
+func (r *subGuardSessionRepo) Transaction(_ context.Context, fn func(tx repository.SessionRepository) error) error {
+	return fn(r)
+}
+
 // GetParticipantByID: the scored participant is always enrolled in the guarded
 // session, so the assessment usecase's membership gate passes and the tests
 // keep pinning the substage/group locks.

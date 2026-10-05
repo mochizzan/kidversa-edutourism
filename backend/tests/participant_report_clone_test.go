@@ -224,10 +224,12 @@ func newReportCloneFixture(targetProgram, srcProgram string) *reportCloneFixture
 
 // TestLinkParticipantClonesReportsWithFreshTokensAndMissions: a same-program
 // link must COPY every source report (2 per-Topic + 1 legacy whole-session
-// row) into the target session with content/review state intact, a FRESH
-// parent token (≠ source, distinct across copies), sent_at cleared, gallery
-// tokens reset, GroupName re-denormalized, and the source report's
-// participant_missions re-created under the clone's ID.
+// row) into the target session with content intact but review/delivery state
+// RESET — status downgraded to DRAFT whatever the source's status (audit #7),
+// sent_at cleared — plus a FRESH parent token (≠ source, distinct across
+// copies), gallery tokens reset, GroupName re-denormalized, a provenance
+// snapshot of the source session, and the source report's participant_missions
+// re-created under the clone's ID — while the source rows stay untouched.
 func TestLinkParticipantClonesReportsWithFreshTokensAndMissions(t *testing.T) {
 	f := newReportCloneFixture("prog-A", "prog-A")
 
@@ -283,6 +285,22 @@ func TestLinkParticipantClonesReportsWithFreshTokensAndMissions(t *testing.T) {
 		if got.SentAt != nil {
 			t.Fatalf("clone for stage %q must clear sent_at, got %v", stage, *got.SentAt)
 		}
+		// Review state: EVERY clone lands as DRAFT regardless of the source's
+		// status (audit #7) — never SENT/APPROVED/PENDING_REVIEW inherited.
+		if got.Status != entity.ReportDraft {
+			t.Fatalf("clone for stage %q status = %q, want DRAFT (source state must not be inherited)", stage, got.Status)
+		}
+		// Provenance: the clone records the session it was copied from —
+		// id plus a name+status snapshot taken at clone time.
+		if got.SourceSessionID == nil || *got.SourceSessionID != "sess-src" {
+			t.Fatalf("clone for stage %q source_session_id = %v, want sess-src", stage, got.SourceSessionID)
+		}
+		if got.SourceSessionName == nil {
+			t.Fatalf("clone for stage %q must snapshot source_session_name", stage)
+		}
+		if got.SourceSessionStatus == nil || *got.SourceSessionStatus != string(entity.SessionCompleted) {
+			t.Fatalf("clone for stage %q source_session_status = %v, want %s", stage, got.SourceSessionStatus, entity.SessionCompleted)
+		}
 		// Fresh parent token: non-empty, never the source's, never reused.
 		if got.ParentAccessToken == "" {
 			t.Fatalf("clone for stage %q must mint a fresh parent token", stage)
@@ -321,8 +339,9 @@ func TestLinkParticipantClonesReportsWithFreshTokensAndMissions(t *testing.T) {
 	if stage1Clone.AINarrativeDraft != "draft narasi satu" || stage1Clone.AINarrativeFinal != "final narasi satu" {
 		t.Fatalf("narratives lost: %+v", stage1Clone)
 	}
-	if stage1Clone.Status != entity.ReportApproved {
-		t.Fatalf("status = %q, want APPROVED", stage1Clone.Status)
+	// Source was APPROVED — the clone must be downgraded to DRAFT (audit #7).
+	if stage1Clone.Status != entity.ReportDraft {
+		t.Fatalf("status = %q, want DRAFT (source APPROVED must not be inherited)", stage1Clone.Status)
 	}
 	if stage1Clone.ReportPDFURL != "pdf/rapor-1.pdf" {
 		t.Fatalf("pdf url = %q, want pdf/rapor-1.pdf", stage1Clone.ReportPDFURL)
@@ -334,16 +353,27 @@ func TestLinkParticipantClonesReportsWithFreshTokensAndMissions(t *testing.T) {
 		t.Fatalf("approved_by = %v, want usr-approver", stage1Clone.ApprovedBy)
 	}
 	legacyClone := reportByStage(target, "")
-	if legacyClone == nil || legacyClone.AINarrativeFinal != "final seluruh sesi" || legacyClone.Status != entity.ReportSent {
-		t.Fatalf("legacy whole-session clone wrong: %+v", legacyClone)
+	if legacyClone == nil || legacyClone.AINarrativeFinal != "final seluruh sesi" || legacyClone.Status != entity.ReportDraft {
+		t.Fatalf("legacy whole-session clone must land DRAFT (source was SENT): %+v", legacyClone)
 	}
 
 	// The SOURCE rows keep their own delivery history untouched.
 	if src1.SentAt == nil || !src1.SentAt.Equal(sentAtFixed) {
 		t.Fatalf("source sent_at must stay intact, got %v", src1.SentAt)
 	}
+	if src1.Status != entity.ReportApproved {
+		t.Fatalf("source status must stay APPROVED (never downgraded by the clone), got %q", src1.Status)
+	}
 	if src1.ParentAccessToken != "parent-token-src-1" || src1.GalleryAccessToken != "gallery-token-src-1" || !src1.GalleryTokenRevoked {
 		t.Fatalf("source token state must stay intact, got %+v", src1)
+	}
+	legacySrc := reportByStage(cloneReportsIn(f.rpt, "sess-src"), "")
+	if legacySrc == nil || legacySrc.Status != entity.ReportSent || legacySrc.SentAt == nil {
+		t.Fatalf("legacy SOURCE row must keep SENT status + sent_at, got %+v", legacySrc)
+	}
+	// Native source rows carry NO provenance — they were never clones.
+	if src1.SourceSessionID != nil || src1.SourceSessionName != nil || src1.SourceSessionStatus != nil {
+		t.Fatalf("native report must keep null provenance, got %+v", src1)
 	}
 
 	// Missions: read for every source report (tenant-scoped), copied ONLY where

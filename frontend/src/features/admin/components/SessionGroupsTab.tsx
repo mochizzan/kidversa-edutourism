@@ -70,6 +70,10 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
 
   const [availableParticipants, setAvailableParticipants] = useState<Participant[]>([])
   const [linkableParticipantInfos, setLinkableParticipantInfos] = useState<ParticipantSessionInfo[]>([])
+  // Session id → status, so the add-participant dialog can warn when the
+  // SOURCE session of a migration candidate is CANCELLED (the linkable
+  // endpoint carries no status field).
+  const [sessionStatusById, setSessionStatusById] = useState<Record<string, string>>({})
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -104,6 +108,20 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
       console.error('[SessionGroupsTab] loadAvailableParticipants failed', err)
       setAvailableParticipants([])
       setLinkableParticipantInfos([])
+      setSessionStatusById({})
+      return
+    }
+    // Advisory side-load: session status map powers the CANCELLED-source
+    // migration warning. Never let it break the picker (endpoint may be
+    // unavailable in tests/prod).
+    try {
+      const sessionsRes = await sessionService.getAll({ limit: 1000 })
+      setSessionStatusById(
+        Object.fromEntries(sessionsRes.data.map((s) => [s.id, s.status])),
+      )
+    } catch (err) {
+      console.error('[SessionGroupsTab] load session statuses failed', err)
+      setSessionStatusById({})
     }
   }
 
@@ -523,6 +541,7 @@ export function SessionGroupsTab({ sessionId, sessionStatus, groups, facilitator
         linkedParticipantIds={linkedParticipantIds}
         currentSessionId={sessionId}
         participantSessionInfos={linkableParticipantInfos}
+        sessionStatusById={sessionStatusById}
       />
 
       <CsvImportModal open={csvImportOpen} onClose={() => setCsvImportOpen(false)} onImport={handleCsvImport} />

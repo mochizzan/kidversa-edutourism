@@ -49,6 +49,15 @@ func (f *fakeProgramRepo) UpdateStage(_ context.Context, s *entity.ProgramStage)
 func (f *fakeProgramRepo) CreateProgram(context.Context, *entity.Program) error {
 	panic("unexpected CreateProgram")
 }
+func (f *fakeProgramRepo) CountProgramSessions(context.Context, string) (int64, error) {
+	panic("unexpected CountProgramSessions")
+}
+func (f *fakeProgramRepo) ListProgramSessionBriefs(context.Context, string, int) ([]entity.Session, error) {
+	panic("unexpected ListProgramSessionBriefs")
+}
+func (f *fakeProgramRepo) DeleteProgramForce(context.Context, string) error {
+	panic("unexpected DeleteProgramForce")
+}
 func (f *fakeProgramRepo) GetProgramByID(context.Context, string) (*entity.Program, error) {
 	panic("unexpected GetProgramByID")
 }

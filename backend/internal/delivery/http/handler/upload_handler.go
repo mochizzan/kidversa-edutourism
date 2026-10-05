@@ -103,8 +103,13 @@ func (h *UploadHandler) UploadPhoto(c *echo.Context) error {
 		}
 		return err
 	}
-	if _, err := h.sessions.GetSessionByID(ctx, sessionID, tenantID); err != nil {
+	sess, err := h.sessions.GetSessionByID(ctx, sessionID, tenantID)
+	if err != nil {
 		return err // missing/cross-tenant session -> 404 not_found
+	}
+	// Session-status gate: a CANCELLED session never accepts photo uploads.
+	if sess.Status == entity.SessionCancelled {
+		return apperrors.Forbidden("session_not_active", errors.New("photo upload rejected for a cancelled session"))
 	}
 	// The stage must BELONG to the uploaded session: a valid-but-foreign
 	// session_stage_id would file the photo under another session's topic.

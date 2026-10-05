@@ -282,6 +282,10 @@ export interface Assessment {
  assessed_by: string
  assessed_at: string
  updated_at: string
+ /** Clone provenance (migration 000003): ALWAYS present, null = natively
+  *  created; non-null id = the assessment was carried over from that session
+  *  by the participant-migration flow. */
+ source_session_id?: string | null
 }
 
 export interface SmartPhoto {
@@ -331,6 +335,12 @@ export interface Report {
  /** Denormalized session_groups.name milik laporan INI (bukan pointer
   *  global peserta) — sumber otoritatif nama kelompok per-sesi. */
  group_name?: string
+ /** Clone provenance (migration 000003): ALWAYS present, null = natively
+  *  created; non-null = carried by the participant-migration flow with a
+  *  name+status SNAPSHOT of the source session taken at clone time. */
+ source_session_id?: string | null
+ source_session_name?: string | null
+ source_session_status?: string | null
 }
 
 export interface ParticipantMission {

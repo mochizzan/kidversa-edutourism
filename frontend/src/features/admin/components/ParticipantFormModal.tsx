@@ -38,6 +38,9 @@ interface ParticipantFormModalProps {
  linkedParticipantIds?: string[]
  currentSessionId?: string
  participantSessionInfos?: ParticipantSessionInfo[]
+ /** Session id → status; used to warn when a migration candidate's SOURCE
+  *  session is CANCELLED (old values/attendance get copied along). */
+ sessionStatusById?: Record<string, string>
 }
 
 interface FormErrors {
@@ -61,6 +64,7 @@ export function ParticipantFormModal({
  linkedParticipantIds,
  currentSessionId,
  participantSessionInfos,
+ sessionStatusById,
 }: ParticipantFormModalProps) {
  const { t } = useTranslation()
  const [formData, setFormData] = useState<ModalFormState>({
@@ -341,6 +345,18 @@ export function ParticipantFormModal({
         }}
        />
       </p>
+      {/* Audit #8: an explicit heads-up when the source session is CANCELLED —
+          migration is still allowed (backend clones values + attendance), the
+          user just must not do it unknowingly. */}
+      {migrateConfirm && sessionStatusById?.[migrateConfirm.session_id] === 'CANCELLED' && (
+       <div
+        role="alert"
+        className="flex items-start gap-2 rounded-xl bg-yellow-50 border border-yellow-200 p-3 text-sm text-yellow-800"
+       >
+        <span aria-hidden>⚠️</span>
+        <span>{t('admin.participants.migrateCancelledWarning')}</span>
+       </div>
+      )}
       <p className="text-sm text-on-surface-variant">
        {t('admin.participants.migrateQuestion')}
       </p>

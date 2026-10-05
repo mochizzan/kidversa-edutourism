@@ -16,6 +16,11 @@ type Assessment struct {
 	ParticipantName   string    `json:"participant_name,omitempty"` // denormalized from participants.child_name
 	KegiatanName      string    `json:"kegiatan_name,omitempty"`    // denormalized from program_substages.name via session_substages.program_substage_id
 	AssessedAt        time.Time `json:"assessed_at"`
+	// SourceSessionID is provenance (penelusuran asal) for rows CLONED by
+	// LinkParticipant: the source session the assessment was copied from;
+	// nil for rows natively created in this session. Always serialized
+	// (no omitempty) so the API answers an explicit null for non-clones.
+	SourceSessionID *string `json:"source_session_id"`
 }
 
 // SmartPhoto is a captured photo of a participant, optionally framed.
@@ -72,6 +77,13 @@ type Report struct {
 	MissionIDs            []string     `json:"mission_ids,omitempty" gorm:"-"`
 	GroupName             string       `json:"group_name,omitempty"`                // denormalized from session_groups.name
 	FacilitatorName       string       `json:"facilitator_name,omitempty" gorm:"-"` // denormalisasi read-time dari users.name via session_groups.facilitator_id; tanpa kolom DB (tanpa migrasi), tidak pernah dipersist
+	// Provenance (penelusuran asal) for reports CLONED by LinkParticipant: the
+	// source session's id plus a SNAPSHOT of its name and status taken at clone
+	// time, so the label survives a later hard delete of the source session.
+	// Nil (JSON null, always present — no omitempty) for natively created reports.
+	SourceSessionID     *string `json:"source_session_id"`
+	SourceSessionName   *string `json:"source_session_name"`
+	SourceSessionStatus *string `json:"source_session_status"`
 }
 
 // ParticipantMission links a report to a completed mission from the mission bank.

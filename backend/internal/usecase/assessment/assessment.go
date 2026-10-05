@@ -59,6 +59,12 @@ func isNotFound(err error) bool {
 //
 // session_not_active / group_completed / substage_completed keep their
 // existing positions and codes for every other path.
+//
+// Concurrency (audit #14): the session-status gate runs twice — the unlocked
+// read above keeps the existing fast-fail precedence, then the write phase
+// below re-reads the session under SELECT ... FOR UPDATE inside the same
+// transaction as the writes, so a CancelSession landing in between is observed
+// under the row lock and the score is rejected instead of stored silently.
 func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy, actorID, actorRole string, assessedAt time.Time, tenantID string) (*entity.Assessment, error) {
 	if req.ParticipantID == "" || req.SessionSubstageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
@@ -135,6 +141,48 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	// participate. It is persisted as 0 (the column allows 0; DEFAULT 1 only
 	// applies when the field is omitted on INSERT). 0 must NOT be coerced to 1 —
 	// that would wrongly mark an absent child as scored and risk awarding badges.
+
+	// WRITE PHASE — TOCTOU guard (audit #14). The session status gate above is
+	// an UNLOCKED read: a CancelSession could commit between it and the writes
+	// below, leaving a score silently stored on a cancelled session. The writes
+	// therefore run inside one session-repo transaction that RE-READS the
+	// session under SELECT ... FOR UPDATE (GetSessionByIDForUpdate) — the same
+	// row lock CancelSession takes — so cancel and score serialize: if the
+	// cancel committed first, the locked re-read sees CANCELLED and the write
+	// is rejected (session_not_active); if this transaction holds the lock
+	// first, the cancel waits until it commits, linearizing the score BEFORE
+	// the cancel. The lock is held until every write below has completed.
+	var saved *entity.Assessment
+	if err := u.sessionRepo.Transaction(ctx, func(tx repository.SessionRepository) error {
+		locked, lerr := tx.GetSessionByIDForUpdate(ctx, req.SessionID, tenantID)
+		if lerr != nil {
+			return lerr
+		}
+		if locked.Status != entity.SessionActive {
+			return apperrors.Forbidden("session_not_active",
+				errors.New("session was cancelled between the status gate and the assessment write"))
+		}
+		var perr error
+		saved, perr = u.persistUpsert(ctx, req, starRating, comment, assessedBy, assessedAt, tenantID)
+		return perr
+	}); err != nil {
+		return nil, err
+	}
+	if saved == nil {
+		// Defensive: a Transaction implementation that reports success without
+		// running fn must not reach badge evaluation with a nil assessment.
+		return nil, apperrors.Internal("internal_error",
+			errors.New("assessment write transaction did not run"))
+	}
+	return u.afterUpsert(ctx, saved, tenantID)
+}
+
+// persistUpsert is the WRITE half of Upsert: read the existing
+// (participant, session Kegiatan) row, then revive/update/create it. It runs
+// inside Upsert's locked session transaction (audit #14), performs no session
+// status checks itself, and returns the persisted row so the caller can run
+// afterUpsert (badge evaluation) once the transaction has committed.
+func (u *Usecase) persistUpsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy string, assessedAt time.Time, tenantID string) (*entity.Assessment, error) {
 	existing, err := u.repo.GetByParticipantStage(ctx, req.ParticipantID, req.SessionSubstageID, tenantID)
 	if err != nil {
 		if !isNotFound(err) {
@@ -154,7 +202,7 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 			if err := u.repo.Revive(ctx, soft); err != nil {
 				return nil, err
 			}
-			return u.afterUpsert(ctx, soft, tenantID)
+			return soft, nil
 		}
 		// NotFound entirely -> fall through to Create (upsert semantics).
 	}
@@ -172,7 +220,7 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 		if err := u.repo.Update(ctx, existing); err != nil {
 			return nil, err
 		}
-		return u.afterUpsert(ctx, existing, tenantID)
+		return existing, nil
 	}
 	a := &entity.Assessment{
 		ParticipantID:     req.ParticipantID,
@@ -189,7 +237,7 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	if err := u.repo.Create(ctx, a); err != nil {
 		return nil, err
 	}
-	return u.afterUpsert(ctx, a, tenantID)
+	return a, nil
 }
 
 // afterUpsert triggers badge recomputation when the upsert is a scored (star>=1)

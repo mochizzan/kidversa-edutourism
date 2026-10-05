@@ -120,6 +120,27 @@ func (r *fakeSessionFlowRepo) ListParticipants(_ context.Context, sessionID, gro
 	return out, nil
 }
 
+// CountActiveGroupMembers counts CURRENT pointer members for the capacity
+// check (audit #10): the seeded roster of the group plus the pointer
+// participant when it targets (sessionID, groupID). History rows
+// (memberships) are deliberately NOT counted — unlike ListParticipants they
+// are not active members — which is exactly the over-count audit #10 fixed.
+func (r *fakeSessionFlowRepo) CountActiveGroupMembers(_ context.Context, sessionID, groupID string) (int, error) {
+	n := 0
+	for _, mb := range r.members[groupID] {
+		if sessionID == "" || mb.SessionID == nil || *mb.SessionID == sessionID {
+			n++
+		}
+	}
+	p := r.participant
+	if p != nil &&
+		(sessionID == "" || (p.SessionID != nil && *p.SessionID == sessionID)) &&
+		(groupID == "" || (p.GroupID != nil && *p.GroupID == groupID)) {
+		n++
+	}
+	return n, nil
+}
+
 // RecordMembership emulates the table's UNIQUE(participant_id, session_id)
 // with insert-DO-NOTHING semantics: a repeated source record (link retry,
 // A → B → A round trip) keeps the first row instead of failing the link.
@@ -405,6 +426,60 @@ func TestGroupCapacityRejectsCreateAndLink(t *testing.T) {
 			t.Fatal("participant linked into a full group")
 		}
 	})
+}
+
+// TestGroupCapacityCountsActiveMembersOnly (audit #10): the capacity check
+// counts CURRENT pointer membership only (CountActiveGroupMembers). A
+// participant recorded in participant_session_memberships history for grp-1
+// whose pointer has since moved to another session still appears in the
+// history-union read ListParticipants — the OLD capacity count saw a phantom
+// 20th member and rejected the link — while the active count sees the 19 real
+// members and lets the link proceed.
+func TestGroupCapacityCountsActiveMembersOnly(t *testing.T) {
+	repo := newFlowRepo()
+	fillGroup(repo, "grp-1", usecase.MaxGroupParticipants-1) // 19 ACTIVE members
+
+	// pid-moved: pointer now on sess-0 (no group), but history says it was a
+	// member of (sess-1, grp-1) — a phantom capacity occupant for union counts.
+	movedFrom := "sess-0"
+	repo.extraSessions = map[string]*entity.Session{
+		"sess-0": {BaseModel: entity.BaseModel{ID: "sess-0"}, Status: entity.SessionCompleted},
+	}
+	repo.participant = &entity.Participant{BaseModel: entity.BaseModel{ID: "pid-moved"}, SessionID: &movedFrom}
+	grp := "grp-1"
+	repo.memberships = []entity.ParticipantSessionMembership{
+		{ParticipantID: "pid-moved", SessionID: "sess-1", GroupID: &grp},
+	}
+
+	// The union read still reports a full group (this is the over-count the
+	// old capacity check used)...
+	ps, err := repo.ListParticipants(context.Background(), "sess-1", "grp-1", "")
+	if err != nil {
+		t.Fatalf("list participants: %v", err)
+	}
+	if len(ps) != usecase.MaxGroupParticipants {
+		t.Fatalf("fixture: union read must report %d members, got %d", usecase.MaxGroupParticipants, len(ps))
+	}
+	// ...while the active-member count sees 19.
+	n, err := repo.CountActiveGroupMembers(context.Background(), "sess-1", "grp-1")
+	if err != nil {
+		t.Fatalf("count active members: %v", err)
+	}
+	if n != usecase.MaxGroupParticipants-1 {
+		t.Fatalf("active member count = %d, want %d", n, usecase.MaxGroupParticipants-1)
+	}
+
+	uc := usecase.NewSessionUsecase(repo, nil)
+	res, err := uc.LinkParticipant(context.Background(), "sess-1", "pid-moved", "grp-1", "tenant-1")
+	if err != nil {
+		t.Fatalf("link must NOT report group_full when only active members count (audit #10): %v", err)
+	}
+	if res.PreviousSessionID != "sess-0" {
+		t.Errorf("PreviousSessionID = %q, want sess-0", res.PreviousSessionID)
+	}
+	if !hasMembership(repo, "pid-moved", "sess-0") {
+		t.Error("the source membership must be recorded by the move")
+	}
 }
 
 // TestImportSkipsRowsBeyondGroupCapacity: bulk import must not hard-fail on a

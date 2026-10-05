@@ -44,6 +44,7 @@ func (h *SessionHandler) List(c *echo.Context) error {
 		Status:        (*c).QueryParam("status"),
 		SessionDate:   (*c).QueryParam("session_date"),
 		FacilitatorID: (*c).QueryParam("facilitator_id"),
+		ProgramID:     (*c).QueryParam("program_id"),
 	}
 	page, limit := pagination(c)
 	res, err := h.uc.ListSessions((*c).Request().Context(), f, page, limit)

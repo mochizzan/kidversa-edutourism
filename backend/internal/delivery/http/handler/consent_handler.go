@@ -75,6 +75,11 @@ func (h *ConsentHandler) SendWhatsApp(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	// Session-status gate before any token write (force=true would already clear
+	// tokens below): a CANCELLED session never issues new consent tokens.
+	if session.Status == entity.SessionCancelled {
+		return apperrors.Forbidden("session_not_active", fmt.Errorf("consent tokens cannot be issued for a cancelled session"))
+	}
 
 	participants, err := h.sessionRepo.ListParticipants((*c).Request().Context(), req.SessionID, "", tenantID)
 	if err != nil {
@@ -280,6 +285,19 @@ func (h *ConsentHandler) RespondCombined(c *echo.Context) error {
 		sessionID = *participant.SessionID
 	}
 
+	// Session-status gate before recording the parent's response: a CANCELLED
+	// session never accepts consent writes. Unlinked participants carry no
+	// session to check and keep the legacy write path.
+	if sessionID != "" {
+		sess, serr := h.sessionRepo.GetSessionByID((*c).Request().Context(), sessionID, "")
+		if serr != nil {
+			return serr
+		}
+		if sess.Status == entity.SessionCancelled {
+			return apperrors.Forbidden("session_not_active", fmt.Errorf("consent response rejected for a cancelled session"))
+		}
+	}
+
 	ip := (*c).RealIP()
 	ua := (*c).Request().UserAgent()
 	if rerr := h.consent.RespondConsent((*c).Request().Context(), participant.ID, sessionID,
@@ -406,6 +424,17 @@ func (h *ConsentHandler) SendSingle(c *echo.Context) error {
 	}
 	sessionID := *participant.SessionID
 
+	// Session-status gate BEFORE any token write (force=true clears tokens
+	// below): a CANCELLED session never issues new consent tokens. The session
+	// read doubles as the message source later — fetched once, here.
+	session, serr := h.sessionRepo.GetSessionByID(ctx, sessionID, tenantID)
+	if serr != nil {
+		return serr
+	}
+	if session.Status == entity.SessionCancelled {
+		return apperrors.Forbidden("session_not_active", fmt.Errorf("consent token cannot be issued for a cancelled session"))
+	}
+
 	// Already consented? When force=true, allow resend (user explicitly chose
 	// "Kirim Ulang") — skip this guard so a new token + WhatsApp message is sent.
 	photoGranted, _ := h.consent.GetConsentValue(ctx, participant.ID, sessionID, entity.ConsentPhoto)
@@ -437,11 +466,6 @@ func (h *ConsentHandler) SendSingle(c *echo.Context) error {
 	}
 	if !ok {
 		return apperrors.Conflict("already_sent", fmt.Errorf("token already set by concurrent request"))
-	}
-
-	session, serr := h.sessionRepo.GetSessionByID(ctx, sessionID, tenantID)
-	if serr != nil {
-		return serr
 	}
 
 	digits, derr := phoneutil.WhatsAppDigits(participant.ParentPhone)

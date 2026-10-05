@@ -756,7 +756,9 @@ const GroupPage = () => {
 
       {!isSessionActive && (
         <div className="flex items-center gap-2 rounded-xl bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-700">
-          {t('fasilitator.group.sessionNotStarted')}
+          {groupDetail.session.status === SessionStatus.CANCELLED
+            ? t('fasilitator.group.sessionCancelled')
+            : t('fasilitator.group.sessionNotStarted')}
         </div>
       )}
 
@@ -806,11 +808,12 @@ const GroupPage = () => {
               school={participant.school_name}
               isAssessed={isAssessed(participant.id)}
               isPresent={isPresent(participant.id)}
-              onToggleAttendance={isMine && !isTopicLocked ? () => handleToggleAttendance(participant.id) : undefined}
+              onToggleAttendance={isMine && isSessionActive && !isTopicLocked ? () => handleToggleAttendance(participant.id) : undefined}
               attendanceLoading={selectedSessionStageId ? attendanceLoading.has(`${selectedSessionStageId}:${participant.id}`) : false}
               showPhoto={participant.consent_photo}
               onAssess={isMine && isSessionActive && !isTopicLocked ? () => handleAssess(participant.id) : undefined}
               locked={isTopicLocked}
+              sessionInactive={isMine && !isSessionActive}
             />
           ))}
         </div>

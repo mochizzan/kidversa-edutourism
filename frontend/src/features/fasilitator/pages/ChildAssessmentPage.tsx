@@ -82,6 +82,9 @@ const ChildAssessmentPage = () => {
           await refreshAssessments()
         } catch (err) {
           // KegiatanCard's catch only logs — the user needs the failure here.
+          // friendlyError resolves the errors.session_not_active locale key
+          // first, so a CANCELLED-session save reads "sesi dibatalkan" rather
+          // than the generic fallback (audit #16).
           addToast({ type: 'error', message: friendlyError(err) })
         } finally {
           setSavingAny(false)
@@ -102,6 +105,10 @@ const ChildAssessmentPage = () => {
 
   const { participant } = childDetail ?? {}
   const isSessionActive = childDetail?.session.status === SessionStatus.ACTIVE
+  // Audit #16: "not started" and "cancelled" are different states — the
+  // payload carries the session status, so branch on it instead of showing
+  // the "belum dimulai" copy for a cancelled session.
+  const isSessionCancelled = childDetail?.session.status === SessionStatus.CANCELLED
   const hasConsentPhoto = participant?.consent_photo ?? false
   // Active topic display name (backend program-stage name, not an i18n key).
   const topicName = childDetail?.programStage?.name ?? t('fasilitator.topicFallback')
@@ -160,7 +167,11 @@ const ChildAssessmentPage = () => {
           ]}
         />
         <ErrorState
-          message={t('fasilitator.assessment.sessionNotStarted')}
+          message={
+            isSessionCancelled
+              ? t('fasilitator.assessment.sessionCancelled')
+              : t('fasilitator.assessment.sessionNotStarted')
+          }
           onRetry={fetchData}
         />
         <div className="flex sm:justify-start">

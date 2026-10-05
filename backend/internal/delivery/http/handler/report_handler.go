@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"log"
 	"math"
 	"net/http"
@@ -232,8 +233,18 @@ func (h *ReportHandler) GenerateStream(c *echo.Context) error {
 		return err
 	}
 	// Ownership check up front so we never stream a report the caller can't see.
-	if _, err := h.uc.Repo().GetByID((*c).Request().Context(), id, tenantID); err != nil {
+	rep, err := h.uc.Repo().GetByID((*c).Request().Context(), id, tenantID)
+	if err != nil {
 		return err
+	}
+	// Session-status gate before queueing the detached run: a CANCELLED session
+	// never regenerates report narratives.
+	sess, err := h.sessionRepo.GetSessionByID((*c).Request().Context(), rep.SessionID, tenantID)
+	if err != nil {
+		return err
+	}
+	if sess.Status == entity.SessionCancelled {
+		return apperrors.Forbidden("session_not_active", errors.New("report narrative cannot be generated for a cancelled session"))
 	}
 	force := (*c).QueryParam("force") == "true"
 	if !h.tryBeginGenerate(id) {
@@ -329,6 +340,16 @@ func (h *ReportHandler) GenerateForSession(c *echo.Context) error {
 	tenantID := appmiddleware.GetTenantID(c)
 	if err := tenantGuard(c, tenantID); err != nil {
 		return err
+	}
+	// Session-status gate before any queueing: a CANCELLED session never starts
+	// a generate run. Runs synchronously so the caller gets a stable
+	// session_not_active rejection instead of a detached 202 run that fails.
+	sess, err := h.sessionRepo.GetSessionByID((*c).Request().Context(), req.SessionID, tenantID)
+	if err != nil {
+		return err
+	}
+	if sess.Status == entity.SessionCancelled {
+		return apperrors.Forbidden("session_not_active", errors.New("reports cannot be generated for a cancelled session"))
 	}
 	// Resolve the session's Topics (program_stage_ids) to scope per-Topic reports.
 	// When the request pins a single topic (topic_id), validate it belongs to

@@ -41,7 +41,10 @@ export interface ProgramService {
  create(data: CreateProgramDTO): Promise<Program>
  update(id: string, data: UpdateProgramDTO): Promise<Program>
  toggleActive(id: string): Promise<ToggleActiveResult>
- delete(id: string): Promise<void>
+ /** `force: true` sends DELETE /api/programs/:id?force=true — hard-deletes the
+ *  program together with every session + child row in one transaction. Without
+ *  it the backend answers 409 program_has_sessions while sessions remain. */
+ delete(id: string, options?: { force?: boolean }): Promise<void>
 
  getStages(programId: string): Promise<ProgramStage[]>
  createStage(programId: string, data: CreateStageDTO): Promise<ProgramStage>

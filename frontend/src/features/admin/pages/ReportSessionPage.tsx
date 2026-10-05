@@ -21,6 +21,7 @@ import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { ErrorState } from '../../../shared/components/feedback/ErrorState'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
+import { ProvenanceBadge } from '../../../shared/components/ui/ProvenanceBadge'
 import { ReportStatus } from '../../../core/types/enums'
 import { cn } from '../../../core/utils'
 import { formatDate } from '../../../shared/utils'
@@ -462,6 +463,15 @@ const ReportSessionPage = () => {
                         <Badge variant={reportStatusBadge[item.report.status]} size="sm">
                           {t(reportStatusLabel[item.report.status])}
                         </Badge>
+                      )}
+                      {/* Clone provenance (audit: label klona) — badge kecil
+                          di daftar rapor per sesi. */}
+                      {item.report && (
+                        <ProvenanceBadge
+                          sourceSessionId={item.report.source_session_id}
+                          sourceSessionName={item.report.source_session_name}
+                          sourceSessionStatus={item.report.source_session_status}
+                        />
                       )}
                       {showGenerateBtn && (
                         <Badge variant="success" size="sm">

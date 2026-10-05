@@ -304,6 +304,17 @@ func (r *fakeSessionRepo) GetSessionByID(ctx context.Context, id, tenantID strin
 	return r.session, nil
 }
 
+// GetSessionByIDForUpdate mirrors GetSessionByID; Transaction runs fn against
+// this fake — the locked write phase of assessment.Upsert (audit #14) needs
+// both to exercise its happy path (badge reconcile scores).
+func (r *fakeSessionRepo) GetSessionByIDForUpdate(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	return r.GetSessionByID(ctx, id, tenantID)
+}
+
+func (r *fakeSessionRepo) Transaction(ctx context.Context, fn func(tx repository.SessionRepository) error) error {
+	return fn(r)
+}
+
 func (r *fakeSessionRepo) ListSessionStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
 	return r.stages, nil
 }

@@ -14,6 +14,7 @@ import type { Session, Report } from '../../../core/types'
 import { ReportStatus, SessionStatus } from '../../../core/types/enums'
 import { cn } from '../../../core/utils'
 import { formatDate } from '../../../shared/utils'
+import { sessionStatusLabel } from '../../../core/utils/sessionStatus'
 import { useTranslation } from 'react-i18next'
 
 /* ── Helpers ── */
@@ -216,7 +217,7 @@ const ReportListPage = () => {
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-on-surface truncate">{session.name}</h3>
                       <Badge variant={statusVariant[session.status] || 'neutral'} size="sm">
-                        {session.status}
+                        {sessionStatusLabel(session.status)}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3 text-sm text-on-surface-variant">

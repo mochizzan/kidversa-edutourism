@@ -82,11 +82,20 @@ type fakeSessionRepo struct {
 	groupErr error
 	stages   []entity.SessionStage
 	stageErr error
+	// session is what GetSessionByID returns (nil = no session, the legacy
+	// fixture default that keeps the session-status gate out of the way).
+	session *entity.Session
 }
 
 func (r *fakeSessionRepo) CreateSession(ctx context.Context, s *entity.Session) error { return nil }
 func (r *fakeSessionRepo) GetSessionByID(ctx context.Context, id, tenantID string) (*entity.Session, error) {
-	return nil, nil
+	return r.session, nil
+}
+func (r *fakeSessionRepo) GetSessionByIDForUpdate(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	return r.session, nil
+}
+func (r *fakeSessionRepo) CountActiveGroupMembers(ctx context.Context, sessionID, groupID string) (int, error) {
+	return 0, nil
 }
 func (r *fakeSessionRepo) ListSessions(ctx context.Context, f repository.SessionFilter, page, limit int) (*repository.Paginated[entity.Session], error) {
 	return nil, nil
@@ -364,5 +373,54 @@ func TestUpsert_GroupResolverError_Propagates(t *testing.T) {
 	}
 	if attendanceRepo.upserted != nil {
 		t.Fatal("expected no attendance write when the group lookup fails")
+	}
+}
+
+// TestUpsert_SessionCancelled_Fails: a CANCELLED session rejects every
+// attendance write with session_not_active before any group/topic gate runs
+// and before the row is persisted (audit #13).
+func TestUpsert_SessionCancelled_Fails(t *testing.T) {
+	attendanceRepo := &fakeAttendanceRepo{}
+	sessionRepo := attSessionRepo(&entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupInProgress})
+	sessionRepo.session = &entity.Session{Status: entity.SessionCancelled}
+	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1")
+	requireAppErrorCode(t, err, "session_not_active")
+	if attendanceRepo.upserted != nil {
+		t.Fatal("attendance row written despite cancelled session")
+	}
+}
+
+// TestUpsert_SessionCancelled_PrecedesGroupGate: the session gate has
+// precedence — a cancelled session answers session_not_active even when the
+// participant's group is also already completed.
+func TestUpsert_SessionCancelled_PrecedesGroupGate(t *testing.T) {
+	attendanceRepo := &fakeAttendanceRepo{}
+	sessionRepo := attSessionRepo(&entity.SessionGroup{BaseModel: entity.BaseModel{ID: "group-1"}, Status: entity.GroupCompleted})
+	sessionRepo.session = &entity.Session{Status: entity.SessionCancelled}
+	uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1")
+	requireAppErrorCode(t, err, "session_not_active")
+}
+
+// TestUpsert_NonCancelledSession_Allowed pins the deviation contract: the gate
+// rejects ONLY CANCELLED. DRAFT / ACTIVE / COMPLETED keep their pre-audit
+// behavior (legitimate pre-start and post-completion writes stay intact; the
+// group_completed lock still applies on top).
+func TestUpsert_NonCancelledSession_Allowed(t *testing.T) {
+	for _, status := range []entity.SessionStatus{"", entity.SessionDraft, entity.SessionActive, entity.SessionCompleted} {
+		attendanceRepo := &fakeAttendanceRepo{}
+		sessionRepo := attSessionRepo(nil)
+		sessionRepo.session = &entity.Session{Status: status}
+		uc := attendance.NewUsecase(attendanceRepo, sessionRepo)
+
+		if _, err := uc.Upsert(context.Background(), "participant-1", "session-1", "stage-A", true, "facilitator-1", "tenant-1"); err != nil {
+			t.Fatalf("session status %q: Upsert = %v, want success (CANCELLED-only gate)", status, err)
+		}
+		if attendanceRepo.upserted == nil {
+			t.Fatalf("session status %q: no attendance row persisted", status)
+		}
 	}
 }

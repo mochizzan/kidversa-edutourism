@@ -97,6 +97,12 @@ func MessageForCode(code string) string {
 		return "Nama peserta sudah digunakan"
 	case "session_not_editable":
 		return "Sesi sudah tidak dapat diubah"
+	case "session_not_active":
+		return "Sesi sudah dibatalkan atau tidak aktif — perubahan tidak dapat disimpan."
+	case "session_cancelled_permanent":
+		return "Sesi sudah dibatalkan dan tidak dapat diaktifkan kembali."
+	case "program_not_found":
+		return "Program terkait sesi ini sudah dihapus — sesi tidak dapat dijalankan."
 	case "participant_already_in_session":
 		return "Peserta sudah berada di sesi ini"
 	case "invalid_group":
@@ -147,6 +153,8 @@ func MessageForCode(code string) string {
 		return "Sesi harus memiliki minimal satu kelompok"
 	case "no_participants":
 		return "Setiap kelompok harus memiliki minimal satu peserta"
+	case "program_has_sessions":
+		return "Program masih memiliki sesi. Hapus atau pindahkan sesi terlebih dahulu."
 	case "program_has_no_topics":
 		return "Program belum memiliki topik. Tambahkan minimal satu topik beserta kegiatannya sebelum membuat sesi."
 	case "topic_has_no_activities":

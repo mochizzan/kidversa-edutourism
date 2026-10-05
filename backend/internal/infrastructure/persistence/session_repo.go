@@ -65,6 +65,32 @@ func (r *GormSessionRepository) GetSessionByID(ctx context.Context, id, tenantID
 	return m.ToEntity(), nil
 }
 
+// GetSessionByIDForUpdate is GetSessionByID plus a SELECT ... FOR UPDATE row
+// lock on the session row. The lock is what serializes CancelSession (#12) and
+// the assessment upsert write (#14): each runs it inside its own transaction,
+// so whichever side gets the lock first forces the other side to wait and then
+// observe its committed status — a score can never land silently on a session
+// that a concurrent cancel has already closed. Callers MUST run it inside
+// Transaction; GORM would otherwise autocommit the statement and release the
+// lock immediately, degrading it to an unlocked read.
+func (r *GormSessionRepository) GetSessionByIDForUpdate(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	var m SessionModel
+	q := r.db.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id)
+	// Same tenant scoping contract as GetSessionByID.
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	}
+	if err := q.First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.NotFound("not_found", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return m.ToEntity(), nil
+}
+
 func (r *GormSessionRepository) ListSessions(ctx context.Context, f repository.SessionFilter, page, limit int) (*repository.Paginated[entity.Session], error) {
 	q := r.db.WithContext(ctx).
 		Model(&SessionModel{}).
@@ -75,6 +101,9 @@ func (r *GormSessionRepository) ListSessions(ctx context.Context, f repository.S
 	}
 	if f.Status != "" {
 		q = q.Where("sessions.status = ?", f.Status)
+	}
+	if f.ProgramID != "" {
+		q = q.Where("sessions.program_id = ?", f.ProgramID)
 	}
 	if f.SessionDate != "" {
 		q = q.Where("sessions.session_date = ?", f.SessionDate)
@@ -178,14 +207,39 @@ func (r *GormSessionRepository) UpdateSession(ctx context.Context, s *entity.Ses
 	return nil
 }
 
-func (r *GormSessionRepository) DeleteSession(ctx context.Context, id string) error {
-	// Hard delete so FK cascades (session_stages, session_groups, participants,
-	// group_stage_progress, timeline_events) actually fire. GORM soft-delete leaves
-	// the row present and the cascade never triggers, orphaning child rows.
-	if err := r.db.WithContext(ctx).Unscoped().Delete(&SessionModel{}, "id = ?", id).Error; err != nil {
+// purgeSessionRows hard-deletes one session row together with its children
+// inside tx. Schema audit of migrations 000001/000002:
+//   - Tables carrying session_id WITHOUT an FK to sessions
+//     (group_stage_progress_history, timeline_events, gallery_tokens) are
+//     purged manually so no row keeps pointing at the session.
+//   - Tables with FK ON DELETE CASCADE (session_stages, session_substages,
+//     session_groups, reports, assessments, participant_attendance,
+//     report_photo_picks, smart_photos, consent_logs,
+//     participant_session_memberships) are cleaned by the physical session
+//     delete itself — and gallery_tokens also cascades via reports.
+//   - participants.session_id is FK ON DELETE SET NULL: participants survive
+//     unassigned instead of being destroyed, which protects their history in
+//     other sessions (multi-session membership rows are per-session and die
+//     via CASCADE).
+func purgeSessionRows(tx *gorm.DB, sessionID string) error {
+	for _, table := range []string{"group_stage_progress_history", "timeline_events", "gallery_tokens"} {
+		if err := tx.Exec("DELETE FROM "+table+" WHERE session_id = ?", sessionID).Error; err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+	}
+	if err := tx.Unscoped().Delete(&SessionModel{}, "id = ?", sessionID).Error; err != nil {
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
+}
+
+func (r *GormSessionRepository) DeleteSession(ctx context.Context, id string) error {
+	// Hard delete in ONE transaction (see purgeSessionRows): the old
+	// Unscoped-only delete left the no-FK children orphaned, and a GORM
+	// soft delete would never fire any cascade at all.
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return purgeSessionRows(tx, id)
+	})
 }
 
 // --- Session stages ---
@@ -287,10 +341,22 @@ func (r *GormSessionRepository) UpdateSessionGroup(ctx context.Context, g *entit
 }
 
 func (r *GormSessionRepository) DeleteSessionGroup(ctx context.Context, id string) error {
-	if err := r.db.WithContext(ctx).Delete(&SessionGroupModel{}, "id = ?", id).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
+	// Hard delete in ONE transaction: group_stage_progress cascades via its FK
+	// on the physical row removal; group_stage_progress_history and
+	// timeline_events carry group_id WITHOUT an FK → purged manually; members
+	// keep their rows — participants.group_id and memberships.group_id are FK
+	// ON DELETE SET NULL, so they simply become ungrouped (schema-designed).
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, table := range []string{"group_stage_progress_history", "timeline_events"} {
+			if err := tx.Exec("DELETE FROM "+table+" WHERE group_id = ?", id).Error; err != nil {
+				return apperrors.Internal("internal_error", err)
+			}
+		}
+		if err := tx.Unscoped().Delete(&SessionGroupModel{}, "id = ?", id).Error; err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+		return nil
+	})
 }
 
 // --- Group stage progress ---
@@ -448,6 +514,27 @@ func (r *GormSessionRepository) ListParticipants(ctx context.Context, sessionID,
 		items = append(items, *models[i].ToEntity())
 	}
 	return items, nil
+}
+
+// CountActiveGroupMembers counts a group's CURRENT members for the capacity
+// check (group_full): participants whose pointer columns target the given
+// (sessionID, groupID). Unlike ListParticipants it never unions
+// participant_session_memberships history — a row that only appears in the
+// history (the member has since moved to another session) does not occupy
+// capacity here (audit #10). An empty sessionID counts by group pointer only.
+func (r *GormSessionRepository) CountActiveGroupMembers(ctx context.Context, sessionID, groupID string) (int, error) {
+	q := r.db.WithContext(ctx).Model(&ParticipantModel{})
+	if sessionID != "" {
+		q = q.Where("session_id = ?", sessionID)
+	}
+	if groupID != "" {
+		q = q.Where("group_id = ?", groupID)
+	}
+	var n int64
+	if err := q.Count(&n).Error; err != nil {
+		return 0, apperrors.Internal("internal_error", err)
+	}
+	return int(n), nil
 }
 
 // ListParticipantsPaginated returns a tenant-scoped, paginated participant list

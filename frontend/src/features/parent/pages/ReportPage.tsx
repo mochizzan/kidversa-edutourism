@@ -5,6 +5,7 @@ import QRCode from 'qrcode'
 import { Button } from '../../../shared/components/ui/Button'
 import { EmptyState } from '../../../shared/components/feedback/EmptyState'
 import { RaportZoomPan } from '../../../shared/components/feedback/RaportZoomPan'
+import { ProvenanceBadge } from '../../../shared/components/ui/ProvenanceBadge'
 import { Loader2 } from 'lucide-react'
 import {
   ParentTokenGuard,
@@ -219,6 +220,18 @@ function ReportView() {
   /* ── Render: fixed-width A4 sheet inside the zoom/pan viewport ── */
   return (
     <div className="relative min-h-screen bg-gray-200 print-report">
+      {/* Clone provenance (PublicReportDTO) — visible to parents, hidden when
+          printing (the print output is the rapor iframe itself). */}
+      {report.source_session_id && (
+        <div className="no-print flex justify-center px-4 pt-4">
+          <ProvenanceBadge
+            sourceSessionId={report.source_session_id}
+            sourceSessionName={report.source_session_name}
+            sourceSessionStatus={report.source_session_status}
+            size="md"
+          />
+        </div>
+      )}
       <RaportZoomPan sheetWidth={A4_SHEET_WIDTH}>
         <div style={{ width: '21cm', height: iframeHeight || 'auto' }}>
           <iframe

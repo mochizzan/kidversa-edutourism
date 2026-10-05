@@ -54,6 +54,10 @@ const (
 	SessionStageWaiting   SessionStageStatus = "WAITING"
 	SessionStageActive    SessionStageStatus = "ACTIVE"
 	SessionStageCompleted SessionStageStatus = "COMPLETED"
+	// SessionStageCancelled stamps a stage of a CANCELLED session (audit #18):
+	// cancelling a session no longer masquerades its ACTIVE stages as
+	// COMPLETED. Data, not schema — session_stages.status is varchar(20).
+	SessionStageCancelled SessionStageStatus = "CANCELLED"
 )
 
 // GroupStatus enumerates session-group states.

@@ -10,6 +10,7 @@ import {
   PlusCircle,
   Layers,
   Award,
+  AlertTriangle,
 } from 'lucide-react'
 import { ROUTES, programDetailPath, programEditPath, topicListPath, topicNewPath, topicDetailPath, topicEditPath } from '../../../core/constants/app'
 import { withOrigin } from '../../../core/utils/navigation'
@@ -26,10 +27,15 @@ import { useClientList, makeTextFilter } from '../../../shared/hooks/useClientLi
 import { useTenantScope } from '../../../core/hooks/useTenantScope'
 import { programService } from '../../../core/services/programs'
 import { programSubstageService } from '../../../core/services/program-substages'
+import { sessionService } from '../../../core/services/sessions'
+import { ApiError } from '../../../core/services/backend-client'
+import { friendlyError } from '../../../core/utils/errorMessages'
+import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { DEFAULT_CLIENT_PAGE_SIZE } from '../../../core/constants/api'
 import { useTranslation } from 'react-i18next'
 import type { Column } from '../../../shared/components/data/DataTable'
-import type { Program, ProgramStage } from '../../../core/types'
+import type { Program, ProgramStage, Session } from '../../../core/types'
+import { sessionStatusLabel } from '../../../core/utils/sessionStatus'
 import { formatDate } from '../../../shared/utils'
 
 interface ExpandedTopicsPanelProps {
@@ -209,12 +215,20 @@ const ProgramsPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { tenantId } = useTenantScope()
+  const { addToast } = useGlobalToast()
   const { data: programs, loading, error, page, totalItems, setPage, setSearch, refresh } = useClientList<Program>({
     fetchFn: () => programService.getAll({ limit: 1000 }).then((r) => r.data),
     filterFn: makeTextFilter(['name', 'description']),
     deps: [tenantId],
   })
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  // Set after a non-force DELETE answers 409 program_has_sessions: the modal
+  // switches to the FULL force-confirmation mode listing the affected sessions
+  // (fetched via GET /api/sessions?program_id=). null = light confirm mode.
+  const [blockedSessions, setBlockedSessions] = useState<Session[] | null>(null)
+  const [blockedTotal, setBlockedTotal] = useState(0)
+  const [forceConfirmed, setForceConfirmed] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const { getHighlightClass } = useHighlight()
 
   const handleToggle = async (id: string) => {
@@ -222,11 +236,63 @@ const ProgramsPage = () => {
     refresh()
   }
 
+  const resetDelete = () => {
+    setDeleteId(null)
+    setBlockedSessions(null)
+    setBlockedTotal(0)
+    setForceConfirmed(false)
+  }
+
+  // Light-confirm step: DELETE without force. A 409 program_has_sessions
+  // escalates to the full modal (count + session list + hard warning +
+  // checkbox) instead of failing — everything else surfaces as an error toast.
   const handleDelete = async () => {
     if (!deleteId) return
-    await programService.delete(deleteId)
-    setDeleteId(null)
-    refresh()
+    setDeleting(true)
+    try {
+      await programService.delete(deleteId)
+      addToast({ type: 'success', message: t('admin.programs.deletedToast') })
+      resetDelete()
+      refresh()
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'program_has_sessions') {
+        try {
+          const res = await sessionService.getAll({
+            limit: 1000,
+            filters: { program_id: deleteId },
+          })
+          setBlockedSessions(res.data)
+          setBlockedTotal(res.total)
+        } catch (listErr) {
+          // The force modal must still open (count unknown → list-derived).
+          console.error('[ProgramsPage] load affected sessions failed', listErr)
+          setBlockedSessions([])
+          setBlockedTotal(0)
+        }
+        setForceConfirmed(false)
+      } else {
+        addToast({ type: 'error', message: friendlyError(err) })
+        resetDelete()
+      }
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // Force step: DELETE ?force=true — hard-deletes program + sessions + children.
+  const handleForceDelete = async () => {
+    if (!deleteId || !forceConfirmed) return
+    setDeleting(true)
+    try {
+      await programService.delete(deleteId, { force: true })
+      addToast({ type: 'success', message: t('admin.programs.deletedToast') })
+      resetDelete()
+      refresh()
+    } catch (err) {
+      addToast({ type: 'error', message: friendlyError(err) })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const columns: Column<Program>[] = [
@@ -317,13 +383,74 @@ const ProgramsPage = () => {
         }
       />
 
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title={t('admin.programs.deleteTitle')} footer={
+      {/* Light confirm: shown when no 409 was seen yet (no sessions, or the
+          user has not confirmed once). DELETE runs without force. */}
+      <Modal open={!!deleteId && blockedSessions === null} onClose={resetDelete} title={t('admin.programs.deleteTitle')} footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDeleteId(null)}>{t('common.cancel')}</Button>
-          <Button variant="danger" onClick={handleDelete}>{t('common.delete')}</Button>
+          <Button variant="secondary" onClick={resetDelete}>{t('common.cancel')}</Button>
+          <Button variant="danger" onClick={handleDelete} loading={deleting}>{t('common.delete')}</Button>
         </div>
       }>
         <p className="text-sm text-on-surface-variant">{t('admin.programs.deleteMsg')}</p>
+      </Modal>
+
+      {/* Full force confirm (409 program_has_sessions): affected-session count
+          + list, hard permanent-deletion warning, mandatory checkbox before
+          the force button unlocks. */}
+      <Modal
+        open={!!deleteId && blockedSessions !== null}
+        onClose={resetDelete}
+        title={t('admin.programs.deleteForceTitle')}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={resetDelete} disabled={deleting}>{t('common.cancel')}</Button>
+            <Button variant="danger" onClick={handleForceDelete} disabled={!forceConfirmed} loading={deleting}>
+              {t('admin.programs.deleteForceConfirm')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-on-surface">
+            {t('admin.programs.deleteForceCount', { count: blockedTotal })}
+          </p>
+
+          {blockedSessions && blockedSessions.length > 0 && (
+            <div className="rounded-xl border border-outline-variant bg-surface-container-low p-3">
+              <p className="text-xs font-medium text-on-surface-variant mb-2">
+                {t('admin.programs.deleteForceListLabel')}
+              </p>
+              <ul className="space-y-1">
+                {blockedSessions.slice(0, 5).map((s) => (
+                  <li key={s.id} className="text-sm text-on-surface flex items-center justify-between gap-3">
+                    <span className="truncate">{s.name}</span>
+                    <Badge variant="neutral" size="sm">{sessionStatusLabel(s.status)}</Badge>
+                  </li>
+                ))}
+              </ul>
+              {blockedTotal > 5 && (
+                <p className="text-xs text-on-surface-variant mt-2">
+                  {t('admin.programs.deleteForceMore', { count: blockedTotal - 5 })}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-start gap-2 rounded-xl bg-error-container/40 text-on-error-container p-3">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <p className="text-sm font-medium">{t('admin.programs.deleteForceWarning')}</p>
+          </div>
+
+          <label className="flex items-start gap-2 text-sm text-on-surface cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={forceConfirmed}
+              onChange={(e) => setForceConfirmed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-error cursor-pointer"
+            />
+            <span>{t('admin.programs.deleteForceCheckbox')}</span>
+          </label>
+        </div>
       </Modal>
     </div>
   )

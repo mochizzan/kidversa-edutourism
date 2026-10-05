@@ -28,6 +28,7 @@ import { ReportMissionSelector } from '../components/ReportMissionSelector'
 import { ReportSentSummaryCard } from '../components/ReportSentSummaryCard'
 import { BadgeList } from '../../../shared/components/data/BadgeList'
 import { Tooltip } from '../../../shared/components/ui/Tooltip'
+import { ProvenanceBadge } from '../../../shared/components/ui/ProvenanceBadge'
 import { useTranslation, Trans } from 'react-i18next'
 
 const ReportReviewPage = () => {
@@ -193,6 +194,18 @@ const ReportReviewPage = () => {
       />
 
       <ReportStatusBanner report={report} copiedLink={copiedLink} onCopyLink={handleCopyLink} />
+
+      {/* Clone provenance (audit: label klona) — hidden from print output. */}
+      {report.source_session_id && (
+        <div className="no-print">
+          <ProvenanceBadge
+            sourceSessionId={report.source_session_id}
+            sourceSessionName={report.source_session_name}
+            sourceSessionStatus={report.source_session_status}
+            size="md"
+          />
+        </div>
+      )}
 
       {topics.length > 1 && (
         <div className="flex flex-wrap gap-2 no-print">

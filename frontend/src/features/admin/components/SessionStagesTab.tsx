@@ -13,16 +13,20 @@ interface SessionStagesTabProps {
   stageMap: Map<string, string>
 }
 
-const stageStatusVariant: Record<string, 'neutral' | 'warning' | 'success'> = {
+const stageStatusVariant: Record<string, 'neutral' | 'warning' | 'success' | 'danger'> = {
   LOCKED: 'neutral',
   IN_PROGRESS: 'warning',
   COMPLETED: 'success',
+  // Audit: a cancelled session stamps its stages CANCELLED — red, matching
+  // the session-status badges elsewhere.
+  CANCELLED: 'danger',
 }
 
 const stageStatusKeys = {
   LOCKED: 'admin.sessions.stageLocked',
   IN_PROGRESS: 'admin.sessions.stageInProgress',
   COMPLETED: 'common.done',
+  CANCELLED: 'admin.sessions.stageCancelled',
 } as const satisfies Record<string, string>
 
 // Opsi A: stage facilitator is derived from the group(s) currently at the stage

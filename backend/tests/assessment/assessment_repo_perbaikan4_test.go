@@ -57,7 +57,7 @@ func TestAssessmentCreate_DenormalizesKegiatanViaProgramSubstages(t *testing.T) 
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 	).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
@@ -113,7 +113,7 @@ func TestAssessmentCreate_KegiatanLookupFailure_LogsAndContinues(t *testing.T) {
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 	).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
@@ -183,7 +183,7 @@ func TestAssessmentCreate_TopicKeyResolveMiss_LeavesSentinel(t *testing.T) {
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 	).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 

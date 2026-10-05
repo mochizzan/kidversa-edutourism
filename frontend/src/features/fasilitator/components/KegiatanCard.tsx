@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Star, Clipboard, ShieldX } from 'lucide-react'
 import { cn } from '../../../core/utils'
 import { Button } from '../../../shared/components/ui/Button'
+import { ProvenanceBadge } from '../../../shared/components/ui/ProvenanceBadge'
 import { useTranslation } from 'react-i18next'
 import { RATING_LABEL_KEYS, MAX_STAR_RATING } from '../../../core/constants/assessment'
 import type { Assessment, CreateAssessmentDTO, SessionSubstage } from '../../../core/types'
@@ -134,9 +135,11 @@ export function KegiatanCard({
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <Clipboard className="w-4 h-4 text-gray-400 shrink-0" />
         <h3 className="font-semibold text-sm text-gray-900">{kegiatanName}</h3>
+        {/* Clone provenance: nilai ini disalin dari sesi lain (migrasi). */}
+        <ProvenanceBadge sourceSessionId={assessment?.source_session_id} />
         {!isMine && (
           <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200">
             <ShieldX className="w-3 h-3 inline mr-0.5 -mt-0.5" />

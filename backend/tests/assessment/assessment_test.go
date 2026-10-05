@@ -52,10 +52,16 @@ func (r *fakeAssessmentRepo) GetGroupFacilitatorIDByParticipant(ctx context.Cont
 }
 
 type fakeSessionRepo struct {
-	session  *entity.Session
-	err      error
-	group    *entity.SessionGroup
-	groupErr error
+	session *entity.Session
+	err     error
+	// lockedSession/lockedErr override GetSessionByIDForUpdate (audit #14):
+	// nil means "same as session". Setting it to a CANCELLED copy models a
+	// CancelSession committing between the unlocked status gate and the write.
+	lockedSession *entity.Session
+	lockedErr     error
+	lockedReads   int // how often the locked re-read ran
+	group         *entity.SessionGroup
+	groupErr      error
 	// participant returned by GetParticipantByID; nil means the default fixture
 	// participant-1 enrolled in session-1 (the session every existing fixture
 	// scores), so the membership gate passes unless a test opts out.
@@ -68,6 +74,18 @@ type fakeSessionRepo struct {
 
 func (r *fakeSessionRepo) CreateSession(ctx context.Context, s *entity.Session) error { return nil }
 func (r *fakeSessionRepo) GetSessionByID(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	return r.session, r.err
+}
+
+// GetSessionByIDForUpdate is the locked re-read of the write phase (audit
+// #14): it reports the CURRENT status, so a test can model a CancelSession
+// committing between the unlocked gate (GetSessionByID) and the write by
+// returning the session's later state here.
+func (r *fakeSessionRepo) GetSessionByIDForUpdate(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	r.lockedReads++
+	if r.lockedSession != nil {
+		return r.lockedSession, r.lockedErr
+	}
 	return r.session, r.err
 }
 func (r *fakeSessionRepo) ListSessions(ctx context.Context, f repository.SessionFilter, page, limit int) (*repository.Paginated[entity.Session], error) {
@@ -157,8 +175,19 @@ func (r *fakeSessionRepo) FindDuplicateParticipants(ctx context.Context, program
 func (r *fakeSessionRepo) ParticipantNameExists(ctx context.Context, tenantID, childName string) (bool, error) {
 	return false, nil
 }
+
+// Transaction runs fn against the same fake (no-op rollback), the way the
+// production wrapper binds fn to a tx-bound handle. Upsert's locked write
+// phase (audit #14) runs entirely inside this callback, so a stub that skipped
+// fn would never persist anything.
 func (r *fakeSessionRepo) Transaction(ctx context.Context, fn func(tx repository.SessionRepository) error) error {
-	return nil
+	return fn(r)
+}
+
+// CountActiveGroupMembers reports the pointer-membership count (audit #10);
+// this fake tracks no rosters, so capacity checks see zero members.
+func (r *fakeSessionRepo) CountActiveGroupMembers(ctx context.Context, sessionID, groupID string) (int, error) {
+	return 0, nil
 }
 func (r *fakeSessionRepo) TenantIDForSession(ctx context.Context, sessionID string) (string, error) {
 	return "", nil
@@ -507,5 +536,64 @@ func TestUsecase_Upsert_NonActiveSession_KeepsSessionGateOverOwnership(t *testin
 	requireAppErrorCode(t, err, "session_not_active")
 	if assessmentRepo.created != nil {
 		t.Fatal("expected no assessment write on a non-active session")
+	}
+}
+
+// ── TOCTOU guard (audit #14): cancel vs. score serialization ──
+
+// (c) A CancelSession commits in the window between the UNLOCKED status gate
+// and the write. The write phase re-reads the session under SELECT ... FOR
+// UPDATE inside the write transaction, observes CANCELLED, and rejects the
+// score with session_not_active — nothing is persisted (no silent write onto
+// a cancelled session).
+func TestUsecase_Upsert_CancelBetweenCheckAndWrite_Rejected(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		// The unlocked gate (GetSessionByID) still sees the session ACTIVE...
+		session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+		// ...but by the time the write phase re-reads under the row lock, a
+		// concurrent CancelSession has committed CANCELLED.
+		lockedSession: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionCancelled},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	_, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1")
+	requireAppErrorCode(t, err, "session_not_active")
+	if sessionRepo.lockedReads == 0 {
+		t.Fatal("the write phase must re-read the session under the row lock (audit #14)")
+	}
+	if assessmentRepo.created != nil {
+		t.Fatal("the score must not be persisted on a session cancelled between check and write")
+	}
+}
+
+// Control for (c): with the locked re-read still ACTIVE the score persists —
+// the lock guards the write without changing its happy path.
+func TestUsecase_Upsert_LockedReReadActive_Succeeds(t *testing.T) {
+	owner := "facilitator-1"
+	assessmentRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &fakeSessionRepo{
+		session:       &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+		lockedSession: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+	}
+	uc := newUsecase(assessmentRepo, sessionRepo)
+
+	if _, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1"); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if sessionRepo.lockedReads == 0 {
+		t.Fatal("the write phase must re-read the session under the row lock (audit #14)")
+	}
+	if assessmentRepo.created == nil {
+		t.Fatal("expected assessment to be written through the locked transaction")
 	}
 }

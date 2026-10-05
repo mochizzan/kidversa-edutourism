@@ -13,6 +13,9 @@ type SessionFilter struct {
 	Status        string
 	SessionDate   string
 	FacilitatorID string
+	// ProgramID restricts the list to one program's sessions (lets the FE
+	// fetch the full session list behind a 409 program_has_sessions).
+	ProgramID string
 }
 
 // GroupWithParticipants bundles a session group with its participants.
@@ -85,6 +88,13 @@ type SessionRepository interface {
 	// Sessions.
 	CreateSession(ctx context.Context, s *entity.Session) error
 	GetSessionByID(ctx context.Context, id, tenantID string) (*entity.Session, error)
+	// GetSessionByIDForUpdate reads a session under a SELECT ... FOR UPDATE row
+	// lock (GORM clause.Locking{Strength:"UPDATE"}). It MUST be called inside
+	// Transaction: outside a transaction the lock is released at statement end,
+	// making it a plain read. Used to serialize CancelSession against the
+	// assessment upsert write (audit #12/#14): both sides lock the same session
+	// row before writing, so a cancel and a score can never interleave.
+	GetSessionByIDForUpdate(ctx context.Context, id, tenantID string) (*entity.Session, error)
 	ListSessions(ctx context.Context, f SessionFilter, page, limit int) (*Paginated[entity.Session], error)
 	UpdateSession(ctx context.Context, s *entity.Session) error
 	DeleteSession(ctx context.Context, id string) error
@@ -115,6 +125,14 @@ type SessionRepository interface {
 	// reject duplicate participant names on create without a schema constraint.
 	ParticipantNameExists(ctx context.Context, tenantID, childName string) (bool, error)
 	ListParticipants(ctx context.Context, sessionID, groupID, tenantID string) ([]entity.Participant, error)
+	// CountActiveGroupMembers counts the group's CURRENT members only: rows
+	// whose participants.session_id/group_id pointers target (sessionID,
+	// groupID). It deliberately does NOT union participant_session_memberships
+	// history (unlike ListParticipants), so a member who since moved to another
+	// session no longer occupies capacity in this group (audit #10: the old
+	// history-union count over-counted and rejected links into a group that
+	// was not actually full). An empty sessionID counts by group pointer only.
+	CountActiveGroupMembers(ctx context.Context, sessionID, groupID string) (int, error)
 	ListParticipantsPaginated(ctx context.Context, tenantID, sessionID, groupID, search string, page, limit int) (*Paginated[entity.Participant], error)
 	UpdateParticipant(ctx context.Context, p *entity.Participant) error
 	// UpdateParticipantFields applies a partial (map) update to a participant. Use

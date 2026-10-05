@@ -192,6 +192,15 @@ func (h *PhotoHandler) SetReportPhoto(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	// Session-status gate at the earliest point the session is known: a
+	// CANCELLED session never accepts report-photo writes.
+	sess, err := h.sessions.GetSessionByID(ctx, p.SessionID, appmiddleware.GetTenantID(c))
+	if err != nil {
+		return err
+	}
+	if sess.Status == entity.SessionCancelled {
+		return apperrors.Forbidden("session_not_active", errors.New("report photo cannot be changed for a cancelled session"))
+	}
 	if err := h.assertPhotoOwnership(c, p.ParticipantID); err != nil {
 		return err
 	}
@@ -234,6 +243,16 @@ func (h *PhotoHandler) SetReportPick(c *echo.Context) error {
 	}
 	if err := h.assertStageInTenant(c, req.ProgramStageID); err != nil {
 		return err
+	}
+	// Session-status gate: a CANCELLED session never accepts pick writes. Runs
+	// right after the stage's tenant validation (§5.D) so request-input checks
+	// keep answering first, and before topic/ownership/consent gates.
+	sess, err := h.sessions.GetSessionByID(ctx, p.SessionID, tenantID)
+	if err != nil {
+		return err
+	}
+	if sess.Status == entity.SessionCancelled {
+		return apperrors.Forbidden("session_not_active", errors.New("report photo pick cannot be changed for a cancelled session"))
 	}
 	// Topic truth (migration 000009): a NEW pick must be topic-true — the
 	// photo's session_stage must resolve to this pick's program stage within
@@ -292,8 +311,13 @@ func (h *PhotoHandler) DeleteReportPick(c *echo.Context) error {
 	}
 	ctx := (*c).Request().Context()
 	tenantID := appmiddleware.GetTenantID(c)
-	if _, err := h.sessions.GetSessionByID(ctx, sessionID, tenantID); err != nil {
+	sess, err := h.sessions.GetSessionByID(ctx, sessionID, tenantID)
+	if err != nil {
 		return err // cross-tenant / missing session -> 404 not_found
+	}
+	// Session-status gate: a CANCELLED session never accepts pick writes.
+	if sess.Status == entity.SessionCancelled {
+		return apperrors.Forbidden("session_not_active", errors.New("report photo pick cannot be cleared for a cancelled session"))
 	}
 	if err := h.assertPhotoOwnership(c, participantID); err != nil {
 		return err

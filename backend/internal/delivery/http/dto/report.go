@@ -145,6 +145,12 @@ type PublicReportDTO struct {
 	ReportPDFURL     string   `json:"report_pdf_url,omitempty"`
 	GroupName        string   `json:"group_name,omitempty"`
 	FacilitatorName  string   `json:"facilitator_name,omitempty"`
+	// Provenance (penelusuran asal): the source session this report was
+	// CLONED from — id plus a name+status snapshot taken at clone time.
+	// Always present, null for natively created reports (no omitempty).
+	SourceSessionID     *string `json:"source_session_id"`
+	SourceSessionName   *string `json:"source_session_name"`
+	SourceSessionStatus *string `json:"source_session_status"`
 	// PhotoURL is the token-free access-photo path, present only when a photo
 	// resolves for this report's topic AND photo consent is granted (omitempty).
 	PhotoURL           string `json:"photo_url,omitempty"`
@@ -168,27 +174,30 @@ type PublicReportDTO struct {
 // is off. The access token itself is never serialized.
 func NewPublicReportDTO(r *entity.Report, view *reportsuc.PublicReportView, photoURL string) *PublicReportDTO {
 	return &PublicReportDTO{
-		ID:                 r.ID,
-		ParticipantID:      r.ParticipantID,
-		SessionID:          r.SessionID,
-		ProgramStageID:     r.ProgramStageID,
-		Status:             string(r.Status),
-		AINarrativeFinal:   r.AINarrativeFinal,
-		MissionIDs:         r.MissionIDs,
-		ReportPDFURL:       r.ReportPDFURL,
-		GroupName:          view.GroupName,
-		FacilitatorName:    view.FacilitatorName,
-		PhotoURL:           photoURL,
-		ProgramName:        view.ProgramName,
-		TopicName:          view.TopicName,
-		ChildName:          view.ChildName,
-		ChildAge:           view.ChildAge,
-		SchoolName:         view.SchoolName,
-		SessionDate:        view.SessionDate,
-		GalleryAccessToken: r.GalleryAccessToken,
-		Stages:             view.Stages,
-		Missions:           view.Missions,
-		Badges:             view.Badges,
+		ID:                  r.ID,
+		ParticipantID:       r.ParticipantID,
+		SessionID:           r.SessionID,
+		ProgramStageID:      r.ProgramStageID,
+		Status:              string(r.Status),
+		AINarrativeFinal:    r.AINarrativeFinal,
+		MissionIDs:          r.MissionIDs,
+		ReportPDFURL:        r.ReportPDFURL,
+		SourceSessionID:     r.SourceSessionID,
+		SourceSessionName:   r.SourceSessionName,
+		SourceSessionStatus: r.SourceSessionStatus,
+		GroupName:           view.GroupName,
+		FacilitatorName:     view.FacilitatorName,
+		PhotoURL:            photoURL,
+		ProgramName:         view.ProgramName,
+		TopicName:           view.TopicName,
+		ChildName:           view.ChildName,
+		ChildAge:            view.ChildAge,
+		SchoolName:          view.SchoolName,
+		SessionDate:         view.SessionDate,
+		GalleryAccessToken:  r.GalleryAccessToken,
+		Stages:              view.Stages,
+		Missions:            view.Missions,
+		Badges:              view.Badges,
 	}
 }
 

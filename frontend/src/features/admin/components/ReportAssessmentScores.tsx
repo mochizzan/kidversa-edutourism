@@ -1,5 +1,6 @@
 import { Star } from 'lucide-react'
 import { Card } from '../../../shared/components/ui/Card'
+import { ProvenanceBadge } from '../../../shared/components/ui/ProvenanceBadge'
 import { cn } from '../../../core/utils'
 import { RATING_LABEL_KEYS } from '../../../core/constants/assessment'
 import { useTranslation } from 'react-i18next'
@@ -59,7 +60,14 @@ export const ReportAssessmentScores = ({ stageInfos }: ReportAssessmentScoresPro
                           const a = k.assessment
                           return (
                             <tr key={idx}>
-                              <td className="py-2 pr-3 text-on-surface">{k.programSubstageName}</td>
+                              <td className="py-2 pr-3 text-on-surface">
+                                {k.programSubstageName}
+                                {/* Clone provenance: nilai disalin dari sesi lain. */}
+                                <ProvenanceBadge
+                                  sourceSessionId={a?.source_session_id}
+                                  className="mt-1"
+                                />
+                              </td>
                               <td className="py-2 pr-3">
                                 {!a ? (
                                   <span className="text-xs text-on-surface-variant">{t('admin.reports.notRated')}</span>

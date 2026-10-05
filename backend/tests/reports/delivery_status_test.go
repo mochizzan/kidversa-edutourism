@@ -179,6 +179,10 @@ type genSessionRepo struct {
 	repository.SessionRepository
 	participants []entity.Participant
 	stages       []entity.SessionStage
+	// status is the lifecycle status GetSessionByID reports ("" by default,
+	// i.e. not cancelled — the generate session-status gate treats only
+	// CANCELLED as closed).
+	status entity.SessionStatus
 }
 
 func (f *genSessionRepo) ListSessionStages(ctx context.Context, sessionID string) ([]entity.SessionStage, error) {
@@ -199,7 +203,7 @@ func (f *genSessionRepo) GetParticipantByID(ctx context.Context, id, tenantID st
 }
 
 func (f *genSessionRepo) GetSessionByID(ctx context.Context, id, tenantID string) (*entity.Session, error) {
-	return &entity.Session{Name: "Petualangan Sains"}, nil
+	return &entity.Session{Name: "Petualangan Sains", Status: f.status}, nil
 }
 
 // gateMessenger blocks every gateway send until release is closed.
@@ -300,7 +304,7 @@ func sortedUnion(st reports.GenerateStatus) []string {
 func TestGenerateRegistryLifecycle(t *testing.T) {
 	repo := newGenRepo("p-a", "p-b", "p-c", "p-d", "p-e")
 	gen := newBlockingGen("r-p-a", "r-p-b", "r-p-c", "r-p-d", "r-p-e")
-	uc := newUsecaseFixture(repo, gen, nil, nil)
+	uc := newUsecaseFixture(repo, gen, &genSessionRepo{}, nil)
 	participants := newParticipants(5)
 	wantAll := allReportIDs()
 
@@ -375,7 +379,7 @@ func TestGenerateRegistryCleanupOnErrors(t *testing.T) {
 		repo := newGenRepo("p-a", "p-b")
 		gen := newBlockingGen()
 		gen.failAll = true
-		uc := newUsecaseFixture(repo, gen, nil, nil)
+		uc := newUsecaseFixture(repo, gen, &genSessionRepo{}, nil)
 		participants := newParticipants(2)
 
 		_, err := uc.GenerateForSession(context.Background(), genSessionID, testTenantID, participants, nil)
@@ -389,7 +393,7 @@ func TestGenerateRegistryCleanupOnErrors(t *testing.T) {
 		repo := newGenRepo("p-a", "p-b")
 		repo.listErrOn = 3 // fail the post-generation List (begin already ran)
 		gen := newBlockingGen("r-p-a", "r-p-b")
-		uc := newUsecaseFixture(repo, gen, nil, nil)
+		uc := newUsecaseFixture(repo, gen, &genSessionRepo{}, nil)
 		participants := newParticipants(2)
 
 		done := make(chan error, 1)

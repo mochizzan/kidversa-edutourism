@@ -26,6 +26,19 @@ type ProgramRepository interface {
 	ListPrograms(ctx context.Context, f ProgramFilter, page, limit int) (*Paginated[entity.Program], error)
 	UpdateProgram(ctx context.Context, p *entity.Program) error
 	DeleteProgram(ctx context.Context, id string) error
+	// CountProgramSessions returns how many live sessions (all lifecycle
+	// statuses) the program still owns — the guard behind
+	// DELETE /api/programs/:id (409 program_has_sessions when > 0 without
+	// ?force=true).
+	CountProgramSessions(ctx context.Context, programID string) (int64, error)
+	// ListProgramSessionBriefs returns up to limit live sessions of the program
+	// (id, name, status) so the 409 can carry a short session list. The full
+	// structured list is fetchable via GET /api/sessions?program_id=...
+	ListProgramSessionBriefs(ctx context.Context, programID string, limit int) ([]entity.Session, error)
+	// DeleteProgramForce hard-deletes the program together with ALL its
+	// sessions and their children in one transaction — the ?force=true path of
+	// DELETE /api/programs/:id.
+	DeleteProgramForce(ctx context.Context, programID string) error
 	ToggleActiveProgram(ctx context.Context, id string) (*entity.Program, error)
 
 	CreateStage(ctx context.Context, s *entity.ProgramStage) error

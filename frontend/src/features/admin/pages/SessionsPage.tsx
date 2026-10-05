@@ -20,6 +20,7 @@ import type { Column } from '../../../shared/components/data/DataTable'
 import type { Session } from '../../../core/types'
 import type { SessionSubstage } from '../../../core/types'
 import { formatDate } from '../../../shared/utils'
+import { sessionStatusLabel } from '../../../core/utils/sessionStatus'
 import { friendlyError } from '../../../core/utils/errorMessages'
 import { useTranslation } from 'react-i18next'
 
@@ -254,7 +255,7 @@ const SessionsPage = () => {
           COMPLETED: 'primary',
           CANCELLED: 'danger',
         }
-        return <Badge variant={variants[item.status] || 'neutral'}>{item.status}</Badge>
+        return <Badge variant={variants[item.status] || 'neutral'}>{sessionStatusLabel(item.status)}</Badge>
       },
     },
     {

@@ -119,8 +119,10 @@ func (u *SessionUsecase) SetBadgeReconciler(b BadgeReconciler) {
 // SetReportCloneDeps injects the report + participant-mission repos used to
 // clone the participant's reports (rapor) to the new session when a
 // participant migrates (LinkParticipant): each source report is copied per
-// (participant, session, program_stage) with a FRESH parent token and
-// sent_at = nil, and its participant_missions follow onto the clone.
+// (participant, session, program_stage) with a FRESH parent token, status
+// downgraded to DRAFT (the source row keeps its own status untouched),
+// sent_at = nil, and a provenance snapshot of the source session
+// (id/name/status), and its participant_missions follow onto the clone.
 // Optional: unwired (either nil) skips the clone entirely, like the other
 // optional LinkParticipant dependencies — production wiring in
 // cmd/server/main.go is mandatory so reports are never silently left behind.
@@ -253,14 +255,47 @@ func (u *SessionUsecase) ListSessions(ctx context.Context, f repository.SessionF
 	return u.sessionRepo.ListSessions(ctx, f, page, limit)
 }
 
+// requireSessionProgram verifies the session's program still exists before a
+// lifecycle transition (audit #3), mirroring the strict create gate in
+// CreateSession. The program repo's not_found covers both a hard delete and a
+// soft delete (GORM's DeletedAt scope), and is re-mapped to program_not_found
+// so callers see "the program behind this session is gone" instead of a
+// generic 404 that only fires later in badge/report code. Skipped when the
+// program reader is unwired (defensive, same as CreateSession; production
+// wiring: cmd/server/main.go SetProgramReader).
+func (u *SessionUsecase) requireSessionProgram(ctx context.Context, programID string) error {
+	if u.programs == nil {
+		return nil
+	}
+	if _, err := u.programs.GetProgramByID(ctx, programID); err != nil {
+		if _, code, ok := apperrors.AsAppError(err); ok && code == "not_found" {
+			return apperrors.NotFound("program_not_found", err)
+		}
+		return err
+	}
+	return nil
+}
+
 // StartSession transitions a session DRAFT -> ACTIVE (cascades Topik to ACTIVE).
 func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
 	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return nil, err
 	}
-	if s.Status != entity.SessionDraft && s.Status != entity.SessionCancelled {
+	// Audit #19: a CANCELLED session is cancelled PERMANENTLY — reactivation is
+	// rejected before any other gate so the reason is unambiguous (the old
+	// code explicitly allowed CANCELLED -> ACTIVE).
+	if s.Status == entity.SessionCancelled {
+		return nil, apperrors.Forbidden("session_cancelled_permanent", nil)
+	}
+	if s.Status != entity.SessionDraft {
 		return nil, apperrors.Conflict("bad_request", nil)
+	}
+	// Audit #3: the session's program must still exist (hard- or soft-deleted
+	// counts as gone) before the session goes live — otherwise it runs until it
+	// fails downstream (badge/report lookups 404 on the missing program).
+	if perr := u.requireSessionProgram(ctx, s.ProgramID); perr != nil {
+		return nil, perr
 	}
 	// Gate: session must have at least one group.
 	groups, gerr := u.sessionRepo.ListSessionGroups(ctx, id)
@@ -351,6 +386,13 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID strin
 	if s.Status != entity.SessionActive {
 		return nil, apperrors.Conflict("bad_request", nil)
 	}
+	// Audit #3: the session's program must still exist before completion — a
+	// session whose program was deleted must not be closed into an orphan
+	// whose badge/report generation 404s. Runs before any grading gate so a
+	// missing program reports program_not_found (no writes have happened yet).
+	if perr := u.requireSessionProgram(ctx, s.ProgramID); perr != nil {
+		return nil, perr
+	}
 	// Grading completeness gate: every participant in every group must be graded
 	// for every session Kegiatan before the session can be completed. The gate
 	// must read assessments under the session's own tenant: the tenant scope
@@ -423,34 +465,56 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID strin
 	return s, nil
 }
 
-// CancelSession transitions a session to CANCELLED and cancels its Topik.
+// CancelSession transitions a session to CANCELLED and stamps its ACTIVE
+// Topik as CANCELLED (audit #18 — never COMPLETED, no completed_at).
+//
+// Atomicity (audit #12): the status write, the stage stamps and the cancel
+// fields all run inside ONE session-repo transaction — a failure at any step
+// rolls the whole thing back, so a session can never end up CANCELLED with
+// live ACTIVE stages (or vice versa).
+//
+// Concurrency (audit #14): the session row is re-read under SELECT ... FOR
+// UPDATE (GetSessionByIDForUpdate) inside the transaction. The assessment
+// upsert takes the same lock before writing, so a cancel and a score
+// serialize: whichever commits first decides — a score can no longer land
+// silently on a session that was cancelled between its status check and its
+// write.
 func (u *SessionUsecase) CancelSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
-	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	if s.Status == entity.SessionCompleted {
-		return nil, apperrors.Conflict("bad_request", nil)
-	}
-	s.Status = entity.SessionCancelled
-	if err := u.sessionRepo.UpdateSession(ctx, s); err != nil {
-		return nil, err
-	}
-	stages, err := u.sessionRepo.ListSessionStages(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	for i := range stages {
-		if stages[i].Status == entity.SessionStageActive {
-			stages[i].Status = entity.SessionStageCompleted
-			now := util.Now()
-			stages[i].CompletedAt = &now
-			if err := u.sessionRepo.UpdateSessionStage(ctx, &stages[i]); err != nil {
-				return nil, err
+	var cancelled *entity.Session
+	err := u.sessionRepo.Transaction(ctx, func(tx repository.SessionRepository) error {
+		s, err := tx.GetSessionByIDForUpdate(ctx, id, tenantID)
+		if err != nil {
+			return err
+		}
+		if s.Status == entity.SessionCompleted {
+			return apperrors.Conflict("bad_request", nil)
+		}
+		s.Status = entity.SessionCancelled
+		if err := tx.UpdateSession(ctx, s); err != nil {
+			return err
+		}
+		stages, err := tx.ListSessionStages(ctx, id)
+		if err != nil {
+			return err
+		}
+		for i := range stages {
+			if stages[i].Status == entity.SessionStageActive {
+				// Audit #18: a cancelled stage reads CANCELLED — it was NOT
+				// completed, so no completed_at is stamped (WAITING stages
+				// stay untouched, as before).
+				stages[i].Status = entity.SessionStageCancelled
+				if err := tx.UpdateSessionStage(ctx, &stages[i]); err != nil {
+					return err
+				}
 			}
 		}
+		cancelled = s
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return s, nil
+	return cancelled, nil
 }
 
 // DeleteSession removes a session. Sessions in ACTIVE or COMPLETED state are
@@ -592,16 +656,17 @@ func requireGroupInSession(ctx context.Context, repo repository.SessionRepositor
 	return g, nil
 }
 
-// groupMemberCount counts participants already assigned to a group. It reuses
-// the existing ListParticipants repo helper (group_id filter) rather than a
-// dedicated count query; an empty sessionID/tenantID means "count by group
-// only", which is the membership definition used by the capacity check.
-func groupMemberCount(ctx context.Context, repo repository.SessionRepository, groupID string) (int, error) {
-	ps, err := repo.ListParticipants(ctx, "", groupID, "")
-	if err != nil {
-		return 0, err
-	}
-	return len(ps), nil
+// groupMemberCount counts the group's CURRENT members for the capacity check
+// (group_full): participants whose session/group pointers target
+// (sessionID, groupID). It delegates to CountActiveGroupMembers — pointer
+// membership only, NO participant_session_memberships history union — so a
+// member who has since migrated to another session no longer occupies
+// capacity here (audit #10: the old ListParticipants union over-counted and
+// rejected links/creates into groups that were not actually full). An empty
+// sessionID falls back to the group pointer only. repo is a parameter so the
+// import path counts through its transaction handle.
+func groupMemberCount(ctx context.Context, repo repository.SessionRepository, sessionID, groupID string) (int, error) {
+	return repo.CountActiveGroupMembers(ctx, sessionID, groupID)
 }
 
 // CreateParticipant adds a participant to a session (and optional group).
@@ -629,7 +694,7 @@ func (u *SessionUsecase) CreateParticipant(ctx context.Context, tenantID, sessio
 			if _, err := requireGroupInSession(ctx, u.sessionRepo, groupID, sessionID, tenantID); err != nil {
 				return nil, err
 			}
-			n, err := groupMemberCount(ctx, u.sessionRepo, groupID)
+			n, err := groupMemberCount(ctx, u.sessionRepo, sessionID, groupID)
 			if err != nil {
 				return nil, err
 			}
@@ -767,7 +832,7 @@ func (u *SessionUsecase) ImportParticipants(ctx context.Context, tenantID, sessi
 			}
 			g := *r.GroupID
 			if _, seen := groupCounts[g]; !seen {
-				n, err := groupMemberCount(ctx, tx, g)
+				n, err := groupMemberCount(ctx, tx, sessionID, g)
 				if err != nil {
 					return err
 				}
@@ -881,7 +946,7 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 			return nil, terr
 		}
 		targetGroupName = tg.Name
-		n, err := groupMemberCount(ctx, u.sessionRepo, groupID)
+		n, err := groupMemberCount(ctx, u.sessionRepo, sessionID, groupID)
 		if err != nil {
 			return nil, err
 		}
@@ -895,7 +960,10 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	// silent skip. sameProgram decides below whether the fact-copy steps run:
 	// same program → clone/carry from the source; different program → skip
 	// every copy so the target session starts scratch, but still link.
-	var prevSessionID, prevSessionName, prevProgramID string
+	// prevSessionName/prevSessionStatus feed the clone provenance snapshot
+	// (the report clones record WHERE they came from — id, name, status at
+	// clone time — and the result reports the same identity back to callers).
+	var prevSessionID, prevSessionName, prevSessionStatus, prevProgramID string
 	sameProgram := false
 	if p.SessionID != nil && *p.SessionID != "" {
 		prevSessionID = *p.SessionID
@@ -904,14 +972,24 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 			return nil, serr
 		}
 		prevSessionName = prevS.Name
+		prevSessionStatus = string(prevS.Status)
 		prevProgramID = prevS.ProgramID
 		sameProgram = prevS.ProgramID == targetS.ProgramID
 	}
 
-	// Migration ordering: the repos share no transaction, so failure safety is
-	// ordering + idempotency instead of a cross-repo BEGIN/COMMIT. Steps 1-5
-	// run ONLY when sameProgram (a cross-program link skips every copy step so
-	// the target session starts scratch); step 6 always runs.
+	// Migration structure: steps 1-5 write across DIFFERENT repositories
+	// (assessment/attendance/photo/report/mission/badge) that expose no
+	// tx-bound handles — SessionRepository is the only repo with a transaction
+	// wrapper — so one cross-repo BEGIN/COMMIT would need a repo-wide refactor.
+	// Those steps therefore rely on ordering + idempotency: each runs while
+	// the participant is still in the source session, and every write either
+	// skips already-existing rows or rewrites identical data, so re-running
+	// LinkParticipant after a mid-step failure converges (ulangi proses aman).
+	// Step 6 (the commit phase: membership history + consent reset + pointer
+	// move) is all SessionRepository work and runs inside ONE session-repo
+	// transaction, so it can never half-commit. Steps 1-5 run ONLY when
+	// sameProgram (a cross-program link skips every copy step so the target
+	// session starts scratch); step 6 always runs.
 	//  1. Clone ALL source assessments (star = 0 included) onto the target
 	//     session's Kegiatan leaves — a failure aborts while the participant is
 	//     still in the source session.
@@ -927,8 +1005,11 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	//  4. Clone the reports (rapor) WITH their participant_missions: each
 	//     source report maps 1:1 onto the same program_stage_id in the target
 	//     session (legacy whole-session rows keyed by ""), the copy gets a
-	//     FRESH parent token, sent_at = nil (never delivered yet) and empty
-	//     gallery tokens, and an occupied target slot — indexed up front or
+	//     FRESH parent token, status downgraded to DRAFT (the source's
+	//     APPROVED/SENT/PENDING_REVIEW state is never inherited and the source
+	//     row stays untouched), sent_at = nil (never delivered yet) and empty
+	//     gallery tokens — plus a provenance snapshot of the source session
+	//     (id/name/status) — and an occupied target slot — indexed up front or
 	//     reported by uq_reports_session_participant_topic as a conflict — is
 	//     skipped, so a retry converges. A failure aborts while the
 	//     participant is still in the source session.
@@ -939,7 +1020,9 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	//     rows, which are program-scoped and carry automatically. A failure
 	//     aborts while the participant is still in the source session.
 	//  6. Record the SOURCE membership (participant_session_memberships) and
-	//     move the participant LAST (the commit step): if it fails after
+	//     move the participant LAST — the commit step, wrapped in ONE
+	//     session-repo transaction together with the consent reset (see below),
+	//     so the three writes succeed or fail as a unit. If it fails after
 	//     1/2/3/4/5, a retry converges because the clone skips already-existing
 	//     rows, the attendance upsert is idempotent, the photo copy skips
 	//     already-copied rows, the report clone skips occupied slots (missions
@@ -955,7 +1038,7 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 		if err := u.copySessionPhotos(ctx, participantID, prevSessionID, sessionID, tenantID); err != nil {
 			return nil, err
 		}
-		if err := u.cloneReports(ctx, participantID, prevSessionID, sessionID, tenantID, targetGroupName); err != nil {
+		if err := u.cloneReports(ctx, participantID, prevSessionID, prevSessionName, prevSessionStatus, sessionID, tenantID, targetGroupName); err != nil {
 			return nil, err
 		}
 		if u.badgeReconciler != nil && prevSessionID != "" {
@@ -965,33 +1048,25 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 		}
 	}
 
+	// COMMIT PHASE (step 6) — ONE session-repo transaction. Membership history,
+	// the consent reset and the pointer move all go through SessionRepository,
+	// the only repository exposing Transaction, so they commit together: a
+	// failure rolls all three back instead of leaving membership recorded
+	// without the move, or a cleared consent on a participant that never left
+	// the source session.
+	//
 	// History write (isolation): record the SOURCE membership in the single
 	// place that severs the old pointer — right before the move below. The
 	// record is idempotent (UNIQUE participant_id+session_id), and the earlier
 	// participant_already_in_session guard guarantees prevSessionID is never
-	// the target session. A failure aborts before the move: the participant
-	// stays in the source session and a retry converges (every step above is
-	// idempotent).
-	if prevSessionID != "" {
-		m := &entity.ParticipantSessionMembership{
-			TenantID:      p.TenantID,
-			ParticipantID: participantID,
-			SessionID:     prevSessionID,
-			GroupID:       p.GroupID,
-		}
-		if err := u.sessionRepo.RecordMembership(ctx, m); err != nil {
-			return nil, err
-		}
-	}
-
+	// the target session.
+	//
 	// Consent invariant — SETIAP SESI WAJIB CONSENT ULANG: consent is keyed per
 	// (participant, session) in consent_logs, so NOTHING of it travels with the
 	// move. The denormalized participants.consent_* projection belongs to the
-	// SOURCE session only and is reset HERE, before the move (same
-	// abort-before-move ordering as the clone steps — a failure leaves the
-	// participant in the source session and a retry converges, while a
-	// participant that moved with a stale projection would claim granted
-	// consent it never gave in the target). The reset mirrors exactly what
+	// SOURCE session only and is reset HERE, inside the same transaction as the
+	// move — while a participant that moved with a stale projection would claim
+	// granted consent it never gave in the target. The reset mirrors exactly what
 	// RespondCombined writes on grant (consent_handler): consent_photo,
 	// consent_at and the combined token pair — so after migration the
 	// participant reports consent_photo=false (every facilitator guard goes
@@ -1000,26 +1075,40 @@ func (u *SessionUsecase) LinkParticipant(ctx context.Context, sessionID, partici
 	// Persistence uses the map-based UpdateParticipantFields, NOT the move's
 	// struct-based UpdateParticipant: GORM skips zero-value struct fields, so
 	// false/nil would never reach the DB (the C2 zero-value bug).
-	p.ConsentPhoto = false
-	p.ConsentAt = nil
-	p.ConsentCombinedToken = nil
-	p.ConsentCombinedTokenExpiresAt = nil
-	if err := u.sessionRepo.UpdateParticipantFields(ctx, participantID, map[string]interface{}{
-		"consent_photo":                     false,
-		"consent_at":                        nil,
-		"consent_combined_token":            nil,
-		"consent_combined_token_expires_at": nil,
-	}); err != nil {
-		return nil, err
-	}
+	if err := u.sessionRepo.Transaction(ctx, func(tx repository.SessionRepository) error {
+		if prevSessionID != "" {
+			m := &entity.ParticipantSessionMembership{
+				TenantID:      p.TenantID,
+				ParticipantID: participantID,
+				SessionID:     prevSessionID,
+				GroupID:       p.GroupID,
+			}
+			if err := tx.RecordMembership(ctx, m); err != nil {
+				return err
+			}
+		}
 
-	sid := sessionID
-	p.SessionID = &sid
-	if groupID != "" {
-		g := groupID
-		p.GroupID = &g
-	}
-	if err := u.sessionRepo.UpdateParticipant(ctx, p); err != nil {
+		p.ConsentPhoto = false
+		p.ConsentAt = nil
+		p.ConsentCombinedToken = nil
+		p.ConsentCombinedTokenExpiresAt = nil
+		if err := tx.UpdateParticipantFields(ctx, participantID, map[string]interface{}{
+			"consent_photo":                     false,
+			"consent_at":                        nil,
+			"consent_combined_token":            nil,
+			"consent_combined_token_expires_at": nil,
+		}); err != nil {
+			return err
+		}
+
+		sid := sessionID
+		p.SessionID = &sid
+		if groupID != "" {
+			g := groupID
+			p.GroupID = &g
+		}
+		return tx.UpdateParticipant(ctx, p)
+	}); err != nil {
 		return nil, err
 	}
 	return &repository.LinkParticipantResult{
@@ -1046,6 +1135,17 @@ func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, c
 	p, err := u.sessionRepo.GetParticipantByID(ctx, participantID, "")
 	if err != nil {
 		return nil, err
+	}
+	// Audit #13b: a profile write on a participant who still points at a
+	// session is a session-scoped write — only DRAFT/ACTIVE sessions accept
+	// it; COMPLETED/CANCELLED reject with session_not_editable (the old path
+	// wrote straight through). Standalone (session-less) participants stay
+	// ungated, like every other session-less participant write. Tenant scope
+	// matches the participant load above (unscoped), so the gate is status-only.
+	if p.SessionID != nil && *p.SessionID != "" {
+		if _, err := u.requireEditableSession(ctx, *p.SessionID, ""); err != nil {
+			return nil, err
+		}
 	}
 	childName = strings.TrimSpace(childName)
 	schoolName = strings.TrimSpace(schoolName)
@@ -1207,6 +1307,8 @@ func (u *SessionUsecase) cloneSubstages(ctx context.Context, sessionID, programI
 // failure — list, substage remap, create — is returned to the caller; only a
 // duplicate-key conflict (target row already exists, e.g. a retry after a
 // partially applied migration) is logged and skipped for idempotency.
+// Provenance: every clone stamps SourceSessionID = oldSessionID (the session
+// it was copied from); natively created assessments keep nil.
 func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participantID, oldSessionID, newSessionID, tenantID string) error {
 	if u.assessmentRepo == nil || u.sessionSubstages == nil || oldSessionID == "" {
 		return nil
@@ -1237,6 +1339,8 @@ func (u *SessionUsecase) cloneScoredAssessments(ctx context.Context, participant
 			Comment:           a.Comment,
 			AssessedBy:        a.AssessedBy,
 			AssessedAt:        a.AssessedAt,
+			// Provenance: this row is a CLONE from oldSessionID.
+			SourceSessionID: new(oldSessionID),
 		}
 		if cerr := u.assessmentRepo.Create(ctx, clone); cerr != nil {
 			if isConflict(cerr) {
@@ -1264,9 +1368,13 @@ const reportCloneListLimit = 1000
 // the target session, and a legacy whole-session row (empty program_stage_id)
 // maps onto the target's legacy slot.
 //
-// The copy keeps the report's content and review state — ProgramStageID,
-// AINarrativeDraft, AINarrativeFinal, Status, GeneratedAt, ApprovedBy,
-// ReportPDFURL — but it is a NEW delivery, so delivery/token fields reset:
+// The copy keeps the report's CONTENT — ProgramStageID, AINarrativeDraft,
+// AINarrativeFinal, GeneratedAt, ApprovedBy, ReportPDFURL — but it is a NEW
+// delivery in the target session, so review/delivery state resets:
+//   - Status = DRAFT for EVERY clone, whatever the source's status (SENT,
+//     APPROVED, PENDING_REVIEW, …): the copy must be re-reviewed and re-sent
+//     in the target session and can never appear there as already delivered
+//     or approved. The source row keeps its own status untouched.
 //   - SentAt = nil: the copy has never been delivered, so it stays
 //     re-sendable; the source row keeps its own delivery history;
 //   - ParentAccessToken = fresh util.RandomToken (the helper GetOrCreateDraft
@@ -1286,6 +1394,12 @@ const reportCloneListLimit = 1000
 //     usual — the participant keeps pointing at the same group, so that value
 //     is correct by definition.
 //
+// Provenance: every clone stamps SourceSessionID/SourceSessionName/
+// SourceSessionStatus with the source session's id and a SNAPSHOT of its
+// name+status taken by LinkParticipant at clone time (no re-resolve at read
+// time, so the label survives a later hard delete of the source session);
+// natively created reports keep all three nil (JSON null).
+//
 // Ordering/idempotency (LinkParticipant step 4, before the participant moves):
 // the target session's active reports are read once and indexed by
 // program_stage_id — an occupied slot means a previous (possibly partially
@@ -1297,7 +1411,7 @@ const reportCloneListLimit = 1000
 // ReplaceByReport (atomic delete + insert) — re-running overwrites with
 // identical rows instead of duplicating. Optional deps: unwired repos (either
 // nil) skip cloning entirely, like the other optional LinkParticipant steps.
-func (u *SessionUsecase) cloneReports(ctx context.Context, participantID, oldSessionID, newSessionID, tenantID, targetGroupName string) error {
+func (u *SessionUsecase) cloneReports(ctx context.Context, participantID, oldSessionID, sourceSessionName, sourceSessionStatus, newSessionID, tenantID, targetGroupName string) error {
 	if u.reportRepo == nil || u.missionRepo == nil || oldSessionID == "" {
 		return nil
 	}
@@ -1340,13 +1454,21 @@ func (u *SessionUsecase) cloneReports(ctx context.Context, participantID, oldSes
 				ParticipantID:  participantID,
 				SessionID:      newSessionID,
 				ProgramStageID: src.ProgramStageID,
-				// Content + review state carried as-is (see doc comment).
+				// Content carried as-is; review state reset (see doc comment).
 				AINarrativeDraft: src.AINarrativeDraft,
 				AINarrativeFinal: src.AINarrativeFinal,
-				Status:           src.Status,
-				GeneratedAt:      src.GeneratedAt,
-				ApprovedBy:       src.ApprovedBy,
-				ReportPDFURL:     src.ReportPDFURL,
+				// ALWAYS DRAFT — a clone must never inherit the source's
+				// APPROVED/SENT/PENDING_REVIEW state (audit point #7); the
+				// source row itself is never written here.
+				Status:       entity.ReportDraft,
+				GeneratedAt:  src.GeneratedAt,
+				ApprovedBy:   src.ApprovedBy,
+				ReportPDFURL: src.ReportPDFURL,
+				// Provenance snapshot (see doc comment): which session this
+				// report was cloned from, with its name+status at clone time.
+				SourceSessionID:     new(oldSessionID),
+				SourceSessionName:   new(sourceSessionName),
+				SourceSessionStatus: new(sourceSessionStatus),
 				// Explicit target group wins (Create only denormalizes an
 				// empty GroupName); "" keeps the denorm path — see doc.
 				GroupName:         targetGroupName,
@@ -1442,6 +1564,8 @@ func (u *SessionUsecase) sessionStageMaps(ctx context.Context, oldSessionID, new
 // moves. Each write is an Upsert keyed on
 // (participant, session, session_stage), keeping retries idempotent.
 // Legacy session-wide rows (empty session_stage_id, pre-backfill) carry as-is.
+// Provenance: every carried row stamps SourceSessionID = oldSessionID (the
+// session it was copied from); natively created rows keep nil.
 func (u *SessionUsecase) carryAttendance(ctx context.Context, participantID, oldSessionID, newSessionID, tenantID string) error {
 	if u.attendanceRepo == nil || oldSessionID == "" {
 		return nil
@@ -1477,6 +1601,8 @@ func (u *SessionUsecase) carryAttendance(ctx context.Context, participantID, old
 			IsPresent:      src.IsPresent,
 			MarkedAt:       src.MarkedAt,
 			MarkedBy:       src.MarkedBy,
+			// Provenance: this row is CARRIED from oldSessionID.
+			SourceSessionID: new(oldSessionID),
 		}
 		if uerr := u.attendanceRepo.Upsert(ctx, dst); uerr != nil {
 			return uerr

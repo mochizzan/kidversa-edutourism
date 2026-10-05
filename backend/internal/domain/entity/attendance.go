@@ -21,4 +21,9 @@ type ParticipantAttendance struct {
 	IsPresent      bool      `json:"is_present"`
 	MarkedAt       time.Time `json:"marked_at"`
 	MarkedBy       *string   `json:"marked_by,omitempty"`
+	// SourceSessionID is provenance (penelusuran asal) for rows CARRIED by
+	// LinkParticipant: the source session the row was copied from; nil for
+	// rows natively created in this session. Always serialized (no omitempty)
+	// so the API answers an explicit null for non-clones.
+	SourceSessionID *string `json:"source_session_id"`
 }

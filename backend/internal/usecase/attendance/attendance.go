@@ -57,14 +57,26 @@ func (u *Usecase) ListBySessionStage(ctx context.Context, sessionID, sessionStag
 //
 // sessionStageID is required (every write is per-Topik) and must belong to
 // the session — a stage of another session is rejected with an explicit
-// topic_not_in_session instead of writing a cross-session row.
+// topic_not_in_session instead of writing a cross-session row. The owning
+// session is read first: a CANCELLED session rejects the write with
+// session_not_active (read paths stay untouched).
 func (u *Usecase) Upsert(ctx context.Context, participantID, sessionID, sessionStageID string, isPresent bool, markedBy, tenantID string) (*entity.ParticipantAttendance, error) {
 	if participantID == "" || sessionID == "" || sessionStageID == "" {
 		return nil, apperrors.BadRequest("validation_error", nil)
 	}
-	// Whole-group lock keeps precedence (mirrors the assessment usecase where
-	// group_completed precedes substage_completed): a COMPLETED group rejects
-	// every write before any topic validation.
+	// Session-status gate first (mirrors the assessment usecase, which reads the
+	// session before any group/topic gate): a CANCELLED session rejects every
+	// attendance write with session_not_active before anything else is checked.
+	sess, err := u.sessionRepo.GetSessionByID(ctx, sessionID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if sess != nil && sess.Status == entity.SessionCancelled {
+		return nil, apperrors.Forbidden("session_not_active", errors.New("attendance cannot be changed after the session is cancelled"))
+	}
+	// Whole-group lock keeps precedence over topic validation (mirrors the
+	// assessment usecase where group_completed precedes substage_completed): a
+	// COMPLETED group rejects every write before any topic validation.
 	g, err := u.sessionRepo.GetSessionGroupByParticipant(ctx, participantID)
 	if err != nil {
 		return nil, err

@@ -106,6 +106,56 @@ func (r *GormProgramRepository) DeleteProgram(ctx context.Context, id string) er
 	return nil
 }
 
+func (r *GormProgramRepository) CountProgramSessions(ctx context.Context, programID string) (int64, error) {
+	// Default GORM scope = live (non soft-deleted) sessions, all statuses.
+	var n int64
+	if err := r.db.WithContext(ctx).Model(&SessionModel{}).Where("program_id = ?", programID).Count(&n).Error; err != nil {
+		return 0, apperrors.Internal("internal_error", err)
+	}
+	return n, nil
+}
+
+func (r *GormProgramRepository) ListProgramSessionBriefs(ctx context.Context, programID string, limit int) ([]entity.Session, error) {
+	q := r.db.WithContext(ctx).Model(&SessionModel{}).Where("program_id = ?", programID).Order("created_at ASC, id ASC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	var models []SessionModel
+	if err := q.Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.Session, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return items, nil
+}
+
+func (r *GormProgramRepository) DeleteProgramForce(ctx context.Context, id string) error {
+	// One transaction: purge every session of the program (incl. legacy
+	// soft-deleted rows — hence Unscoped) together with its children, then
+	// hard-delete the program so its FK cascades (sessions, program_stages,
+	// mission_banks, participant_badges) fire on the physical row removal.
+	// Children are purged per session FIRST because the no-FK tables
+	// (group_stage_progress_history, timeline_events, gallery_tokens) are not
+	// covered by any cascade.
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var ids []string
+		if err := tx.Unscoped().Model(&SessionModel{}).Where("program_id = ?", id).Pluck("id", &ids).Error; err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+		for _, sid := range ids {
+			if err := purgeSessionRows(tx, sid); err != nil {
+				return err
+			}
+		}
+		if err := tx.Unscoped().Delete(&ProgramModel{}, "id = ?", id).Error; err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+		return nil
+	})
+}
+
 func (r *GormProgramRepository) ToggleActiveProgram(ctx context.Context, id string) (*entity.Program, error) {
 	var m ProgramModel
 	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
@@ -208,10 +258,23 @@ func (r *GormProgramRepository) UpdateStage(ctx context.Context, s *entity.Progr
 }
 
 func (r *GormProgramRepository) DeleteStage(ctx context.Context, id string) error {
-	if err := r.db.WithContext(ctx).Delete(&ProgramStageModel{}, "id = ?", id).Error; err != nil {
-		return apperrors.Internal("internal_error", err)
-	}
-	return nil
+	// Hard delete in ONE transaction. Children with an FK to program_stages
+	// (program_substages→session_substages, session_stages, mission_bank_stages,
+	// participant_badges) cascade on the physical row removal; rows that carry
+	// program_stage_id WITHOUT an FK (assessments, reports, report_photo_picks)
+	// are purged manually so nothing keeps pointing at the deleted stage.
+	// The old GORM soft delete left the row present, so no cascade ever fired.
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, table := range []string{"assessments", "reports", "report_photo_picks"} {
+			if err := tx.Exec("DELETE FROM "+table+" WHERE program_stage_id = ?", id).Error; err != nil {
+				return apperrors.Internal("internal_error", err)
+			}
+		}
+		if err := tx.Unscoped().Delete(&ProgramStageModel{}, "id = ?", id).Error; err != nil {
+			return apperrors.Internal("internal_error", err)
+		}
+		return nil
+	})
 }
 
 // ListStageContents returns the JOIN-shaped StageContent list for a program
