@@ -591,9 +591,15 @@ export function useReportReview(sessionId: string | undefined, participantId: st
  const buildRaportHtml = useCallback(async (): Promise<string | null> => {
   if (!participant || !session) return null
 
-  const groupName = participant.group_id
-   ? groups.find((g) => g.id === participant.group_id)?.name
-   : undefined
+  // Nama kelompok per-sesi: report.group_name (denormalisasi backend, milik
+  // laporan ini) MENANG; intersect groups<->group_id hanya fallback kompatibel
+  // mundul bila payload lama tak membawa group_name (pointer global peserta
+  // bisa menunjuk kelompok sesi lain → find meleset → "-").
+  const groupName =
+   report?.group_name ||
+   (participant.group_id
+    ? groups.find((g) => g.id === participant.group_id)?.name
+    : undefined)
 
   const detailStages = stageInfos.slice(0, RAPORT_LAYOUT.MAX_DETAIL_STAGES)
   const extraTopicsCount = Math.max(0, stageInfos.length - RAPORT_LAYOUT.MAX_DETAIL_STAGES)

@@ -308,6 +308,17 @@ func (r *fakeSessionRepo) ListSessionStages(ctx context.Context, sessionID strin
 	return r.stages, nil
 }
 
+// ListSessionMemberships/ListSessionGroups: BuildPublicReportView's group
+// resolution chain reads both; the fixture's participant has no group and no
+// membership history, so nothing resolves (badge tests assert badges only).
+func (r *fakeSessionRepo) ListSessionMemberships(ctx context.Context, sessionID, tenantID string) ([]entity.ParticipantSessionMembership, error) {
+	return nil, nil
+}
+
+func (r *fakeSessionRepo) ListSessionGroups(ctx context.Context, sessionID string) ([]entity.SessionGroup, error) {
+	return nil, nil
+}
+
 func (r *fakeSessionRepo) ListParticipants(ctx context.Context, sessionID, groupID, tenantID string) ([]entity.Participant, error) {
 	return r.participants, nil
 }

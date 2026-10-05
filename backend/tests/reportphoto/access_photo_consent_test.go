@@ -56,6 +56,17 @@ func (f *accessSessionRepo) ListSessionStages(context.Context, string) ([]entity
 	return nil, nil
 }
 
+// ListSessionMemberships/ListSessionGroups: rantai resolusi grup membaca
+// keduanya; peserta fake tanpa grup & tanpa riwayat keanggotaan → tak ada
+// yang cocok (GroupName tetap "" — rute ini tidak pernah meng_assert-nya).
+func (f *accessSessionRepo) ListSessionMemberships(context.Context, string, string) ([]entity.ParticipantSessionMembership, error) {
+	return nil, nil
+}
+
+func (f *accessSessionRepo) ListSessionGroups(context.Context, string) ([]entity.SessionGroup, error) {
+	return nil, nil
+}
+
 // accessProgramRepo: program OK; Topik report tidak ada → topik "" (ditolerir).
 type accessProgramRepo struct {
 	repository.ProgramRepository

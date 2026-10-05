@@ -328,6 +328,9 @@ export interface Report {
  generated_at?: string
  sent_at?: string
  approved_by?: string
+ /** Denormalized session_groups.name milik laporan INI (bukan pointer
+  *  global peserta) — sumber otoritatif nama kelompok per-sesi. */
+ group_name?: string
 }
 
 export interface ParticipantMission {

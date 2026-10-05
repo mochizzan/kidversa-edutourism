@@ -120,16 +120,45 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 		}
 	}
 
-	// Participant group: live name lookup (admin parity — report.group_name is
-	// a denormalization that goes stale when the group is renamed).
+	// Participant group — canonical per-session resolution chain:
+	//  1) participant_session_memberships row for THIS session (the per-session
+	//     truth recorded before a move overwrites the global pointer),
+	//  2) the report's own denormalized group_name (stamped per-session at
+	//     create/clone time),
+	//  3) the live participants.group_id pointer — ONLY while the participant
+	//     is still linked to this session. The pointer follows the participant
+	//     across sessions, so it must never resolve a report from a session it
+	//     has left. Steps 1/3 resolve the live name inside THIS session (admin
+	//     parity: a renamed group shows its current name).
 	var groups []entity.SessionGroup
-	if derefStr(participant.GroupID) != "" {
+	// resolvedGroupID drives BOTH the name lookup and the facilitator fallback
+	// so they follow the same per-session group.
+	var resolvedGroupID string
+	memberships, err := u.sessionRepo.ListSessionMemberships(ctx, r.SessionID, "")
+	if err != nil {
+		return nil, err
+	}
+	for i := range memberships {
+		if memberships[i].ParticipantID == r.ParticipantID && derefStr(memberships[i].GroupID) != "" {
+			resolvedGroupID = *memberships[i].GroupID
+			break
+		}
+	}
+	switch {
+	case resolvedGroupID != "":
+		// Membership row wins → live name lookup below.
+	case r.GroupName != "":
+		view.GroupName = r.GroupName
+	case derefStr(participant.SessionID) == r.SessionID && derefStr(participant.GroupID) != "":
+		resolvedGroupID = derefStr(participant.GroupID)
+	}
+	if resolvedGroupID != "" {
 		groups, err = u.sessionRepo.ListSessionGroups(ctx, r.SessionID)
 		if err != nil {
 			return nil, err
 		}
 		for i := range groups {
-			if groups[i].ID == *participant.GroupID {
+			if groups[i].ID == resolvedGroupID {
 				view.GroupName = groups[i].Name
 				break
 			}
@@ -137,11 +166,12 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 	}
 	// GetByToken already resolved the facilitator name read-time via the same
 	// join the admin session detail uses (users.name via group.facilitator_id);
-	// fall back to group → user when it came back empty.
+	// fall back to group → user when it came back empty — keyed on the SAME
+	// per-session group resolved above, never the global pointer.
 	view.FacilitatorName = r.FacilitatorName
-	if view.FacilitatorName == "" && u.userRepo != nil && derefStr(participant.GroupID) != "" {
+	if view.FacilitatorName == "" && u.userRepo != nil && resolvedGroupID != "" {
 		for i := range groups {
-			if groups[i].ID != *participant.GroupID || groups[i].FacilitatorID == nil || *groups[i].FacilitatorID == "" {
+			if groups[i].ID != resolvedGroupID || groups[i].FacilitatorID == nil || *groups[i].FacilitatorID == "" {
 				continue
 			}
 			if usr, uerr := u.userRepo.GetByID(ctx, *groups[i].FacilitatorID); uerr == nil && usr != nil {

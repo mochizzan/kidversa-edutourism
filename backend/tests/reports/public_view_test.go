@@ -20,6 +20,14 @@ type viewSessionRepo struct {
 	session     *entity.Session
 	stages      []entity.SessionStage
 	groups      []entity.SessionGroup
+	// groupsBySession, when non-nil, supersedes groups so a lookup against
+	// the WRONG session returns a different (wrong) name instead of a lucky
+	// match — mirrors per-session session_groups rows.
+	groupsBySession map[string][]entity.SessionGroup
+	// memberships served by ListSessionMemberships, session-scoped like the
+	// production WHERE session_id = ? (tenant intentionally not filtered —
+	// that scoping is covered by the repo-level sqlmock tests).
+	memberships []entity.ParticipantSessionMembership
 }
 
 func (f *viewSessionRepo) GetParticipantByID(ctx context.Context, id, tenantID string) (*entity.Participant, error) {
@@ -35,7 +43,20 @@ func (f *viewSessionRepo) ListSessionStages(ctx context.Context, sessionID strin
 }
 
 func (f *viewSessionRepo) ListSessionGroups(ctx context.Context, sessionID string) ([]entity.SessionGroup, error) {
+	if f.groupsBySession != nil {
+		return f.groupsBySession[sessionID], nil
+	}
 	return f.groups, nil
+}
+
+func (f *viewSessionRepo) ListSessionMemberships(ctx context.Context, sessionID, tenantID string) ([]entity.ParticipantSessionMembership, error) {
+	out := make([]entity.ParticipantSessionMembership, 0, len(f.memberships))
+	for i := range f.memberships {
+		if f.memberships[i].SessionID == sessionID {
+			out = append(out, f.memberships[i])
+		}
+	}
+	return out, nil
 }
 
 type viewProgramRepo struct {
@@ -130,6 +151,7 @@ type viewFixture struct {
 	uc          *reports.Usecase
 	assessments *viewAssessmentRepo
 	missions    *viewMissionRepo
+	sessRepo    *viewSessionRepo
 }
 
 // newViewFixture wires a session with 3 mapped Topik (stage1/stage2/stage3),
@@ -138,11 +160,13 @@ func newViewFixture() *viewFixture {
 	tenant := "t-1"
 	groupID := "g1"
 	facilitatorID := "u1"
+	sessID := "s1" // the report's session (newViewReport) — participant is still in it
 	ts := time.Date(2026, 9, 19, 10, 0, 0, 0, time.UTC)
 
 	sessRepo := &viewSessionRepo{
 		participant: &entity.Participant{
 			TenantID:   &tenant,
+			SessionID:  &sessID,
 			GroupID:    &groupID,
 			ChildName:  "Budi Santoso",
 			ChildAge:   7,
@@ -215,7 +239,7 @@ func newViewFixture() *viewFixture {
 	users := &viewUserRepo{users: map[string]entity.User{"u1": {BaseModel: entity.BaseModel{ID: "u1"}, Name: "Bu Sari"}}}
 
 	uc := reports.NewUsecase(nil, nil, nil, missions, assessments, sessRepo, progRepo, nil, progSubs, sessSubs, nil, (*config.Config)(nil), nil, users, nil)
-	return &viewFixture{uc: uc, assessments: assessments, missions: missions}
+	return &viewFixture{uc: uc, assessments: assessments, missions: missions, sessRepo: sessRepo}
 }
 
 func newViewReport() *entity.Report {
@@ -429,4 +453,165 @@ func TestBuildPublicReportViewLegacyKeepsSessionWideStages(t *testing.T) {
 	if view.Stages[2].Kegiatan[0].StarRating != 5 {
 		t.Errorf("stage[2] rating = %d, want 5", view.Stages[2].Kegiatan[0].StarRating)
 	}
+}
+
+// ── Group resolution: per-session history contract ──
+//
+// The mini-rapor kelompok must come from the REPORT'S session, in this order:
+//  1. the participant_session_memberships row for (report.ParticipantID,
+//     report.SessionID) with a non-empty group_id → live name via
+//     ListSessionGroups(report.SessionID);
+//  2. else report.group_name (the denormalized per-session name);
+//  3. else the participant is still in the report's session with a group
+//     pointer → live name ∩ ListSessionGroups(report.SessionID);
+//  4. else "" — the global pointer must never leak a name from, or into,
+//     another session's historical report.
+//
+// The fakes serve group lists PER SESSION, so resolving against the wrong
+// session yields "Kelompok Kelinci" (or "") instead of a lucky match.
+
+// group builds a session group with an optional facilitator.
+func group(id, name, facilitatorID string) entity.SessionGroup {
+	g := entity.SessionGroup{BaseModel: entity.BaseModel{ID: id}, Name: name}
+	if facilitatorID != "" {
+		g.FacilitatorID = &facilitatorID
+	}
+	return g
+}
+
+// moveParticipant points the participant's GLOBAL pointer at another session
+// (the state LinkParticipant leaves behind: report rows stay in the source
+// session while the pointer names the destination).
+func moveParticipant(f *viewFixture, sessionID, groupID string) {
+	f.sessRepo.participant.SessionID = &sessionID
+	f.sessRepo.participant.GroupID = &groupID
+}
+
+// TestBuildPublicReportViewResolvesGroupPerSession is the regression for the
+// "same program, different session, same participant" mini-rapor: after
+// LinkParticipant moves the participant, the report's session still holds the
+// per-session membership row (and the denormalized report.group_name), so
+// GroupName must resolve — never the empty "-" render, and never a group name
+// borrowed from the participant's current session.
+func TestBuildPublicReportViewResolvesGroupPerSession(t *testing.T) {
+	// T1 (headline): peserta pindah sesi. Report row in s1, participant
+	// pointer now s2/g2, membership (p1, s1) → g1. Must resolve s1's group.
+	t.Run("T1_peserta_pindah_sesi_pakai_keanggotaan_sesi_lama", func(t *testing.T) {
+		f := newViewFixture()
+		moveParticipant(f, "s2", "g2")
+		f.sessRepo.groupsBySession = map[string][]entity.SessionGroup{
+			"s1": {group("g1", "Kelompok Sapi", "u1")},
+			"s2": {group("g2", "Kelompok Kelinci", "u2")},
+		}
+		g1 := "g1"
+		f.sessRepo.memberships = []entity.ParticipantSessionMembership{
+			{ParticipantID: "p1", SessionID: "s1", GroupID: &g1},
+		}
+
+		view, err := f.uc.BuildPublicReportView(context.Background(), newViewReport())
+		if err != nil {
+			t.Fatalf("BuildPublicReportView: %v", err)
+		}
+		if view.GroupName != "Kelompok Sapi" {
+			t.Fatalf("GroupName = %q, want %q (membership for the report's session); never %q",
+				view.GroupName, "Kelompok Sapi", "Kelompok Kelinci")
+		}
+	})
+
+	// T2: no membership row, but the report carries the per-session
+	// denormalized name — it wins over the participant's foreign pointer.
+	t.Run("T2_fallback_ke_report_group_name", func(t *testing.T) {
+		f := newViewFixture()
+		moveParticipant(f, "s2", "g2")
+		f.sessRepo.groupsBySession = map[string][]entity.SessionGroup{
+			"s1": {group("g1", "Kelompok Sapi", "u1")},
+			"s2": {group("g2", "Kelompok Kelinci", "u2")},
+		}
+
+		r := newViewReport()
+		r.GroupName = "Kelompok Lama"
+		view, err := f.uc.BuildPublicReportView(context.Background(), r)
+		if err != nil {
+			t.Fatalf("BuildPublicReportView: %v", err)
+		}
+		if view.GroupName != "Kelompok Lama" {
+			t.Fatalf("GroupName = %q, want %q (report.group_name fallback)", view.GroupName, "Kelompok Lama")
+		}
+	})
+
+	// T3: the happy path is preserved — no membership, no denormalized name,
+	// but the participant is still IN the report's session with a group
+	// pointer → live intersection resolves as before.
+	t.Run("T3_peserta_masih_di_sesi_yang_sama", func(t *testing.T) {
+		f := newViewFixture()
+		current := "s1"
+		f.sessRepo.participant.SessionID = &current // GroupID stays fixture's "g1"
+		f.sessRepo.groupsBySession = map[string][]entity.SessionGroup{
+			"s1": {group("g1", "Kelompok Sapi", "u1")},
+			"s2": {group("g2", "Kelompok Kelinci", "u2")},
+		}
+
+		view, err := f.uc.BuildPublicReportView(context.Background(), newViewReport())
+		if err != nil {
+			t.Fatalf("BuildPublicReportView: %v", err)
+		}
+		if view.GroupName != "Kelompok Sapi" {
+			t.Fatalf("GroupName = %q, want %q (still-in-session pointer path)", view.GroupName, "Kelompok Sapi")
+		}
+	})
+
+	// T4: no per-session data at all → "". The global pointer (g2, another
+	// session) must never leak into this historical report. The decoy
+	// membership row belongs to a DIFFERENT participant in the report's
+	// session — matching must be keyed on (report.ParticipantID,
+	// report.SessionID), so it must be ignored too.
+	t.Run("T4_ptr_global_tidak_bocor", func(t *testing.T) {
+		f := newViewFixture()
+		moveParticipant(f, "s2", "g2")
+		f.sessRepo.groupsBySession = map[string][]entity.SessionGroup{
+			"s1": {group("g1", "Kelompok Sapi", "u1")},
+			"s2": {group("g2", "Kelompok Kelinci", "u2")},
+		}
+		g1 := "g1"
+		f.sessRepo.memberships = []entity.ParticipantSessionMembership{
+			{ParticipantID: "other-p", SessionID: "s1", GroupID: &g1},
+		}
+
+		view, err := f.uc.BuildPublicReportView(context.Background(), newViewReport())
+		if err != nil {
+			t.Fatalf("BuildPublicReportView: %v", err)
+		}
+		if view.GroupName != "" {
+			t.Fatalf("GroupName = %q, want \"\" (no data for THIS participant in THIS session)", view.GroupName)
+		}
+	})
+
+	// T5: the facilitator fallback resolves from the per-session-resolved
+	// group (membership → g1 → u1), not from the raw global pointer
+	// (g2 → u2 / no match). report.FacilitatorName is empty so the
+	// group→user fallback is exercised.
+	t.Run("T5_fasilitator_dari_grup_terselesaikan", func(t *testing.T) {
+		f := newViewFixture()
+		moveParticipant(f, "s2", "g2")
+		f.sessRepo.groupsBySession = map[string][]entity.SessionGroup{
+			"s1": {group("g1", "Kelompok Sapi", "u1")},
+			"s2": {group("g2", "Kelompok Kelinci", "u2")},
+		}
+		g1 := "g1"
+		f.sessRepo.memberships = []entity.ParticipantSessionMembership{
+			{ParticipantID: "p1", SessionID: "s1", GroupID: &g1},
+		}
+
+		view, err := f.uc.BuildPublicReportView(context.Background(), newViewReport())
+		if err != nil {
+			t.Fatalf("BuildPublicReportView: %v", err)
+		}
+		if view.GroupName != "Kelompok Sapi" {
+			t.Fatalf("GroupName = %q, want %q (membership path)", view.GroupName, "Kelompok Sapi")
+		}
+		if view.FacilitatorName != "Bu Sari" {
+			t.Fatalf("FacilitatorName = %q, want %q (resolved group g1's facilitator, not the global pointer)",
+				view.FacilitatorName, "Bu Sari")
+		}
+	})
 }
