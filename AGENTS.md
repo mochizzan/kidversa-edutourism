@@ -147,6 +147,7 @@ scripts/push-ghcr.sh                           # manual image publish (no image 
 - **No CI/CD pipeline is configured**: GitHub Actions was intentionally removed by decision — no `.github/workflows/` exists anywhere in this repo, so all gates must be run locally:
   `gofmt -l .` (empty) → `go vet ./...` → `go build ./...` → `go test ./...` → `pnpm build` → `pnpm test:unit:run` → `pnpm test:unit:typecheck`.
 - **SSE must stay special-cased in three places**: Vite proxy (keep-alive for `/stream`), `nginx/default.conf` (`proxy_buffering off`, 86400s timeout), `nginx/vps.conf`. A plain `proxy_pass` rewrite breaks live monitoring.
+- **OpenWA is proxied at `/wa/` on port 8002** (`nginx/default.conf`, upstream `wa-engine:2785`): `location ^~ /wa/` strips the prefix, and `sub_filter` rewrites the dashboard's root-absolute URLs — HTML asset/favicon refs, the JS API base (so `/api/*` reaches OpenWA instead of the Go backend), and the socket.io path — because OpenWA ships **no base-path option**. Static misses fall through via `try_files $uri /wa$uri`, so that extension list must cover every asset type OpenWA serves (`.webp` for its logo); a gap makes the SPA fallback answer an `<img>` with `index.html` and the image renders broken.
 - **Local harness rules** in `.omp/rules/` (gitignored) ban shell grep/sed/awk and heredoc file creation — use the repo search/edit tools instead.
 - **Never commit**: `tmp/` artifacts (logs/screenshots/credentials), `.env`, `backups/*.sql`, generated `miniRaport.styles.css` edits that weren't rebuilt.
 
