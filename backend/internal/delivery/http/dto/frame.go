@@ -13,8 +13,8 @@ func NewFrameResponse(f *entity.PhotoFrame) *FrameResponse {
 }
 
 // FrameRequest is the create/update payload.
+// Tenant is resolved from request scope (GetTenantID), never from the body (anti-forgery, F5).
 type FrameRequest struct {
-	TenantID     string `json:"tenant_id" validate:"required"`
 	ProgramID    string `json:"program_id,omitempty"`
 	Name         string `json:"name" validate:"required"`
 	FileURL      string `json:"file_url" validate:"required"`

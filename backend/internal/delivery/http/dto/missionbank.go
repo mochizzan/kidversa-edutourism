@@ -13,8 +13,8 @@ func NewMissionBankResponse(m *entity.MissionBank) *MissionBankResponse {
 }
 
 // MissionBankRequest is the create/update payload.
+// Tenant is resolved from request scope (GetTenantID), never from the body (anti-forgery, F5).
 type MissionBankRequest struct {
-	TenantID        string   `json:"tenant_id" validate:"required"`
 	ProgramID       string   `json:"program_id" validate:"required"`
 	Title           string   `json:"title" validate:"required"`
 	RelatedStageIDs []string `json:"related_stage_ids,omitempty"`
