@@ -78,19 +78,31 @@ function buildQuery(path: string, params?: ListParams): string {
   return qs ? `${path}?${qs}` : path
 }
 
+// Opt-in fetch controls for list shims. `fetchAll === undefined` preserves the
+// legacy trigger (fan-out when limit >= 100); pass `fetchAll: false` for an
+// explicit single page. `signal` aborts in-flight page fetches (forwarded to
+// apiRequest) and stops `fetchAllPages` between pages.
+export interface ListFetchOpts {
+  fetchAll?: boolean
+  signal?: AbortSignal
+}
+
 // Single source of truth for pagination traversal (EC9). Given a `requestFn`
 // that fetches one page (by 1-based page number) and resolves to `{ data, meta? }`,
 // loop until the full working set is gathered. Stops when the page is empty,
-// shorter than the requested limit, or once `meta.total` items have accumulated.
+// shorter than the requested limit, once `meta.total` items have accumulated,
+// or when `opts.signal` aborts between pages.
 // `startPage` lets a caller that already fetched page 1 resume from page 2+.
 export async function fetchAllPages<T>(
   requestFn: (page: number) => Promise<{ data: T[]; meta?: { page: number; limit: number; total: number } }>,
   startPage = 1,
+  opts?: ListFetchOpts,
 ): Promise<T[]> {
   const all: T[] = []
   let page = startPage
   // Guard with a sane upper bound so a misbehaving backend can never loop forever.
   for (let safety = 0; safety < 1000; safety++) {
+    if (opts?.signal?.aborted) break
     const res = await requestFn(page)
     const items = res.data ?? []
     all.push(...items)
@@ -108,26 +120,30 @@ export async function fetchAllPages<T>(
 export async function listRequest<T>(
   path: string,
   params?: ListParams,
+  opts?: ListFetchOpts,
 ): Promise<PaginatedResponse<T>> {
   const limit = Math.max(1, params?.limit ?? PAGE_SIZE)
   const page = Math.max(1, params?.page ?? 1)
   const url = buildQuery(path, params)
 
-  const first = await apiRequest<ListEnvelope<T>>('GET', url, undefined)
+  const first = await apiRequest<ListEnvelope<T>>('GET', url, undefined, opts?.signal ? { signal: opts.signal } : undefined)
   if (!Array.isArray(first?.data)) throw unexpectedEnvelope(url)
 
-  if (limit >= 100 && first.meta && first.meta.total > first.data.length) {
+  const shouldFetchAll = opts?.fetchAll ?? limit >= 100
+  if (shouldFetchAll && first.meta && first.meta.total > first.data.length) {
     const rest = await fetchAllPages<T>(
       async (p) => {
         const res = await apiRequest<ListEnvelope<T>>(
           'GET',
           buildQuery(path, { ...params, page: p }),
           undefined,
+          opts?.signal ? { signal: opts.signal } : undefined,
         )
         if (!Array.isArray(res?.data)) throw unexpectedEnvelope(url)
         return res
       },
       page + 1,
+      opts,
     )
     const all = [...first.data, ...rest].map(normalizeTenantId)
     return { data: all, total: first.meta.total, page: 1, limit: all.length, totalPages: 1 }
@@ -143,8 +159,8 @@ export async function listRequest<T>(
 }
 
 // GET an array (sub-resource list, e.g. stages/contents/groups/participants).
-export async function arrayRequest<T>(method: string, path: string, body?: unknown): Promise<T[]> {
-  const res = await apiRequest<ItemEnvelope<T[]>>(method, path, body)
+export async function arrayRequest<T>(method: string, path: string, body?: unknown, opts?: ListFetchOpts): Promise<T[]> {
+  const res = await apiRequest<ItemEnvelope<T[]>>(method, path, body, opts?.signal ? { signal: opts.signal } : undefined)
   if (res === undefined || res === null || typeof res !== 'object' || !('data' in res)) {
     throw unexpectedEnvelope(path)
   }
@@ -158,8 +174,8 @@ export async function arrayRequest<T>(method: string, path: string, body?: unkno
 // participant-missions). Unwraps the nested `items` array and normalizes
 // tenant_id. Tenant scoping is applied by apiRequest's built-in X-Tenant-Id
 // injection (SUPER_ADMIN), so no header plumbing is needed here.
-export async function itemsRequest<T>(method: string, path: string, body?: unknown): Promise<T[]> {
-  const res = await apiRequest<ItemsEnvelope<T>>(method, path, body)
+export async function itemsRequest<T>(method: string, path: string, body?: unknown, opts?: ListFetchOpts): Promise<T[]> {
+  const res = await apiRequest<ItemsEnvelope<T>>(method, path, body, opts?.signal ? { signal: opts.signal } : undefined)
   if (res === undefined || res === null || typeof res !== 'object' || !('data' in res)) {
     throw unexpectedEnvelope(path)
   }

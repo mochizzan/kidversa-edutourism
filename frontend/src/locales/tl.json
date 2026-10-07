@@ -1409,7 +1409,11 @@
       "needHelp": "Kailangan ng tulong?",
       "contact": "Makipag-ugnayan sa Amin",
       "expiredTitle": "Hindi na valid ang link",
-      "expiredDesc": "Ang link na ito ay paso na. Kung sa tingin mo ay may mali, mangyaring makipag-ugnayan sa coordinator para makakuha ng bagong link."
+      "expiredDesc": "Ang link na ito ay paso na. Kung sa tingin mo ay may mali, mangyaring makipag-ugnayan sa coordinator para makakuha ng bagong link.",
+      "rateLimitedTitle": "Masyadong maraming kahilingan",
+      "rateLimitedDesc": "Masyadong madalas mong binuksan ang link na ito. Mangyaring maghintay sandali at subukang muli.",
+      "serverErrorTitle": "May problema sa server",
+      "serverErrorDesc": "Nabigong i-load ang ulat dahil sa problema sa server o network. Pakisubukang muli."
     },
     "missions": {
       "loadError": "Nabigong i-load ang misyon. Pakisubukang muli.",

@@ -1409,7 +1409,11 @@
       "needHelp": "Perlukan bantuan?",
       "contact": "Hubungi Kami",
       "expiredTitle": "Pautan sudah tidak sah",
-      "expiredDesc": "Pautan ini telah luput. Jika anda rasa ini satu kesilapan, sila hubungi penyelaras untuk mendapatkan pautan baharu."
+      "expiredDesc": "Pautan ini telah luput. Jika anda rasa ini satu kesilapan, sila hubungi penyelaras untuk mendapatkan pautan baharu.",
+      "rateLimitedTitle": "Terlalu banyak permintaan",
+      "rateLimitedDesc": "Anda mengakses pautan terlalu kerap. Sila tunggu sebentar kemudian cuba lagi.",
+      "serverErrorTitle": "Gangguan pelayan",
+      "serverErrorDesc": "Gagal memuatkan laporan kerana gangguan pelayan atau rangkaian. Sila cuba lagi."
     },
     "missions": {
       "loadError": "Gagal memuatkan misi. Sila cuba lagi.",

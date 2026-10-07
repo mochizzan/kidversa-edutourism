@@ -71,7 +71,7 @@ func (h *SessionParticipantBulkHandler) UpdateParticipant(c *echo.Context) error
 	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
 		return nil
 	}
-	p, err := h.uc.UpdateParticipant((*c).Request().Context(), pid,
+	p, err := h.uc.UpdateParticipant((*c).Request().Context(), appmiddleware.GetTenantID(c), pid,
 		req.ChildName, req.ChildAge, req.SchoolName, req.ParentName, req.ParentPhone,
 		req.ParentEmail, req.GroupID, req.ConsentPhoto, req.ChildAge != 0)
 	if err != nil {

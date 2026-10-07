@@ -39,7 +39,7 @@ const ChangePasswordPage = () => {
   const location = useLocation()
   const { isAuthenticated, user } = useAuth()
   const setUser = useAuthStore((s) => s.setUser)
-  const returnUrl = searchParams.get('returnUrl') || ROUTES.ADMIN.DASHBOARD
+  const returnUrl = searchParams.get('returnUrl') || useAuthStore.getState().getRedirectPath()
   const { t } = useTranslation()
 
   const {

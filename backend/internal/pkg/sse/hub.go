@@ -36,6 +36,11 @@ type perChannelState struct {
 
 	mu      sync.RWMutex
 	clients map[string]chan Event
+
+	// lastActive is the last Publish/Subscribe/unsubscribe activity.
+	// Guarded by the Hub's mu (never by pc.mu) — all stamps go through
+	// getOrCreate or the unsubscribe func, both under hub mu.
+	lastActive time.Time
 }
 
 // Hub is an in-memory SSE pub/sub hub (single-instance v1).
@@ -49,11 +54,25 @@ type Hub struct {
 	published int64
 	dropped   int64
 	slow      int64
+
+	// sweepTick counts Publish calls; maybeSweep runs an idle sweep every
+	// 128th call (or immediately when over SSEMaxChannels).
+	sweepTick uint64
+	// now is the clock for idle expiry; nil means time.Now. Tests override it.
+	now func() time.Time
 }
 
 // NewHub creates an empty hub.
 func NewHub() *Hub {
-	return &Hub{channels: make(map[string]*perChannelState)}
+	return &Hub{channels: make(map[string]*perChannelState), now: time.Now}
+}
+
+// nowOrDefault returns the hub clock (time.Now outside tests).
+func (h *Hub) nowOrDefault() time.Time {
+	if h.now != nil {
+		return h.now()
+	}
+	return time.Now()
 }
 
 func (h *Hub) getOrCreate(ch string) *perChannelState {
@@ -64,17 +83,30 @@ func (h *Hub) getOrCreate(ch string) *perChannelState {
 		pc = &perChannelState{cap: constants.SSEBufferSize, buf: make([]Event, 0, constants.SSEBufferSize), clients: make(map[string]chan Event)}
 		h.channels[ch] = pc
 	}
+	// Stamp on create + on every Publish/Subscribe hit (both call sites go
+	// through here). Guarded by the Hub's mu — never by pc.mu.
+	pc.lastActive = h.nowOrDefault()
 	return pc
 }
 
-func (h *Hub) cleanupEmptyChannels() {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+// get returns the channel state without creating it (read paths such as
+// ReplaySince must not grow the channel map).
+func (h *Hub) get(ch string) *perChannelState {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.channels[ch]
+}
+
+// sweepIdleLocked deletes subscriber-less channels idle longer than
+// SSEIdleChannelTTL. Caller must hold h.mu (Lock). Lock discipline: hub mu
+// → pc mu RLock, never inverted — same as the old cleanupEmptyChannels.
+func (h *Hub) sweepIdleLocked() {
+	now := h.nowOrDefault()
 	for ch, pc := range h.channels {
 		pc.mu.RLock()
 		empty := len(pc.clients) == 0
 		pc.mu.RUnlock()
-		if empty {
+		if empty && now.Sub(pc.lastActive) > constants.SSEIdleChannelTTL {
 			delete(h.channels, ch)
 		}
 	}
@@ -93,12 +125,16 @@ func (h *Hub) Subscribe(_ context.Context, ch string) (<-chan Event, func(), err
 	unsub := func() {
 		pc.mu.Lock()
 		delete(pc.clients, cid)
-		empty := len(pc.clients) == 0
 		pc.mu.Unlock()
 		atomic.AddInt64(&h.connected, -1)
-		if empty {
-			h.cleanupEmptyChannels()
+		// Stamp-and-keep: leave the emptied channel in place so a reconnect
+		// within SSEIdleChannelTTL can still ReplaySince its buffered window.
+		// The opportunistic idle sweep reaps it once it goes quiet past GRACE.
+		h.mu.Lock()
+		if cur, ok := h.channels[ch]; ok && cur == pc {
+			cur.lastActive = h.nowOrDefault()
 		}
+		h.mu.Unlock()
 	}
 	return ec, unsub, nil
 }
@@ -106,6 +142,7 @@ func (h *Hub) Subscribe(_ context.Context, ch string) (<-chan Event, func(), err
 // Publish broadcasts an event to all subscribers of a channel (non-blocking, drop on slow clients).
 func (h *Hub) Publish(_ context.Context, ch string, ev Event) error {
 	pc := h.getOrCreate(ch)
+	h.maybeSweep()
 	ev.UUID = uuid.NewString()
 	ev.ID = atomic.AddUint64(&pc.counter, 1)
 	ev.TS = time.Now().UnixMilli()
@@ -137,6 +174,24 @@ func (h *Hub) Publish(_ context.Context, ch string, ev Event) error {
 	return nil
 }
 
+// maybeSweep runs an idle sweep every 128th Publish, or immediately when
+// the channel count exceeds SSEMaxChannels. Cheap-path first: the counter
+// check avoids taking the write lock on ordinary publishes.
+func (h *Hub) maybeSweep() {
+	tick := atomic.AddUint64(&h.sweepTick, 1)
+	if tick%128 != 0 {
+		h.mu.RLock()
+		over := len(h.channels) > constants.SSEMaxChannels
+		h.mu.RUnlock()
+		if !over {
+			return
+		}
+	}
+	h.mu.Lock()
+	h.sweepIdleLocked()
+	h.mu.Unlock()
+}
+
 // ReplaySince returns events with counter > since. A since of 0 means "replay
 // the entire buffered window" (the caller has no cursor yet), so it never
 // returns ReplayGap — returning an empty slice instead. ReplayGap is reserved
@@ -144,7 +199,10 @@ func (h *Hub) Publish(_ context.Context, ch string, ev Event) error {
 // below the current buffer head). This keeps early SSE events from being lost
 // when a subscriber connects just after publishing started.
 func (h *Hub) ReplaySince(ch string, since uint64) ([]Event, error) {
-	pc := h.getOrCreate(ch)
+	pc := h.get(ch)
+	if pc == nil {
+		return nil, nil
+	}
 	pc.bufMu.RLock()
 	defer pc.bufMu.RUnlock()
 	if len(pc.buf) == 0 {

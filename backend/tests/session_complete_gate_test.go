@@ -38,6 +38,14 @@ func (r *fakeCompleteGateSessionRepo) GetSessionByID(_ context.Context, id, tena
 	return &s, nil
 }
 
+func (r *fakeCompleteGateSessionRepo) GetSessionByIDForUpdate(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	return r.GetSessionByID(ctx, id, tenantID)
+}
+
+func (r *fakeCompleteGateSessionRepo) Transaction(_ context.Context, fn func(tx repository.SessionRepository) error) error {
+	return fn(r)
+}
+
 func (r *fakeCompleteGateSessionRepo) UpdateSession(_ context.Context, s *entity.Session) error {
 	r.session.Status = s.Status
 	return nil

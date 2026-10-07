@@ -1409,7 +1409,11 @@
       "needHelp": "Cần trợ giúp?",
       "contact": "Liên hệ với chúng tôi",
       "expiredTitle": "Liên kết đã hết hạn",
-      "expiredDesc": "Liên kết này đã hết hạn. Nếu bạn cho rằng đây là lỗi, vui lòng liên hệ với điều phối viên để nhận liên kết mới."
+      "expiredDesc": "Liên kết này đã hết hạn. Nếu bạn cho rằng đây là lỗi, vui lòng liên hệ với điều phối viên để nhận liên kết mới.",
+      "rateLimitedTitle": "Quá nhiều yêu cầu",
+      "rateLimitedDesc": "Bạn đã truy cập liên kết này quá thường xuyên. Vui lòng đợi một lúc rồi thử lại.",
+      "serverErrorTitle": "Lỗi máy chủ",
+      "serverErrorDesc": "Không tải được báo cáo do lỗi máy chủ hoặc mạng. Vui lòng thử lại."
     },
     "missions": {
       "loadError": "Không tải được nhiệm vụ. Vui lòng thử lại.",

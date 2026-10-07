@@ -32,7 +32,7 @@ const AUTH_CHANNEL = 'kidversa-auth'
 let accessToken: string | null = null
 let tokenSetAt = 0 // timestamp (Date.now) when accessToken was last set
 
-// Access token TTL on the backend is 15 minutes (JWT_ACCESS_TTL). We refresh
+// Default 15m (`JWT_ACCESS_TTL`); TOKEN_STALE_MS must track it. We refresh
 // proactively 2 minutes before expiry so the in-memory token is always fresh
 // when apiRequest fires — preventing the 401→refresh→retry cycle entirely.
 const TOKEN_STALE_MS = 13 * 60 * 1000 // 13 minutes
@@ -199,7 +199,7 @@ async function toApiError(response: Response): Promise<ApiError> {
 }
 
 // ---------------------------------------------------------------------------
-// Token refresh — single-flight per tab + cross-tab lock
+// Token refresh — single-flight per tab + cross-tab atomic claim
 // ---------------------------------------------------------------------------
 
 let refreshing: Promise<string> | null = null
@@ -245,6 +245,82 @@ function waitForRemoteRefresh(timeoutMs = 10000): Promise<string | null> {
   })
 }
 
+// Cross-tab atomic refresh claim (F-B-002). The per-tab `refreshing`
+// single-flight below handles same-tab concurrency; across tabs the refresh
+// cookie is single-use, so two tabs POSTing together forks the chain. The
+// primary claim is the Web Locks API (exclusive); where it is unavailable
+// (old WebView) we fall back to a localStorage compare-and-swap claim.
+// Contenders that fail the claim never POST — they piggyback on the holder
+// via the existing `waitForRemoteRefresh()`, then re-check.
+const REFRESH_LOCK_NAME = 'kidversa-refresh'
+const REFRESH_CLAIM_KEY = 'kidversa-refresh-claim'
+const REFRESH_CLAIM_TTL_MS = 10_000
+
+// Unique per-tab holder id for the localStorage-CAS fallback claim.
+const refreshTabId: string = (() => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch {
+    // crypto unavailable — fall through to the Math.random fallback.
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+})()
+
+// Best-effort localStorage compare-and-swap: claim only when no live claim by
+// another tab exists. Parses the stored claim with shape validation (missing,
+// corrupt, or wrongly-shaped values are treated as absent so the caller
+// overwrites them).
+function readRefreshClaim(raw: string | null): { holder: unknown; exp: unknown } | null {
+  if (!raw) return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (parsed && typeof parsed === 'object' && 'holder' in parsed && 'exp' in parsed) {
+    return { holder: parsed.holder, exp: parsed.exp }
+  }
+  return null
+}
+
+// Best-effort localStorage compare-and-swap: claim only when no live claim by
+// another tab exists. Returns true when this tab now holds the claim.
+function tryAcquireRefreshClaim(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return true
+    const cur = readRefreshClaim(localStorage.getItem(REFRESH_CLAIM_KEY))
+    if (cur && cur.holder !== refreshTabId && typeof cur.exp === 'number' && cur.exp > Date.now()) {
+      return false
+    }
+    localStorage.setItem(
+      REFRESH_CLAIM_KEY,
+      JSON.stringify({ holder: refreshTabId, exp: Date.now() + REFRESH_CLAIM_TTL_MS }),
+    )
+    return true
+  } catch {
+    // Storage unavailable (e.g. private mode) — no cross-tab coordination
+    // possible; allow the POST (per-tab single-flight still applies).
+    return true
+  }
+}
+
+function releaseRefreshClaim(): void {
+  try {
+    if (typeof localStorage === 'undefined') return
+    const raw = localStorage.getItem(REFRESH_CLAIM_KEY)
+    if (!raw) return
+    const cur = readRefreshClaim(raw)
+    // A corrupt value (null) is removed; another tab's live claim is kept.
+    if (cur && cur.holder !== refreshTabId) return
+    localStorage.removeItem(REFRESH_CLAIM_KEY)
+  } catch {
+    // Ignore cleanup failures.
+  }
+}
+
 export async function refreshAccessToken(): Promise<string> {
   // Single-flight: reuse an in-flight refresh within this tab.
   if (refreshing) return refreshing
@@ -259,7 +335,10 @@ export async function refreshAccessToken(): Promise<string> {
     // Timeout / no token returned: fall through to our own refresh.
   }
 
-  const refreshPromise = (async (): Promise<string> => {
+  // Holder-only POST body (semantics unchanged): broadcasts refresh:start/end
+  // so followers piggyback, rotates via the single-use cookie, reconciles the
+  // user into sessionStorage.
+  const doRefreshPost = async (): Promise<string> => {
     authChannel?.postMessage({ type: 'refresh:start' })
     try {
       const res = await fetch(`${getApiBaseUrl()}${API_ROUTES.AUTH.REFRESH}`, {
@@ -300,6 +379,75 @@ export async function refreshAccessToken(): Promise<string> {
     } finally {
       authChannel?.postMessage({ type: 'refresh:end', token: accessToken })
     }
+  }
+
+  const refreshPromise = (async (): Promise<string> => {
+    // Primary: Web Locks exclusive claim — only the holder POSTs. A contender
+    // whose ifAvailable request is denied piggybacks, then re-checks.
+    let locksAvailable = false
+    try {
+      locksAvailable = typeof navigator !== 'undefined' && !!navigator.locks?.request
+    } catch {
+      locksAvailable = false
+    }
+    if (locksAvailable) {
+      try {
+        const claimed = await navigator.locks.request(
+          REFRESH_LOCK_NAME,
+          { mode: 'exclusive', ifAvailable: true },
+          (lock) => {
+            if (!lock) return Promise.resolve(null)
+            return doRefreshPost()
+          },
+        )
+        if (claimed !== null) return claimed
+      } catch {
+        // Lock API failure — fall through to a direct POST below.
+        return doRefreshPost()
+      }
+      // Contender: the holder broadcasts refresh:end; adopt its token.
+      const token = await waitForRemoteRefresh()
+      if (token) {
+        accessToken = token
+        return token
+      }
+      // Re-check: the lock is free again (holder finished or died) — queue
+      // behind it and POST ourselves rather than failing the session.
+      return navigator.locks.request(REFRESH_LOCK_NAME, { mode: 'exclusive' }, () =>
+        doRefreshPost(),
+      )
+    }
+
+    // Fallback: localStorage-CAS claim when navigator.locks is unavailable.
+    if (tryAcquireRefreshClaim()) {
+      try {
+        return await doRefreshPost()
+      } finally {
+        // Release the CAS claim alongside the refresh:end broadcast above.
+        releaseRefreshClaim()
+      }
+    }
+    // Contender: piggyback, then re-check the claim before giving up.
+    const token = await waitForRemoteRefresh()
+    if (token) {
+      accessToken = token
+      return token
+    }
+    if (tryAcquireRefreshClaim()) {
+      try {
+        return await doRefreshPost()
+      } finally {
+        releaseRefreshClaim()
+      }
+    }
+    if (!authChannel) {
+      // No cross-tab channel at all: coordination is impossible, so degrade to
+      // the legacy per-tab behavior rather than failing the session.
+      return doRefreshPost()
+    }
+    // Another tab still holds a live claim but broadcast no token (holder
+    // failed): surface the failure so callers run the normal 401 path.
+    throw new ApiError('Session expired. Please log in again.', 'refresh_failed', 401)
   })()
 
   refreshing = refreshPromise

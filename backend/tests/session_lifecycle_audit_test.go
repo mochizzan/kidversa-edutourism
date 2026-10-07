@@ -58,8 +58,6 @@ func (r *lifecycleRepo) GetSessionByID(_ context.Context, id, _ string) (*entity
 	return &cp, nil
 }
 
-// GetSessionByIDForUpdate mirrors the production lock read (same data, counted)
-// so tests can assert CancelSession re-read the session under the row lock.
 func (r *lifecycleRepo) GetSessionByIDForUpdate(ctx context.Context, id, tenantID string) (*entity.Session, error) {
 	r.lockedReads++
 	return r.GetSessionByID(ctx, id, tenantID)
@@ -322,7 +320,7 @@ func TestUpdateParticipant_RejectsClosedSession(t *testing.T) {
 	repo.participant = &entity.Participant{BaseModel: entity.BaseModel{ID: "pid-1"}, SessionID: &sid}
 	uc := usecase.NewSessionUsecase(repo, nil)
 
-	_, err := uc.UpdateParticipant(context.Background(), "pid-1", "Nama Baru", 0, "", "", "", "", "", false, false)
+	_, err := uc.UpdateParticipant(context.Background(), "tenant-1", "pid-1", "Nama Baru", 0, "", "", "", "", "", false, false)
 	requireAppErrorCode(t, err, "session_not_editable")
 	if repo.updated != nil {
 		t.Error("a rejected update must not write the participant")
@@ -337,7 +335,7 @@ func TestUpdateParticipant_AllowsEditableSession(t *testing.T) {
 	repo.participant = &entity.Participant{BaseModel: entity.BaseModel{ID: "pid-1"}, SessionID: &sid}
 	uc := usecase.NewSessionUsecase(repo, nil)
 
-	p, err := uc.UpdateParticipant(context.Background(), "pid-1", "Nama Baru", 0, "", "", "", "", "", false, false)
+	p, err := uc.UpdateParticipant(context.Background(), "tenant-1", "pid-1", "Nama Baru", 0, "", "", "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("update on an ACTIVE session must succeed: %v", err)
 	}

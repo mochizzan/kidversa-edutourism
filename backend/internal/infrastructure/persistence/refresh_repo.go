@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
@@ -51,6 +52,15 @@ func NewGormRefreshRepository(db *gorm.DB) auth.RefreshStore {
 	return &GormRefreshRepository{db: db}
 }
 
+// Transaction runs fn with a store bound to a single DB transaction, so the
+// locked re-read (GetByHashForUpdate), the rotation Revoke, and the
+// successor Create commit atomically (AR-6).
+func (r *GormRefreshRepository) Transaction(ctx context.Context, fn func(auth.RefreshStore) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(&GormRefreshRepository{db: tx})
+	})
+}
+
 func (r *GormRefreshRepository) Create(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error {
 	m := &RefreshTokenModel{UserID: userID, TokenHash: tokenHash, ExpiresAt: expiresAt}
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
@@ -82,6 +92,32 @@ func (r *GormRefreshRepository) RevokeAllForUser(ctx context.Context, userID str
 func (r *GormRefreshRepository) GetByHash(ctx context.Context, tokenHash string) (*auth.RefreshRecord, error) {
 	var m RefreshTokenModel
 	if err := r.db.WithContext(ctx).
+		Where("token_hash = ?", tokenHash).
+		First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.Unauthorized("token_invalid", err)
+		}
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	return &auth.RefreshRecord{
+		ID:        m.ID,
+		UserID:    m.UserID,
+		ExpiresAt: m.ExpiresAt,
+		RevokedAt: m.RevokedAt,
+	}, nil
+}
+
+// GetByHashForUpdate is GetByHash plus a SELECT ... FOR UPDATE row lock on
+// the refresh row. The lock is what serializes Refresh rotation (AR-6):
+// concurrent same-cookie refreshes queue on the row, the winner rotates and
+// commits, and the loser re-reads the committed revoked_at and enters the D2
+// reuse path instead of forking a second chain. Callers MUST run it inside
+// Transaction; GORM would otherwise autocommit the statement and release the
+// lock immediately, degrading it to an unlocked read.
+func (r *GormRefreshRepository) GetByHashForUpdate(ctx context.Context, tokenHash string) (*auth.RefreshRecord, error) {
+	var m RefreshTokenModel
+	if err := r.db.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("token_hash = ?", tokenHash).
 		First(&m).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

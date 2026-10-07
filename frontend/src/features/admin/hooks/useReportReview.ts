@@ -530,21 +530,23 @@ export function useReportReview(sessionId: string | undefined, participantId: st
   const prev = narrativeText
   prevTextRef.current = prev
   setNarrativeText('')
+  let source: EventSource | null = null
   try {
-   const source = openSSE(
+   const opened = openSSE(
     API_ROUTES.REPORTS.GENERATE_STREAM(report.id),
     () => { },
     {
      tenantId: saTenant,
      onError: () => {
-      source.close()
+      source?.close()
       setNarrativeText(prevTextRef.current)
       setStreaming(false)
       addToast({ type: 'error', message: i18n.t('admin.reportReview.narrativeStreamError') })
      },
     },
    )
-   source.addEventListener('token', (ev: MessageEvent) => {
+   source = opened
+   opened.addEventListener('token', (ev: MessageEvent) => {
     try {
      const parsed = JSON.parse(ev.data)
      if (typeof parsed.delta === 'string') {
@@ -552,18 +554,18 @@ export function useReportReview(sessionId: string | undefined, participantId: st
      }
     } catch (err) { /* ignore malformed */ console.warn('[useReportReview] malformed narrative event', err) }
    })
-   source.addEventListener('done', (ev: MessageEvent) => {
+   opened.addEventListener('done', (ev: MessageEvent) => {
     try {
      const parsed = JSON.parse(ev.data)
      if (typeof parsed.full === 'string' && parsed.full) {
       setNarrativeText(parsed.full)
      }
     } catch (err) { /* ignore */ console.warn('[useReportReview] malformed done event', err) }
-    source.close()
+    opened.close()
     setStreaming(false)
     addToast({ type: 'success', message: i18n.t('admin.reportReview.narrativeDone') })
    })
-   source.addEventListener('error', (ev: MessageEvent) => {
+   opened.addEventListener('error', (ev: MessageEvent) => {
     try {
      const parsed = JSON.parse(ev.data)
      const code: string | undefined = parsed.code
@@ -575,12 +577,15 @@ export function useReportReview(sessionId: string | undefined, participantId: st
      })
     } catch (err) { /* ignore */ console.warn('[useReportReview] malformed error event', err) }
     setNarrativeText(prevTextRef.current)
-    source.close()
+    opened.close()
     setStreaming(false)
    })
    await reportService.generateNarrativeStream(report.id, force, saTenant)
    return true
   } catch (err) {
+   // The kick-off POST failed after the stream was pre-opened: close the
+   // orphan (it can never receive replayable events) before restoring state.
+   source?.close()
    setNarrativeText(prevTextRef.current)
    setStreaming(false)
    addToast({ type: 'error', message: friendlyError(err) })

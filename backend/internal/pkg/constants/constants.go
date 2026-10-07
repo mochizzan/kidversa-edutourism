@@ -46,3 +46,12 @@ const SSEBufferSize = 64
 // SSEChannelBuffer is the per-subscriber unbuffered-event channel capacity
 // (pkg/sse/hub.go).
 const SSEChannelBuffer = 256
+
+// SSEIdleChannelTTL is how long a subscriber-less SSE channel survives before
+// the hub's opportunistic sweep reaps it (pkg/sse/hub.go).
+const SSEIdleChannelTTL = 2 * time.Hour
+
+// SSEMaxChannels is the backstop channel count: whenever Publish observes more
+// channels than this, an idle sweep runs immediately instead of waiting for
+// the periodic tick (pkg/sse/hub.go).
+const SSEMaxChannels = 5000

@@ -73,9 +73,9 @@ func TestConsentSendRequest_CreateError_Internal(t *testing.T) {
 	db, mock := newConsentMockDB(t)
 	repo := persistence.NewConsentRepository(db, 0)
 
+	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT.*consent_logs").
 		WillReturnRows(sqlmock.NewRows([]string{"id"})) // miss → create path
-	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO `consent_logs`").WithArgs(
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 		sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
@@ -102,9 +102,9 @@ func TestConsentSendRequest_CreateError_Internal(t *testing.T) {
 // touched (SendSingle mints the fresh token before this audit write).
 func TestConsentSendRequest_ClearsParticipantProjection(t *testing.T) {
 	expectProjectionClear := func(mock sqlmock.Sqlmock) {
-		mock.ExpectBegin()
+		// Runs on the tx-bound repo inside the outer transaction: bare Exec,
+		// committed by the outer COMMIT below.
 		mock.ExpectExec("UPDATE `participants`").WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectCommit()
 	}
 
 	t.Run("re_send_resets_log_then_clears_projection", func(t *testing.T) {
@@ -113,14 +113,17 @@ func TestConsentSendRequest_ClearsParticipantProjection(t *testing.T) {
 
 		// Existing (already granted) row → reset: sent_at=now, responded_at
 		// NULL, value false…
+		mock.ExpectBegin()
 		mock.ExpectQuery("SELECT.*consent_logs").
 			WillReturnRows(sqlmock.NewRows([]string{"id", "participant_id", "session_id", "consent_type", "value"}).
 				AddRow("log-1", "p-1", "s-1", "PHOTO", true))
-		mock.ExpectBegin()
+		// AR-7 re-screen: no grant landed since the read above (miss → false).
+		mock.ExpectQuery("SELECT.*consent_logs").
+			WillReturnRows(sqlmock.NewRows([]string{"id"}))
 		mock.ExpectExec("UPDATE `consent_logs`").WillReturnResult(sqlmock.NewResult(0, 1))
-		mock.ExpectCommit()
 		// …and the paired projection clear on the participant row.
 		expectProjectionClear(mock)
+		mock.ExpectCommit()
 
 		if err := repo.SendConsentRequest(context.Background(), "p-1", "s-1", entity.ConsentPhoto); err != nil {
 			t.Fatalf("re-send must succeed, got %v", err)
@@ -135,12 +138,12 @@ func TestConsentSendRequest_ClearsParticipantProjection(t *testing.T) {
 		repo := persistence.NewConsentRepository(db, 0)
 
 		// Miss → create path, then the paired projection clear.
+		mock.ExpectBegin()
 		mock.ExpectQuery("SELECT.*consent_logs").
 			WillReturnRows(sqlmock.NewRows([]string{"id"}))
-		mock.ExpectBegin()
 		mock.ExpectExec("INSERT INTO `consent_logs`").WillReturnResult(sqlmock.NewResult(1, 1))
-		mock.ExpectCommit()
 		expectProjectionClear(mock)
+		mock.ExpectCommit()
 
 		if err := repo.SendConsentRequest(context.Background(), "p-1", "s-1", entity.ConsentPhoto); err != nil {
 			t.Fatalf("fresh send must succeed, got %v", err)

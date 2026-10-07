@@ -1409,7 +1409,11 @@
       "needHelp": "Need help?",
       "contact": "Contact Us",
       "expiredTitle": "Link has expired",
-      "expiredDesc": "This link has expired. If you believe this is an error, please contact the coordinator to request a new link."
+      "expiredDesc": "This link has expired. If you believe this is an error, please contact the coordinator to request a new link.",
+      "rateLimitedTitle": "Too many requests",
+      "rateLimitedDesc": "You accessed this link too frequently. Please wait a moment and try again.",
+      "serverErrorTitle": "Server error",
+      "serverErrorDesc": "Failed to load the report due to a server or network error. Please try again."
     },
     "missions": {
       "loadError": "Failed to load missions. Please try again.",

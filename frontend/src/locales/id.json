@@ -1409,7 +1409,11 @@
       "needHelp": "Butuh bantuan?",
       "contact": "Hubungi Kami",
       "expiredTitle": "Link sudah tidak berlaku",
-      "expiredDesc": "Tautan ini sudah kedaluwarsa. Jika Anda merasa ini kesalahan, silakan hubungi koordinator untuk mendapatkan tautan baru."
+      "expiredDesc": "Tautan ini sudah kedaluwarsa. Jika Anda merasa ini kesalahan, silakan hubungi koordinator untuk mendapatkan tautan baru.",
+      "rateLimitedTitle": "Terlalu banyak permintaan",
+      "rateLimitedDesc": "Anda mengakses tautan terlalu sering. Silakan tunggu beberapa saat lalu coba lagi.",
+      "serverErrorTitle": "Gangguan server",
+      "serverErrorDesc": "Gagal memuat laporan karena gangguan server atau jaringan. Silakan coba lagi."
     },
     "missions": {
       "loadError": "Gagal memuat misi. Silakan coba lagi.",

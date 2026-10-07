@@ -292,24 +292,33 @@ func (u *SessionUsecase) requireSessionProgram(ctx context.Context, programID st
 }
 
 // StartSession transitions a session DRAFT -> ACTIVE (cascades Topik to ACTIVE).
+//
+// Atomicity + concurrency (audit #14): the status write, the stage cascade
+// and the progress seed all run inside ONE session-repo transaction, and the
+// session row is re-read under SELECT ... FOR UPDATE
+// (GetSessionByIDForUpdate) inside it — mirroring CancelSession. A
+// concurrent CancelSession and a StartSession serialize on the row lock
+// instead of interleaving, and the program re-read below runs inside the tx
+// (mirroring CreateSession's in-tx re-read) so a program deleted between the
+// pre-gate and this write cannot orphan an ACTIVE session.
 func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
-	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
+	pre, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
 	if err != nil {
 		return nil, err
 	}
 	// Audit #19: a CANCELLED session is cancelled PERMANENTLY — reactivation is
 	// rejected before any other gate so the reason is unambiguous (the old
 	// code explicitly allowed CANCELLED -> ACTIVE).
-	if s.Status == entity.SessionCancelled {
+	if pre.Status == entity.SessionCancelled {
 		return nil, apperrors.Forbidden("session_cancelled_permanent", nil)
 	}
-	if s.Status != entity.SessionDraft {
+	if pre.Status != entity.SessionDraft {
 		return nil, apperrors.Conflict("bad_request", nil)
 	}
 	// Audit #3: the session's program must still exist (hard- or soft-deleted
 	// counts as gone) before the session goes live — otherwise it runs until it
 	// fails downstream (badge/report lookups 404 on the missing program).
-	if perr := u.requireSessionProgram(ctx, s.ProgramID); perr != nil {
+	if perr := u.requireSessionProgram(ctx, pre.ProgramID); perr != nil {
 		return nil, perr
 	}
 	// Gate: session must have at least one group.
@@ -337,147 +346,205 @@ func (u *SessionUsecase) StartSession(ctx context.Context, id, tenantID string) 
 			return nil, apperrors.BadRequest("no_participants", nil)
 		}
 	}
-	s.Status = entity.SessionActive
-	if err := u.sessionRepo.UpdateSession(ctx, s); err != nil {
-		return nil, err
-	}
-	// Cascade: stages WAITING -> ACTIVE.
-	stages, err := u.sessionRepo.ListSessionStages(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	for i := range stages {
-		if stages[i].Status == entity.SessionStageWaiting {
-			stages[i].Status = entity.SessionStageActive
-			now := util.Now()
-			stages[i].StartedAt = &now
-			if err := u.sessionRepo.UpdateSessionStage(ctx, &stages[i]); err != nil {
-				return nil, err
-			}
+	var started *entity.Session
+	err = u.sessionRepo.Transaction(ctx, func(tx repository.SessionRepository) error {
+		s, err := tx.GetSessionByIDForUpdate(ctx, id, tenantID)
+		if err != nil {
+			return err
 		}
-	}
-	// Seed a LOCKED progress row for every (group, session Kegiatan) pair so the
-	// live monitor renders real per-Kegiatan state instead of treating every group
-	// as locked. group_stage_progress.session_substage_id is an FK to
-	// session Kegiatan (the Kegiatan leaf), so seed per Kegiatan — not per
-	// session Topik. session Kegiatan is populated on CreateSession via
-	// cloneSubstages; skip gracefully when it is unwired or empty (idempotent).
-	if u.sessionSubstages != nil {
-		subs, serr := u.sessionSubstages.ListSessionSubstages(ctx, id)
-		if serr != nil {
-			return nil, serr
+		if s.Status == entity.SessionCancelled {
+			return apperrors.Forbidden("session_cancelled_permanent", nil)
 		}
-		if len(subs) > 0 {
-			existing, eerr := u.sessionRepo.ListGroupStageProgress(ctx, subs[0].ID)
-			if eerr != nil {
-				return nil, eerr
-			}
-			if len(existing) == 0 {
-				groups, gerr := u.sessionRepo.ListSessionGroups(ctx, id)
-				if gerr != nil {
-					return nil, gerr
+		if s.Status != entity.SessionDraft {
+			return apperrors.Conflict("bad_request", nil)
+		}
+		// In-tx program re-read (mirror CreateSession's re-read lines): the
+		// program repo's not_found covers both hard and soft deletes and is
+		// re-mapped to program_not_found like requireSessionProgram, so a
+		// program deleted between the pre-gate above and this write cannot
+		// orphan an ACTIVE session.
+		if u.programs != nil {
+			if _, err := u.programs.GetProgramByID(ctx, s.ProgramID); err != nil {
+				if _, code, ok := apperrors.AsAppError(err); ok && code == "not_found" {
+					return apperrors.NotFound("program_not_found", err)
 				}
-				for i := range groups {
-					for j := range subs {
-						if cerr := u.sessionRepo.CreateGroupStageProgress(ctx, &entity.GroupStageProgress{
-							GroupID:           groups[i].ID,
-							SessionSubstageID: subs[j].ID,
-							Status:            entity.ProgressLocked,
-						}); cerr != nil {
-							return nil, cerr
+				return err
+			}
+		}
+		s.Status = entity.SessionActive
+		if err := tx.UpdateSession(ctx, s); err != nil {
+			return err
+		}
+		// Cascade: stages WAITING -> ACTIVE.
+		stages, err := tx.ListSessionStages(ctx, id)
+		if err != nil {
+			return err
+		}
+		for i := range stages {
+			if stages[i].Status == entity.SessionStageWaiting {
+				stages[i].Status = entity.SessionStageActive
+				now := util.Now()
+				stages[i].StartedAt = &now
+				if err := tx.UpdateSessionStage(ctx, &stages[i]); err != nil {
+					return err
+				}
+			}
+		}
+		// Seed a LOCKED progress row for every (group, session Kegiatan) pair so the
+		// live monitor renders real per-Kegiatan state instead of treating every group
+		// as locked. group_stage_progress.session_substage_id is an FK to
+		// session Kegiatan (the Kegiatan leaf), so seed per Kegiatan — not per
+		// session Topik. session Kegiatan is populated on CreateSession via
+		// cloneSubstages; skip gracefully when it is unwired or empty (idempotent).
+		if u.sessionSubstages != nil {
+			subs, serr := u.sessionSubstages.ListSessionSubstages(ctx, id)
+			if serr != nil {
+				return serr
+			}
+			if len(subs) > 0 {
+				existing, eerr := tx.ListGroupStageProgress(ctx, subs[0].ID)
+				if eerr != nil {
+					return eerr
+				}
+				if len(existing) == 0 {
+					groups, gerr := tx.ListSessionGroups(ctx, id)
+					if gerr != nil {
+						return gerr
+					}
+					for i := range groups {
+						for j := range subs {
+							if cerr := tx.CreateGroupStageProgress(ctx, &entity.GroupStageProgress{
+								GroupID:           groups[i].ID,
+								SessionSubstageID: subs[j].ID,
+								Status:            entity.ProgressLocked,
+							}); cerr != nil {
+								return cerr
+							}
 						}
 					}
 				}
 			}
 		}
-	}
-	return s, nil
-}
-func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
-	s, err := u.sessionRepo.GetSessionByID(ctx, id, tenantID)
+		started = s
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if s.Status != entity.SessionActive {
-		return nil, apperrors.Conflict("bad_request", nil)
-	}
-	// Audit #3: the session's program must still exist before completion — a
-	// session whose program was deleted must not be closed into an orphan
-	// whose badge/report generation 404s. Runs before any grading gate so a
-	// missing program reports program_not_found (no writes have happened yet).
-	if perr := u.requireSessionProgram(ctx, s.ProgramID); perr != nil {
-		return nil, perr
-	}
-	// Grading completeness gate: every participant in every group must be graded
-	// for every session Kegiatan before the session can be completed. The gate
-	// must read assessments under the session's own tenant: the tenant scope
-	// resolves via session_id -> sessions.tenant_id, so a placeholder tenant
-	// matches no sessions and reports every participant as ungraded.
-	gateTenant := tenantID
-	if s.TenantID != nil && *s.TenantID != "" {
-		gateTenant = *s.TenantID
-	}
-	if ungraded, gerr := u.firstUngradedGroup(ctx, id, gateTenant); gerr != nil {
-		return nil, gerr
-	} else if ungraded != "" {
-		// Observability only: the gate decision is unchanged (grading_incomplete).
-		// The group name + leaf count pinpoint which group/topic blocks completion
-		// without loosening the validator (Bug1's fix owns the gate itself).
-		leafCount := 0
-		if u.sessionSubstages != nil {
-			if subs, serr := u.sessionSubstages.ListSessionSubstages(ctx, id); serr == nil {
-				leafCount = len(subs)
+	return started, nil
+}
+
+// CompleteSession transitions a session ACTIVE -> COMPLETED (cascades Topik
+// and groups to COMPLETED).
+//
+// Atomicity (audit #12): the status write, the stage stamps and the group
+// stamps all run inside ONE session-repo transaction — a failure at any step
+// rolls the whole thing back, so a session can never end up COMPLETED with
+// live ACTIVE Topik (or vice versa).
+//
+// Concurrency (audit #14): the session row is re-read under SELECT ... FOR
+// UPDATE (GetSessionByIDForUpdate) inside the transaction, mirroring
+// CancelSession exactly (same helper, same must-be-in-tx contract): a
+// concurrent CancelSession and a CompleteSession serialize on the row lock —
+// whichever commits first decides, the loser sees the terminal status and
+// rejects instead of interleaving.
+//
+// Safe retry: completion requires ACTIVE, and a rolled-back attempt leaves
+// the session ACTIVE (the status write is part of the rolled-back tx), so
+// retrying the completion after fixing the failure is safe.
+func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID string) (*entity.Session, error) {
+	var completed *entity.Session
+	err := u.sessionRepo.Transaction(ctx, func(tx repository.SessionRepository) error {
+		s, err := tx.GetSessionByIDForUpdate(ctx, id, tenantID)
+		if err != nil {
+			return err
+		}
+		if s.Status != entity.SessionActive {
+			return apperrors.Conflict("bad_request", nil)
+		}
+		// Audit #3: the session's program must still exist before completion — a
+		// session whose program was deleted must not be closed into an orphan
+		// whose badge/report generation 404s. Runs before any grading gate so a
+		// missing program reports program_not_found (no writes have happened yet).
+		if perr := u.requireSessionProgram(ctx, s.ProgramID); perr != nil {
+			return perr
+		}
+		// Grading completeness gate: every participant in every group must be graded
+		// for every session Kegiatan before the session can be completed. The gate
+		// must read assessments under the session's own tenant: the tenant scope
+		// resolves via session_id -> sessions.tenant_id, so a placeholder tenant
+		// matches no sessions and reports every participant as ungraded.
+		gateTenant := tenantID
+		if s.TenantID != nil && *s.TenantID != "" {
+			gateTenant = *s.TenantID
+		}
+		if ungraded, gerr := u.firstUngradedGroup(ctx, id, gateTenant); gerr != nil {
+			return gerr
+		} else if ungraded != "" {
+			// Observability only: the gate decision is unchanged (grading_incomplete).
+			// The group name + leaf count pinpoint which group/topic blocks completion
+			// without loosening the validator (Bug1's fix owns the gate itself).
+			leafCount := 0
+			if u.sessionSubstages != nil {
+				if subs, serr := u.sessionSubstages.ListSessionSubstages(ctx, id); serr == nil {
+					leafCount = len(subs)
+				}
+			}
+			log.Printf("session: complete blocked session=%s gate=grading_incomplete group=%q substage_leaves=%d", id, ungraded, leafCount)
+			return apperrors.BadRequest("grading_incomplete", nil)
+		}
+		// Completion gate, hierarchy step 1: enumerate Topik before any write so a
+		// read failure surfaces here instead of stranding a COMPLETED session with
+		// ACTIVE Topik (the cascade re-lists stages after UpdateSession). The count
+		// feeds the block log below — same observability pattern as the grading gate.
+		topics, terr := tx.ListSessionStages(ctx, id)
+		if terr != nil {
+			return terr
+		}
+		// Facilitator completion gate: every Kelompok holding a present peserta must
+		// already be COMPLETED by its facilitator (PUT .../groups/:groupId →
+		// badge.CheckAndCompleteGroup). Runs AFTER the grading gate so
+		// grading_incomplete keeps global precedence; no mutation has happened yet,
+		// so a rejection leaves the whole session untouched.
+		if pending, gerr := u.firstPendingFacilitatorGroup(ctx, id, gateTenant); gerr != nil {
+			return gerr
+		} else if pending != "" {
+			log.Printf("session: complete blocked session=%s gate=group_completion_pending group=%q topics=%d", id, pending, len(topics))
+			return apperrors.BadRequest("group_completion_pending", nil)
+		}
+		s.Status = entity.SessionCompleted
+		if err := tx.UpdateSession(ctx, s); err != nil {
+			return err
+		}
+		stages, err := tx.ListSessionStages(ctx, id)
+		if err != nil {
+			return err
+		}
+		for i := range stages {
+			stages[i].Status = entity.SessionStageCompleted
+			now := util.Now()
+			stages[i].CompletedAt = &now
+			if err := tx.UpdateSessionStage(ctx, &stages[i]); err != nil {
+				return err
 			}
 		}
-		log.Printf("session: complete blocked session=%s gate=grading_incomplete group=%q substage_leaves=%d", id, ungraded, leafCount)
-		return nil, apperrors.BadRequest("grading_incomplete", nil)
-	}
-	// Completion gate, hierarchy step 1: enumerate Topik before any write so a
-	// read failure surfaces here instead of stranding a COMPLETED session with
-	// ACTIVE Topik (the cascade re-lists stages after UpdateSession). The count
-	// feeds the block log below — same observability pattern as the grading gate.
-	topics, terr := u.sessionRepo.ListSessionStages(ctx, id)
-	if terr != nil {
-		return nil, terr
-	}
-	// Facilitator completion gate: every Kelompok holding a present peserta must
-	// already be COMPLETED by its facilitator (PUT .../groups/:groupId →
-	// badge.CheckAndCompleteGroup). Runs AFTER the grading gate so
-	// grading_incomplete keeps global precedence; no mutation has happened yet,
-	// so a rejection leaves the whole session untouched.
-	if pending, gerr := u.firstPendingFacilitatorGroup(ctx, id, gateTenant); gerr != nil {
-		return nil, gerr
-	} else if pending != "" {
-		log.Printf("session: complete blocked session=%s gate=group_completion_pending group=%q topics=%d", id, pending, len(topics))
-		return nil, apperrors.BadRequest("group_completion_pending", nil)
-	}
-	s.Status = entity.SessionCompleted
-	if err := u.sessionRepo.UpdateSession(ctx, s); err != nil {
-		return nil, err
-	}
-	stages, err := u.sessionRepo.ListSessionStages(ctx, id)
+		groups, err := tx.ListSessionGroups(ctx, id)
+		if err != nil {
+			return err
+		}
+		for i := range groups {
+			groups[i].Status = entity.GroupCompleted
+			if err := tx.UpdateSessionGroup(ctx, &groups[i]); err != nil {
+				return err
+			}
+		}
+		completed = s
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	for i := range stages {
-		stages[i].Status = entity.SessionStageCompleted
-		now := util.Now()
-		stages[i].CompletedAt = &now
-		if err := u.sessionRepo.UpdateSessionStage(ctx, &stages[i]); err != nil {
-			return nil, err
-		}
-	}
-	groups, err := u.sessionRepo.ListSessionGroups(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	for i := range groups {
-		groups[i].Status = entity.GroupCompleted
-		if err := u.sessionRepo.UpdateSessionGroup(ctx, &groups[i]); err != nil {
-			return nil, err
-		}
-	}
-	return s, nil
+	return completed, nil
 }
 
 // CancelSession transitions a session to CANCELLED and stamps every
@@ -582,8 +649,16 @@ func (u *SessionUsecase) GetStages(ctx context.Context, sessionID, tenantID stri
 	return u.sessionRepo.ListSessionStages(ctx, sessionID)
 }
 
-// CreateGroup creates a new session group.
-func (u *SessionUsecase) CreateGroup(ctx context.Context, sessionID, name string) (*entity.SessionGroup, error) {
+// CreateGroup creates a new session group. The owning session is verified
+// against tenantID first so cross-tenant session IDs surface as 404 (§5.A,
+// mirror GetGroups): a non-empty tenant must own the session, otherwise the
+// repo returns not_found and nothing is created. An empty tenantID stays
+// unscoped (tenant-less SUPER_ADMIN passthrough, same contract as
+// GetSessionByID).
+func (u *SessionUsecase) CreateGroup(ctx context.Context, sessionID, tenantID, name string) (*entity.SessionGroup, error) {
+	if _, err := u.sessionRepo.GetSessionByID(ctx, sessionID, tenantID); err != nil {
+		return nil, err
+	}
 	g := &entity.SessionGroup{
 		SessionID: sessionID,
 		Name:      name,
@@ -637,8 +712,13 @@ func (u *SessionUsecase) UpdateGroup(ctx context.Context, groupID, name, status,
 	return g, nil
 }
 
-// DeleteGroup removes a session group.
+// DeleteGroup removes a session group. The group is loaded tenant-scoped
+// first so a cross-tenant group ID surfaces as 404 and deletes nothing
+// (mirror UpdateGroup); the repo delete itself stays untouched.
 func (u *SessionUsecase) DeleteGroup(ctx context.Context, groupID, tenantID string) error {
+	if _, err := u.sessionRepo.GetSessionGroupByID(ctx, groupID, tenantID); err != nil {
+		return err
+	}
 	return u.sessionRepo.DeleteSessionGroup(ctx, groupID)
 }
 
@@ -1171,9 +1251,16 @@ func (u *SessionUsecase) FindParticipantSessionInfo(ctx context.Context, partici
 	return u.sessionRepo.FindParticipantSessionInfo(ctx, participantIDs, tenantID)
 }
 
-// UpdateParticipant patches a participant's fields.
-func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, childName string, childAge int, schoolName, parentName, parentPhone, parentEmail, groupID string, consentPhoto bool, hasAge bool) (*entity.Participant, error) {
-	p, err := u.sessionRepo.GetParticipantByID(ctx, participantID, "")
+// UpdateParticipant patches a participant's fields. The participant is loaded
+// tenant-scoped (a non-empty tenant must own it, otherwise not_found), the
+// owning session gate runs WITH the real tenant (cross-tenant sessions surface
+// as 404), and an explicit group move re-runs the group∈session/capacity
+// triple from Create/Link (invalid_group / group_full). GroupID is a plain
+// string like every sibling participant write: "" means absent (keep) — no
+// explicit-clear semantics exist anywhere on this path, so none is invented
+// here (mirror siblings; a nil GroupID stays nil).
+func (u *SessionUsecase) UpdateParticipant(ctx context.Context, tenantID, participantID, childName string, childAge int, schoolName, parentName, parentPhone, parentEmail, groupID string, consentPhoto bool, hasAge bool) (*entity.Participant, error) {
+	p, err := u.sessionRepo.GetParticipantByID(ctx, participantID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -1181,11 +1268,28 @@ func (u *SessionUsecase) UpdateParticipant(ctx context.Context, participantID, c
 	// session is a session-scoped write — only DRAFT/ACTIVE sessions accept
 	// it; COMPLETED/CANCELLED reject with session_not_editable (the old path
 	// wrote straight through). Standalone (session-less) participants stay
-	// ungated, like every other session-less participant write. Tenant scope
-	// matches the participant load above (unscoped), so the gate is status-only.
+	// ungated, like every other session-less participant write. The gate runs
+	// with the caller's tenant (not unscoped) so a cross-tenant session
+	// surfaces as 404 instead of passing status-only.
+	var sessionID string
 	if p.SessionID != nil && *p.SessionID != "" {
-		if _, err := u.requireEditableSession(ctx, *p.SessionID, ""); err != nil {
+		sessionID = *p.SessionID
+		if _, err := u.requireEditableSession(ctx, sessionID, tenantID); err != nil {
 			return nil, err
+		}
+	}
+	if groupID != "" && sessionID != "" {
+		if _, err := requireGroupInSession(ctx, u.sessionRepo, groupID, sessionID, tenantID); err != nil {
+			return nil, err
+		}
+		if p.GroupID == nil || *p.GroupID != groupID {
+			n, err := groupMemberCount(ctx, u.sessionRepo, sessionID, groupID)
+			if err != nil {
+				return nil, err
+			}
+			if n >= MaxGroupParticipants {
+				return nil, apperrors.Conflict("group_full", nil)
+			}
 		}
 	}
 	childName = strings.TrimSpace(childName)

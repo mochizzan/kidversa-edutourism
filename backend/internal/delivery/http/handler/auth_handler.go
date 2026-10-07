@@ -120,6 +120,11 @@ func (h *AuthHandler) Logout(c *echo.Context) error {
 }
 
 // ChangePassword handles POST /api/auth/change-password (auth required).
+// On success ALL sessions are revoked (D1): both cookies are cleared so the
+// caller must log in again. The refresh cookie is read tolerated-absent (no
+// 401 when missing — family revoke covers it); the current access jti comes
+// from CtxClaims. An empty jti still proceeds with the family revoke; the
+// current access token then dies at its natural expiry (≤AccessTTL).
 func (h *AuthHandler) ChangePassword(c *echo.Context) error {
 	var req dto.ChangePasswordRequest
 	if err := bindAndValidate(c, &req); err != nil {
@@ -129,9 +134,20 @@ func (h *AuthHandler) ChangePassword(c *echo.Context) error {
 	if uid == "" {
 		return appresp.Fail(c, http.StatusUnauthorized, "unauthorized")
 	}
-	if err := h.authUC.ChangePassword((*c).Request().Context(), uid, req.OldPassword, req.NewPassword); err != nil {
+	var jti string
+	if claims, ok := (*c).Get(appmiddleware.CtxClaims).(*auth.Claims); ok && claims != nil {
+		jti = claims.ID
+	}
+	// The current refresh cookie is read tolerated-absent (same (*c).Cookie
+	// pattern as Refresh, but no 401 when missing): the family revoke below
+	// kills every refresh token incl. the current one, so its value is not
+	// needed — absence changes nothing.
+	_, _ = (*c).Cookie(h.refreshCookieName)
+	if err := h.authUC.ChangePassword((*c).Request().Context(), uid, req.OldPassword, req.NewPassword, jti, h.jwt.AccessTTL()); err != nil {
 		return err
 	}
+	clearSessionCookie(c, h.cookieName)
+	clearRefreshCookie(c, h.refreshCookieName)
 	return appresp.OK(c, map[string]string{"status": "ok"})
 }
 

@@ -1409,7 +1409,11 @@
       "needHelp": "需要帮助？",
       "contact": "联系我们",
       "expiredTitle": "链接已失效",
-      "expiredDesc": "此链接已过期。如果您认为这是错误，请联系协调员获取新链接。"
+      "expiredDesc": "此链接已过期。如果您认为这是错误，请联系协调员获取新链接。",
+      "rateLimitedTitle": "请求过于频繁",
+      "rateLimitedDesc": "您访问此链接过于频繁。请稍等片刻后重试。",
+      "serverErrorTitle": "服务器故障",
+      "serverErrorDesc": "由于服务器或网络故障，报告加载失败。请重试。"
     },
     "missions": {
       "loadError": "加载任务失败。请重试。",

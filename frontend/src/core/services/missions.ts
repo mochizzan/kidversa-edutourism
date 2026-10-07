@@ -82,7 +82,8 @@ const getById = async (id: string): Promise<MissionBank | null> => {
 
 // getByTopic returns active missions linked (via mission_bank_stages) to the
 // given Topic (program_stage_id). Used by the [Misi Lanjutan] library modal so
-// only the report's Topic missions are selectable.
+// only the report's Topic missions are selectable. This call claims the full
+// Topic set (not the paged library view), so a bounded limit fetch is correct.
 const getByTopic = async (topicId: string, params?: { limit?: number }): Promise<MissionBank[]> => {
   const limit = params?.limit ?? 100
   const qs = new URLSearchParams()

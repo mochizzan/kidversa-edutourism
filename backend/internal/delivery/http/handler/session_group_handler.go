@@ -7,6 +7,7 @@ import (
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
+	apperrors "kidversa-edutourism-backend/internal/pkg/errors"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 	"kidversa-edutourism-backend/internal/usecase"
 	badgeuc "kidversa-edutourism-backend/internal/usecase/badge"
@@ -68,7 +69,7 @@ func (h *SessionGroupHandler) CreateGroup(c *echo.Context) error {
 	if resp, okResp := (*c).Response().(*echo.Response); okResp && resp.Committed {
 		return nil
 	}
-	g, err := h.uc.CreateGroup((*c).Request().Context(), id, req.Name)
+	g, err := h.uc.CreateGroup((*c).Request().Context(), id, appmiddleware.GetTenantID(c), req.Name)
 	if err != nil {
 		return err
 	}
@@ -116,13 +117,30 @@ func (h *SessionGroupHandler) UpdateGroup(c *echo.Context) error {
 	return appresp.OK(c, g)
 }
 
-// DeleteGroup handles DELETE /api/sessions/:id/groups/:groupId.
+// DeleteGroup handles DELETE /api/sessions/:id/groups/:groupId. The path
+// session :id must own the group: the tenant-scoped load runs first and a
+// group from another session surfaces as 404 before any delete (defense in
+// depth with the usecase load — both layers reject, the repo delete never runs
+// for a foreign group).
 func (h *SessionGroupHandler) DeleteGroup(c *echo.Context) error {
+	sessionID, ok := bindUUID(c, "id")
+	if !ok {
+		return nil
+	}
 	groupID, ok := bindUUID(c, "groupId")
 	if !ok {
 		return nil
 	}
-	if err := h.uc.DeleteGroup((*c).Request().Context(), groupID, appmiddleware.GetTenantID(c)); err != nil {
+	ctx := (*c).Request().Context()
+	tenantID := appmiddleware.GetTenantID(c)
+	g, err := h.uc.GetGroupByID(ctx, groupID, tenantID)
+	if err != nil {
+		return err
+	}
+	if g.SessionID != sessionID {
+		return apperrors.NotFound("not_found", nil)
+	}
+	if err := h.uc.DeleteGroup(ctx, groupID, tenantID); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
