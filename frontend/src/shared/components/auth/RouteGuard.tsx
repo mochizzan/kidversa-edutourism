@@ -11,7 +11,7 @@ interface RouteGuardProps {
  segment?: string
  /** Explicit role allow-list; if absent, `segment` must resolve to roles. */
  allowedRoles?: RouteAccess['roles']
- /** Public token-scoped routes (parent/learner): skip session auth entirely;
+ /** Public token-scoped routes (parent report/consent): skip session auth entirely;
   *  access is enforced per-page via the token in the query string. */
  public?: boolean
  children?: React.ReactNode
@@ -25,7 +25,7 @@ interface RouteGuardProps {
 // - `segment` (admin-style): resolves roles + tenantFree from ROUTE_ACCESS;
 //   unauthenticated → login; wrong role → role-specific redirect; non-tenantFree
 //   segments are additionally wrapped in TenantGuard.
-// - `public`: token-scoped routes (parent report/consent, learner kiosk) are
+// - `public`: token-scoped routes (parent report/consent) are
 //   reachable without a session; the page validates the token itself.
 const LoadingSpinner = () => (
  <div className="min-h-screen flex items-center justify-center bg-gray-50">

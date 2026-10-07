@@ -16,6 +16,13 @@ type Session struct {
 	Status      SessionStatus `json:"status"`
 	Notes       string        `json:"notes,omitempty"`
 	CreatedBy   *string       `json:"created_by,omitempty"`
+	// AlreadyCancelled marks an idempotent re-cancel (CANCELLED -> CANCELLED):
+	// the cancel succeeded but the session was already cancelled, so callers
+	// can tell "no-op" apart from a fresh cancel without a new status code
+	// (HTTP stays 200). Transient display field — gorm:"-" keeps it out of
+	// INSERT/UPDATE so it never becomes a phantom column (same precedent as
+	// Topics/ActivityCount below).
+	AlreadyCancelled bool `gorm:"-" json:"already_cancelled,omitempty"`
 	// Topics is the ordered list of Topik names instantiated in this session.
 	// List-endpoint-only display field, populated by ListSessions; the gorm:"-"
 	// tag keeps it out of INSERT/UPDATE so it never becomes a phantom column.

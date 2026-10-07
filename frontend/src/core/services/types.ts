@@ -7,10 +7,6 @@ import type {
  ToggleActiveResult,
  CreateStageDTO,
  UpdateStageDTO,
- StageContent,
- StageContentFileType,
- Content,
- ContentUsage,
  Session,
  SessionStage,
  SessionSubstage,
@@ -50,20 +46,6 @@ export interface ProgramService {
  createStage(programId: string, data: CreateStageDTO): Promise<ProgramStage>
  updateStage(programId: string, stageId: string, data: UpdateStageDTO): Promise<ProgramStage>
  deleteStage(programId: string, stageId: string): Promise<void>
-
- getContents(substageId: string): Promise<StageContent[]>
-}
-
-// Standalone, tenant-scoped content CRUD + usage/assign (Content Single-Source).
-export interface ContentService {
- getAll(params?: ListParams): Promise<PaginatedResponse<Content>>
- getById(id: string): Promise<Content | null>
- create(data: { title: string; file_url: string; youtube_url?: string; file_type: StageContentFileType; duration_seconds?: number }): Promise<Content>
- update(id: string, data: Partial<{ title: string; file_url: string; youtube_url?: string; file_type: StageContentFileType; duration_seconds?: number }>): Promise<Content>
- remove(id: string): Promise<void>
- getUsage(id: string): Promise<ContentUsage[]>
- upload(data: { file: File; title: string; file_type: StageContentFileType; duration_seconds?: number; youtube_url?: string }): Promise<Content>
- replaceFile(id: string, data: { file: File; title?: string; file_type?: StageContentFileType; duration_seconds?: number }): Promise<Content>
 }
 
 // Sessions
@@ -343,7 +325,7 @@ export interface ConsentService {
 }
 
 export interface ConsentInfo {
- status: 'ok' | 'invalid' | 'expired' | 'consumed'
+ status: 'ok' | 'invalid' | 'expired' | 'consumed' | 'cancelled'
  child_name?: string
  parent_name?: string
  session_name?: string
@@ -364,7 +346,6 @@ export interface AuthService {
  refresh(refreshToken: string): Promise<LoginResponse>
  logout(): Promise<void>
  getMe(): Promise<User>
- generateKioskToken(sessionId: string): Promise<{ access_token: string }>
  generateParentToken(reportId: string): Promise<{ access_token: string }>
 }
 

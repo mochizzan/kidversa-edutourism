@@ -6,9 +6,9 @@ package auth_test
 // BodyLimit rejects an oversized raw body with 413 at the Content-Length
 // check BEFORE the handler parses or persists anything.
 //
-// The test wires the REAL RegisterContentsRoutes chain (JWT → role → tenant
-// scope → BodyLimit → handler) exactly as router.go does, and drives it over
-// httptest. Stdlib testing + in-file fakes, no DB/network (repo test convention).
+// The test wires the REAL content-upload route chain (JWT → role → tenant
+// scope → BodyLimit → handler) exactly as RegisterUploadRoutes does, and drives
+// it over httptest. Stdlib testing + in-file fakes, no DB/network (repo test convention).
 
 import (
 	"bytes"
@@ -42,8 +42,9 @@ func (r *bodyLimitContentRepo) CreateContent(_ context.Context, ct *entity.Conte
 	return nil
 }
 
-// bodyLimitHarness is a wired /api tree: RegisterContentsRoutes over a real
-// echo instance with the production middleware chain and error handler.
+// bodyLimitHarness is a wired /api tree: RegisterUploadRoutes (content upload
+// pair) over a real echo instance with the production middleware chain and
+// error handler.
 type bodyLimitHarness struct {
 	e       *echo.Echo
 	uploads *bodyLimitContentRepo
@@ -80,7 +81,7 @@ func newBodyLimitHarness(t *testing.T) *bodyLimitHarness {
 	e := echo.New()
 	e.Validator = appmiddleware.NewValidator()
 	e.HTTPErrorHandler = appmiddleware.ErrorHandler // sama seperti router produksi
-	handler.RegisterContentsRoutes(e.Group("/api"), handler.NewContentHandler(cfg, uploads), uploadH, jm, revoker)
+	handler.RegisterUploadRoutes(e.Group("/api"), uploadH, jm, cfg, revoker)
 
 	return &bodyLimitHarness{e: e, uploads: uploads, token: access}
 }

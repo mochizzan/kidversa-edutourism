@@ -9,7 +9,6 @@ import (
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
-	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/auth"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
@@ -22,17 +21,11 @@ type AuthHandler struct {
 	refreshCookieName string
 	cookieSecure      bool
 	cookieSameSite    string
-	sessionRepo       repository.SessionRepository
 }
 
-// kioskTokenTTL is the lifetime of an issued kiosk token, shared with the
-// auth usecase (auth.KioskTokenTTL) so the requested and max-allowed values
-// stay in sync.
-const kioskTokenTTL = auth.KioskTokenTTL
-
 // NewAuthHandler builds the auth handler.
-func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, refreshCookieName string, cookieSecure bool, cookieSameSite string, sessionRepo repository.SessionRepository) *AuthHandler {
-	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, refreshCookieName: refreshCookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite, sessionRepo: sessionRepo}
+func NewAuthHandler(uc *auth.Usecase, jwt *auth.JWTManager, cookieName string, refreshCookieName string, cookieSecure bool, cookieSameSite string) *AuthHandler {
+	return &AuthHandler{authUC: uc, jwt: jwt, cookieName: cookieName, refreshCookieName: refreshCookieName, cookieSecure: cookieSecure, cookieSameSite: cookieSameSite}
 }
 
 // Login handles POST /api/auth/login and sets the SSE session cookie.
@@ -140,50 +133,6 @@ func (h *AuthHandler) ChangePassword(c *echo.Context) error {
 		return err
 	}
 	return appresp.OK(c, map[string]string{"status": "ok"})
-}
-
-// IssueKiosk handles POST /api/auth/kiosk (JWT-protected). It issues a kiosk
-// token bound to the requested session (within the caller's tenant scope).
-// The token is multi-use: it is valid for its full TTL and is never consumed,
-// so the kiosk may retry freely (see kiosk_handler.go KioskAccess).
-func (h *AuthHandler) IssueKiosk(c *echo.Context) error {
-	var req dto.KioskTokenRequest
-	if err := bindAndValidate(c, &req); err != nil {
-		return err
-	}
-	tenantID := appmiddleware.GetTenantID(c)
-	if tenantID == "" {
-		return appresp.Fail(c, http.StatusBadRequest, "tenant_required")
-	}
-	userID := appmiddleware.GetUserID(c)
-	role := appmiddleware.GetRole(c)
-
-	// Prevent cross-tenant kiosk token issuance (IDOR guard).
-	sessTenant, err := h.sessionRepo.TenantIDForSession((*c).Request().Context(), req.SessionID)
-	if err != nil {
-		return appresp.Fail(c, http.StatusNotFound, "session_not_found")
-	}
-	if sessTenant != tenantID {
-		return appresp.Fail(c, http.StatusForbidden, "kiosk_forbidden")
-	}
-
-	// Facilitator ownership gate: a FASILITATOR may only issue a kiosk token for a
-	// session where they own at least one group. ADMIN/KOORDINATOR/SUPER_ADMIN bypass.
-	if entity.UserRole(role) == entity.RoleFasilitator {
-		owns, oerr := h.sessionRepo.FacilitatorOwnsAnyGroup((*c).Request().Context(), req.SessionID, userID)
-		if oerr != nil {
-			return oerr
-		}
-		if !owns {
-			return appresp.Fail(c, http.StatusForbidden, "kiosk_not_group_owner")
-		}
-	}
-
-	token, err := h.authUC.IssueKioskToken((*c).Request().Context(), req.SessionID, tenantID, kioskTokenTTL)
-	if err != nil {
-		return err
-	}
-	return appresp.OK(c, map[string]string{"token": token})
 }
 
 // setSessionCookie / setRefreshCookie issue the auth cookies. These MUST be

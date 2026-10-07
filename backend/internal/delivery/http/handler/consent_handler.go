@@ -356,6 +356,9 @@ func (h *ConsentHandler) Info(c *echo.Context) error {
 			res.SessionName = session.Name
 			res.SessionDate = session.SessionDate
 			res.Location = session.Location
+			if session.Status == entity.SessionCancelled {
+				res.Status = "cancelled"
+			}
 		}
 	}
 	return appresp.OK(c, res)

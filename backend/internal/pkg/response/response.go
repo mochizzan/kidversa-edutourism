@@ -133,12 +133,6 @@ func MessageForCode(code string) string {
 		return "Token telah dicabut"
 	case "token_required":
 		return "Token diperlukan"
-	case "kiosk_invalid":
-		return "Token kiosk tidak valid"
-	case "kiosk_expired":
-		return "Tautan kiosk telah kedaluwarsa"
-	case "kiosk_cancelled":
-		return "Sesi kiosk telah dibatalkan"
 	case "bad_request":
 		return "Permintaan tidak dapat diproses"
 	case "schema_drift":
@@ -155,6 +149,12 @@ func MessageForCode(code string) string {
 		return "Setiap kelompok harus memiliki minimal satu peserta"
 	case "program_has_sessions":
 		return "Program masih memiliki sesi. Hapus atau pindahkan sesi terlebih dahulu."
+	case "stage_has_sessions":
+		return "Topik masih dipakai sesi. Hapus atau pindahkan sesi terlebih dahulu."
+	case "substage_has_sessions":
+		return "Kegiatan masih dipakai sesi. Hapus atau pindahkan sesi terlebih dahulu."
+	case "program_has_completed_sessions":
+		return "Program memiliki sesi yang sudah selesai (COMPLETED) dan diarsipkan. Hapus paksa ditolak untuk melindungi arsip."
 	case "program_has_no_topics":
 		return "Program belum memiliki topik. Tambahkan minimal satu topik beserta kegiatannya sebelum membuat sesi."
 	case "topic_has_no_activities":

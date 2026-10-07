@@ -96,7 +96,10 @@
       "aria": "Komentar",
       "placeholder": "Tulis komentar..."
     },
-    "phone": { "countryCode": "Kode negara", "emptyCountry": "Negara tidak ditemukan" },
+    "phone": {
+      "countryCode": "Kode negara",
+      "emptyCountry": "Negara tidak ditemukan"
+    },
     "greeting": {
       "morning": "Selamat Pagi",
       "afternoon": "Selamat Siang",
@@ -232,11 +235,6 @@
     "token_invalid": "Tautan tidak valid.",
     "tenant_required": "Silakan pilih tenant terlebih dahulu.",
     "internal_error": "Terjadi kesalahan pada server. Silakan coba lagi.",
-    "kiosk_invalid": "Sesi berakhir atau tautan tidak valid.",
-    "kiosk_forbidden": "Anda tidak memiliki akses ke sesi tersebut.",
-    "kiosk_expired": "Tautan kiosk telah kedaluwarsa. Minta fasilitator membuka ulang sesi.",
-    "kiosk_cancelled": "Sesi ini telah dibatalkan.",
-    "group_required": "Tautan kiosk tidak menyertakan kelompok. Minta admin membuka kiosk dari kartu kelompok.",
     "session_not_found": "Sesi tidak ditemukan.",
     "session_not_deletable": "Sesi ini tidak dapat dihapus.",
     "participant_not_deletable": "Peserta ini tidak dapat dihapus.",
@@ -341,11 +339,12 @@
       "title": "Pilih Tenant Terlebih Dahulu",
       "description": "Gunakan pemilih tenant di sidebar untuk memilih tenant sebelum mengakses halaman operasional."
     },
-    "tenantSwitcher": { "placeholder": "Pilih Tenant..." },
+    "tenantSwitcher": {
+      "placeholder": "Pilih Tenant..."
+    },
     "sidebar": {
       "language": "Bahasa",
       "dashboard": "Dashboard",
-      "live": "Live Monitor",
       "programs": "Daftar Program",
       "topics": "Daftar Topik",
       "activities": "Daftar Kegiatan",
@@ -353,7 +352,6 @@
       "participants": "Peserta",
       "reports": "Reports",
       "missions": "Missions",
-      "content": "Content Manager",
       "frames": "Frame Manager",
       "tenants": "Tenants",
       "users": "Users",
@@ -435,7 +433,8 @@
       "uploadSuccess": "Berhasil diunggah",
       "uploadBtn": "Unggah Gambar",
       "mediaUnavailable": "Unggahan tersimpan, tetapi gambar tidak dapat diakses dari server.",
-      "invalidType": "Format tidak didukung. Gunakan gambar JPG, PNG, GIF, atau WebP (SVG tidak didukung)."
+      "invalidType": "Format tidak didukung. Gunakan gambar JPG, PNG, GIF, atau WebP (SVG tidak didukung).",
+      "fileTooLarge": "File melebihi batas {{limit}} MB"
     },
     "col": {
       "name": "Nama",
@@ -953,27 +952,6 @@
       "updatedToast": "Misi berhasil diperbarui",
       "createdToast": "Misi baru berhasil ditambahkan"
     },
-    "live": {
-      "pageTitle": "Live Monitor",
-      "loadError": "Gagal Memuat",
-      "loadMonitorError": "Gagal memuat data live monitor",
-      "emptyTitle": "Tidak ada sesi aktif",
-      "emptyDesc": "Belum ada sesi yang sedang berlangsung saat ini",
-      "reconnecting": "Menyambung ulang…",
-      "weakConnection": "Koneksi lemah",
-      "noTopicToast": "Belum ada topik untuk sesi ini.",
-      "openingKiosk": "Membuka…",
-      "openKiosk": "Buka Kiosk",
-      "sessionLabel": "Sesi:",
-      "allCompletedTitle": "🎉 Semua kelompok selesai!",
-      "allCompletedDesc": "Sesi telah berakhir. Semua kelompok telah menyelesaikan semua stage.",
-      "statTotal": "Total",
-      "statOngoing": "Berlangsung",
-      "live": "Live",
-      "timelineTitle": "Timeline Aktivitas",
-      "emptyFeed": "Belum ada aktivitas",
-      "byUser": "oleh user ID: {{id}}"
-    },
     "consent": {
       "title": "Monitor Consent",
       "loadError": "Gagal memuat data consent",
@@ -1013,6 +991,7 @@
       "title": "Laporan",
       "subtitle": "Kelola laporan penilaian untuk setiap sesi.",
       "refresh": "Refresh",
+      "reconnecting": "Menyambung ulang…",
       "loadError": "Gagal memuat data laporan. Silakan coba lagi.",
       "emptyDesc": "Buat sesi terlebih dahulu untuk mulai membuat laporan.",
       "noSessionTitle": "Tidak ada sesi",
@@ -1079,7 +1058,11 @@
       "colIndikator": "Indikator",
       "colKomentar": "Komentar",
       "notRated": "Belum dinilai",
-      "absent": "Tidak hadir"
+      "absent": "Tidak hadir",
+      "cancelledTitle": "Sesi Dibatalkan",
+      "cancelledDesc": "Sesi ini sudah dibatalkan. Laporan di bawah adalah arsip pra-pembatalan — generate dan kirim dinonaktifkan.",
+      "preCancelLabel": "Pra-pembatalan",
+      "sessionInactiveError": "Sesi sudah dibatalkan — laporan tidak dapat dibuat atau dikirim lagi."
     },
     "review": {
       "subtitle": "Review dan kelola laporan peserta",
@@ -1134,63 +1117,6 @@
       "removeMission": "Hapus {{title}}",
       "pickTitle": "Pilih dari Library Misi",
       "missionsEmptyForTopic": "Tidak ada misi untuk topik ini."
-    },
-    "content": {
-      "add": "Tambah Konten",
-      "subtitle": "Perpustakaan konten tenant: video, gambar, game.",
-      "searchPlaceholder": "Cari konten...",
-      "typeLabel": "Tipe",
-      "allTypes": "Semua Tipe",
-      "foundCount": "{{count}} konten ditemukan",
-      "emptyTitle": "Belum ada konten",
-      "emptyAll": "Klik \"Tambah Konten\" di atas untuk membuat konten pertama.",
-      "emptyFiltered": "Tidak ada konten yang cocok dengan filter.",
-      "loadError": "Gagal memuat konten",
-      "deletedToast": "Konten dihapus",
-      "deleteError": "Gagal menghapus konten",
-      "notFound": "Konten tidak ditemukan",
-      "updatedToast": "Konten berhasil diperbarui",
-      "createdToast": "Konten baru berhasil ditambahkan",
-      "saveError": "Gagal menyimpan konten",
-      "editTitle": "Edit Konten",
-      "newTitle": "Tambah Konten Baru",
-      "editSubtitle": "Perbarui detail konten",
-      "newSubtitle": "Buat konten baru untuk perpustakaan tenant",
-      "deleteTitle": "Hapus Konten",
-      "deleteMsg": "Apakah Anda yakin ingin menghapus konten “{{title}}”? Tindakan ini tidak dapat dibatalkan.",
-      "usageCount": "Konten ini masih digunakan di {{count}} topik:",
-      "usageNote": "Menghapus konten akan melepasnya dari semua topik tersebut.",
-      "titleLabel": "Judul",
-      "titlePlaceholder": "Judul konten",
-      "fileTypeLabel": "Tipe File",
-      "fileTypeHint": "Format media dari satu konten; boleh berbeda dari Tipe Aktivitas topik.",
-      "videoSourceLabel": "Sumber Video:",
-      "uploadManual": "Upload Manual",
-      "urlFileLabel": "URL File",
-      "youtubeUrlLabel": "URL YouTube",
-      "youtubeHint": "Tempel tautan YouTube (watch / youtu.be / embed). Kiosk akan menampilkan via embed.",
-      "fileLabel": "File",
-      "removeFileAria": "Hapus file",
-      "dropzoneText": "Seret file ke sini atau klik untuk pilih",
-      "typeUnsupported": "Tipe file tidak didukung. Gunakan URL untuk Game Bundle.",
-      "imageTooLarge": "Gambar melebihi batas 10 MB",
-      "fileTooLarge": "File melebihi batas {{limit}} MB",
-      "gifNoCompress": "GIF tidak dapat dikompresi otomatis",
-      "processError": "Gagal memproses file. Coba lagi.",
-      "youtubeUrlRequired": "URL YouTube wajib diisi",
-      "urlRequired": "URL wajib diisi",
-      "fileRequired": "File wajib diisi",
-      "durationLine": "Total Durasi Video: {{duration}}(detik)",
-      "activeLabel": "Aktif",
-      "pickerTitle": "Pilih Konten dari Perpustakaan",
-      "pickerEmpty": "Tidak ada konten yang cocok.",
-      "noPreview": "No Preview",
-      "duration": {
-        "live": "Langsung",
-        "seconds": "{{count}} detik",
-        "minuteSeconds": "{{m}} menit {{s}} detik",
-        "minutes": "{{count}} menit"
-      }
     }
   },
   "fasilitator": {
@@ -1202,10 +1128,20 @@
       "profile": "Profile"
     },
     "hello": "Hai, {{name}}",
-    "profile": { "quickMenu": {
-      "dashboard": { "title": "Dashboard", "desc": "Lihat ringkasan aktivitas" },
-      "groups": { "title": "Kelompok", "desc": "Kelola semua kelompok" },
-      "camera": { "title": "Kamera", "desc": "Buka kamera untuk scan QR" }
+    "profile": {
+      "quickMenu": {
+        "dashboard": {
+          "title": "Dashboard",
+          "desc": "Lihat ringkasan aktivitas"
+        },
+        "groups": {
+          "title": "Kelompok",
+          "desc": "Kelola semua kelompok"
+        },
+        "camera": {
+          "title": "Kamera",
+          "desc": "Buka kamera untuk scan QR"
+        }
       },
       "loadErrorTitle": "Tidak dapat memuat profil",
       "loadErrorDesc": "Silakan login ulang ke dalam sistem.",
@@ -1385,14 +1321,11 @@
       "noActivities": "Kelompok belum memiliki kegiatan untuk diselesaikan.",
       "completeSuccess": "Kelompok berhasil diselesaikan",
       "completeError": "Gagal menyelesaikan kelompok",
-      "noActiveStage": "Kelompok belum memiliki stage aktif untuk dibuka di kiosk.",
-      "sessionInactiveKiosk": "Sesi belum aktif — kiosk mungkin menampilkan konten kosong.",
       "attendanceError": "Gagal mengubah kehadiran",
       "pageTitle": "Kelompok",
       "crumbError": "Error",
       "emptyTitle": "Belum ada peserta",
       "emptyDesc": "Belum ada peserta yang terdaftar di kelompok ini.",
-      "openKiosk": "Buka Kiosk",
       "sessionNotStarted": "Sesi belum dimulai. Penilaian akan tersedia setelah sesi aktif.",
       "sessionCancelled": "Sesi ini sudah dibatalkan. Absensi dan penilaian tidak dapat diubah.",
       "readOnlyPic": "Bukan kelompok Anda (PIC: {{name}}) — mode baca saja.",
@@ -1414,7 +1347,11 @@
       "continueToNextTopic": "Lanjut ke topik berikutnya: {{name}}",
       "allTopicsDone": "Semua topik selesai"
     },
-    "session": { "allDay": "Sepanjang hari", "notMine": "Sesi ini bukan tanggung jawab Anda", "noLocation": "Lokasi belum ditentukan" },
+    "session": {
+      "allDay": "Sepanjang hari",
+      "notMine": "Sesi ini bukan tanggung jawab Anda",
+      "noLocation": "Lokasi belum ditentukan"
+    },
     "child": {
       "years": "{{age}} tahun",
       "assessed": "Sudah dinilai",
@@ -1462,7 +1399,9 @@
     }
   },
   "parent": {
-    "layout": { "role": "Orang Tua" },
+    "layout": {
+      "role": "Orang Tua"
+    },
     "token": {
       "verifying": "Memverifikasi tautan...",
       "invalidTitle": "Link tidak valid",
@@ -1501,6 +1440,8 @@
       "expiredMsg": "Laporan sudah tidak tersedia.",
       "loadFailedMsg": "Terjadi kesalahan saat memuat laporan.",
       "iframeTitle": "Mini Raport",
+      "cancelledTitle": "Sesi Dibatalkan — Arsip",
+      "cancelledDesc": "Sesi kegiatan ini sudah dibatalkan. Laporan ini adalah arsip pra-pembatalan.",
       "print": "Cetak",
       "downloadPdf": "Unduh PDF",
       "downloadPng": "Unduh PNG",
@@ -1557,30 +1498,9 @@
       "expiredMsg": "Tautan persetujuan sudah kedaluwarsa. Silakan hubungi koordinator.",
       "nameToast": "Silakan masukkan nama Anda.",
       "chooseToast": "Silakan pilih Ya/Tidak untuk izin foto.",
-      "submitError": "Gagal mengirim persetujuan. Silakan coba lagi."
-    }
-  },
-  "learner": {
-    "kiosk": {
-      "noSessionContent": "Sesi ini belum memiliki konten.",
-      "topicNotFound": "Topik tidak ditemukan pada sesi ini.",
-      "missingParams": "Parameter tidak lengkap",
-      "invalidToken": "Tautan kiosk tidak valid (token tidak ditemukan).",
-      "loading": "Memuat konten...",
-      "unavailableTitle": "Konten Tidak Tersedia",
-      "notFoundFallback": "Topik tidak ditemukan",
-      "lockedTitle": "Konten Dikunci",
-      "lockedDesc": "Kegiatan ini sedang dikunci oleh admin. Silakan tunggu hingga dibuka kembali.",
-      "emptyTitle": "Belum Ada Konten",
-      "emptyDesc": "Kegiatan ini belum memiliki konten yang dapat ditampilkan.",
-      "contentOf": "Konten {{current}} dari {{total}}",
-      "stageCompleted": "Kegiatan selesai",
-      "stageOngoing": "Kegiatan berlangsung",
-      "previous": "Sebelumnya",
-      "next": "Selanjutnya"
-    },
-    "content": {
-      "invalid": "Konten tidak valid atau belum tersedia."
+      "submitError": "Gagal mengirim persetujuan. Silakan coba lagi.",
+      "cancelledTitle": "Sesi Dibatalkan",
+      "cancelledMsg": "Sesi kegiatan ini sudah dibatalkan. Formulir persetujuan ini sudah ditutup dan tidak dapat diisi lagi."
     }
   }
 }

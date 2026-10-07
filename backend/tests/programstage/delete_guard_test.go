@@ -60,7 +60,7 @@ func guardedProgram() entity.Program {
 // ProgramHandler.Delete. force is appended as ?force=... when non-empty.
 func runProgramDelete(t *testing.T, repo repository.ProgramRepository, force string) *httptest.ResponseRecorder {
 	t.Helper()
-	h := handler.NewProgramHandler(repo, nil, nil)
+	h := handler.NewProgramHandler(repo, nil)
 	e := echo.New()
 	target := "/api/programs/" + programID
 	if force != "" {

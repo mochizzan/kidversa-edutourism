@@ -61,12 +61,15 @@ func (r *GormProgramSubstageRepository) ListSubstages(ctx context.Context, progr
 }
 
 func (r *GormProgramSubstageRepository) ListPaginatedSubstages(ctx context.Context, filter repository.SubstageFilter, page, limit int) (*repository.Paginated[entity.ProgramSubstage], error) {
-	q := r.db.WithContext(ctx).Model(&ProgramSubstageModel{}).Joins("JOIN program_stages ps ON ps.id = program_substages.program_stage_id")
+	q := r.db.WithContext(ctx).Model(&ProgramSubstageModel{}).Joins("JOIN program_stages ps ON ps.id = program_substages.program_stage_id").Joins("JOIN programs p ON p.id = ps.program_id")
 	if filter.ProgramStageID != "" {
 		q = q.Where("program_substages.program_stage_id = ?", filter.ProgramStageID)
 	}
 	if filter.ProgramID != "" {
 		q = q.Where("ps.program_id = ?", filter.ProgramID)
+	}
+	if filter.TenantID != "" {
+		q = q.Where("p.tenant_id = ?", filter.TenantID)
 	}
 	if filter.Search != "" {
 		like := "%" + strings.ToLower(filter.Search) + "%"
@@ -108,6 +111,39 @@ func (r *GormProgramSubstageRepository) DeleteSubstage(ctx context.Context, id s
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
+}
+
+// CountSubstageUsage counts live session_substages rows referencing the
+// Kegiatan (default GORM scope excludes soft-deleted rows).
+func (r *GormProgramSubstageRepository) CountSubstageUsage(ctx context.Context, substageID string) (int64, error) {
+	var n int64
+	if err := r.db.WithContext(ctx).Model(&SessionSubstageModel{}).Where("program_substage_id = ?", substageID).Count(&n).Error; err != nil {
+		return 0, apperrors.Internal("internal_error", err)
+	}
+	return n, nil
+}
+
+// ListSubstageSessionBriefs returns up to limit live sessions using the
+// Kegiatan (id, name, status), oldest first — the short list behind the 409.
+func (r *GormProgramSubstageRepository) ListSubstageSessionBriefs(ctx context.Context, substageID string, limit int) ([]entity.Session, error) {
+	q := r.db.WithContext(ctx).Table("sessions s").
+		Select("s.*").
+		Joins("JOIN session_substages ssub ON ssub.session_id = s.id").
+		Where("ssub.program_substage_id = ?", substageID).
+		Where("s.deleted_at IS NULL").
+		Order("s.created_at ASC, s.id ASC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	var models []SessionModel
+	if err := q.Find(&models).Error; err != nil {
+		return nil, apperrors.Internal("internal_error", err)
+	}
+	items := make([]entity.Session, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
+	}
+	return items, nil
 }
 
 // GormSessionSubstageRepository implements repository.SessionSubstageRepository.

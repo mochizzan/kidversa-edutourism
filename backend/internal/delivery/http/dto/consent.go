@@ -90,8 +90,11 @@ type ConsentSendSingleResponse struct {
 // auth — token is the bearer). It exposes only what a parent needs to recognize
 // the request: the child's name, the session name/date/location, and whether the
 // token has already been consumed or expired. Parent phone/email stay private.
+// "cancelled" means the token itself is still valid but its session was
+// CANCELLED — the form must render locked (archive), not accept a response
+// (RespondCombined rejects with session_not_active).
 type ConsentInfoResponse struct {
-	Status      string `json:"status"` // "ok" | "consumed" | "invalid" | "expired"
+	Status      string `json:"status"` // "ok" | "consumed" | "invalid" | "expired" | "cancelled"
 	ChildName   string `json:"child_name,omitempty"`
 	ParentName  string `json:"parent_name,omitempty"`
 	SessionName string `json:"session_name,omitempty"`

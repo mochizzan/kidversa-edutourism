@@ -29,6 +29,7 @@ export enum SessionStageStatus {
   WAITING = 'WAITING',
   ACTIVE = 'ACTIVE',
   COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
 }
 
 export enum GroupStatus {

@@ -154,11 +154,18 @@ function ConsentForm() {
           setLockedError(t('parent.consent.expiredMsgNew'))
           return
         }
+        if (res.status === 'cancelled') {
+          setInfo(res)
+          setLockedError(t('parent.consent.cancelledMsg'))
+          return
+        }
         setInfo(res)
       })
       .catch(() => {
         // Non-fatal: the form still works; personalization just stays generic.
-        setInfo({ status: 'ok' })
+        // A known-cancelled session must stay locked — a failed refetch must
+        // never downgrade it back to a writable form.
+        setInfo((prev) => (prev?.status === 'cancelled' ? prev : { status: 'ok' }))
       })
       .finally(() => setInfoLoading(false))
   }, [token])
@@ -189,6 +196,13 @@ function ConsentForm() {
         setLockedError(t('parent.consent.expiredMsg'))
         return
       }
+      if (code === 'session_not_active') {
+        // The session was cancelled between Info and submit: lock the form
+        // with the same cancelled panel instead of a generic toast.
+        setInfo((prev) => (prev ? { ...prev, status: 'cancelled' } : prev))
+        setLockedError(t('parent.consent.cancelledMsg'))
+        return
+      }
       addToast({
         type: 'error',
         message: t('parent.consent.submitError'),
@@ -200,11 +214,12 @@ function ConsentForm() {
 
   /* ── Locked (invalid/expired token) ── */
   if (lockedError) {
+    const cancelled = info?.status === 'cancelled'
     return (
       <StatePanel
         tone="warn"
         icon={<AlertTriangle className="w-8 h-8 text-yellow-600" />}
-        title={t('parent.consent.lockedTitle')}
+        title={t(cancelled ? 'parent.consent.cancelledTitle' : 'parent.consent.lockedTitle')}
       >
         {lockedError}
       </StatePanel>

@@ -29,9 +29,6 @@ export interface RouteAccess {
 // index its sidebar label-key maps with compile-time missing-key detection.
 export const ADMIN_ROUTE_ACCESS = [
   { path: 'dashboard', section: 'OVERVIEW', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  // Live Monitor hidden from sidebar/nav for all admin roles (temporary, reversible —
-  // uncomment to restore; route definitions and page files are untouched).
-  // { path: 'live', section: 'OVERVIEW', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'programs', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'topics', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'activities', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
@@ -39,9 +36,6 @@ export const ADMIN_ROUTE_ACCESS = [
   { path: 'participants', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'reports', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
   { path: 'missions', section: 'PROGRAM', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.KOORDINATOR] },
-  // Content Manager hidden from sidebar/nav for admin roles (temporary, reversible —
-  // uncomment to restore; route definitions and page files are untouched).
-  // { path: 'content', section: 'CONTENT', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { path: 'frames', section: 'CONTENT', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },
   { path: 'tenants', section: 'SETTINGS', roles: [UserRole.SUPER_ADMIN] },
   { path: 'users', section: 'SETTINGS', roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN] },

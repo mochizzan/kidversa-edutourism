@@ -75,7 +75,7 @@ func TestProgramStageEntityJSONOmitsPhotoStage(t *testing.T) {
 // entity plumbing, not merely renamed).
 func TestCreateStageResponseOmitsPhotoStage(t *testing.T) {
 	repo := &createStageRepo{}
-	h := handler.NewProgramHandler(repo, nil, nil)
+	h := handler.NewProgramHandler(repo, nil)
 	e := echo.New()
 	e.Validator = appmiddleware.NewValidator() // same validator the router installs
 	body := `{"sequence_order":1,"name":"Topik Baru","description":"d",` +

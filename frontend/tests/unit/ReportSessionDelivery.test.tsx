@@ -395,7 +395,7 @@ describe('ReportSessionPage — server-driven per-row delivery state', () => {
     // run is alive and polling continues on the next tick.
     expect(
      useToastStore.getState().toasts.some(
-      (t) => t.type === 'info' && t.message === i18n.t('admin.live.reconnecting'),
+      (t) => t.type === 'info' && t.message === i18n.t('admin.reports.reconnecting'),
      ),
     ).toBe(true)
     // Last known state retained (row still queued) — not cleared on failure.

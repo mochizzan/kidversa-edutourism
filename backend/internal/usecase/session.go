@@ -184,6 +184,21 @@ func (u *SessionUsecase) CreateSession(ctx context.Context, tenantID, createdBy 
 		CreatedBy:   cb,
 	}
 	err := u.sessionRepo.Transaction(ctx, func(tx repository.SessionRepository) error {
+		// Tahap 2 step 8: re-read the program INSIDE the session-creation
+		// transaction so a program deleted between the pre-gate above and
+		// this write cannot orphan the new session (Count-then-Delete
+		// narrowing, no lock redesign). The program repo's not_found covers
+		// both hard and soft deletes (GORM DeletedAt scope) and is
+		// re-mapped to program_not_found like requireSessionProgram.
+		// NEEDS-RUNTIME-VERIFICATION for concurrent coverage.
+		if u.programs != nil {
+			if _, err := u.programs.GetProgramByID(ctx, programID); err != nil {
+				if _, code, ok := apperrors.AsAppError(err); ok && code == "not_found" {
+					return apperrors.NotFound("program_not_found", err)
+				}
+				return err
+			}
+		}
 		if err := tx.CreateSession(ctx, s); err != nil {
 			return err
 		}
@@ -465,8 +480,15 @@ func (u *SessionUsecase) CompleteSession(ctx context.Context, id, tenantID strin
 	return s, nil
 }
 
-// CancelSession transitions a session to CANCELLED and stamps its ACTIVE
-// Topik as CANCELLED (audit #18 — never COMPLETED, no completed_at).
+// CancelSession transitions a session to CANCELLED and stamps every
+// non-terminal Topik (WAITING and ACTIVE) as CANCELLED (audit #18 — never
+// COMPLETED, no completed_at).
+//
+// Re-cancel (CANCELLED -> CANCELLED) is an idempotent success (HTTP 200): the
+// returned session carries AlreadyCancelled=true ("already_cancelled") so
+// callers can tell the no-op apart from a fresh cancel without a new status
+// code. The stage loop re-runs so a leftover non-terminal stage converges
+// instead of stranding live stages on a cancelled session.
 //
 // Atomicity (audit #12): the status write, the stage stamps and the cancel
 // fields all run inside ONE session-repo transaction — a failure at any step
@@ -489,26 +511,45 @@ func (u *SessionUsecase) CancelSession(ctx context.Context, id, tenantID string)
 		if s.Status == entity.SessionCompleted {
 			return apperrors.Conflict("bad_request", nil)
 		}
-		s.Status = entity.SessionCancelled
-		if err := tx.UpdateSession(ctx, s); err != nil {
-			return err
+		if s.Status == entity.SessionCancelled {
+			// Idempotent re-cancel: already CANCELLED is a success (HTTP 200),
+			// marked so callers can tell the no-op apart from a fresh cancel.
+			// The stage loop below still runs so a leftover non-terminal
+			// stage converges instead of stranding live stages.
+			cancelled = s
+			cancelled.AlreadyCancelled = true
+		} else {
+			s.Status = entity.SessionCancelled
+			if err := tx.UpdateSession(ctx, s); err != nil {
+				return err
+			}
+			cancelled = s
 		}
 		stages, err := tx.ListSessionStages(ctx, id)
 		if err != nil {
 			return err
 		}
 		for i := range stages {
-			if stages[i].Status == entity.SessionStageActive {
+			if stages[i].Status == entity.SessionStageActive || stages[i].Status == entity.SessionStageWaiting {
 				// Audit #18: a cancelled stage reads CANCELLED — it was NOT
-				// completed, so no completed_at is stamped (WAITING stages
-				// stay untouched, as before).
+				// completed, so no completed_at is stamped. WAITING stages are
+				// non-terminal too: leaving them WAITING would strand a live
+				// stage on a cancelled session (and the FE stage map would
+				// show a runnable Topik for a dead session).
 				stages[i].Status = entity.SessionStageCancelled
 				if err := tx.UpdateSessionStage(ctx, &stages[i]); err != nil {
 					return err
 				}
 			}
 		}
-		cancelled = s
+		// Revoke outstanding parent-consent tokens in the SAME transaction:
+		// a cancelled session never accepts consent writes (RespondCombined
+		// and SendWhatsApp both gate on CANCELLED), so live tokens would be
+		// dead links. Atomic here — a rollback restores the tokens together
+		// with the session/stage statuses.
+		if err := tx.ClearParticipantTokens(ctx, id, tenantID); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
@@ -1223,9 +1264,9 @@ func (u *SessionUsecase) DeleteParticipant(ctx context.Context, participantID, t
 }
 
 // EnsureSessionSubstages guarantees a session has its Kegiatan leaves
-// (session Kegiatan) cloned from the program, so the kiosk/live monitor always
-// have per-leaf content to render. Sessions created before Kegiatan cloning
-// landed (or whose clone was skipped) would otherwise show an empty kiosk.
+// (session Kegiatan) cloned from the program, so per-leaf flows always have
+// data to render. Sessions created before Kegiatan cloning
+// landed (or whose clone was skipped) would otherwise show empty data.
 // Idempotent: when session Kegiatan already exist it returns immediately.
 // No-op when the Kegiatan repos are unwired.
 func (u *SessionUsecase) EnsureSessionSubstages(ctx context.Context, sessionID string) error {

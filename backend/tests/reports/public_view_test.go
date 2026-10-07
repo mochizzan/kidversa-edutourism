@@ -455,6 +455,33 @@ func TestBuildPublicReportViewLegacyKeepsSessionWideStages(t *testing.T) {
 	}
 }
 
+// TestBuildPublicReportViewSessionCancelledFlag: the frozen-archive marker
+// (step 17) — an ACTIVE session yields false, a CANCELLED session yields true
+// while the content stays served (pre-cancel snapshot, banner on the client).
+func TestBuildPublicReportViewSessionCancelledFlag(t *testing.T) {
+	f := newViewFixture()
+	view, err := f.uc.BuildPublicReportView(context.Background(), newViewReport())
+	if err != nil {
+		t.Fatalf("BuildPublicReportView: %v", err)
+	}
+	if view.SessionCancelled {
+		t.Error("SessionCancelled = true for an active session, want false")
+	}
+
+	f2 := newViewFixture()
+	f2.sessRepo.session.Status = entity.SessionCancelled
+	view2, err := f2.uc.BuildPublicReportView(context.Background(), newViewReport())
+	if err != nil {
+		t.Fatalf("BuildPublicReportView (cancelled): %v", err)
+	}
+	if !view2.SessionCancelled {
+		t.Error("SessionCancelled = false for a CANCELLED session, want true")
+	}
+	if len(view2.Stages) == 0 {
+		t.Error("cancelled session must still serve the pre-cancel snapshot (stages), not an empty view")
+	}
+}
+
 // ── Group resolution: per-session history contract ──
 //
 // The mini-rapor kelompok must come from the REPORT'S session, in this order:

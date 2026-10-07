@@ -3,7 +3,6 @@ package persistence
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"gorm.io/gorm"
 
@@ -47,39 +46,9 @@ func (r *GormContentRepository) GetContentByID(ctx context.Context, id string) (
 	return m.ToEntity(), nil
 }
 
-func (r *GormContentRepository) ListContents(ctx context.Context, f repository.ContentFilter, page, limit int) (*repository.Paginated[entity.Content], error) {
-	q := r.db.WithContext(ctx).Model(&ContentModel{})
-	if f.TenantID != "" {
-		q = q.Where("tenant_id = ?", f.TenantID)
-	}
-	if f.FileType != "" {
-		q = q.Where("file_type = ?", f.FileType)
-	}
-	if f.Search != "" {
-		like := "%" + strings.ToLower(f.Search) + "%"
-		q = q.Where("LOWER(title) LIKE ?", like)
-	}
-
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-
-	var models []ContentModel
-	offset := (page - 1) * limit
-	if err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	items := make([]entity.Content, 0, len(models))
-	for i := range models {
-		items = append(items, *models[i].ToEntity())
-	}
-	return &repository.Paginated[entity.Content]{Items: items, Total: int(total)}, nil
-}
-
 func (r *GormContentRepository) UpdateContent(ctx context.Context, c *entity.Content) error {
 	m := contentModelFromEntity(c)
-	// Update only the global content fields (per-stage state lives on the junction).
+	// Update only the global content fields.
 	if err := r.db.WithContext(ctx).Model(&ContentModel{}).Where("id = ?", c.ID).Updates(map[string]interface{}{
 		"title":            m.Title,
 		"file_url":         m.FileURL,
@@ -94,116 +63,6 @@ func (r *GormContentRepository) UpdateContent(ctx context.Context, c *entity.Con
 		return apperrors.Internal("internal_error", err)
 	}
 	return nil
-}
-
-// DeleteContent atomically removes the stage_contents junctions for the content
-// (or relies on the FK cascade) and then the contents row, returning the stored
-// file_url so the caller can remove the orphan file (D10a/E24). YouTube contents
-// have an empty file_url, so the caller skips removal.
-func (r *GormContentRepository) DeleteContent(ctx context.Context, id string) (string, error) {
-	var m ContentModel
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", apperrors.NotFound("not_found", err)
-		}
-		return "", apperrors.Internal("internal_error", err)
-	}
-	fileURL := m.FileURL
-
-	if err := InTx(ctx, r.db, func(tx *gorm.DB) error {
-		// Drop junctions first (also covered by FK ON DELETE CASCADE, but explicit for clarity/ordering).
-		if err := tx.Where("content_id = ?", id).Delete(&StageContentRefModel{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("id = ?", id).Delete(&ContentModel{}).Error; err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		return "", apperrors.Internal("internal_error", err)
-	}
-	return fileURL, nil
-}
-
-// --- Junction (content <-> stage) ---
-
-// ListStageContents returns the StageContent list for a program
-// substage (Kegiatan), ordered by sort_order, filtering soft-deleted junctions.
-// Content now belongs to the Kegiatan leaf (program_substages), so the filter
-// is on sc.program_substage_id (v4 column rename). stageID is the
-// program_substage_id.
-func (r *GormContentRepository) ListStageContents(ctx context.Context, substageID string) ([]entity.StageContent, error) {
-	type joinRow struct {
-		ContentID         string
-		ProgramSubstageID string
-		SortOrder         int
-		IsActive          bool
-		Title             string
-		FileURL           string
-		YouTubeURL        string `gorm:"column:youtube_url"`
-		FileType          entity.StageContentFileType
-		DurationSeconds   int
-	}
-	var rows []joinRow
-	err := r.db.WithContext(ctx).
-		Table("stage_contents sc").
-		Select("sc.content_id, sc.program_substage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds").
-		Joins("JOIN contents c ON c.id = sc.content_id").
-		Where("sc.program_substage_id = ?", substageID).
-		Order("sc.sort_order ASC").
-		Find(&rows).Error
-	if err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	items := make([]entity.StageContent, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, entity.StageContent{
-			ID:              row.ContentID,
-			ProgramStageID:  row.ProgramSubstageID,
-			Title:           row.Title,
-			FileURL:         row.FileURL,
-			YouTubeURL:      row.YouTubeURL,
-			FileType:        row.FileType,
-			DurationSeconds: row.DurationSeconds,
-			SortOrder:       row.SortOrder,
-			IsActive:        row.IsActive,
-		})
-	}
-	return items, nil
-}
-
-// GetContentUsage returns every (program, stage) that references the content,
-// for the Manager delete-confirm dialog (A3a).
-func (r *GormContentRepository) GetContentUsage(ctx context.Context, contentID string) ([]entity.ContentUsage, error) {
-	type usageRow struct {
-		ProgramID   string
-		ProgramName string
-		StageID     string
-		StageName   string
-	}
-	var rows []usageRow
-	err := r.db.WithContext(ctx).
-		Table("stage_contents sc").
-		Select("p.id AS program_id, p.name AS program_name, ps.id AS stage_id, ps.name AS stage_name").
-		Joins("JOIN program_substages psub ON psub.id = sc.program_substage_id").
-		Joins("JOIN program_stages ps ON ps.id = psub.program_stage_id").
-		Joins("JOIN programs p ON p.id = ps.program_id").
-		Where("sc.content_id = ?", contentID).
-		Order("p.name ASC, ps.name ASC").
-		Find(&rows).Error
-	if err != nil {
-		return nil, apperrors.Internal("internal_error", err)
-	}
-	items := make([]entity.ContentUsage, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, entity.ContentUsage{
-			ProgramID:   row.ProgramID,
-			ProgramName: row.ProgramName,
-			StageID:     row.StageID,
-			StageName:   row.StageName,
-		})
-	}
-	return items, nil
 }
 
 // GetContentProgramTenant resolves the owning tenant of a content via its stage's

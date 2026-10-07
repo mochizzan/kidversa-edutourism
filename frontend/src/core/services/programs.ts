@@ -2,7 +2,6 @@ import type { ProgramService } from './types'
 import type {
   Program,
   ProgramStage,
-  StageContent,
   CreateProgramDTO,
   UpdateProgramDTO,
   CreateStageDTO,
@@ -84,7 +83,4 @@ export const programService: ProgramService = {
 
   deleteStage: (programId, stageId) =>
     voidRequest('DELETE', API_ROUTES.PROGRAMS.STAGE_DETAIL(programId, stageId)),
-
-  getContents: (substageId) =>
-    arrayRequest<StageContent>('GET', API_ROUTES.PROGRAMS.CONTENTS(substageId)),
 }

@@ -14,8 +14,8 @@ interface SessionStagesTabProps {
 }
 
 const stageStatusVariant: Record<string, 'neutral' | 'warning' | 'success' | 'danger'> = {
-  LOCKED: 'neutral',
-  IN_PROGRESS: 'warning',
+  WAITING: 'neutral',
+  ACTIVE: 'warning',
   COMPLETED: 'success',
   // Audit: a cancelled session stamps its stages CANCELLED — red, matching
   // the session-status badges elsewhere.
@@ -23,8 +23,8 @@ const stageStatusVariant: Record<string, 'neutral' | 'warning' | 'success' | 'da
 }
 
 const stageStatusKeys = {
-  LOCKED: 'admin.sessions.stageLocked',
-  IN_PROGRESS: 'admin.sessions.stageInProgress',
+  WAITING: 'admin.status.waiting',
+  ACTIVE: 'admin.status.active',
   COMPLETED: 'common.done',
   CANCELLED: 'admin.sessions.stageCancelled',
 } as const satisfies Record<string, string>

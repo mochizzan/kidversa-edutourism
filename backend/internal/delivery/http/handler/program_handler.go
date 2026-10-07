@@ -18,15 +18,13 @@ import (
 // ProgramHandler serves /api/programs/* (SUPER_ADMIN, ADMIN, KOORDINATOR).
 type ProgramHandler struct {
 	repo         repository.ProgramRepository
-	contentRepo  repository.ContentRepository
 	substageRepo repository.ProgramSubstageRepository
 }
 
-// NewProgramHandler builds the program handler. It owns the substage-scoped
-// content ops (list/assign/unassign/reorder) via the shared ContentRepository
-// (CRIT-5). substageRepo guards Kegiatan existence and resolves tenant scope.
-func NewProgramHandler(repo repository.ProgramRepository, contentRepo repository.ContentRepository, substageRepo repository.ProgramSubstageRepository) *ProgramHandler {
-	return &ProgramHandler{repo: repo, contentRepo: contentRepo, substageRepo: substageRepo}
+// NewProgramHandler builds the program handler.
+// substageRepo guards Kegiatan existence and resolves tenant scope.
+func NewProgramHandler(repo repository.ProgramRepository, substageRepo repository.ProgramSubstageRepository) *ProgramHandler {
+	return &ProgramHandler{repo: repo, substageRepo: substageRepo}
 }
 
 // List handles GET /api/programs (paginated; ?search=, ?is_active=).
@@ -83,8 +81,14 @@ func (h *ProgramHandler) Create(c *echo.Context) error {
 	if tenantID != "" {
 		tp = &tenantID
 	}
+	name := derefString(req.Name)
+	if duplicate, derr := h.programNameExists((*c).Request().Context(), tenantID, name); derr != nil {
+		return derr
+	} else if duplicate {
+		return appresp.Fail(c, http.StatusConflict, "conflict")
+	}
 	p := &entity.Program{
-		Name:               derefString(req.Name),
+		Name:               name,
 		Description:        derefString(req.Description),
 		FinalBadgeName:     derefString(req.FinalBadgeName),
 		FinalBadgeImageURL: derefString(req.FinalBadgeImageURL),
@@ -106,6 +110,10 @@ func (h *ProgramHandler) Get(c *echo.Context) error {
 	p, err := h.repo.GetProgramByID((*c).Request().Context(), id)
 	if err != nil {
 		return err
+	}
+	// Enforce tenant isolation on the read path (mirrors Update and media_handler.go:169).
+	if caller := appmiddleware.GetTenantID(c); caller != "" && derefTenant(p.TenantID) != caller {
+		return appresp.Fail(c, http.StatusForbidden, "forbidden")
 	}
 	return appresp.OK(c, p)
 }

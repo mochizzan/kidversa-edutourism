@@ -209,13 +209,16 @@ func (r *GormProgramRepository) ListStages(ctx context.Context, programID string
 }
 
 func (r *GormProgramRepository) ListPaginatedStages(ctx context.Context, filter repository.StageFilter, page, limit int) (*repository.Paginated[entity.ProgramStage], error) {
-	q := r.db.WithContext(ctx).Model(&ProgramStageModel{})
+	q := r.db.WithContext(ctx).Model(&ProgramStageModel{}).Joins("JOIN programs p ON p.id = program_stages.program_id")
 	if filter.ProgramID != "" {
-		q = q.Where("program_id = ?", filter.ProgramID)
+		q = q.Where("program_stages.program_id = ?", filter.ProgramID)
+	}
+	if filter.TenantID != "" {
+		q = q.Where("p.tenant_id = ?", filter.TenantID)
 	}
 	if filter.Search != "" {
 		like := "%" + strings.ToLower(filter.Search) + "%"
-		q = q.Where("LOWER(name) LIKE ? OR LOWER(description) LIKE ?", like, like)
+		q = q.Where("LOWER(program_stages.name) LIKE ? OR LOWER(program_stages.description) LIKE ?", like, like)
 	}
 
 	var total int64
@@ -225,7 +228,7 @@ func (r *GormProgramRepository) ListPaginatedStages(ctx context.Context, filter 
 
 	var models []ProgramStageModel
 	offset := (page - 1) * limit
-	if err := q.Order("sequence_order ASC, created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
+	if err := q.Order("program_stages.sequence_order ASC, program_stages.created_at DESC").Offset(offset).Limit(limit).Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
 	items := make([]entity.ProgramStage, 0, len(models))
@@ -264,6 +267,8 @@ func (r *GormProgramRepository) DeleteStage(ctx context.Context, id string) erro
 	// program_stage_id WITHOUT an FK (assessments, reports, report_photo_picks)
 	// are purged manually so nothing keeps pointing at the deleted stage.
 	// The old GORM soft delete left the row present, so no cascade ever fired.
+	// Callers MUST run the CountStageUsage guard first: this body still purges
+	// and cascades whenever it is invoked.
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, table := range []string{"assessments", "reports", "report_photo_picks"} {
 			if err := tx.Exec("DELETE FROM "+table+" WHERE program_stage_id = ?", id).Error; err != nil {
@@ -277,47 +282,59 @@ func (r *GormProgramRepository) DeleteStage(ctx context.Context, id string) erro
 	})
 }
 
-// ListStageContents returns the JOIN-shaped StageContent list for a program
-// Kegiatan. Content ownership lives in ContentRepository; this
-// reuses the stage_contents + contents JOIN logic against the v4 column
-// program_substage_id (content is now owned by the Kegiatan leaf, not the
-// Topik). stageID is the program_substage_id.
-func (r *GormProgramRepository) ListStageContents(ctx context.Context, substageID string) ([]entity.StageContent, error) {
-	type joinRow struct {
-		ContentID         string
-		ProgramSubstageID string
-		SortOrder         int
-		IsActive          bool
-		Title             string
-		FileURL           string
-		YouTubeURL        string `gorm:"column:youtube_url"`
-		FileType          entity.StageContentFileType
-		DurationSeconds   int
+// CountStageUsage counts live rows still referencing the Topik: session
+// instantiations (session_stages), cloned Kegiatan (session_substages via
+// program_substages), scored assessments and reports. Default GORM scopes
+// exclude soft-deleted rows.
+func (r *GormProgramRepository) CountStageUsage(ctx context.Context, stageID string) (int64, error) {
+	db := r.db.WithContext(ctx)
+	var total int64
+	var n int64
+	if err := db.Model(&SessionStageModel{}).Where("program_stage_id = ?", stageID).Count(&n).Error; err != nil {
+		return 0, apperrors.Internal("internal_error", err)
 	}
-	var rows []joinRow
-	err := r.db.WithContext(ctx).
-		Table("stage_contents sc").
-		Select("sc.content_id, sc.program_substage_id, sc.sort_order, sc.is_active, c.title, c.file_url, c.youtube_url, c.file_type, c.duration_seconds").
-		Joins("JOIN contents c ON c.id = sc.content_id").
-		Where("sc.program_substage_id = ?", substageID).
-		Order("sc.sort_order ASC").
-		Find(&rows).Error
-	if err != nil {
+	total += n
+	n = 0
+	if err := db.Table("session_substages ssub").
+		Joins("JOIN program_substages psub ON psub.id = ssub.program_substage_id").
+		Where("psub.program_stage_id = ?", stageID).
+		Where("ssub.deleted_at IS NULL").
+		Count(&n).Error; err != nil {
+		return 0, apperrors.Internal("internal_error", err)
+	}
+	total += n
+	n = 0
+	if err := db.Model(&AssessmentModel{}).Where("program_stage_id = ?", stageID).Count(&n).Error; err != nil {
+		return 0, apperrors.Internal("internal_error", err)
+	}
+	total += n
+	n = 0
+	if err := db.Model(&ReportModel{}).Where("program_stage_id = ?", stageID).Count(&n).Error; err != nil {
+		return 0, apperrors.Internal("internal_error", err)
+	}
+	total += n
+	return total, nil
+}
+
+// ListStageSessionBriefs returns up to limit live sessions instantiating the
+// Topik (id, name, status), oldest first — the short list behind the 409.
+func (r *GormProgramRepository) ListStageSessionBriefs(ctx context.Context, stageID string, limit int) ([]entity.Session, error) {
+	q := r.db.WithContext(ctx).Table("sessions s").
+		Select("s.*").
+		Joins("JOIN session_stages st ON st.session_id = s.id").
+		Where("st.program_stage_id = ?", stageID).
+		Where("s.deleted_at IS NULL").
+		Order("s.created_at ASC, s.id ASC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	var models []SessionModel
+	if err := q.Find(&models).Error; err != nil {
 		return nil, apperrors.Internal("internal_error", err)
 	}
-	items := make([]entity.StageContent, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, entity.StageContent{
-			ID:              row.ContentID,
-			ProgramStageID:  row.ProgramSubstageID,
-			Title:           row.Title,
-			FileURL:         row.FileURL,
-			YouTubeURL:      row.YouTubeURL,
-			FileType:        row.FileType,
-			DurationSeconds: row.DurationSeconds,
-			SortOrder:       row.SortOrder,
-			IsActive:        row.IsActive,
-		})
+	items := make([]entity.Session, 0, len(models))
+	for i := range models {
+		items = append(items, *models[i].ToEntity())
 	}
 	return items, nil
 }

@@ -22,7 +22,6 @@ export const ROUTES = {
   ADMIN: {
     BASE: '/admin',
     DASHBOARD: '/admin/dashboard',
-    LIVE: '/admin/live',
     PROGRAMS: '/admin/programs',
     PROGRAM_NEW: '/admin/programs/new',
     SESSIONS: '/admin/sessions',
@@ -32,8 +31,6 @@ export const ROUTES = {
     REPORTS: '/admin/reports',
     MISSIONS: '/admin/missions',
     MISSION_NEW: '/admin/missions/new',
-    CONTENT: '/admin/content',
-    CONTENT_NEW: '/admin/content/new',
     TOPICS: '/admin/topics',
     TOPIC_NEW: '/admin/topics/new',
     ACTIVITIES: '/admin/activities',
@@ -59,12 +56,6 @@ export const ROUTES = {
   },
   PARENT: {
     REPORT: '/parent/report',
-  },
-  LEARNER: {
-    BASE: '/learner',
-  },
-  KIOSK: {
-    BASE: '/kiosk',
   },
 } as const
 
@@ -104,43 +95,6 @@ export const activityNewPath = (params?: { programId?: string; stageId?: string 
 export const activityDetailPath = (id: string) => `${ROUTES.ADMIN.ACTIVITIES}/${id}`
 
 export const activityEditPath = (id: string) => `${ROUTES.ADMIN.ACTIVITIES}/${id}/edit`
-
-export const contentNewPath = (params?: { programId?: string; stageId?: string }) => {
-  const base = ROUTES.ADMIN.CONTENT_NEW
-  if (!params?.programId) return base
-  const q = new URLSearchParams()
-  q.set('programId', params.programId)
-  if (params.stageId) q.set('stageId', params.stageId)
-  return `${base}?${q.toString()}`
-}
-
-export const contentEditPath = (contentId: string, params?: { programId?: string; stageId?: string }) => {
-  const base = `${ROUTES.ADMIN.CONTENT}/${contentId}/edit`
-  if (!params?.programId) return base
-  const q = new URLSearchParams()
-  q.set('programId', params.programId)
-  if (params.stageId) q.set('stageId', params.stageId)
-  return `${base}?${q.toString()}`
-}
-
-export const kioskAccessPath = (sessionId: string, stageId: string, groupId?: string) => {
-  // Opsi A: groupId lives in the PATH (first segment), not the query string.
-  // Route: /learner/:groupId?/:sessionId/:stageId. token stays in ?token=.
-  const segs: string[] = [ROUTES.LEARNER.BASE]
-  if (groupId) segs.push(encodeURIComponent(groupId))
-  segs.push(encodeURIComponent(sessionId), encodeURIComponent(stageId))
-  return segs.join('/')
-}
-
-export const kioskSessionPath = (sessionId: string, stageId: string, substageId?: string, groupId?: string) => {
-  // Opsi A: groupId lives in the PATH (first segment after /session).
-  // Route: /kiosk/session/:groupId?/:sessionId/:stageId/:substageId?
-  const segs: string[] = [ROUTES.KIOSK.BASE, 'session']
-  if (groupId) segs.push(encodeURIComponent(groupId))
-  segs.push(encodeURIComponent(sessionId), encodeURIComponent(stageId))
-  if (substageId) segs.push(encodeURIComponent(substageId))
-  return segs.join('/')
-}
 
 // API
 // NOTE: API_BASE_URL was removed — all callers must use getApiBaseUrl() from

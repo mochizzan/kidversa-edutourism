@@ -117,7 +117,7 @@ export function BadgeEditor({
         message:
           rejection === 'type'
             ? t('admin.badge.invalidType')
-            : t('admin.content.fileTooLarge', { limit: BADGE_UPLOAD_MAX_BYTES / (1024 * 1024) }),
+            : t('admin.badge.fileTooLarge', { limit: BADGE_UPLOAD_MAX_BYTES / (1024 * 1024) }),
       })
       setStatus('error')
       return

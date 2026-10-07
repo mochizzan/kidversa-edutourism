@@ -144,9 +144,8 @@ type PhotoFrame struct {
 	SortOrder    int    `json:"sort_order"`
 }
 
-// Content is a standalone, tenant-scoped, reusable media asset. It is NOT owned
-// by a Topik: many program Topik can reference the same Content via the
-// stage_contents junction (Model A / single-source refactor).
+// Content is a standalone, tenant-scoped, reusable media asset used by the
+// badge/media/report upload + serving flows.
 type Content struct {
 	BaseModel
 	TenantID        string               `json:"tenant_id"`
@@ -155,37 +154,4 @@ type Content struct {
 	YouTubeURL      string               `json:"youtube_url,omitempty" gorm:"column:youtube_url"`
 	FileType        StageContentFileType `json:"file_type"`
 	DurationSeconds int                  `json:"duration_seconds,omitempty"`
-}
-
-// StageContentRef is one row of the stage_contents junction: a Content assigned
-// to a Kegiatan with per-Kegiatan ordering + activation.
-type StageContentRef struct {
-	ContentID      string    `json:"content_id"`
-	ProgramStageID string    `json:"program_stage_id" gorm:"column:program_substage_id"`
-	SortOrder      int       `json:"sort_order"`
-	IsActive       bool      `json:"is_active"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-// ContentUsage describes a single (program, stage) where a Content is used.
-type ContentUsage struct {
-	ProgramID   string `json:"program_id"`
-	ProgramName string `json:"program_name"`
-	StageID     string `json:"stage_id"`
-	StageName   string `json:"stage_name"`
-}
-
-// StageContent is the JOIN-shaped projection returned by the kiosk/learner path.
-type StageContent struct {
-	ID              string               `json:"id"`
-	ProgramStageID  string               `json:"program_stage_id"`
-	Title           string               `json:"title"`
-	FileURL         string               `json:"file_url"`
-	YouTubeURL      string               `json:"youtube_url,omitempty" gorm:"column:youtube_url"`
-	FileType        StageContentFileType `json:"file_type"`
-	DurationSeconds int                  `json:"duration_seconds,omitempty"`
-	SortOrder       int                  `json:"sort_order"`
-	IsActive        bool                 `json:"is_active"`
-	CreatedAt       time.Time            `json:"created_at"`
 }

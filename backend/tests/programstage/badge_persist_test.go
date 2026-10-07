@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"kidversa-edutourism-backend/internal/delivery/http/handler"
+	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
 	"kidversa-edutourism-backend/internal/domain/entity"
 	"kidversa-edutourism-backend/internal/domain/repository"
 	"kidversa-edutourism-backend/internal/infrastructure/persistence"
@@ -55,14 +56,20 @@ func (f *fakeProgramRepo) CountProgramSessions(context.Context, string) (int64, 
 func (f *fakeProgramRepo) ListProgramSessionBriefs(context.Context, string, int) ([]entity.Session, error) {
 	panic("unexpected ListProgramSessionBriefs")
 }
+func (f *fakeProgramRepo) CountStageUsage(context.Context, string) (int64, error) {
+	panic("unexpected CountStageUsage")
+}
+func (f *fakeProgramRepo) ListStageSessionBriefs(context.Context, string, int) ([]entity.Session, error) {
+	panic("unexpected ListStageSessionBriefs")
+}
 func (f *fakeProgramRepo) DeleteProgramForce(context.Context, string) error {
 	panic("unexpected DeleteProgramForce")
 }
 func (f *fakeProgramRepo) GetProgramByID(context.Context, string) (*entity.Program, error) {
-	panic("unexpected GetProgramByID")
+	return &entity.Program{BaseModel: entity.BaseModel{ID: f.loaded.ProgramID}}, nil
 }
 func (f *fakeProgramRepo) ListPrograms(context.Context, repository.ProgramFilter, int, int) (*repository.Paginated[entity.Program], error) {
-	panic("unexpected ListPrograms")
+	return &repository.Paginated[entity.Program]{}, nil
 }
 func (f *fakeProgramRepo) UpdateProgram(context.Context, *entity.Program) error {
 	panic("unexpected UpdateProgram")
@@ -80,13 +87,10 @@ func (f *fakeProgramRepo) ListStages(context.Context, string) ([]entity.ProgramS
 	panic("unexpected ListStages")
 }
 func (f *fakeProgramRepo) ListPaginatedStages(context.Context, repository.StageFilter, int, int) (*repository.Paginated[entity.ProgramStage], error) {
-	panic("unexpected ListPaginatedStages")
+	return &repository.Paginated[entity.ProgramStage]{}, nil
 }
 func (f *fakeProgramRepo) DeleteStage(context.Context, string) error {
 	panic("unexpected DeleteStage")
-}
-func (f *fakeProgramRepo) ListStageContents(context.Context, string) ([]entity.StageContent, error) {
-	panic("unexpected ListStageContents")
 }
 
 // loadedStage is the stage as it exists in the DB before the PUT.
@@ -106,8 +110,9 @@ func loadedStage() entity.ProgramStage {
 // runUpdateStage performs one PUT through ProgramHandler.UpdateStage.
 func runUpdateStage(t *testing.T, repo repository.ProgramRepository, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	h := handler.NewProgramHandler(repo, nil, nil)
+	h := handler.NewProgramHandler(repo, nil)
 	e := echo.New()
+	e.Validator = appmiddleware.NewValidator() // bindAndValidate needs the router's validator
 	req := httptest.NewRequest(http.MethodPut, "/api/programs/"+programID+"/stages/"+stageID, strings.NewReader(body))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()

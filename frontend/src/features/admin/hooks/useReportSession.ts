@@ -403,7 +403,7 @@ export function useReportSession(sessionId: string | undefined) {
     generatingRef.current
    useToastStore.getState().addToast({
     type: runInFlight ? 'info' : 'error',
-    message: i18n.t(runInFlight ? 'admin.live.reconnecting' : 'admin.reports.loadDataError'),
+    message: i18n.t(runInFlight ? 'admin.reports.reconnecting' : 'admin.reports.loadDataError'),
    })
    return false
   }
@@ -585,9 +585,11 @@ export function useReportSession(sessionId: string | undefined) {
       }
       finished.add(reportId)
       const reason =
-       err instanceof Error && err.message
-        ? err.message
-        : i18n.t('admin.reports.sendListError')
+       err instanceof ApiError && err.status === 403 && err.code === 'session_not_active'
+        ? i18n.t('admin.reports.sessionInactiveError')
+        : err instanceof Error && err.message
+         ? err.message
+         : i18n.t('admin.reports.sendListError')
       failures.push(`${r.participant.child_name}: ${reason}`)
      }
     }
@@ -701,6 +703,9 @@ export function useReportSession(sessionId: string | undefined) {
     setGenError(i18n.t('errors.already_generating'))
     // A live run may exist server-side — refetch so the poll attaches to it.
     void refreshReports()
+   } else if (e instanceof ApiError && e.status === 403 && e.code === 'session_not_active') {
+    setGenError(i18n.t('admin.reports.sessionInactiveError'))
+    void refreshReports()
    } else {
     setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
    }
@@ -734,7 +739,11 @@ export function useReportSession(sessionId: string | undefined) {
    // Failure surfaced via genError below — suppress the matching flag-clear
    // interruption notice (noteExtras consumes this on the next fetch).
    localGenFailedRef.current = true
-   setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
+   if (e instanceof ApiError && e.status === 403 && e.code === 'session_not_active') {
+    setGenError(i18n.t('admin.reports.sessionInactiveError'))
+   } else {
+    setGenError(e instanceof Error ? e.message : i18n.t('admin.reports.generateError'))
+   }
    generatingRef.current = false
    setGenerating(false)
    genAcceptedRef.current = false

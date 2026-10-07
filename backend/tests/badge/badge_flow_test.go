@@ -818,6 +818,57 @@ func TestEvaluateAfterAssessmentReturnsAssessmentListError(t *testing.T) {
 	}
 }
 
+// ── Tahap 3 step 12: no NEW badge is awarded once the session is CANCELLED.
+// The committed score is untouched (by design) — only the award is skipped,
+// and the skip is a nil success (not an error) so the triggering upsert still
+// succeeds.
+
+func TestEvaluateAfterAssessmentCancelledSessionSkipsAward(t *testing.T) {
+	f := newFixture()
+	f.sessRepo.session.Status = entity.SessionCancelled
+	for _, id := range []string{"subA1", "subA2"} {
+		f.assess.score(testParticipantID, id)
+	}
+
+	if err := f.badgeUC.EvaluateAfterAssessment(context.Background(), testParticipantID, "subA2", testTenant); err != nil {
+		t.Fatalf("cancelled-session evaluation must skip (nil), got: %v", err)
+	}
+	if rows := f.badges(t); len(rows) != 0 {
+		t.Fatalf("badges = %+v, want none (no award after cancel)", rows)
+	}
+}
+
+// Control: the same scores on a non-cancelled session still award.
+func TestEvaluateAfterAssessmentActiveSessionStillAwards(t *testing.T) {
+	f := newFixture()
+	f.sessRepo.session.Status = entity.SessionActive
+	f.completeTopic(t, "subA1", "subA2")
+	assertBadges(t, f.badges(t), []wantBadge{
+		{badgeType: entity.BadgeTypeTopik, stageID: "stageA", name: "Ahli Topik A"},
+	})
+}
+
+func TestCompleteSessionSubstageCancelledSessionSkipsAward(t *testing.T) {
+	f := newFixture()
+	f.sessRepo.session.Status = entity.SessionCancelled
+	for _, id := range []string{"subB1", "subB2"} {
+		f.assess.score(testParticipantID, id)
+	}
+
+	if err := f.badgeUC.CompleteSessionSubstage(context.Background(), "subB2", testTenant); err != nil {
+		t.Fatalf("cancelled-session override must skip (nil), got: %v", err)
+	}
+	if rows := f.badges(t); len(rows) != 0 {
+		t.Fatalf("badges = %+v, want none (no award after cancel)", rows)
+	}
+	// The skip lands BEFORE the leaf write: the Kegiatan leaf keeps its
+	// pre-cancel status — only the award is gated, nothing is flipped.
+	sub, err := f.store.GetSessionSubstage(context.Background(), "subB2")
+	if err != nil || sub.Status == entity.SessionSubstageCompleted {
+		t.Errorf("subB2 status = %v (err %v), want it untouched (not COMPLETED)", sub.Status, err)
+	}
+}
+
 // ── Empty tenant at the evaluation boundary → explicit tenant_required ──
 
 func TestEvaluateAfterAssessmentEmptyTenantReturnsTenantRequired(t *testing.T) {

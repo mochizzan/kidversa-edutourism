@@ -13,10 +13,13 @@ type ProgramFilter struct {
 	Search   string
 }
 
-// StageFilter narrows a paginated Topik list query.
+// StageFilter narrows a paginated Topik list query. A non-empty TenantID
+// scopes the result to programs owned by that tenant (Tahap 1 tenant
+// isolation on the global /api/program-stages list).
 type StageFilter struct {
 	ProgramID string
 	Search    string
+	TenantID  string
 }
 
 // ProgramRepository is the persistence contract for programs (and their stages/contents).
@@ -47,9 +50,14 @@ type ProgramRepository interface {
 	ListPaginatedStages(ctx context.Context, filter StageFilter, page, limit int) (*Paginated[entity.ProgramStage], error)
 	UpdateStage(ctx context.Context, s *entity.ProgramStage) error
 	DeleteStage(ctx context.Context, id string) error
-
-	// ListStageContents returns the JOIN-shaped StageContent list for a stage
-	// (kiosk/learner path, E22/CRIT-7). Content ownership now lives in
-	// ContentRepository; this method is the read-only stage-scoped projection.
-	ListStageContents(ctx context.Context, stageID string) ([]entity.StageContent, error)
+	// CountStageUsage returns how many live rows still reference the Topik:
+	// session instantiations (session_stages), cloned Kegiatan
+	// (session_substages via program_substages), scored assessments and
+	// reports. The guard behind DELETE .../stages/:stageId (409
+	// stage_has_sessions when > 0).
+	CountStageUsage(ctx context.Context, stageID string) (int64, error)
+	// ListStageSessionBriefs returns up to limit live sessions that
+	// instantiate the Topik (id, name, status) so the 409 can carry a short
+	// session list.
+	ListStageSessionBriefs(ctx context.Context, stageID string, limit int) ([]entity.Session, error)
 }

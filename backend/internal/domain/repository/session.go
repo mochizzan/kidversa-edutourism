@@ -185,7 +185,7 @@ type SessionRepository interface {
 	GetGroupFacilitatorID(ctx context.Context, groupID string) (*string, error)
 
 	// FacilitatorOwnsAnyGroup reports whether the facilitator owns at least one group
-	// in the given session. Used to gate kiosk issuance to group owners.
+	// in the given session.
 	FacilitatorOwnsAnyGroup(ctx context.Context, sessionID, facilitatorID string) (bool, error)
 
 	// GetSessionGroupByParticipant resolves the session group a participant belongs

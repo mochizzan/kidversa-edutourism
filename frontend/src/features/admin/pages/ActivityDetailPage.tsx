@@ -1,11 +1,9 @@
-import { useEffect, /* useMemo, */ useState } from 'react'
-import { /* Link, */ useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Pencil, Trash2, /* Plus, Play, Image, Gamepad2, */ Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Pencil, Trash2, Loader2 } from 'lucide-react'
 import { PageHeader } from '../../../shared/components/ui/PageHeader'
 import { Card } from '../../../shared/components/ui/Card'
 import { Button } from '../../../shared/components/ui/Button'
-// import { Badge } from '../../../shared/components/ui/Badge' // hidden: section Konten yang Ditugaskan
-// import { ListEmptyState } from '../../../shared/components/feedback/ListEmptyState' // hidden: section Konten yang Ditugaskan
 import { ConfirmDialog } from '../../../shared/components/feedback/ConfirmDialog'
 import { useGlobalToast } from '../../../shared/components/feedback/Toast'
 import { programService } from '../../../core/services/programs'
@@ -14,22 +12,11 @@ import { programSubstageService } from '../../../core/services/program-substages
 import {
   activityListPath,
   activityEditPath,
-  // contentNewPath, // hidden: section Konten yang Ditugaskan
-  // contentEditPath, // hidden: section Konten yang Ditugaskan
 } from '../../../core/constants/app'
 import { withOrigin } from '../../../core/utils/navigation'
-// import { STAGE_CONTENT_FILE_TYPE_LABELS, YOUTUBE_LABEL } from '../../../core/constants/labels' // hidden: section Konten yang Ditugaskan
 import { friendlyError } from '../../../core/utils/errorMessages'
-import type { Program, ProgramStage, ProgramSubstage /* , StageContent */ } from '../../../core/types'
-// import { StageContentFileType } from '../../../core/types/enums' // hidden: section Konten yang Ditugaskan
+import type { Program, ProgramStage, ProgramSubstage } from '../../../core/types'
 import { useTranslation } from 'react-i18next'
-
-// hidden: section Konten yang Ditugaskan
-// const FILE_TYPE_META: Record<StageContentFileType, { icon: React.ReactNode; fg: string }> = {
-//   [StageContentFileType.VIDEO]: { icon: <Play className="w-4 h-4" />, fg: 'text-blue-700' },
-//   [StageContentFileType.IMAGE]: { icon: <Image className="w-4 h-4" />, fg: 'text-emerald-700' },
-//   [StageContentFileType.GAME_BUNDLE]: { icon: <Gamepad2 className="w-4 h-4" />, fg: 'text-purple-700' },
-// }
 
 const ActivityDetailPage = () => {
   const { t } = useTranslation()
@@ -41,9 +28,7 @@ const ActivityDetailPage = () => {
   const [activity, setActivity] = useState<ProgramSubstage | null>(null)
   const [stage, setStage] = useState<ProgramStage | null>(null)
   const [program, setProgram] = useState<Program | null>(null)
-  // const [contents, setContents] = useState<StageContent[]>([]) // hidden: section Konten yang Ditugaskan
   const [loading, setLoading] = useState(true)
-  // const [contentsLoading, setContentsLoading] = useState(false) // hidden: section Konten yang Ditugaskan
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -68,35 +53,13 @@ const ActivityDetailPage = () => {
             const prog = programs.data.find((p) => p.id === parent.program_id)
             if (prog) setProgram(prog)
           }
-
-          // setContentsLoading(true)
-          // const contentList = await programService.getContents(found.id)
-          // setContents(contentList)
         } catch (err) {
           addToast({ type: 'error', message: friendlyError(err) })
         } finally {
           setLoading(false)
-          // setContentsLoading(false)
         }
       })()
   }, [activityId, addToast, navigate])
-
-  // hidden: section Konten yang Ditugaskan
-  // const contentEditHref = useMemo(
-  //   () => (contentId: string) => {
-  //     if (!program || !stage) return contentEditPath(contentId)
-  //     return contentEditPath(contentId, { programId: program.id, stageId: stage.id })
-  //   },
-  //   [program, stage],
-  // )
-
-  // const newContentHref = useMemo(
-  //   () => {
-  //     if (!program || !stage) return contentNewPath()
-  //     return contentNewPath({ programId: program.id, stageId: stage.id })
-  //   },
-  //   [program, stage],
-  // )
 
   const handleDelete = async () => {
     if (!activity) return
@@ -181,60 +144,6 @@ const ActivityDetailPage = () => {
           </div>
         </div>
       </Card>
-
-      {/* ── Section "Konten yang Ditugaskan" — disembunyikan (comment-out; hapus komentar pembuka ini dan penutupnya di bawah untuk mengaktifkan kembali) ──
-      <Card
-        title={t('admin.activities.contentTitle')}
-        actions={
-          <Link to={newContentHref}>
-            <Button icon={<Plus className="w-4 h-4" />}>{t('admin.content.add')}</Button>
-          </Link>
-        }
-      >
-        {contentsLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          </div>
-        ) : contents.length === 0 ? (
-          <ListEmptyState
-            icon={<Play className="w-10 h-10" />}
-            title={t('admin.content.emptyTitle')}
-            description={t('admin.activities.emptyContentDesc')}
-          />
-        ) : (
-          <ul className="space-y-2">
-            {contents.map((content) => {
-              const meta = FILE_TYPE_META[content.file_type] ?? FILE_TYPE_META.VIDEO
-              const isYouTube = content.file_type === 'VIDEO' && !!content.youtube_url
-              return (
-                <li
-                  key={content.id}
-                  className="flex items-center justify-between p-3 bg-surface-container-low rounded-xl"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className={meta.fg}>{meta.icon}</span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-on-surface truncate">{content.title}</p>
-                      <p className="text-xs text-on-surface-variant">
-                        <Badge variant="neutral" size="sm" className="mr-1">
-                          {isYouTube ? YOUTUBE_LABEL : t(STAGE_CONTENT_FILE_TYPE_LABELS[content.file_type])}
-                        </Badge>
-                        {!isYouTube && t('admin.content.duration.seconds', { count: content.duration_seconds ?? 0 })}
-                      </p>
-                    </div>
-                  </div>
-                  <Link to={contentEditHref(content.id)}>
-                    <Button variant="ghost" size="sm">
-                      {t('admin.common.edit')}
-                    </Button>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Card>
-      */}
 
       <ConfirmDialog
         open={deleteOpen}

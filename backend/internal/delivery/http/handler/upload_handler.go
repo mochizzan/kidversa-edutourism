@@ -234,8 +234,7 @@ func (h *UploadHandler) UploadFrame(c *echo.Context) error {
 
 // UploadContentFile handles POST /api/contents/upload (content-level, Model A):
 //   - validates + stores the multipart file to disk (subdir "contents"),
-//   - creates a standalone Content row referencing the stored file (tenant-scoped),
-//   - the caller then assigns it to a stage via POST /api/programs/program-stages/:stageId/contents/assign.
+//   - creates a standalone Content row referencing the stored file (tenant-scoped).
 //
 // tenant scoping is enforced via the JWT/scope (never the body, F5). file_type is required.
 func (h *UploadHandler) UploadContentFile(c *echo.Context) error {

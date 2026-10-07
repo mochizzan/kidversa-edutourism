@@ -37,23 +37,18 @@ type RefreshRecord struct {
 	RevokedAt *time.Time
 }
 
-// KioskTokenTTL is the default lifetime of an issued kiosk token. It is also the
-// upper bound enforced by IssueKioskToken (ttl is clamped to [1h, KioskTokenTTL]).
-const KioskTokenTTL = 4 * time.Hour
-
 // Usecase implements authentication business logic.
 type Usecase struct {
 	users   repository.UserRepository
 	jwt     *JWTManager
 	revoker TokenRevoker
 	refresh RefreshStore
-	kiosk   KioskTokenStore
 	cost    int
 }
 
 // NewUsecase builds the auth usecase.
-func NewUsecase(users repository.UserRepository, jwt *JWTManager, revoker TokenRevoker, refresh RefreshStore, kiosk KioskTokenStore, cost int) *Usecase {
-	return &Usecase{users: users, jwt: jwt, revoker: revoker, refresh: refresh, kiosk: kiosk, cost: cost}
+func NewUsecase(users repository.UserRepository, jwt *JWTManager, revoker TokenRevoker, refresh RefreshStore, cost int) *Usecase {
+	return &Usecase{users: users, jwt: jwt, revoker: revoker, refresh: refresh, cost: cost}
 }
 
 // Login verifies credentials and issues a token pair.
@@ -139,35 +134,6 @@ func (u *Usecase) Logout(ctx context.Context, refreshTok, accessJTI string, acce
 		u.revoker.Revoke(ctx, accessJTI, accessTTL)
 	}
 	return nil
-}
-
-// Logout revokes the current refresh token and denylists the access jti.
-// ttl is clamped to [1h, KioskTokenTTL] (plan B11). The raw token is never logged.
-func (u *Usecase) IssueKioskToken(ctx context.Context, sessionID, tenantID string, ttl time.Duration) (string, error) {
-	const minTTL = time.Hour
-	const maxTTL = KioskTokenTTL
-	if ttl < minTTL {
-		ttl = minTTL
-	}
-	if ttl > maxTTL {
-		ttl = maxTTL
-	}
-	if u.kiosk == nil {
-		return "", apperrors.Internal("internal_error", nil)
-	}
-	token, err := u.kiosk.Issue(ctx, sessionID, tenantID, ttl)
-	if err != nil {
-		return "", err
-	}
-	return token, nil
-}
-
-// ValidateKioskToken validates a kiosk token and returns its session/tenant binding.
-func (u *Usecase) ValidateKioskToken(ctx context.Context, token string) (sessionID, tenantID string, err error) {
-	if u.kiosk == nil {
-		return "", "", apperrors.Internal("internal_error", nil)
-	}
-	return u.kiosk.Validate(ctx, token)
 }
 
 // Register creates a pending, inactive user (self-service); an admin must approve.

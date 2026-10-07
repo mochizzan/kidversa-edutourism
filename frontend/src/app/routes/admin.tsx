@@ -5,7 +5,6 @@ import { guardedRoute } from './helpers'
 
 // ── Overview ──
 const AdminDashboardPage = lazy(() => import('../../features/admin/pages/DashboardPage'))
-const LiveMonitorPage = lazy(() => import('../../features/admin/pages/LiveMonitorPage'))
 
 // ── Program ──
 const ProgramsPage = lazy(() => import('../../features/admin/pages/ProgramsPage'))
@@ -29,8 +28,6 @@ const MissionBankPage = lazy(() => import('../../features/admin/pages/MissionBan
 const MissionFormPage = lazy(() => import('../../features/admin/pages/MissionFormPage'))
 
 // ── Content ──
-const ContentPage = lazy(() => import('../../features/admin/pages/ContentPage'))
-const ContentFormPage = lazy(() => import('../../features/admin/pages/ContentFormPage'))
 const FramesPage = lazy(() => import('../../features/admin/pages/FramesPage'))
 const FrameFormPage = lazy(() => import('../../features/admin/pages/FrameFormPage'))
 const FrameUploadPage = lazy(() => import('../../features/admin/pages/FrameUploadPage'))
@@ -50,8 +47,6 @@ export const adminRoutes: RouteObject[] = [
 
       // ── Overview ──
       guardedRoute('dashboard', 'dashboard', AdminDashboardPage),
-      guardedRoute('live', 'live', LiveMonitorPage),
-      guardedRoute('live/:sessionId', 'live', LiveMonitorPage),
 
       // ── Program ──
       guardedRoute('programs', 'programs', ProgramsPage),
@@ -87,9 +82,6 @@ export const adminRoutes: RouteObject[] = [
       guardedRoute('missions/:missionId/edit', 'missions', MissionFormPage),
 
       // ── Content ──
-      guardedRoute('content', 'content', ContentPage),
-      guardedRoute('content/new', 'content', ContentFormPage),
-      guardedRoute('content/:contentId/edit', 'content', ContentFormPage),
       guardedRoute('frames/upload', 'frames', FrameUploadPage),
       guardedRoute('frames', 'frames', FramesPage),
       guardedRoute('frames/:frameId/edit', 'frames', FrameFormPage),

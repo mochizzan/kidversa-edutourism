@@ -11,7 +11,7 @@ import (
 // RegisterProgramsRoutes mounts /api/programs/* and /api/programs/Topik/* on the given echo group.
 // Write operations require SUPER_ADMINISTRATOR, ADMIN, or KOORDINATOR; read-only GETs on a program
 // (detail and Topik) also allow FASILITATOR. Tenant scope is enforced
-// by TenantScope (programs filtered by GetTenantID; Topik/contents scoped through their program).
+// by TenantScope (programs filtered by GetTenantID; stages scoped through their program).
 func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManager, revoker auth.TokenRevoker) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMWAdmin := appmiddleware.RequireRole(entity.RoleSuperAdmin, entity.RoleAdmin, entity.RoleKoordinator)
@@ -31,8 +31,4 @@ func RegisterProgramsRoutes(g *echo.Group, h *ProgramHandler, jm *auth.JWTManage
 	g.POST("/:id/stages", h.CreateStage, authMW, roleMWAdmin, scopeMW)
 	g.PUT("/:id/stages/:stageId", h.UpdateStage, authMW, roleMWAdmin, scopeMW)
 	g.DELETE("/:id/stages/:stageId", h.DeleteStage, authMW, roleMWAdmin, scopeMW)
-
-	// Contents keyed directly by Kegiatan. Read-only: list for kiosk/learner
-	// (also admin). A missing Kegiatan returns 404 (substage_not_found).
-	g.GET("/program-substages/:substageId/contents", h.ListContents, authMW, roleMWAdmin, scopeMW)
 }

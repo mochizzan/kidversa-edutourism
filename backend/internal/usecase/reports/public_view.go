@@ -63,9 +63,14 @@ type PublicReportView struct {
 	SessionDate     string
 	GroupName       string
 	FacilitatorName string
-	Stages          []PublicStage
-	Missions        []PublicMission
-	Badges          []PublicBadge
+	// SessionCancelled marks the frozen archive: the report's session was
+	// CANCELLED after the report was generated. The content stays served
+	// (pre-cancel snapshot), and the parent page renders a "sesi dibatalkan"
+	// banner. Data, not schema — resolved live from the session row.
+	SessionCancelled bool
+	Stages           []PublicStage
+	Missions         []PublicMission
+	Badges           []PublicBadge
 }
 
 // publicAssessmentPageSize matches the admin's GET /api/assessments?limit=100.
@@ -100,14 +105,15 @@ func (u *Usecase) BuildPublicReportView(ctx context.Context, r *entity.Report) (
 	}
 
 	view := &PublicReportView{
-		ProgramName: program.Name,
-		ChildName:   participant.ChildName,
-		ChildAge:    participant.ChildAge,
-		SchoolName:  participant.SchoolName,
-		SessionDate: publicSessionDate(session.SessionDate),
-		Stages:      []PublicStage{},
-		Missions:    []PublicMission{},
-		Badges:      []PublicBadge{},
+		ProgramName:      program.Name,
+		ChildName:        participant.ChildName,
+		ChildAge:         participant.ChildAge,
+		SchoolName:       participant.SchoolName,
+		SessionDate:      publicSessionDate(session.SessionDate),
+		SessionCancelled: session.Status == entity.SessionCancelled,
+		Stages:           []PublicStage{},
+		Missions:         []PublicMission{},
+		Badges:           []PublicBadge{},
 	}
 
 	// Topic name (admin: topics.find(activeTopicId)?.name ?? ''). A deleted

@@ -75,7 +75,7 @@ func main() {
 	waGateway := messaging.NewWhatsAppGateway(cfg)
 
 	// Usecases.
-	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, auth.NewKioskStore(db.DB), cfg.BcryptCost)
+	authUC := auth.NewUsecase(userRepo, jwt, revoker, refreshStore, cfg.BcryptCost)
 	userUC := auth.NewUserUsecase(userRepo, notifRepo, hub, cfg.BcryptCost)
 	tenantUC := auth.NewTenantUsecase(tenantRepo)
 	sessionUC := usecase.NewSessionUsecase(sessionRepo, programRepo)
@@ -105,20 +105,18 @@ func main() {
 	reportsUC := reportsuc.NewUsecase(reportRepo, narrativeGen, aiClient, missionBankRepo, assessmentRepo, sessionRepo, programRepo, participantMissionRepo, programSubstageRepo, sessionSubstageRepo, galleryRepo, cfg, waGateway, userRepo, attendanceRepo)
 
 	// Handlers.
-	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite, sessionRepo)
+	authHandler := handler.NewAuthHandler(authUC, jwt, cfg.SSECookieName(), cfg.RefreshCookieName(), cfg.CookieSecure, cfg.CookieSameSite)
 	registry := handler.NewRegistry(authHandler)
 	registry.User = handler.NewUserHandler(userUC, jwt, liveSvc)
 	registry.Tenant = handler.NewTenantHandler(tenantUC, jwt)
-	registry.Program = handler.NewProgramHandler(programRepo, contentRepo, programSubstageRepo)
-	registry.Content = handler.NewContentHandler(cfg, contentRepo)
+	registry.Program = handler.NewProgramHandler(programRepo, programSubstageRepo)
 	registry.Session = handler.NewSessionHandler(sessionUC)
 	registry.SessionLifecycle = handler.NewSessionLifecycleHandler(sessionUC)
 	registry.SessionStage = handler.NewSessionStageHandler(sessionUC)
 	registry.SessionGroup = handler.NewSessionGroupHandler(sessionUC, badgeUC)
 	registry.SessionParticipant = handler.NewSessionParticipantHandler(sessionUC)
 	registry.SessionParticipantBulk = handler.NewSessionParticipantBulkHandler(sessionUC)
-	registry.Kiosk = handler.NewKioskHandler(authUC, sessionUC, contentRepo, sessionSubstageRepo, liveRepo)
-	registry.ProgramSubstage = handler.NewProgramSubstageHandler(programSubstageRepo)
+	registry.ProgramSubstage = handler.NewProgramSubstageHandler(programSubstageRepo, programRepo)
 	registry.SessionSubstage = handler.NewSessionSubstageHandler(badgeUC, sessionUC, sessionSubstageRepo, sessionRepo)
 	registry.Badge = handler.NewBadgeHandler(sessionSubstageRepo)
 	registry.Live = handler.NewLiveHandler(liveSvc, hub, cfg.SSEKeepaliveSec)

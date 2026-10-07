@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 
 	"kidversa-edutourism-backend/internal/delivery/http/dto"
 	appmiddleware "kidversa-edutourism-backend/internal/delivery/http/middleware"
+	"kidversa-edutourism-backend/internal/domain/entity"
 	appresp "kidversa-edutourism-backend/internal/pkg/response"
 )
 
@@ -58,6 +60,25 @@ func (h *ProgramHandler) Delete(c *echo.Context) error {
 	}
 	ctx := (*c).Request().Context()
 	if (*c).QueryParam("force") == "true" {
+		// Hardening (Tahap 2 step 9): force-delete is refused with 409 when
+		// the program owns COMPLETED sessions — those rows are the audit
+		// archive (scores, badges, reports) and must not be purged.
+		briefs, err := h.repo.ListProgramSessionBriefs(ctx, id, 100)
+		if err != nil {
+			return err
+		}
+		var completed []string
+		for i := range briefs {
+			if briefs[i].Status == entity.SessionCompleted {
+				completed = append(completed, fmt.Sprintf("%s (%s)", briefs[i].ID, briefs[i].Name))
+			}
+		}
+		if len(completed) > 0 {
+			log.Printf("program: force-delete refused for %s: %d COMPLETED session(s): %s", id, len(completed), strings.Join(completed, ", "))
+			msg := fmt.Sprintf("%s (%d sesi COMPLETED: %s).",
+				appresp.MessageForCode("program_has_completed_sessions"), len(completed), strings.Join(completed, ", "))
+			return appresp.FailMsg(c, http.StatusConflict, "program_has_completed_sessions", msg)
+		}
 		if err := h.repo.DeleteProgramForce(ctx, id); err != nil {
 			return err
 		}

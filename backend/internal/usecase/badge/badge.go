@@ -212,6 +212,18 @@ func (u *Usecase) EvaluateAfterAssessment(ctx context.Context, participantID, se
 	if err != nil {
 		return err
 	}
+	// Cancelled-session gate: a score committed before the cancel stays stored
+	// (by design — the assessment itself already saved), but no NEW badge may
+	// be awarded for a cancelled session. Skip (nil, not an error) so the
+	// upsert that triggered this evaluation still succeeds.
+	sess, serr := u.sessionRepo.GetSessionByID(ctx, sub.SessionID, tenantID)
+	if serr != nil {
+		return serr
+	}
+	if sess.Status == entity.SessionCancelled {
+		log.Printf("badge: skip award participant=%s session=%s: session is CANCELLED", participantID, sub.SessionID)
+		return nil
+	}
 	progSub, err := u.programSubstageRepo.GetSubstageByID(ctx, sub.ProgramSubstageID)
 	if err != nil {
 		return err
@@ -285,8 +297,17 @@ func (u *Usecase) CompleteSessionSubstage(ctx context.Context, sessionSubstageID
 		return err
 	}
 	// Tenant isolation: the substage's owning session must belong to callerTenant.
-	if _, err := u.sessionRepo.GetSessionByID(ctx, sub.SessionID, callerTenant); err != nil {
-		return err
+	sess, serr := u.sessionRepo.GetSessionByID(ctx, sub.SessionID, callerTenant)
+	if serr != nil {
+		return serr
+	}
+	// Cancelled-session gate (same as EvaluateAfterAssessment): no NEW badge
+	// may be awarded for a cancelled session. The skip lands BEFORE the leaf
+	// write, so the Kegiatan keeps its pre-cancel status — evaluation is
+	// skipped for every participant and nothing is flipped.
+	if sess.Status == entity.SessionCancelled {
+		log.Printf("badge: skip award after session-substage %s: session %s is CANCELLED", sessionSubstageID, sub.SessionID)
+		return nil
 	}
 	now := time.Now()
 	sub.Status = entity.SessionSubstageCompleted

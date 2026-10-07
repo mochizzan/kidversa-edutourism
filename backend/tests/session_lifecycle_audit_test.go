@@ -35,6 +35,8 @@ type lifecycleRepo struct {
 	updated      *entity.Session
 	stageCalls   int
 	stageErrOn   int // 1-based UpdateSessionStage call to fail on (0 = never)
+	clearCalls   int // ClearParticipantTokens invocations inside the cancel tx
+	clearErr     error
 }
 
 func newLifecycleRepo(status entity.SessionStatus, stages ...entity.SessionStage) *lifecycleRepo {
@@ -99,6 +101,11 @@ func (r *lifecycleRepo) CountActiveGroupMembers(context.Context, string, string)
 	return 0, nil
 }
 
+func (r *lifecycleRepo) ClearParticipantTokens(_ context.Context, _, _ string) error {
+	r.clearCalls++
+	return r.clearErr
+}
+
 // Transaction snapshots session + stage state before fn and restores it when
 // fn fails — the rollback contract of the real wrapper (audit #12).
 func (r *lifecycleRepo) Transaction(_ context.Context, fn func(tx repository.SessionRepository) error) error {
@@ -115,13 +122,15 @@ func (r *lifecycleRepo) Transaction(_ context.Context, fn func(tx repository.Ses
 	return nil
 }
 
-// (a) CancelSession succeeds atomically: session CANCELLED, ACTIVE stage
-// stamped CANCELLED (not COMPLETED — audit #18), WAITING stage untouched, no
-// completed_at, everything through one transaction under the row lock (#12/#14).
+// (a) CancelSession succeeds atomically: session CANCELLED, every
+// non-terminal stage (ACTIVE and WAITING) stamped CANCELLED (not COMPLETED —
+// audit #18), no completed_at, everything through one transaction under the
+// row lock (#12/#14).
 func TestCancelSession_CommitsStatusAndCancelledStagesAtomically(t *testing.T) {
 	repo := newLifecycleRepo(entity.SessionActive,
 		entity.SessionStage{BaseModel: entity.BaseModel{ID: "st-active"}, SessionID: "sess-1", Status: entity.SessionStageActive},
 		entity.SessionStage{BaseModel: entity.BaseModel{ID: "st-waiting"}, SessionID: "sess-1", Status: entity.SessionStageWaiting},
+		entity.SessionStage{BaseModel: entity.BaseModel{ID: "st-completed"}, SessionID: "sess-1", Status: entity.SessionStageCompleted},
 	)
 	uc := usecase.NewSessionUsecase(repo, nil)
 
@@ -131,6 +140,9 @@ func TestCancelSession_CommitsStatusAndCancelledStagesAtomically(t *testing.T) {
 	}
 	if s.Status != entity.SessionCancelled {
 		t.Errorf("session status = %q, want CANCELLED", s.Status)
+	}
+	if s.AlreadyCancelled {
+		t.Error("a fresh cancel must not carry the already_cancelled marker")
 	}
 	if !repo.txRan {
 		t.Error("CancelSession must run inside one repository transaction (audit #12)")
@@ -144,8 +156,45 @@ func TestCancelSession_CommitsStatusAndCancelledStagesAtomically(t *testing.T) {
 	if repo.stages[0].CompletedAt != nil {
 		t.Error("a cancelled stage must not carry completed_at (audit #18)")
 	}
-	if repo.stages[1].Status != entity.SessionStageWaiting {
-		t.Errorf("WAITING stage status = %q, want it untouched", repo.stages[1].Status)
+	// WAITING is non-terminal too: cancelling stamps it CANCELLED so no live
+	// stage survives on a cancelled session (Tahap 3 step 13).
+	if repo.stages[1].Status != entity.SessionStageCancelled {
+		t.Errorf("WAITING stage status = %q, want CANCELLED", repo.stages[1].Status)
+	}
+	if repo.stages[1].CompletedAt != nil {
+		t.Error("a cancelled WAITING stage must not carry completed_at")
+	}
+	// Terminal COMPLETED stages are never rewritten.
+	if repo.stages[2].Status != entity.SessionStageCompleted {
+		t.Errorf("COMPLETED stage status = %q, want it untouched", repo.stages[2].Status)
+	}
+}
+
+// (a2) Re-cancel (CANCELLED -> CANCELLED) is an idempotent success: HTTP 200
+// with the already_cancelled marker, no error, and leftover non-terminal
+// stages still converge to CANCELLED.
+func TestCancelSession_ReCancel_IsIdempotentMarked(t *testing.T) {
+	repo := newLifecycleRepo(entity.SessionCancelled,
+		entity.SessionStage{BaseModel: entity.BaseModel{ID: "st-active"}, SessionID: "sess-1", Status: entity.SessionStageActive},
+		entity.SessionStage{BaseModel: entity.BaseModel{ID: "st-done"}, SessionID: "sess-1", Status: entity.SessionStageCompleted},
+	)
+	uc := usecase.NewSessionUsecase(repo, nil)
+
+	s, err := uc.CancelSession(context.Background(), "sess-1", "tenant-1")
+	if err != nil {
+		t.Fatalf("re-cancel must succeed idempotently, got: %v", err)
+	}
+	if s.Status != entity.SessionCancelled {
+		t.Errorf("session status = %q, want CANCELLED", s.Status)
+	}
+	if !s.AlreadyCancelled {
+		t.Error("re-cancel must carry the already_cancelled marker (AlreadyCancelled=true)")
+	}
+	if repo.stages[0].Status != entity.SessionStageCancelled {
+		t.Errorf("leftover ACTIVE stage status = %q, want CANCELLED (re-cancel converges)", repo.stages[0].Status)
+	}
+	if repo.stages[1].Status != entity.SessionStageCompleted {
+		t.Errorf("COMPLETED stage status = %q, want it untouched", repo.stages[1].Status)
 	}
 }
 
@@ -172,6 +221,43 @@ func TestCancelSession_MidStageFailureRollsBackStatus(t *testing.T) {
 		if st.Status != entity.SessionStageActive {
 			t.Errorf("stage %d status = %q after rollback, want ACTIVE unchanged", i, st.Status)
 		}
+	}
+}
+
+// TestCancelSession_RevokesConsentTokensAtomically: cancel clears outstanding
+// parent-consent tokens inside the same transaction (step 14) — a cancelled
+// session never accepts consent writes, so live tokens would be dead links.
+func TestCancelSession_RevokesConsentTokensAtomically(t *testing.T) {
+	repo := newLifecycleRepo(entity.SessionActive,
+		entity.SessionStage{BaseModel: entity.BaseModel{ID: "st-1"}, SessionID: "sess-1", Status: entity.SessionStageActive},
+	)
+	uc := usecase.NewSessionUsecase(repo, nil)
+
+	if _, err := uc.CancelSession(context.Background(), "sess-1", "tenant-1"); err != nil {
+		t.Fatalf("CancelSession failed: %v", err)
+	}
+	if repo.clearCalls != 1 {
+		t.Errorf("ClearParticipantTokens calls = %d, want 1 inside the cancel tx", repo.clearCalls)
+	}
+}
+
+// TestCancelSession_TokenClearFailureRollsBack: a token-revoke failure aborts
+// the whole cancel — no half-cancelled session with live tokens.
+func TestCancelSession_TokenClearFailureRollsBack(t *testing.T) {
+	repo := newLifecycleRepo(entity.SessionActive,
+		entity.SessionStage{BaseModel: entity.BaseModel{ID: "st-1"}, SessionID: "sess-1", Status: entity.SessionStageActive},
+	)
+	repo.clearErr = errStageUpdate
+	uc := usecase.NewSessionUsecase(repo, nil)
+
+	if _, err := uc.CancelSession(context.Background(), "sess-1", "tenant-1"); err == nil {
+		t.Fatal("CancelSession must surface the token-clear failure")
+	}
+	if !repo.txRolledBack {
+		t.Fatal("the transaction must have rolled back")
+	}
+	if repo.session.Status != entity.SessionActive {
+		t.Errorf("session status = %q after rollback, want ACTIVE unchanged", repo.session.Status)
 	}
 }
 

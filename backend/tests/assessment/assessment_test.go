@@ -572,6 +572,56 @@ func TestUsecase_Upsert_CancelBetweenCheckAndWrite_Rejected(t *testing.T) {
 	}
 }
 
+// ── Tahap 3 step 11: the assessment writes join the SAME transaction as the
+// locked session re-read. A session-tx handle exposing AssessmentTx() routes
+// the read-revive/update/create through the tx-bound repo; a handle without
+// it falls back to the usecase repo unchanged (all pre-existing tests above).
+
+// txBoundSessionRepo wraps fakeSessionRepo and supplies a tx-bound assessment
+// repo, mirroring the production GORM handle's AssessmentTx.
+type txBoundSessionRepo struct {
+	*fakeSessionRepo
+	txAssessment *fakeAssessmentRepo
+}
+
+func (r *txBoundSessionRepo) AssessmentTx() repository.AssessmentRepository {
+	return r.txAssessment
+}
+
+// Transaction passes the wrapper itself (not the embedded fake) so the
+// AssessmentTx binding is visible on the tx handle — mirroring production,
+// where the tx-bound *GormSessionRepository carries AssessmentTx.
+func (r *txBoundSessionRepo) Transaction(ctx context.Context, fn func(tx repository.SessionRepository) error) error {
+	return fn(r)
+}
+
+func TestUsecase_Upsert_WritesThroughTxBoundAssessmentRepo(t *testing.T) {
+	owner := "facilitator-1"
+	outerRepo := &fakeAssessmentRepo{ownerID: &owner}
+	txRepo := &fakeAssessmentRepo{ownerID: &owner}
+	sessionRepo := &txBoundSessionRepo{
+		fakeSessionRepo: &fakeSessionRepo{
+			session: &entity.Session{BaseModel: entity.BaseModel{ID: "session-1"}, Status: entity.SessionActive},
+		},
+		txAssessment: txRepo,
+	}
+	uc := assessment.NewUsecase(outerRepo, sessionRepo, &fakeBadgeEvaluator{})
+
+	if _, err := uc.Upsert(context.Background(), repository.AssessmentFilter{
+		ParticipantID:     "participant-1",
+		SessionID:         "session-1",
+		SessionSubstageID: "substage-1",
+	}, 3, "Good job", owner, owner, string(entity.RoleFasilitator), time.Now(), "tenant-1"); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if txRepo.created == nil {
+		t.Fatal("the assessment write must land on the tx-bound repo (same DB transaction as the locked re-read)")
+	}
+	if outerRepo.created != nil {
+		t.Fatal("the assessment write must not bypass the tx-bound repo onto the outer repo")
+	}
+}
+
 // Control for (c): with the locked re-read still ACTIVE the score persists —
 // the lock guards the write without changing its happy path.
 func TestUsecase_Upsert_LockedReReadActive_Succeeds(t *testing.T) {

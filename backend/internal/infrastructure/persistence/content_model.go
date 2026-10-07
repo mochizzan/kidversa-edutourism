@@ -9,8 +9,6 @@ import (
 )
 
 // ContentModel is the GORM persistence model for the standalone contents table.
-// Hard-delete (no DeletedAt) per D10a: removing a Content must drop its junctions
-// atomically, then the row, so soft-delete is unnecessary and would leak orphans.
 type ContentModel struct {
 	entity.Content
 	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
@@ -42,41 +40,6 @@ func (m *ContentModel) ToEntity() *entity.Content {
 // contentModelFromEntity builds a model from a domain entity.
 func contentModelFromEntity(e *entity.Content) *ContentModel {
 	return &ContentModel{Content: *e}
-}
-
-// StageContentRefModel is the GORM persistence model for the stage_contents
-// junction. The PRIMARY KEY is content_id (a content appears at most once per
-// stage — A6a/E1). Soft-delete is retained for list filtering consistency.
-type StageContentRefModel struct {
-	entity.StageContentRef
-	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime(3);index" json:"-"`
-}
-
-// TableName pins the table name.
-func (StageContentRefModel) TableName() string { return "stage_contents" }
-
-// BeforeCreate stamps audit fields. content_id is supplied by the caller (it is
-// the PK, never auto-generated).
-func (m *StageContentRefModel) BeforeCreate(*gorm.DB) error {
-	now := time.Now()
-	if m.CreatedAt.IsZero() {
-		m.CreatedAt = now
-	}
-	m.UpdatedAt = m.CreatedAt
-	return nil
-}
-
-// ToEntity maps the model back to the domain entity.
-func (m *StageContentRefModel) ToEntity() *entity.StageContentRef {
-	e := m.StageContentRef
-	return &e
-}
-
-// stageContentRefModelFromEntity builds a model from a domain entity.
-func stageContentRefModelFromEntity(e *entity.StageContentRef) *StageContentRefModel {
-	return &StageContentRefModel{StageContentRef: *e}
 }
 
 // SmartPhotoModel is the GORM persistence model for photos.

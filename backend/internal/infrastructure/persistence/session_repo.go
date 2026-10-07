@@ -32,6 +32,15 @@ func (r *GormSessionRepository) Transaction(ctx context.Context, fn func(tx repo
 	})
 }
 
+// AssessmentTx returns an assessment repository bound to this handle's tx, so
+// the assessment usecase's persistUpsert joins the SAME database transaction
+// as the locked session re-read (audit #14 atomicity). The tx handle is a
+// *gorm.DB either way (base or tx-bound), so NewAssessmentRepository accepts
+// it directly — same pattern as the session tx binding above.
+func (r *GormSessionRepository) AssessmentTx() repository.AssessmentRepository {
+	return NewAssessmentRepository(r.db)
+}
+
 func (r *GormSessionRepository) CreateSession(ctx context.Context, s *entity.Session) error {
 	// Denormalize: fetch program name if not set
 	if s.ProgramName == "" && s.ProgramID != "" {
@@ -865,7 +874,7 @@ func (r *GormSessionRepository) GetGroupFacilitatorID(ctx context.Context, group
 }
 
 // FacilitatorOwnsAnyGroup reports whether the facilitator owns at least one group
-// in the given session. Used to gate kiosk issuance to group owners.
+// in the given session.
 func (r *GormSessionRepository) FacilitatorOwnsAnyGroup(ctx context.Context, sessionID, facilitatorID string) (bool, error) {
 	var n int64
 	if err := r.db.WithContext(ctx).

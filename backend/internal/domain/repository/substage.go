@@ -13,6 +13,10 @@ type SubstageFilter struct {
 	ProgramID      string
 	ProgramStageID string
 	Search         string
+	// TenantID scopes the result to substages whose Topik belongs to a
+	// program owned by that tenant (Tahap 1 tenant isolation on the
+	// global /api/program-substages list).
+	TenantID string
 }
 
 type ProgramSubstageRepository interface {
@@ -22,6 +26,13 @@ type ProgramSubstageRepository interface {
 	ListPaginatedSubstages(ctx context.Context, filter SubstageFilter, page, limit int) (*Paginated[entity.ProgramSubstage], error)
 	UpdateSubstage(ctx context.Context, s *entity.ProgramSubstage) error
 	DeleteSubstage(ctx context.Context, id string) error
+	// CountSubstageUsage returns how many live session_substages rows still
+	// reference the Kegiatan. The guard behind DELETE /api/program-substages/:id
+	// (409 substage_has_sessions when > 0).
+	CountSubstageUsage(ctx context.Context, substageID string) (int64, error)
+	// ListSubstageSessionBriefs returns up to limit live sessions that use the
+	// Kegiatan (id, name, status) so the 409 can carry a short session list.
+	ListSubstageSessionBriefs(ctx context.Context, substageID string, limit int) ([]entity.Session, error)
 }
 
 // SessionSubstageRepository is the persistence contract for session Kegiatan

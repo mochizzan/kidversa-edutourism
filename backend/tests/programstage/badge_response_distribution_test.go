@@ -33,7 +33,7 @@ func (r *listStagesRepo) ListStages(context.Context, string) ([]entity.ProgramSt
 func runListStages(t *testing.T, stages []entity.ProgramStage) []map[string]json.RawMessage {
 	t.Helper()
 	repo := &listStagesRepo{stages: stages}
-	h := handler.NewProgramHandler(repo, nil, nil)
+	h := handler.NewProgramHandler(repo, nil)
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/api/programs/"+programID+"/stages", nil)
 	rec := httptest.NewRecorder()

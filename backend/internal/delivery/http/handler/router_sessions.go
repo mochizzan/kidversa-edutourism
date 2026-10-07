@@ -12,19 +12,21 @@ import (
 // Auth + role guard (FASILITATOR, ADMIN, KOORDINATOR, SUPER_ADMIN); tenant scope via JWT.
 func RegisterSessionsRoutes(g *echo.Group, h *SessionHandler, lh *SessionLifecycleHandler,
 	sh *SessionStageHandler, gh *SessionGroupHandler,
-	ph *SessionParticipantHandler, bh *SessionParticipantBulkHandler, jm *auth.JWTManager, revoker auth.TokenRevoker, kioskH *KioskHandler,
+	ph *SessionParticipantHandler, bh *SessionParticipantBulkHandler, jm *auth.JWTManager, revoker auth.TokenRevoker,
 	participantsGroup *echo.Group) {
 	authMW := appmiddleware.JWTAuth(jm, "", revoker)
 	roleMW := appmiddleware.RequireRole(entity.RoleFasilitator, entity.RoleAdmin, entity.RoleKoordinator, entity.RoleSuperAdmin)
+	// Cancel is restricted to ADMIN/KOORDINATOR/SUPER_ADMIN: a FASILITATOR
+	// cancelling the session would orphan in-flight grading/consent flows.
+	roleMWCancel := appmiddleware.RequireRole(entity.RoleAdmin, entity.RoleKoordinator, entity.RoleSuperAdmin)
 
 	g.GET("", h.List, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("", h.Create, authMW, roleMW, appmiddleware.TenantScope())
 	g.GET("/:id", h.Get, authMW, roleMW, appmiddleware.TenantScope())
-	g.GET("/:id/kiosk", kioskH.KioskAccess)
 	g.DELETE("/:id", h.Delete, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("/:id/start", lh.Start, authMW, roleMW, appmiddleware.TenantScope())
 	g.POST("/:id/complete", lh.Complete, authMW, roleMW, appmiddleware.TenantScope())
-	g.POST("/:id/cancel", lh.Cancel, authMW, roleMW, appmiddleware.TenantScope())
+	g.POST("/:id/cancel", lh.Cancel, authMW, roleMWCancel, appmiddleware.TenantScope())
 
 	g.GET("/:id/stages", sh.GetStages, authMW, roleMW, appmiddleware.TenantScope())
 

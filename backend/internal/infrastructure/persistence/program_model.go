@@ -72,5 +72,6 @@ func programStageModelFromEntity(e *entity.ProgramStage) *ProgramStageModel {
 	return &ProgramStageModel{ProgramStage: *e}
 }
 
-// NOTE: the stage_contents model is now StageContentRefModel in content_model.go
-// (repurposed as a junction). StageContentModel is removed.
+// NOTE: the stage_contents junction was removed with the kiosk/learner +
+// content-manager wave (table stays in the DB, no migration). StageContentModel
+// is removed.

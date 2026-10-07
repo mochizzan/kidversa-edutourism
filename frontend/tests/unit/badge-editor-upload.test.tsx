@@ -233,7 +233,7 @@ describe('BadgeEditor: upload status handler (uji unit handler status)', () => {
     expect(toasts).toHaveLength(1)
     expect(toasts[0]).toMatchObject({
       type: 'error',
-      message: t('admin.content.fileTooLarge', { limit: BADGE_UPLOAD_MAX_BYTES / (1024 * 1024) }),
+      message: t('admin.badge.fileTooLarge', { limit: BADGE_UPLOAD_MAX_BYTES / (1024 * 1024) }),
     })
   })
 

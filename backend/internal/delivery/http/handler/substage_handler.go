@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -16,12 +17,15 @@ import (
 
 // ProgramSubstageHandler serves /api/program-substages/* (CRUD over Kegiatan).
 type ProgramSubstageHandler struct {
-	repo repository.ProgramSubstageRepository
+	repo     repository.ProgramSubstageRepository
+	programs repository.ProgramRepository
 }
 
-// NewProgramSubstageHandler builds the program-substage handler.
-func NewProgramSubstageHandler(repo repository.ProgramSubstageRepository) *ProgramSubstageHandler {
-	return &ProgramSubstageHandler{repo: repo}
+// NewProgramSubstageHandler builds the program-substage handler. programs
+// resolves the parent Topik/program for tenant isolation (Tahap 1); it may
+// be nil in unit tests that never touch parent resolution.
+func NewProgramSubstageHandler(repo repository.ProgramSubstageRepository, programs repository.ProgramRepository) *ProgramSubstageHandler {
+	return &ProgramSubstageHandler{repo: repo, programs: programs}
 }
 
 // SubstageRequest is the create/update payload (Kegiatan leaf).
@@ -38,13 +42,29 @@ func (h *ProgramSubstageHandler) Create(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	ctx := (*c).Request().Context()
+	caller := appmiddleware.GetTenantID(c)
+	if h.programs != nil {
+		stage, err := h.programs.GetStageByID(ctx, req.ProgramStageID)
+		if err != nil {
+			return err
+		}
+		if _, err := loadProgramAndCheckTenant(ctx, h.programs, stage.ProgramID, caller); err != nil {
+			return err
+		}
+		if duplicate, derr := h.substageNameExists(ctx, req.ProgramStageID, req.Name); derr != nil {
+			return derr
+		} else if duplicate {
+			return appresp.Fail(c, http.StatusConflict, "conflict")
+		}
+	}
 	s := &entity.ProgramSubstage{
 		ProgramStageID: req.ProgramStageID,
 		SequenceOrder:  req.SequenceOrder,
 		Name:           req.Name,
 		Description:    req.Description,
 	}
-	if err := h.repo.CreateSubstage((*c).Request().Context(), s); err != nil {
+	if err := h.repo.CreateSubstage(ctx, s); err != nil {
 		return err
 	}
 	return appresp.Created(c, s)
@@ -56,9 +76,19 @@ func (h *ProgramSubstageHandler) Get(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	s, err := h.repo.GetSubstageByID((*c).Request().Context(), id)
+	ctx := (*c).Request().Context()
+	s, err := h.repo.GetSubstageByID(ctx, id)
 	if err != nil {
 		return err
+	}
+	if h.programs != nil {
+		stage, err := h.programs.GetStageByID(ctx, s.ProgramStageID)
+		if err != nil {
+			return err
+		}
+		if _, err := loadProgramAndCheckTenant(ctx, h.programs, stage.ProgramID, appmiddleware.GetTenantID(c)); err != nil {
+			return err
+		}
 	}
 	return appresp.OK(c, s)
 }
@@ -68,13 +98,32 @@ func (h *ProgramSubstageHandler) List(c *echo.Context) error {
 	programStageID := (*c).QueryParam("program_stage_id")
 	programID := (*c).QueryParam("program_id")
 
+	ctx := (*c).Request().Context()
+	caller := appmiddleware.GetTenantID(c)
+	if h.programs != nil {
+		if programStageID != "" {
+			stage, err := h.programs.GetStageByID(ctx, programStageID)
+			if err != nil {
+				return err
+			}
+			if _, err := loadProgramAndCheckTenant(ctx, h.programs, stage.ProgramID, caller); err != nil {
+				return err
+			}
+		} else if programID != "" {
+			if _, err := loadProgramAndCheckTenant(ctx, h.programs, programID, caller); err != nil {
+				return err
+			}
+		}
+	}
+
 	page, limit := pagination(c)
 	f := repository.SubstageFilter{
 		ProgramStageID: programStageID,
 		ProgramID:      programID,
 		Search:         (*c).QueryParam("search"),
+		TenantID:       caller,
 	}
-	res, err := h.repo.ListPaginatedSubstages((*c).Request().Context(), f, page, limit)
+	res, err := h.repo.ListPaginatedSubstages(ctx, f, page, limit)
 	if err != nil {
 		return err
 	}
@@ -87,33 +136,99 @@ func (h *ProgramSubstageHandler) Update(c *echo.Context) error {
 	if !ok {
 		return nil
 	}
-	s, err := h.repo.GetSubstageByID((*c).Request().Context(), id)
+	ctx := (*c).Request().Context()
+	s, err := h.repo.GetSubstageByID(ctx, id)
 	if err != nil {
 		return err
+	}
+	if h.programs != nil {
+		stage, err := h.programs.GetStageByID(ctx, s.ProgramStageID)
+		if err != nil {
+			return err
+		}
+		if _, err := loadProgramAndCheckTenant(ctx, h.programs, stage.ProgramID, appmiddleware.GetTenantID(c)); err != nil {
+			return err
+		}
 	}
 	var req SubstageRequest
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	if h.programs != nil && req.ProgramStageID != "" && req.ProgramStageID != s.ProgramStageID {
+		stage, err := h.programs.GetStageByID(ctx, req.ProgramStageID)
+		if err != nil {
+			return err
+		}
+		if _, err := loadProgramAndCheckTenant(ctx, h.programs, stage.ProgramID, appmiddleware.GetTenantID(c)); err != nil {
+			return err
+		}
+		s.ProgramStageID = req.ProgramStageID
+	}
 	s.SequenceOrder = req.SequenceOrder
 	s.Name = req.Name
 	s.Description = req.Description
-	if err := h.repo.UpdateSubstage((*c).Request().Context(), s); err != nil {
+	if err := h.repo.UpdateSubstage(ctx, s); err != nil {
 		return err
 	}
 	return appresp.OK(c, s)
 }
 
 // Delete handles DELETE /api/program-substages/:id.
+//
+// Guard (Tahap 2 step 7): the delete is refused with 409
+// substage_has_sessions when live session_substages still reference the
+// Kegiatan — the count and a short session list (id, name, status) ride in
+// the message. No purge/cascade is added: the row is soft-deleted only when
+// unused.
 func (h *ProgramSubstageHandler) Delete(c *echo.Context) error {
 	id, ok := bindUUID(c, "id")
 	if !ok {
 		return nil
 	}
-	if err := h.repo.DeleteSubstage((*c).Request().Context(), id); err != nil {
+	ctx := (*c).Request().Context()
+	if h.programs != nil {
+		s, err := h.repo.GetSubstageByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		stage, err := h.programs.GetStageByID(ctx, s.ProgramStageID)
+		if err != nil {
+			return err
+		}
+		if _, err := loadProgramAndCheckTenant(ctx, h.programs, stage.ProgramID, appmiddleware.GetTenantID(c)); err != nil {
+			return err
+		}
+	}
+	n, err := h.repo.CountSubstageUsage(ctx, id)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		briefs, err := h.repo.ListSubstageSessionBriefs(ctx, id, 5)
+		if err != nil {
+			return err
+		}
+		return appresp.FailMsg(c, http.StatusConflict, "substage_has_sessions", stageUsageMessage("substage_has_sessions", n, briefs))
+	}
+	if err := h.repo.DeleteSubstage(ctx, id); err != nil {
 		return err
 	}
 	return appresp.NoContent(c)
+}
+
+// substageNameExists reports whether a Kegiatan name already exists under the
+// Topik (case-insensitive app-level dedup; no schema change).
+func (h *ProgramSubstageHandler) substageNameExists(ctx context.Context, programStageID, name string) (bool, error) {
+	res, err := h.repo.ListPaginatedSubstages(ctx, repository.SubstageFilter{ProgramStageID: programStageID}, 1, 100)
+	if err != nil {
+		return false, err
+	}
+	for i := range res.Items {
+		if equalFoldTrim(res.Items[i].Name, name) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // BadgeHandler serves /api/badges/* (read participant badges).

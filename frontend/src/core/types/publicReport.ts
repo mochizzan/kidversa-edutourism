@@ -59,6 +59,10 @@ export interface PublicReport {
  stages?: PublicReportStage[]
  missions?: PublicReportMission[]
  badges?: PublicReportBadge[]
+ /** Frozen-archive marker (PublicReportDTO.session_cancelled): true when the
+  *  report's session was CANCELLED after generation. Content stays served
+  *  (pre-cancel snapshot); the parent page renders an archive banner. */
+ session_cancelled?: boolean
  /** Clone provenance (PublicReportDTO): ALWAYS present, null = natively
   *  created; non-null = report carried by the participant-migration flow,
   *  with a name+status SNAPSHOT of the source session at clone time. */

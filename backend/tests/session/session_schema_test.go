@@ -48,7 +48,7 @@ func TestSessionModelSchema_HasNoPhantomColumns(t *testing.T) {
 	}
 
 	// Explicit guards for the list-only display fields added to entity.Session.
-	for _, col := range []string{"topics", "activity_count"} {
+	for _, col := range []string{"topics", "activity_count", "already_cancelled"} {
 		if got[col] {
 			t.Errorf("display field %q leaked into the GORM schema: gorm:\"-\" tag is missing or ineffective", col)
 		}

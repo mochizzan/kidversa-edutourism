@@ -167,6 +167,11 @@ type PublicReportDTO struct {
 	Stages   []reportsuc.PublicStage   `json:"stages"`
 	Missions []reportsuc.PublicMission `json:"missions"`
 	Badges   []reportsuc.PublicBadge   `json:"badges"`
+	// SessionCancelled is the frozen-archive marker: true when the report's
+	// session was CANCELLED after generation. The content stays served
+	// (pre-cancel snapshot); the parent page renders a banner. Always
+	// present (no omitempty) so clients can branch without nil checks.
+	SessionCancelled bool `json:"session_cancelled"`
 }
 
 // NewPublicReportDTO builds the public view from the report plus its assembled
@@ -198,6 +203,7 @@ func NewPublicReportDTO(r *entity.Report, view *reportsuc.PublicReportView, phot
 		Stages:              view.Stages,
 		Missions:            view.Missions,
 		Badges:              view.Badges,
+		SessionCancelled:    view.SessionCancelled,
 	}
 }
 

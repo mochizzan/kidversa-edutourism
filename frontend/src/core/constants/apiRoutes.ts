@@ -20,7 +20,6 @@ export const API_ROUTES = {
   LOGIN: '/api/auth/login',
   REGISTER: '/api/auth/register',
   REFRESH: '/api/auth/refresh',
-  KIOSK: '/api/auth/kiosk',
   ME: '/api/auth/me',
   LOGOUT: '/api/auth/logout',
   CHANGE_PASSWORD: '/api/auth/change-password',
@@ -60,8 +59,6 @@ export const API_ROUTES = {
    `/api/sessions/${encodeURIComponent(sessionId)}/participants/import`,
   LINKABLE_PARTICIPANTS: (sessionId: string) =>
    `/api/sessions/${encodeURIComponent(sessionId)}/participants/linkable`,
-  KIOSK_ACCESS: (sessionId: string) =>
-   `/api/sessions/${encodeURIComponent(sessionId)}/kiosk`,
  },
 
  PARTICIPANTS: {
@@ -78,8 +75,6 @@ export const API_ROUTES = {
    `/api/programs/${encodeURIComponent(programId)}/stages/${encodeURIComponent(stageId)}`,
   TOGGLE_ACTIVE: (id: string) =>
    `/api/programs/${encodeURIComponent(id)}/toggle-active`,
-  CONTENTS: (substageId: string) =>
-   `/api/programs/program-substages/${encodeURIComponent(substageId)}/contents`,
  },
 
  USERS: {
@@ -247,10 +242,7 @@ export const API_ROUTES = {
  },
 
  CONTENTS: {
-  BASE: '/api/contents',
-  DETAIL: (id: string) => `/api/contents/${encodeURIComponent(id)}`,
   UPLOAD: '/api/contents/upload',
   REPLACE_FILE: (id: string) => `/api/contents/${encodeURIComponent(id)}/replace-file`,
-  USAGE: (id: string) => `/api/contents/${encodeURIComponent(id)}/usage`,
  },
 } as const

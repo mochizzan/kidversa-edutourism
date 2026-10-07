@@ -4,7 +4,6 @@
 
 export * from './types'
 export * from './assessments'
-export * from './badges'
 export * from './consent'
 export * from './frames'
 export * from './live'
@@ -19,4 +18,3 @@ export * from './program-substages'
 export * from './reports'
 export * from './sessions'
 export * from './tenants'
-export * from './content'

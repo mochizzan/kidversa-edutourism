@@ -13,7 +13,6 @@ type Registry struct {
 	SessionGroup           *SessionGroupHandler
 	SessionParticipant     *SessionParticipantHandler
 	SessionParticipantBulk *SessionParticipantBulkHandler
-	Kiosk                  *KioskHandler
 	ProgramSubstage        *ProgramSubstageHandler
 	SessionSubstage        *SessionSubstageHandler
 	Badge                  *BadgeHandler
@@ -29,7 +28,6 @@ type Registry struct {
 	Frame                  *FrameHandler
 	Upload                 *UploadHandler
 	Media                  *MediaHandler
-	Content                *ContentHandler
 	Gallery                *GalleryHandler
 }
 

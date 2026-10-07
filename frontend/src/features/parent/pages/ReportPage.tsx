@@ -222,6 +222,25 @@ function ReportView() {
     <div className="relative min-h-screen bg-gray-200 print-report">
       {/* Clone provenance (PublicReportDTO) — visible to parents, hidden when
           printing (the print output is the rapor iframe itself). */}
+      {/* Frozen archive (session_cancelled): the session was CANCELLED after
+          this report was generated — content stays served as the
+          pre-cancellation snapshot, with an explicit banner. */}
+      {report.session_cancelled && (
+        <div className="no-print flex justify-center px-4 pt-4">
+          <div
+            className="w-full max-w-3xl rounded-2xl border border-error/40 bg-error-container px-4 py-3"
+            role="alert"
+            data-testid="public-report-cancelled-banner"
+          >
+            <p className="text-sm font-semibold text-on-error-container">
+              {t('parent.report.cancelledTitle')}
+            </p>
+            <p className="text-sm text-on-error-container/90">
+              {t('parent.report.cancelledDesc')}
+            </p>
+          </div>
+        </div>
+      )}
       {report.source_session_id && (
         <div className="no-print flex justify-center px-4 pt-4">
           <ProvenanceBadge

@@ -12,8 +12,14 @@ type ProgramRequest struct {
 }
 
 // ProgramStageRequest is the create/update payload for Topik.
+//
+// SequenceOrder follows the pointer convention of the badge fields below:
+// absent key -> nil -> leave the stored value untouched on update (and
+// default to 0 on create); present (even 0) -> set. A plain int with
+// `omitempty` cannot distinguish "absent" from "explicit 0", so updates
+// always overwrote the stored order.
 type ProgramStageRequest struct {
-	SequenceOrder int                `json:"sequence_order,omitempty"`
+	SequenceOrder *int               `json:"sequence_order,omitempty"`
 	Name          string             `json:"name" validate:"required"`
 	Description   string             `json:"description,omitempty"`
 	ContentType   entity.ContentType `json:"content_type" validate:"required"`
@@ -21,16 +27,6 @@ type ProgramStageRequest struct {
 	// -> nil -> leave the stored value untouched; present (even "") -> set/clear.
 	BadgeName     *string `json:"badge_name,omitempty"`
 	BadgeImageURL *string `json:"badge_image_url,omitempty"`
-}
-
-// ContentRequest is the create/update payload for the standalone Content entity
-// (Model A). Global fields only; per-Kegiatan activation lives on the junction.
-type ContentRequest struct {
-	Title           string                      `json:"title" validate:"required"`
-	FileURL         string                      `json:"file_url"`
-	YouTubeURL      string                      `json:"youtube_url,omitempty"`
-	FileType        entity.StageContentFileType `json:"file_type" validate:"required"`
-	DurationSeconds int                         `json:"duration_seconds,omitempty"`
 }
 
 // ToggleActiveResponse is returned by the toggle-active endpoint.

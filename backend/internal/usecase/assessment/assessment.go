@@ -162,8 +162,18 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 			return apperrors.Forbidden("session_not_active",
 				errors.New("session was cancelled between the status gate and the assessment write"))
 		}
+		// Atomicity: the assessment rows join the SAME database transaction
+		// as the locked session re-read above. When the tx handle can supply
+		// a tx-bound assessment repo (the production GORM handle does, via
+		// AssessmentTx), the read-revive/update/create below runs inside that
+		// tx and rolls back with it; otherwise (fakes, unwired handles) it
+		// falls back to u.repo unchanged.
+		repo := u.repo
+		if binder, ok := tx.(assessmentTxBinder); ok {
+			repo = binder.AssessmentTx()
+		}
 		var perr error
-		saved, perr = u.persistUpsert(ctx, req, starRating, comment, assessedBy, assessedAt, tenantID)
+		saved, perr = u.persistUpsert(ctx, repo, req, starRating, comment, assessedBy, assessedAt, tenantID)
 		return perr
 	}); err != nil {
 		return nil, err
@@ -177,20 +187,30 @@ func (u *Usecase) Upsert(ctx context.Context, req repository.AssessmentFilter, s
 	return u.afterUpsert(ctx, saved, tenantID)
 }
 
+// assessmentTxBinder is the optional contract a session-tx handle exposes to
+// bind the assessment writes to the same database transaction as the locked
+// session re-read. The production GORM handle implements it (AssessmentTx
+// returns a GormAssessmentRepository over the tx handle, same pattern as the
+// session tx binding itself). Handles that do not implement it (fakes, other
+// repos) keep the pre-existing behavior: persistUpsert runs on u.repo.
+type assessmentTxBinder interface {
+	AssessmentTx() repository.AssessmentRepository
+}
+
 // persistUpsert is the WRITE half of Upsert: read the existing
 // (participant, session Kegiatan) row, then revive/update/create it. It runs
 // inside Upsert's locked session transaction (audit #14), performs no session
 // status checks itself, and returns the persisted row so the caller can run
 // afterUpsert (badge evaluation) once the transaction has committed.
-func (u *Usecase) persistUpsert(ctx context.Context, req repository.AssessmentFilter, starRating int, comment, assessedBy string, assessedAt time.Time, tenantID string) (*entity.Assessment, error) {
-	existing, err := u.repo.GetByParticipantStage(ctx, req.ParticipantID, req.SessionSubstageID, tenantID)
+func (u *Usecase) persistUpsert(ctx context.Context, repo repository.AssessmentRepository, req repository.AssessmentFilter, starRating int, comment, assessedBy string, assessedAt time.Time, tenantID string) (*entity.Assessment, error) {
+	existing, err := repo.GetByParticipantStage(ctx, req.ParticipantID, req.SessionSubstageID, tenantID)
 	if err != nil {
 		if !isNotFound(err) {
 			return nil, err
 		}
 		// NotFound among active rows: a soft-deleted assessment may occupy this
 		// unique slot (OQ3). Revive it instead of creating a colliding row.
-		if soft, serr := u.repo.GetByParticipantStageIncludingDeleted(ctx, req.ParticipantID, req.SessionSubstageID, tenantID); serr == nil && soft != nil {
+		if soft, serr := repo.GetByParticipantStageIncludingDeleted(ctx, req.ParticipantID, req.SessionSubstageID, tenantID); serr == nil && soft != nil {
 			soft.StarRating = starRating
 			if comment != "" {
 				soft.Comment = comment
@@ -199,7 +219,7 @@ func (u *Usecase) persistUpsert(ctx context.Context, req repository.AssessmentFi
 			if !assessedAt.IsZero() {
 				soft.AssessedAt = assessedAt
 			}
-			if err := u.repo.Revive(ctx, soft); err != nil {
+			if err := repo.Revive(ctx, soft); err != nil {
 				return nil, err
 			}
 			return soft, nil
@@ -217,7 +237,7 @@ func (u *Usecase) persistUpsert(ctx context.Context, req repository.AssessmentFi
 		if !assessedAt.IsZero() {
 			existing.AssessedAt = assessedAt
 		}
-		if err := u.repo.Update(ctx, existing); err != nil {
+		if err := repo.Update(ctx, existing); err != nil {
 			return nil, err
 		}
 		return existing, nil
@@ -234,7 +254,7 @@ func (u *Usecase) persistUpsert(ctx context.Context, req repository.AssessmentFi
 	if a.AssessedAt.IsZero() {
 		a.AssessedAt = apputil.Now()
 	}
-	if err := u.repo.Create(ctx, a); err != nil {
+	if err := repo.Create(ctx, a); err != nil {
 		return nil, err
 	}
 	return a, nil

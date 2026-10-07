@@ -106,23 +106,6 @@ export interface ParticipantBadge {
  awarded_at: string
 }
 
-export interface StageContent {
- id: string
- program_stage_id: string
- title: string
- file_url: string
- /**
-  * Present only when the VIDEO content is sourced from YouTube instead of an
-  * uploaded file. Exactly one of `file_url` / `youtube_url` is populated for VIDEO.
-  */
- youtube_url?: string
- file_type: import('./enums').StageContentFileType
- duration_seconds?: number
- sort_order: number
- is_active: boolean
- created_at: string
-}
-
 export interface PhotoFrame {
  id: string
  tenant_id: string
@@ -410,9 +393,9 @@ export interface Notification {
  created_at?: string
 }
 
-// Standalone, tenant-scoped content entity (Content Single-Source model).
-// A Content is independent of any stage and is attached to stages via the
-// stage_contents junction (see StageContent for the JOIN shape).
+// Standalone, tenant-scoped content entity (badge/media/report upload +
+// serving). The legacy content-manager CRUD and the stage_contents junction
+// were removed; only the upload path and the media endpoint remain.
 export interface Content {
  id: string
  tenant_id: string
@@ -423,12 +406,4 @@ export interface Content {
  duration_seconds?: number
  created_at: string
  updated_at: string
-}
-
-// Where a Content is currently referenced (used by the delete-confirm dialog).
-export interface ContentUsage {
- program_id: string
- program_name: string
- stage_id: string
- stage_name: string
 }

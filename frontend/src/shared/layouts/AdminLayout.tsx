@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   FolderOpen,
   Calendar,
-  FileText,
   Image,
   Users,
   UserRound,
@@ -12,7 +11,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   X,
-  Radio,
   FileCheck,
   ClipboardList,
   ShieldCheck,
@@ -38,7 +36,6 @@ import type { ReactNode } from 'react'
 
 const iconByPath: Record<string, ReactNode> = {
   dashboard: <LayoutDashboard className="w-5 h-5" />,
-  live: <Radio className="w-5 h-5" />,
   programs: <FolderOpen className="w-5 h-5" />,
   topics: <Layers className="w-5 h-5" />,
   activities: <List className="w-5 h-5" />,
@@ -46,7 +43,6 @@ const iconByPath: Record<string, ReactNode> = {
   participants: <UserRound className="w-5 h-5" />,
   reports: <FileCheck className="w-5 h-5" />,
   missions: <ClipboardList className="w-5 h-5" />,
-  content: <FileText className="w-5 h-5" />,
   frames: <Image className="w-5 h-5" />,
   tenants: <Building2 className="w-5 h-5" />,
   users: <Users className="w-5 h-5" />,
@@ -57,7 +53,6 @@ const iconByPath: Record<string, ReactNode> = {
 // `path` from ADMIN_ROUTE_ACCESS, so a route missing here is a compile error.
 const SIDEBAR_LABEL_KEYS = {
   dashboard: 'admin.sidebar.dashboard',
-  live: 'admin.sidebar.live',
   programs: 'admin.sidebar.programs',
   topics: 'admin.sidebar.topics',
   activities: 'admin.sidebar.activities',
@@ -65,7 +60,6 @@ const SIDEBAR_LABEL_KEYS = {
   participants: 'admin.sidebar.participants',
   reports: 'admin.sidebar.reports',
   missions: 'admin.sidebar.missions',
-  content: 'admin.sidebar.content',
   frames: 'admin.sidebar.frames',
   tenants: 'admin.sidebar.tenants',
   users: 'admin.sidebar.users',

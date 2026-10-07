@@ -4,7 +4,7 @@
 // `/api/live/:sessionId/groups` (snapshot: groups + progress + timeline),
 // `/api/live/:sessionId/timeline`, facilitator overrides, and
 // `/api/live/events` for publishing timeline events. Live deltas arrive via
-// SSE (see backendClient.openSSE) and are consumed by the monitor pages.
+// SSE (see backendClient.openSSE) and are consumed by the facilitator pages.
 //
 // The returned `SessionGroup` / `GroupStageProgress` / `TimelineEvent` shapes
 // match the backend entity JSON (see backend/internal/domain/entity).

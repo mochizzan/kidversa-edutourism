@@ -23,11 +23,6 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
-// KioskTokenRequest requests a kiosk token for a session.
-type KioskTokenRequest struct {
-	SessionID string `json:"session_id" validate:"required"`
-}
-
 // LoginResponse is returned by login/refresh.
 type LoginResponse struct {
 	AccessToken  string       `json:"access_token"`

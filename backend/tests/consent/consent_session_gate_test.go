@@ -2,6 +2,7 @@ package consent_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -225,5 +226,68 @@ func TestRespondCombined_SessionActive_RecordsConsent(t *testing.T) {
 	}
 	if got := sess.fieldCalls.Load(); got != 1 {
 		t.Fatalf("participant field updates = %d, want 1", got)
+	}
+}
+
+func gateInfo(e *echo.Echo, token string) (*echo.Context, *httptest.ResponseRecorder) {
+	req := httptest.NewRequest(http.MethodGet, "/api/consent/info?token="+token, nil)
+	rec := httptest.NewRecorder()
+	return e.NewContext(req, rec), rec
+}
+
+func decodeInfoStatus(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var payload struct {
+		Data struct {
+			Status string `json:"status"`
+		} `json:"data"`
+		Status string `json:"status"`
+	}
+	raw := rec.Body.String()
+	// appresp.OK wraps in an envelope; accept either the envelope or a bare DTO.
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("Info body is not JSON: %v (%s)", err, raw)
+	}
+	if payload.Data.Status != "" {
+		return payload.Data.Status
+	}
+	return payload.Status
+}
+
+// TestInfo_SessionCancelled_ReturnsCancelled: Info reports "cancelled" for a
+// valid token whose session is CANCELLED (step 14) — the FE locks the form as
+// an archive instead of offering a writable form that RespondCombined would
+// reject with session_not_active.
+func TestInfo_SessionCancelled_ReturnsCancelled(t *testing.T) {
+	p := gateParticipant()
+	repo := &gateConsentRepo{participant: new(p)}
+	sess := &gateSessionRepo{session: gateSession(entity.SessionCancelled)}
+	msg := &gateMessenger{}
+	h, e := gateFixture(repo, sess, msg)
+
+	c, rec := gateInfo(e, "tok")
+	if err := h.Info(c); err != nil {
+		t.Fatalf("Info = %v, want success", err)
+	}
+	if got := decodeInfoStatus(t, rec); got != "cancelled" {
+		t.Fatalf("Info status = %q, want cancelled", got)
+	}
+}
+
+// TestInfo_SessionActive_ReturnsOk pins the unchanged path: an ACTIVE session
+// keeps status "ok" with the session snapshot attached.
+func TestInfo_SessionActive_ReturnsOk(t *testing.T) {
+	p := gateParticipant()
+	repo := &gateConsentRepo{participant: new(p)}
+	sess := &gateSessionRepo{session: gateSession(entity.SessionActive)}
+	msg := &gateMessenger{}
+	h, e := gateFixture(repo, sess, msg)
+
+	c, rec := gateInfo(e, "tok")
+	if err := h.Info(c); err != nil {
+		t.Fatalf("Info = %v, want success", err)
+	}
+	if got := decodeInfoStatus(t, rec); got != "ok" {
+		t.Fatalf("Info status = %q, want ok", got)
 	}
 }

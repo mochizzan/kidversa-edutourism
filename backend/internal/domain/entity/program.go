@@ -23,6 +23,5 @@ type ProgramStage struct {
 	BadgeImageURL string      `json:"badge_image_url,omitempty"`
 }
 
-// NOTE: StageContent (now the JOIN-shaped kiosk/learner projection), MissionBank,
-// and PhotoFrame are defined in content.go. This file keeps Program/ProgramStage
-// only to avoid redeclaration conflicts.
+// NOTE: MissionBank and PhotoFrame are defined in content.go. This file keeps
+// Program/ProgramStage only to avoid redeclaration conflicts.

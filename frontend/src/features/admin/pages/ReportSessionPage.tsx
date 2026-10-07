@@ -238,6 +238,24 @@ const ReportSessionPage = () => {
         }
       />
 
+      {session.status === 'CANCELLED' && (
+        <div
+          className="flex items-start gap-3 rounded-2xl border border-error/40 bg-error-container px-4 py-3"
+          role="alert"
+          data-testid="report-cancelled-banner"
+        >
+          <AlertTriangle className="w-5 h-5 shrink-0 text-error" />
+          <div>
+            <p className="text-sm font-semibold text-on-error-container">
+              {t('admin.reports.cancelledTitle')}
+            </p>
+            <p className="text-sm text-on-error-container/90">
+              {t('admin.reports.cancelledDesc')}
+            </p>
+          </div>
+        </div>
+      )}
+
       {topics.length > 1 && (
         <div className="flex flex-wrap gap-2 no-print">
           {topics.map((t) => (
@@ -286,7 +304,7 @@ const ReportSessionPage = () => {
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={onGenerate}
-          disabled={generateInProgress || topicAllFinalized || topicReports.length === 0}
+          disabled={generateInProgress || topicAllFinalized || topicReports.length === 0 || session.status === 'CANCELLED'}
         >
           {generateInProgress ? (
             <>
@@ -306,7 +324,7 @@ const ReportSessionPage = () => {
         <Button
           variant="secondary"
           onClick={() => setShowConfirmSend(true)}
-          disabled={sendTargetCount === 0 || sendInProgress}
+          disabled={sendTargetCount === 0 || sendInProgress || session.status === 'CANCELLED'}
         >
           {sendInProgress ? (
             activeSend ? (
@@ -464,6 +482,11 @@ const ReportSessionPage = () => {
                           {t(reportStatusLabel[item.report.status])}
                         </Badge>
                       )}
+                      {item.report && session.status === 'CANCELLED' && (
+                        <Badge variant="warning" size="sm" data-testid="report-pre-cancel-label">
+                          {t('admin.reports.preCancelLabel')}
+                        </Badge>
+                      )}
                       {/* Clone provenance (audit: label klona) — badge kecil
                           di daftar rapor per sesi. */}
                       {item.report && (
@@ -572,7 +595,7 @@ const ReportSessionPage = () => {
                           <Button
                             size="sm"
                             variant="primary"
-                            disabled={generateInProgress || item.status !== 'ready_to_generate' || topicAllFinalized}
+                            disabled={generateInProgress || item.status !== 'ready_to_generate' || topicAllFinalized || session.status === 'CANCELLED'}
                             onClick={(e) => {
                               e?.preventDefault()
                               e?.stopPropagation()

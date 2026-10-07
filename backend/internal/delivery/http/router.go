@@ -66,7 +66,7 @@ func NewRouter(d Deps) *echo.Echo {
 	handler.RegisterSessionsRoutes(
 		api.Group("/sessions"),
 		h.Session, h.SessionLifecycle, h.SessionStage, h.SessionGroup, h.SessionParticipant, h.SessionParticipantBulk,
-		d.JWT, d.Revoker, h.Kiosk,
+		d.JWT, d.Revoker,
 		api.Group("/participants"),
 	)
 
@@ -90,10 +90,6 @@ func NewRouter(d Deps) *echo.Echo {
 
 	// Session substages (Live Monitor "Selesaikan Kegiatan" override).
 	handler.RegisterSessionSubstagesRoutes(api.Group("/session-substages"), h.SessionSubstage, d.JWT, d.Revoker)
-
-	// Contents (standalone, single-source). Stage assign/unassign now live
-	// under /api/programs (RegisterProgramsRoutes) alongside stage list/reorder.
-	handler.RegisterContentsRoutes(api.Group(""), h.Content, h.Upload, d.JWT, d.Revoker)
 
 	// File upload + authenticated media.
 	handler.RegisterUploadRoutes(api.Group(""), h.Upload, d.JWT, d.Config, d.Revoker)
