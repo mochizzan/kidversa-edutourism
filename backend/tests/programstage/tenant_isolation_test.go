@@ -86,6 +86,40 @@ func (f *tenantProgramRepo) ListPrograms(_ context.Context, flt repository.Progr
 	return out, nil
 }
 
+// ProgramNameTaken answers handler dedup lookups directly from the fixture
+// programs (case-insensitive, trimmed, tenant-scoped, self-exempt).
+func (f *tenantProgramRepo) ProgramNameTaken(_ context.Context, tenantID, name, excludeID string) (bool, error) {
+	for _, p := range f.programs {
+		if p.ID == excludeID {
+			continue
+		}
+		if tenantID != "" && tenantOf(p) != tenantID {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(p.Name), strings.TrimSpace(name)) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// StageNameTaken answers handler dedup lookups directly from the fixture
+// stages (case-insensitive, trimmed, program-scoped, self-exempt).
+func (f *tenantProgramRepo) StageNameTaken(_ context.Context, programID, name, excludeID string) (bool, error) {
+	for _, s := range f.stages {
+		if s.ID == excludeID {
+			continue
+		}
+		if programID != "" && s.ProgramID != programID {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(s.Name), strings.TrimSpace(name)) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (f *tenantProgramRepo) ListStages(_ context.Context, programID string) ([]entity.ProgramStage, error) {
 	var out []entity.ProgramStage
 	for _, s := range f.stages {

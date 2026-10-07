@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v5"
@@ -50,6 +51,23 @@ func (f *fakeSubstageRepo) CreateSubstage(_ context.Context, s *entity.ProgramSu
 	cp := *s
 	f.subs[subStageID] = &cp
 	return nil
+}
+
+// SubstageNameTaken answers handler dedup lookups directly from the fixture
+// subs (case-insensitive, trimmed, Topik-scoped, self-exempt).
+func (f *fakeSubstageRepo) SubstageNameTaken(_ context.Context, programStageID, name, excludeID string) (bool, error) {
+	for _, s := range f.subs {
+		if s.ID == excludeID {
+			continue
+		}
+		if programStageID != "" && s.ProgramStageID != programStageID {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(s.Name), strings.TrimSpace(name)) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // TestSubstageGet_CrossTenant_Forbidden: GET another tenant's Kegiatan → 403.

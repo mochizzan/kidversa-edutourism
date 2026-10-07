@@ -93,6 +93,23 @@ func (r *GormProgramSubstageRepository) ListPaginatedSubstages(ctx context.Conte
 	return &repository.Paginated[entity.ProgramSubstage]{Items: items, Total: int(total)}, nil
 }
 
+// SubstageNameTaken answers the dedup question with one COUNT over the whole
+// table (no limit window): another live Kegiatan under the Topik already
+// uses the name (case-insensitive, trimmed)? excludeID exempts one row.
+func (r *GormProgramSubstageRepository) SubstageNameTaken(ctx context.Context, programStageID, name, excludeID string) (bool, error) {
+	q := r.db.WithContext(ctx).Model(&ProgramSubstageModel{}).
+		Where("program_stage_id = ?", programStageID).
+		Where("LOWER(TRIM(name)) = LOWER(TRIM(?))", name)
+	if excludeID != "" {
+		q = q.Where("id <> ?", excludeID)
+	}
+	var n int64
+	if err := q.Count(&n).Error; err != nil {
+		return false, apperrors.Internal("internal_error", err)
+	}
+	return n > 0, nil
+}
+
 func (r *GormProgramSubstageRepository) UpdateSubstage(ctx context.Context, s *entity.ProgramSubstage) error {
 	m := programSubstageModelFromEntity(s)
 	if err := r.db.WithContext(ctx).Model(&ProgramSubstageModel{}).Where("id = ?", s.ID).Updates(m).Error; err != nil {

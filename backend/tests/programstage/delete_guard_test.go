@@ -42,6 +42,18 @@ func (f *deleteGuardRepo) ListProgramSessionBriefs(context.Context, string, int)
 	return f.briefs, nil
 }
 
+// CountCompletedSessions answers the force-guard whole-table scan from the
+// fixture briefs so the force-refusal tests keep their meaning.
+func (f *deleteGuardRepo) CountCompletedSessions(context.Context, string) (int64, error) {
+	var n int64
+	for i := range f.briefs {
+		if f.briefs[i].Status == entity.SessionCompleted {
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (f *deleteGuardRepo) DeleteProgram(context.Context, string) error {
 	f.deleted++
 	return nil

@@ -72,40 +72,18 @@ func (h *ProgramHandler) ListProgramStages(c *echo.Context) error {
 	return appresp.OKWithMeta(c, res.Items, &appresp.Meta{Page: page, Limit: limit, Total: res.Total})
 }
 
-// equalFoldTrim compares names case-insensitively after trimming spaces
-// (app-level dedup helper; no schema change).
-func equalFoldTrim(a, b string) bool {
-	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+// stageNameExists reports whether a Topik name is already used in the program
+// (case-insensitive, whole-table COUNT — no limit window). excludeID exempts
+// one row so Update can pass its own id.
+func (h *ProgramHandler) stageNameExists(ctx context.Context, programID, name, excludeID string) (bool, error) {
+	return h.repo.StageNameTaken(ctx, programID, name, excludeID)
 }
 
-// stageNameExists reports whether a Topik name already exists in the program
-// (case-insensitive app-level dedup; no schema change).
-func (h *ProgramHandler) stageNameExists(ctx context.Context, programID, name string) (bool, error) {
-	res, err := h.repo.ListPaginatedStages(ctx, repository.StageFilter{ProgramID: programID}, 1, 100)
-	if err != nil {
-		return false, err
-	}
-	for i := range res.Items {
-		if equalFoldTrim(res.Items[i].Name, name) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// programNameExists reports whether a program name already exists in the
-// caller's tenant (case-insensitive app-level dedup; no schema change).
-func (h *ProgramHandler) programNameExists(ctx context.Context, tenantID, name string) (bool, error) {
-	res, err := h.repo.ListPrograms(ctx, repository.ProgramFilter{TenantID: tenantID}, 1, 100)
-	if err != nil {
-		return false, err
-	}
-	for i := range res.Items {
-		if equalFoldTrim(res.Items[i].Name, name) {
-			return true, nil
-		}
-	}
-	return false, nil
+// programNameExists reports whether a program name is already used in the
+// caller's tenant (case-insensitive, whole-table COUNT — no limit window).
+// excludeID exempts one row so Update can pass its own id.
+func (h *ProgramHandler) programNameExists(ctx context.Context, tenantID, name, excludeID string) (bool, error) {
+	return h.repo.ProgramNameTaken(ctx, tenantID, name, excludeID)
 }
 
 // CreateStage handles POST /api/programs/:id/stages.
@@ -123,7 +101,10 @@ func (h *ProgramHandler) CreateStage(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
-	if duplicate, derr := h.stageNameExists(ctx, programID, req.Name); derr != nil {
+	// Serialize check-then-write (single-process scope; see mu).
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if duplicate, derr := h.stageNameExists(ctx, programID, req.Name, ""); derr != nil {
 		return derr
 	} else if duplicate {
 		return appresp.Fail(c, http.StatusConflict, "conflict")
@@ -157,7 +138,16 @@ func (h *ProgramHandler) UpdateStage(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	// Serialize check-then-write (single-process scope; see mu).
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	if req.Name != "" {
+		duplicate, derr := h.stageNameExists(ctx, s.ProgramID, req.Name, stageID)
+		if derr != nil {
+			return derr
+		} else if duplicate {
+			return appresp.Fail(c, http.StatusConflict, "conflict")
+		}
 		s.Name = req.Name
 	}
 	if req.Description != "" {

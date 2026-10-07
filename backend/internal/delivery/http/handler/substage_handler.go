@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/labstack/echo/v5"
 
@@ -19,6 +20,9 @@ import (
 type ProgramSubstageHandler struct {
 	repo     repository.ProgramSubstageRepository
 	programs repository.ProgramRepository
+	// mu serializes the check-then-write dedup sections of Create/Update.
+	// Same single-process scope as ProgramHandler.mu (see program_handler.go).
+	mu sync.Mutex
 }
 
 // NewProgramSubstageHandler builds the program-substage handler. programs
@@ -52,11 +56,16 @@ func (h *ProgramSubstageHandler) Create(c *echo.Context) error {
 		if _, err := loadProgramAndCheckTenant(ctx, h.programs, stage.ProgramID, caller); err != nil {
 			return err
 		}
-		if duplicate, derr := h.substageNameExists(ctx, req.ProgramStageID, req.Name); derr != nil {
-			return derr
-		} else if duplicate {
-			return appresp.Fail(c, http.StatusConflict, "conflict")
-		}
+	}
+	// Dedup check-then-write serialized (single-process scope; see mu).
+	// Outside the programs!=nil gate on purpose: name uniqueness must not
+	// depend on whether the tenant resolver is wired.
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if duplicate, derr := h.substageNameExists(ctx, req.ProgramStageID, req.Name, ""); derr != nil {
+		return derr
+	} else if duplicate {
+		return appresp.Fail(c, http.StatusConflict, "conflict")
 	}
 	s := &entity.ProgramSubstage{
 		ProgramStageID: req.ProgramStageID,
@@ -154,6 +163,9 @@ func (h *ProgramSubstageHandler) Update(c *echo.Context) error {
 	if err := bindAndValidate(c, &req); err != nil {
 		return err
 	}
+	// Serialize check-then-write (single-process scope; see mu).
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	if h.programs != nil && req.ProgramStageID != "" && req.ProgramStageID != s.ProgramStageID {
 		stage, err := h.programs.GetStageByID(ctx, req.ProgramStageID)
 		if err != nil {
@@ -163,6 +175,18 @@ func (h *ProgramSubstageHandler) Update(c *echo.Context) error {
 			return err
 		}
 		s.ProgramStageID = req.ProgramStageID
+	}
+	// Dedup rename (whole-table COUNT): the check runs against the target
+	// Topik (after a possible move above), exempting this row itself.
+	// A no-change name skips the query; otherwise the new name is checked.
+	// Covered by the function-level mu above (check-then-write serialized).
+	if req.Name != "" && req.Name != s.Name {
+		duplicate, derr := h.substageNameExists(ctx, s.ProgramStageID, req.Name, id)
+		if derr != nil {
+			return derr
+		} else if duplicate {
+			return appresp.Fail(c, http.StatusConflict, "conflict")
+		}
 	}
 	s.SequenceOrder = req.SequenceOrder
 	s.Name = req.Name
@@ -216,19 +240,11 @@ func (h *ProgramSubstageHandler) Delete(c *echo.Context) error {
 	return appresp.NoContent(c)
 }
 
-// substageNameExists reports whether a Kegiatan name already exists under the
-// Topik (case-insensitive app-level dedup; no schema change).
-func (h *ProgramSubstageHandler) substageNameExists(ctx context.Context, programStageID, name string) (bool, error) {
-	res, err := h.repo.ListPaginatedSubstages(ctx, repository.SubstageFilter{ProgramStageID: programStageID}, 1, 100)
-	if err != nil {
-		return false, err
-	}
-	for i := range res.Items {
-		if equalFoldTrim(res.Items[i].Name, name) {
-			return true, nil
-		}
-	}
-	return false, nil
+// substageNameExists reports whether a Kegiatan name is already used under the
+// Topik (case-insensitive, whole-table COUNT — no limit window). excludeID
+// exempts one row so Update can pass its own id.
+func (h *ProgramSubstageHandler) substageNameExists(ctx context.Context, programStageID, name, excludeID string) (bool, error) {
+	return h.repo.SubstageNameTaken(ctx, programStageID, name, excludeID)
 }
 
 // BadgeHandler serves /api/badges/* (read participant badges).

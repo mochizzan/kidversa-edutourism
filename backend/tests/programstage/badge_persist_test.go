@@ -71,6 +71,28 @@ func (f *fakeProgramRepo) GetProgramByID(context.Context, string) (*entity.Progr
 func (f *fakeProgramRepo) ListPrograms(context.Context, repository.ProgramFilter, int, int) (*repository.Paginated[entity.Program], error) {
 	return &repository.Paginated[entity.Program]{}, nil
 }
+
+// ProgramNameTaken answers dedup lookups for Update-path tests; the shared
+// fixture owns no program rows, so only an explicit override reports taken.
+func (f *fakeProgramRepo) ProgramNameTaken(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
+
+// StageNameTaken answers dedup lookups against the preloaded stage: a rename
+// collides only when another stage of the same program already uses the name.
+func (f *fakeProgramRepo) StageNameTaken(_ context.Context, programID, name, excludeID string) (bool, error) {
+	if f.loaded.ID != "" && f.loaded.ProgramID == programID && f.loaded.ID != excludeID &&
+		strings.EqualFold(strings.TrimSpace(f.loaded.Name), strings.TrimSpace(name)) {
+		return true, nil
+	}
+	return false, nil
+}
+
+// CountCompletedSessions answers the force-guard for Update-path tests: the
+// shared fixture owns no sessions.
+func (f *fakeProgramRepo) CountCompletedSessions(context.Context, string) (int64, error) {
+	return 0, nil
+}
 func (f *fakeProgramRepo) UpdateProgram(context.Context, *entity.Program) error {
 	panic("unexpected UpdateProgram")
 }

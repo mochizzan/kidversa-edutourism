@@ -27,6 +27,12 @@ type ProgramRepository interface {
 	CreateProgram(ctx context.Context, p *entity.Program) error
 	GetProgramByID(ctx context.Context, id string) (*entity.Program, error)
 	ListPrograms(ctx context.Context, f ProgramFilter, page, limit int) (*Paginated[entity.Program], error)
+	// ProgramNameTaken answers a whole-table existence question directly in
+	// the database (case-insensitive, trimmed): is name already used by
+	// another program of the tenant? excludeID exempts one row (the Update
+	// path passes its own id so a no-rename update is never a "duplicate").
+	// No schema change — a plain COUNT query over existing columns.
+	ProgramNameTaken(ctx context.Context, tenantID, name, excludeID string) (bool, error)
 	UpdateProgram(ctx context.Context, p *entity.Program) error
 	DeleteProgram(ctx context.Context, id string) error
 	// CountProgramSessions returns how many live sessions (all lifecycle
@@ -42,11 +48,21 @@ type ProgramRepository interface {
 	// sessions and their children in one transaction — the ?force=true path of
 	// DELETE /api/programs/:id.
 	DeleteProgramForce(ctx context.Context, programID string) error
+	// CountCompletedSessions returns how many live COMPLETED sessions the
+	// program owns, scanned over the whole table (no limit window) — the
+	// guard behind the ?force=true refusal (409
+	// program_has_completed_sessions). A plain COUNT query, no schema change.
+	CountCompletedSessions(ctx context.Context, programID string) (int64, error)
 	ToggleActiveProgram(ctx context.Context, id string) (*entity.Program, error)
 
 	CreateStage(ctx context.Context, s *entity.ProgramStage) error
 	GetStageByID(ctx context.Context, id string) (*entity.ProgramStage, error)
 	ListStages(ctx context.Context, programID string) ([]entity.ProgramStage, error)
+	// StageNameTaken answers a whole-table existence question directly in
+	// the database (case-insensitive, trimmed): is name already used by
+	// another Topik of the program? excludeID exempts one row (the Update
+	// path passes its own id). No schema change.
+	StageNameTaken(ctx context.Context, programID, name, excludeID string) (bool, error)
 	ListPaginatedStages(ctx context.Context, filter StageFilter, page, limit int) (*Paginated[entity.ProgramStage], error)
 	UpdateStage(ctx context.Context, s *entity.ProgramStage) error
 	DeleteStage(ctx context.Context, id string) error

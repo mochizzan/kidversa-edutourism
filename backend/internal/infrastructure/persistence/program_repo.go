@@ -77,6 +77,28 @@ func (r *GormProgramRepository) ListPrograms(ctx context.Context, f repository.P
 	return &repository.Paginated[entity.Program]{Items: items, Total: int(total)}, nil
 }
 
+// ProgramNameTaken answers the dedup question with one COUNT over the whole
+// table (no limit window): another live program of the tenant already uses
+// the name (case-insensitive, trimmed)? excludeID exempts one row.
+// GORM's default scope excludes soft-deleted rows from the count.
+func (r *GormProgramRepository) ProgramNameTaken(ctx context.Context, tenantID, name, excludeID string) (bool, error) {
+	q := r.db.WithContext(ctx).Model(&ProgramModel{}).
+		Where("LOWER(TRIM(name)) = LOWER(TRIM(?))", name)
+	if tenantID != "" {
+		q = q.Where("tenant_id = ?", tenantID)
+	} else {
+		q = q.Where("tenant_id IS NULL")
+	}
+	if excludeID != "" {
+		q = q.Where("id <> ?", excludeID)
+	}
+	var n int64
+	if err := q.Count(&n).Error; err != nil {
+		return false, apperrors.Internal("internal_error", err)
+	}
+	return n > 0, nil
+}
+
 func (r *GormProgramRepository) UpdateProgram(ctx context.Context, p *entity.Program) error {
 	// Map-form update so zero/false/empty values are NOT skipped by GORM
 	// (struct mode drops zero-values, breaking is_active=false and clearing
@@ -129,6 +151,21 @@ func (r *GormProgramRepository) ListProgramSessionBriefs(ctx context.Context, pr
 		items = append(items, *models[i].ToEntity())
 	}
 	return items, nil
+}
+
+// CountCompletedSessions counts live COMPLETED sessions of the program over
+// the whole table (no limit window): the force-delete guard must see every
+// session because DeleteProgramForce purges every session. A COMPLETED row
+// outside a LIMIT window must never slip through.
+func (r *GormProgramRepository) CountCompletedSessions(ctx context.Context, programID string) (int64, error) {
+	var n int64
+	if err := r.db.WithContext(ctx).Model(&SessionModel{}).
+		Where("program_id = ?", programID).
+		Where("status = ?", string(entity.SessionCompleted)).
+		Count(&n).Error; err != nil {
+		return 0, apperrors.Internal("internal_error", err)
+	}
+	return n, nil
 }
 
 func (r *GormProgramRepository) DeleteProgramForce(ctx context.Context, id string) error {
@@ -236,6 +273,23 @@ func (r *GormProgramRepository) ListPaginatedStages(ctx context.Context, filter 
 		items = append(items, *models[i].ToEntity())
 	}
 	return &repository.Paginated[entity.ProgramStage]{Items: items, Total: int(total)}, nil
+}
+
+// StageNameTaken answers the dedup question with one COUNT over the whole
+// table (no limit window): another live Topik of the program already uses
+// the name (case-insensitive, trimmed)? excludeID exempts one row.
+func (r *GormProgramRepository) StageNameTaken(ctx context.Context, programID, name, excludeID string) (bool, error) {
+	q := r.db.WithContext(ctx).Model(&ProgramStageModel{}).
+		Where("program_id = ?", programID).
+		Where("LOWER(TRIM(name)) = LOWER(TRIM(?))", name)
+	if excludeID != "" {
+		q = q.Where("id <> ?", excludeID)
+	}
+	var n int64
+	if err := q.Count(&n).Error; err != nil {
+		return false, apperrors.Internal("internal_error", err)
+	}
+	return n > 0, nil
 }
 
 func (r *GormProgramRepository) UpdateStage(ctx context.Context, s *entity.ProgramStage) error {

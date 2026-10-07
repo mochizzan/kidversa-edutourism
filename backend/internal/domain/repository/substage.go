@@ -23,6 +23,11 @@ type ProgramSubstageRepository interface {
 	CreateSubstage(ctx context.Context, s *entity.ProgramSubstage) error
 	GetSubstageByID(ctx context.Context, id string) (*entity.ProgramSubstage, error)
 	ListSubstages(ctx context.Context, programStageID string) ([]entity.ProgramSubstage, error)
+	// SubstageNameTaken answers a whole-table existence question directly in
+	// the database (case-insensitive, trimmed): is name already used by
+	// another Kegiatan under the Topik? excludeID exempts one row (the
+	// Update path passes its own id). No schema change.
+	SubstageNameTaken(ctx context.Context, programStageID, name, excludeID string) (bool, error)
 	ListPaginatedSubstages(ctx context.Context, filter SubstageFilter, page, limit int) (*Paginated[entity.ProgramSubstage], error)
 	UpdateSubstage(ctx context.Context, s *entity.ProgramSubstage) error
 	DeleteSubstage(ctx context.Context, id string) error

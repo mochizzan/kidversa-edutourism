@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/labstack/echo/v5"
 
@@ -19,6 +20,11 @@ import (
 type ProgramHandler struct {
 	repo         repository.ProgramRepository
 	substageRepo repository.ProgramSubstageRepository
+	// mu serializes the check-then-write dedup sections of Create/Update
+	// (program + stage). It closes the concurrent-duplicate race within one
+	// server process; multi-replica deployments would need a DB UNIQUE
+	// constraint (rejected by the no-schema decision).
+	mu sync.Mutex
 }
 
 // NewProgramHandler builds the program handler.
@@ -82,7 +88,9 @@ func (h *ProgramHandler) Create(c *echo.Context) error {
 		tp = &tenantID
 	}
 	name := derefString(req.Name)
-	if duplicate, derr := h.programNameExists((*c).Request().Context(), tenantID, name); derr != nil {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if duplicate, derr := h.programNameExists((*c).Request().Context(), tenantID, name, ""); derr != nil {
 		return derr
 	} else if duplicate {
 		return appresp.Fail(c, http.StatusConflict, "conflict")
@@ -136,9 +144,19 @@ func (h *ProgramHandler) Update(c *echo.Context) error {
 	if err := bindAndValidateStrict(c, &req); err != nil {
 		return err
 	}
+	// Serialize check-then-write so two concurrent renames to the same name
+	// cannot both pass the dedup check (single-process scope; see mu).
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	if req.Name != nil {
 		if strings.TrimSpace(*req.Name) == "" {
 			return appresp.Fail(c, http.StatusBadRequest, "validation_error")
+		}
+		duplicate, derr := h.programNameExists((*c).Request().Context(), appmiddleware.GetTenantID(c), *req.Name, id)
+		if derr != nil {
+			return derr
+		} else if duplicate {
+			return appresp.Fail(c, http.StatusConflict, "conflict")
 		}
 		p.Name = *req.Name
 	}

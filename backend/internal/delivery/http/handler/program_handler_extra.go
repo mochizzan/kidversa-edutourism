@@ -62,21 +62,31 @@ func (h *ProgramHandler) Delete(c *echo.Context) error {
 	if (*c).QueryParam("force") == "true" {
 		// Hardening (Tahap 2 step 9): force-delete is refused with 409 when
 		// the program owns COMPLETED sessions — those rows are the audit
-		// archive (scores, badges, reports) and must not be purged.
-		briefs, err := h.repo.ListProgramSessionBriefs(ctx, id, 100)
+		// archive (scores, badges, reports) and must not be purged. The
+		// count scans the whole table (no limit window): the purge below
+		// deletes every session, so the guard must see every session. The
+		// short session list only names a few rows for the message.
+		completedCount, err := h.repo.CountCompletedSessions(ctx, id)
 		if err != nil {
 			return err
 		}
-		var completed []string
-		for i := range briefs {
-			if briefs[i].Status == entity.SessionCompleted {
-				completed = append(completed, fmt.Sprintf("%s (%s)", briefs[i].ID, briefs[i].Name))
+		if completedCount > 0 {
+			briefs, err := h.repo.ListProgramSessionBriefs(ctx, id, 100)
+			if err != nil {
+				return err
 			}
-		}
-		if len(completed) > 0 {
-			log.Printf("program: force-delete refused for %s: %d COMPLETED session(s): %s", id, len(completed), strings.Join(completed, ", "))
+			var completed []string
+			for i := range briefs {
+				if briefs[i].Status == entity.SessionCompleted {
+					completed = append(completed, fmt.Sprintf("%s (%s)", briefs[i].ID, briefs[i].Name))
+				}
+			}
+			if extra := completedCount - int64(len(completed)); extra > 0 {
+				completed = append(completed, fmt.Sprintf("…+%d lagi", extra))
+			}
+			log.Printf("program: force-delete refused for %s: %d COMPLETED session(s): %s", id, completedCount, strings.Join(completed, ", "))
 			msg := fmt.Sprintf("%s (%d sesi COMPLETED: %s).",
-				appresp.MessageForCode("program_has_completed_sessions"), len(completed), strings.Join(completed, ", "))
+				appresp.MessageForCode("program_has_completed_sessions"), completedCount, strings.Join(completed, ", "))
 			return appresp.FailMsg(c, http.StatusConflict, "program_has_completed_sessions", msg)
 		}
 		if err := h.repo.DeleteProgramForce(ctx, id); err != nil {
